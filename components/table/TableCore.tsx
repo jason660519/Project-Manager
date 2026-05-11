@@ -2,15 +2,15 @@
 
 import React, { useMemo } from 'react';
 import {
-  useReactTable,
-  getCoreRowModel,
-  flexRender,
   createColumnHelper,
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
 } from '@tanstack/react-table';
-import { Bot, ExternalLink } from 'lucide-react';
-import { Feature, FeatureStatus } from '../../lib/types';
+import { Bot } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { Feature, FeatureStatus } from '../../lib/types';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -19,73 +19,78 @@ function cn(...inputs: ClassValue[]) {
 interface TableCoreProps {
   data: Feature[];
   onDispatch: (feature: Feature) => void;
-  onOpenFile: (feature: Feature, type: keyof Feature['paths']) => void;
+  onRowClick: (feature: Feature) => void;
 }
+
+const STATUS_LABELS: Record<FeatureStatus, string> = {
+  todo: 'To Do',
+  in_progress: 'In Progress',
+  done: 'Done',
+  on_hold: 'Blocked',
+};
 
 const columnHelper = createColumnHelper<Feature>();
 
-export function TableCore({ data, onDispatch, onOpenFile }: TableCoreProps) {
-  const columns = useMemo(() => [
-    columnHelper.accessor('id', {
-      header: 'ID',
-      cell: info => <span className="font-mono text-xs">{info.getValue()}</span>,
-      size: 60,
-    }),
-    columnHelper.accessor('category', {
-      header: '分類',
-      cell: info => (
-        <span className="border border-amber-200/20 bg-amber-100/10 px-2 py-1 text-xs text-amber-100/90">
-          {info.getValue()}
-        </span>
-      ),
-    }),
-    columnHelper.accessor('name', {
-      header: '功能名稱',
-      cell: info => <span className="font-medium text-stone-100">{info.getValue()}</span>,
-    }),
-    columnHelper.accessor('status', {
-      header: '狀態',
-      cell: info => <StatusBadge status={info.getValue()} />,
-    }),
-    columnHelper.accessor('progress', {
-      header: '進度',
-      cell: info => (
-        <div className="flex items-center gap-2">
-          <div className="h-2 w-28 bg-stone-200/15">
-            <div 
-              className="h-2 bg-emerald-400" 
-              style={{ width: `${Math.min(100, Math.max(0, info.getValue()))}%` }}
-            />
+export function TableCore({ data, onDispatch, onRowClick }: TableCoreProps) {
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor('id', {
+        header: 'ID',
+        cell: (info) => <span className="font-mono text-xs">{info.getValue()}</span>,
+        size: 60,
+      }),
+      columnHelper.accessor('category', {
+        header: 'Category',
+        cell: (info) => (
+          <span className="border border-amber-200/20 bg-amber-100/10 px-2 py-1 text-xs text-amber-100/90">
+            {info.getValue()}
+          </span>
+        ),
+      }),
+      columnHelper.accessor('name', {
+        header: 'Name',
+        cell: (info) => <span className="font-medium text-stone-100">{info.getValue()}</span>,
+      }),
+      columnHelper.accessor('status', {
+        header: 'Status',
+        cell: (info) => <StatusBadge status={info.getValue()} />,
+      }),
+      columnHelper.accessor('progress', {
+        header: 'Progress',
+        cell: (info) => (
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-24 bg-stone-200/15">
+              <div
+                className="h-2 bg-emerald-400"
+                style={{ width: `${Math.min(100, Math.max(0, info.getValue()))}%` }}
+              />
+            </div>
+            <span className="w-9 text-right font-mono text-xs text-stone-400">
+              {info.getValue()}%
+            </span>
           </div>
-          <span className="w-9 text-right font-mono text-xs text-stone-400">{info.getValue()}%</span>
-        </div>
-      ),
-    }),
-    columnHelper.display({
-      id: 'actions',
-      header: '操作',
-      cell: info => (
-        <div className="flex gap-2">
-          <button 
-            onClick={() => onDispatch(info.row.original)}
-            className="inline-flex h-8 items-center gap-1.5 border border-emerald-200/25 bg-emerald-100/10 px-2.5 text-xs font-medium text-emerald-100 hover:bg-emerald-100/18"
-            title="派遣到 Agent"
+        ),
+      }),
+      columnHelper.display({
+        id: 'actions',
+        header: '',
+        cell: (info) => (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDispatch(info.row.original);
+            }}
+            className="inline-flex h-7 items-center gap-1.5 border border-emerald-200/25 bg-emerald-100/10 px-2.5 text-xs font-medium text-emerald-100 hover:bg-emerald-100/18"
+            title="Dispatch to Agent"
           >
-            <Bot size={14} />
-            派遣
+            <Bot size={13} />
+            Dispatch
           </button>
-          <button 
-            onClick={() => onOpenFile(info.row.original, 'implementation')}
-            className="inline-flex h-8 items-center gap-1.5 border border-stone-200/20 px-2.5 text-xs font-medium text-stone-200 hover:bg-white/5"
-            title="開啟實作路徑"
-          >
-            <ExternalLink size={14} />
-            開啟
-          </button>
-        </div>
-      ),
-    }),
-  ], [onDispatch, onOpenFile]);
+        ),
+      }),
+    ],
+    [onDispatch],
+  );
 
   const table = useReactTable({
     data,
@@ -97,10 +102,13 @@ export function TableCore({ data, onDispatch, onOpenFile }: TableCoreProps) {
     <div className="overflow-x-auto bg-transparent">
       <table className="w-full border-collapse text-left">
         <thead className="border-b border-stone-200/12 bg-white/[0.035]">
-          {table.getHeaderGroups().map(headerGroup => (
+          {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
-              {headerGroup.headers.map(header => (
-                <th key={header.id} className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">
+              {headerGroup.headers.map((header) => (
+                <th
+                  key={header.id}
+                  className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400"
+                >
                   {flexRender(header.column.columnDef.header, header.getContext())}
                 </th>
               ))}
@@ -108,15 +116,26 @@ export function TableCore({ data, onDispatch, onOpenFile }: TableCoreProps) {
           ))}
         </thead>
         <tbody>
-          {table.getRowModel().rows.map(row => (
-            <tr key={row.id} className="border-b border-stone-200/10 transition-colors hover:bg-white/[0.045]">
-              {row.getVisibleCells().map(cell => (
+          {table.getRowModel().rows.map((row) => (
+            <tr
+              key={row.id}
+              onClick={() => onRowClick(row.original)}
+              className="cursor-pointer border-b border-stone-200/10 transition-colors hover:bg-white/[0.045]"
+            >
+              {row.getVisibleCells().map((cell) => (
                 <td key={cell.id} className="px-4 py-3 text-sm text-stone-300">
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </td>
               ))}
             </tr>
           ))}
+          {data.length === 0 && (
+            <tr>
+              <td colSpan={6} className="px-4 py-8 text-center text-xs text-stone-500">
+                No features match the current filter.
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
@@ -124,7 +143,7 @@ export function TableCore({ data, onDispatch, onOpenFile }: TableCoreProps) {
 }
 
 function StatusBadge({ status }: { status: FeatureStatus }) {
-  const styles = {
+  const styles: Record<FeatureStatus, string> = {
     todo: 'border-stone-300/20 bg-stone-200/10 text-stone-200',
     in_progress: 'border-cyan-200/20 bg-cyan-100/10 text-cyan-100',
     done: 'border-emerald-200/20 bg-emerald-100/10 text-emerald-100',
@@ -132,7 +151,7 @@ function StatusBadge({ status }: { status: FeatureStatus }) {
   };
   return (
     <span className={cn('border px-2 py-0.5 text-xs font-medium', styles[status])}>
-      {status}
+      {STATUS_LABELS[status]}
     </span>
   );
 }

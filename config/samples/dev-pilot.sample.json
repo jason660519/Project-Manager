@@ -30,6 +30,49 @@
         "spec": "docs/features/032-contract-gen.md",
         "tdd": "apps/superadmin/unit_test/032/README.md"
       }
+    },
+    {
+      "id": "033",
+      "name": "報表匯出功能",
+      "category": "Backend/Export",
+      "status": "on_hold",
+      "progress": 20,
+      "paths": {
+        "spec": "docs/features/033-report-export.md"
+      },
+      "notes": "等待後端 API 確認欄位格式，PM 尚未回覆"
+    },
+    {
+      "id": "034",
+      "name": "通知推播整合",
+      "category": "Backend/Notification",
+      "status": "in_progress",
+      "progress": 70,
+      "paths": {
+        "spec": "docs/features/034-push-notification.md",
+        "implementation": "apps/superadmin/app/api/notifications/"
+      }
+    },
+    {
+      "id": "035",
+      "name": "房源照片管理",
+      "category": "Frontend/Media",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "spec": "docs/features/035-photo-management.md",
+        "implementation": "apps/superadmin/app/superadmin/properties/photos/"
+      }
+    },
+    {
+      "id": "036",
+      "name": "帳單自動生成",
+      "category": "Backend/Finance",
+      "status": "todo",
+      "progress": 0,
+      "paths": {
+        "spec": "docs/features/036-auto-billing.md"
+      }
     }
   ],
   "adapters": {

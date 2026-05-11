@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "DevPilot",
+    "root": "/Volumes/KLEVV-4T-1/Dev-Pilot",
+    "defaultIDE": "Cursor"
+  },
+  "features": [
+    {
+      "id": "F01",
+      "name": "Sidebar Navigation",
+      "category": "Frontend/UI",
+      "status": "done",
+      "progress": 100,
+      "paths": { "implementation": "app/ui/Sidebar.tsx" }
+    },
+    {
+      "id": "F02",
+      "name": "Feature Filter Tabs",
+      "category": "Frontend/UX",
+      "status": "in_progress",
+      "progress": 65,
+      "paths": { "implementation": "app/ui/DashboardClient.tsx" }
+    },
+    {
+      "id": "F03",
+      "name": "Live Run Inspector",
+      "category": "Frontend/Monitor",
+      "status": "in_progress",
+      "progress": 30,
+      "paths": { "implementation": "app/ui/views/RunsView.tsx" }
+    },
+    {
+      "id": "F04",
+      "name": "Add Project by GitHub URL",
+      "category": "Core/Integration",
+      "status": "on_hold",
+      "progress": 10,
+      "paths": { "spec": "docs/01-user-scenarios.md" },
+      "notes": "需要 GitHub token 設定與 Rust bridge 整合"
+    },
+    {
+      "id": "F05",
+      "name": "Spec Ingestion Pipeline",
+      "category": "Core/AI",
+      "status": "todo",
+      "progress": 0,
+      "paths": { "spec": "docs/02-prd.md" }
+    }
+  ],
+  "adapters": {
+    "ides": [
+      { "id": "Cursor", "name": "Cursor", "type": "ide", "command": "cursor" },
+      { "id": "VSCode", "name": "Visual Studio Code", "type": "ide", "command": "code" }
+    ],
+    "agents": [
+      {
+        "id": "claude-code",
+        "name": "Claude Code",
+        "type": "agent",
+        "command": "claude",
+        "argsTemplate": ["--cwd", "{root}", "{prompt}"]
+      }
+    ]
+  }
+}

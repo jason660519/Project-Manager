@@ -79,6 +79,40 @@ export interface DevPilotConfig {
   adapters: AdapterConfig;
 }
 
+// ── App navigation & run-store types ─────────────────────────────────────────
+
+export type ViewId = 'dashboard' | 'features' | 'runs' | 'projects' | 'ingestion' | 'settings';
+
+export interface ActiveRun {
+  pid: number;
+  featureId: string;
+  featureName: string;
+  command: string;
+  args: string[];
+  startedAt: number;
+  logs: string[];
+  phase: 'running' | 'done' | 'error';
+}
+
+export interface CompletedRun {
+  pid: number;
+  featureId: string;
+  featureName: string;
+  command: string;
+  args: string[];
+  startedAt: number;
+  completedAt: number;
+  exitCode: number;
+  success: boolean;
+  logs: string[];
+}
+
+export interface ProjectEntry {
+  id: string;
+  config: DevPilotConfig;
+  configPath: string;
+}
+
 // ── AI API types ──────────────────────────────────────────────────────────────
 
 export interface AnthropicMessage {

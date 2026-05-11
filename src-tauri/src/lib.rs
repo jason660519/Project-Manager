@@ -197,6 +197,224 @@ async fn kill_process(pid: u32) -> Result<(), String> {
     Ok(())
 }
 
+// ── File watch ────────────────────────────────────────────────────────────────
+
+#[derive(Serialize, Clone)]
+struct ConfigChangedEvent {
+    path: String,
+    config: serde_json::Value,
+}
+
+/// Poll a `.dev-pilot.json` for changes every 2 s; emit `config-changed` with
+/// the new parsed config whenever the file modification time advances.
+#[tauri::command]
+async fn watch_config(app: AppHandle, path: String) -> Result<(), String> {
+    let path_clone = path.clone();
+    tokio::spawn(async move {
+        let file = std::path::Path::new(&path_clone);
+        let mut last_modified = tokio::fs::metadata(file)
+            .await
+            .and_then(|m| m.modified())
+            .ok();
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(2));
+        loop {
+            interval.tick().await;
+            let current = tokio::fs::metadata(file)
+                .await
+                .and_then(|m| m.modified())
+                .ok();
+            if current != last_modified {
+                last_modified = current;
+                if let Ok(text) = tokio::fs::read_to_string(file).await {
+                    if let Ok(config) = serde_json::from_str::<serde_json::Value>(&text) {
+                        let _ = app.emit(
+                            "config-changed",
+                            ConfigChangedEvent { path: path_clone.clone(), config },
+                        );
+                    }
+                }
+            }
+        }
+    });
+    Ok(())
+}
+
+// ── GitHub integration ────────────────────────────────────────────────────────
+
+#[derive(Serialize, Clone)]
+struct GitHubFeature {
+    id: String,
+    name: String,
+    category: String,
+    status: String,
+    progress: u32,
+    #[serde(rename = "daysIdle")]
+    days_idle: Option<u64>,
+    notes: Option<String>,
+}
+
+/// Convert an ISO 8601 date prefix ("YYYY-MM-DD…") to days since Unix epoch.
+fn parse_iso_days(s: &str) -> Option<u64> {
+    let b = s.as_bytes();
+    if b.len() < 10 {
+        return None;
+    }
+    let parse_num = |sl: &[u8]| -> Option<i64> {
+        std::str::from_utf8(sl).ok()?.parse().ok()
+    };
+    let (y, m, d) = (parse_num(&b[0..4])?, parse_num(&b[5..7])?, parse_num(&b[8..10])?);
+    // Howard Hinnant civil-from-days algorithm (inverse)
+    let y2 = if m <= 2 { y - 1 } else { y };
+    let era = y2.div_euclid(400);
+    let yoe = y2 - era * 400;
+    let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    u64::try_from(era * 146097 + doe - 719_468).ok()
+}
+
+fn extract_labels(nodes: &serde_json::Value) -> Vec<String> {
+    nodes
+        .as_array()
+        .map(|arr| arr.iter().filter_map(|n| n["name"].as_str().map(String::from)).collect())
+        .unwrap_or_default()
+}
+
+/// Fetch open PRs and issues from a GitHub repo via GraphQL and map them to
+/// DevPilot feature cards.  PRs idle ≥ 5 days are flagged in `notes`; issues
+/// and PRs labelled blocked/hold/stuck become `on_hold`.
+#[tauri::command]
+async fn fetch_github_repo(token: String, repo_url: String) -> Result<Vec<GitHubFeature>, String> {
+    let parts: Vec<&str> = repo_url.trim_end_matches('/').split('/').collect();
+    if parts.len() < 2 {
+        return Err("Invalid GitHub URL — expected https://github.com/owner/repo".to_string());
+    }
+    let owner = parts[parts.len() - 2];
+    let repo = parts[parts.len() - 1];
+
+    let body = serde_json::json!({
+        "query": "query($owner:String!,$repo:String!){ repository(owner:$owner,name:$repo){ pullRequests(states:[OPEN],first:20,orderBy:{field:UPDATED_AT,direction:ASC}){ nodes{ number title updatedAt isDraft labels(first:5){ nodes{ name } } } } issues(states:[OPEN],first:30){ nodes{ number title labels(first:5){ nodes{ name } } } } } }",
+        "variables": { "owner": owner, "repo": repo }
+    });
+
+    let client = reqwest::Client::new();
+    let res = client
+        .post("https://api.github.com/graphql")
+        .header("Authorization", format!("Bearer {token}"))
+        .header("User-Agent", "DevPilot/0.1.0")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {e}"))?;
+
+    if !res.status().is_success() {
+        let status = res.status();
+        let text = res.text().await.unwrap_or_default();
+        return Err(format!("GitHub API {status}: {text}"));
+    }
+
+    let data: serde_json::Value = res.json().await.map_err(|e| format!("JSON parse: {e}"))?;
+
+    if let Some(errors) = data["errors"].as_array() {
+        let msg: Vec<&str> = errors.iter().filter_map(|e| e["message"].as_str()).collect();
+        return Err(format!("GitHub GraphQL: {}", msg.join(", ")));
+    }
+
+    let now_days = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() / 86400)
+        .unwrap_or(0);
+
+    let is_blocked = |labels: &[String]| {
+        labels.iter().any(|l| {
+            let l = l.to_lowercase();
+            l.contains("block") || l.contains("hold") || l.contains("stuck")
+        })
+    };
+    let is_wip = |labels: &[String]| {
+        labels.iter().any(|l| {
+            let l = l.to_lowercase();
+            l.contains("wip") || l.contains("in progress") || l.contains("in-progress")
+        })
+    };
+
+    let mut features: Vec<GitHubFeature> = Vec::new();
+
+    // ── PRs ──
+    if let Some(prs) = data["data"]["repository"]["pullRequests"]["nodes"].as_array() {
+        for pr in prs {
+            let number = pr["number"].as_u64().unwrap_or(0);
+            let title = pr["title"].as_str().unwrap_or("Untitled PR").to_string();
+            let updated_at = pr["updatedAt"].as_str().unwrap_or("");
+            let labels = extract_labels(&pr["labels"]["nodes"]);
+
+            let updated_days = parse_iso_days(updated_at).unwrap_or(now_days);
+            let days_idle = now_days.saturating_sub(updated_days);
+
+            let blocked = is_blocked(&labels);
+            let status = if blocked { "on_hold" } else { "in_progress" }.to_string();
+
+            let notes = if blocked {
+                None
+            } else if days_idle >= 5 {
+                Some(format!(
+                    "PR #{number} idle for {days_idle} day{} — review dispatch recommended",
+                    if days_idle == 1 { "" } else { "s" }
+                ))
+            } else if !labels.is_empty() {
+                Some(format!("Labels: {}", labels.join(", ")))
+            } else {
+                None
+            };
+
+            features.push(GitHubFeature {
+                id: format!("PR-{number}"),
+                name: title,
+                category: "GitHub/PR".to_string(),
+                status,
+                progress: 0,
+                days_idle: Some(days_idle),
+                notes,
+            });
+        }
+    }
+
+    // ── Issues ──
+    if let Some(issues) = data["data"]["repository"]["issues"]["nodes"].as_array() {
+        for issue in issues {
+            let number = issue["number"].as_u64().unwrap_or(0);
+            let title = issue["title"].as_str().unwrap_or("Untitled Issue").to_string();
+            let labels = extract_labels(&issue["labels"]["nodes"]);
+
+            let status = if is_blocked(&labels) {
+                "on_hold"
+            } else if is_wip(&labels) {
+                "in_progress"
+            } else {
+                "todo"
+            }
+            .to_string();
+
+            let notes = if !labels.is_empty() {
+                Some(format!("Labels: {}", labels.join(", ")))
+            } else {
+                None
+            };
+
+            features.push(GitHubFeature {
+                id: format!("ISS-{number}"),
+                name: title,
+                category: "GitHub/Issue".to_string(),
+                status,
+                progress: 0,
+                days_idle: None,
+                notes,
+            });
+        }
+    }
+
+    Ok(features)
+}
+
 // ── App entry ─────────────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -219,6 +437,8 @@ pub fn run() {
             spawn_agent,
             kill_process,
             call_anthropic,
+            watch_config,
+            fetch_github_repo,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

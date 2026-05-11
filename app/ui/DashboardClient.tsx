@@ -1,170 +1,261 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Activity,
-  Bot,
-  CheckCircle2,
-  FolderGit2,
-  GitPullRequestDraft,
-  TerminalSquare,
-} from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle2, Terminal, TerminalSquare } from 'lucide-react';
 import { TableCore } from '../../components/table/TableCore';
 import { TaskDispatchModal } from '../../components/table/TaskDispatchModal';
 import {
+  ActiveRun,
   AnyAdapterConfig,
-  ExecutionResult,
+  CompletedRun,
   Feature,
+  FeatureStatus,
   ProjectConfig,
 } from '../../lib/types';
-import { AppShell } from './AppShell';
+import { FeatureDetailPanel } from './FeatureDetailPanel';
 import { MetricItem, MetricStrip } from './MetricStrip';
 
 interface DashboardClientProps {
   project: ProjectConfig;
   features: Feature[];
   adapters: AnyAdapterConfig[];
+  activeRuns: ActiveRun[];
+  runHistory: CompletedRun[];
+  onRunStart: (
+    pid: number,
+    featureId: string,
+    featureName: string,
+    command: string,
+    args: string[],
+  ) => void;
+  onRunLog: (pid: number, line: string) => void;
+  onRunEnd: (pid: number, exitCode: number) => void;
 }
 
-export function DashboardClient({ project, features, adapters }: DashboardClientProps) {
-  const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
-  const [lastResult, setLastResult] = useState<ExecutionResult | null>(null);
-  const [runHistory, setRunHistory] = useState<ExecutionResult[]>([]);
+const FILTER_OPTIONS: Array<{ label: string; value: FeatureStatus | 'all' }> = [
+  { label: 'All', value: 'all' },
+  { label: 'Blocked', value: 'on_hold' },
+  { label: 'In Progress', value: 'in_progress' },
+  { label: 'To Do', value: 'todo' },
+  { label: 'Done', value: 'done' },
+];
 
-  const completed = features.filter((feature) => feature.status === 'done').length;
-  const active = features.filter((feature) => feature.status === 'in_progress').length;
-  const avgProgress = Math.round(
-    features.reduce((sum, feature) => sum + feature.progress, 0) / Math.max(features.length, 1),
-  );
-  const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-  const bridgeStatus = (isTauri ? 'live' : 'dry-run') as 'live' | 'dry-run';
+export function DashboardClient({
+  project,
+  features,
+  adapters,
+  activeRuns,
+  runHistory,
+  onRunStart,
+  onRunLog,
+  onRunEnd,
+}: DashboardClientProps) {
+  const [statusFilter, setStatusFilter] = useState<FeatureStatus | 'all'>('all');
+  const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
+  const [dispatchingFeature, setDispatchingFeature] = useState<Feature | null>(null);
+
+  const blocked = features.filter((f) => f.status === 'on_hold').length;
+  const inProgress = features.filter((f) => f.status === 'in_progress').length;
+  const ready = features.filter((f) => f.status === 'todo').length;
+  const done = features.filter((f) => f.status === 'done').length;
+
+  const filtered =
+    statusFilter === 'all' ? features : features.filter((f) => f.status === statusFilter);
 
   const metrics: MetricItem[] = [
     {
-      label: 'Total Features',
-      value: features.length.toString(),
-      caption: `${active} active / ${completed} complete`,
-      icon: <FolderGit2 size={18} />,
+      label: 'Blocked',
+      value: blocked.toString(),
+      caption: blocked === 0 ? 'no blockers today' : `${blocked} need attention`,
+      icon: <AlertTriangle size={18} />,
     },
     {
-      label: 'Avg Progress',
-      value: `${avgProgress}%`,
-      caption: 'across loaded roadmap',
+      label: 'In Progress',
+      value: inProgress.toString(),
+      caption: `${ready} ready to start`,
       icon: <Activity size={18} />,
     },
     {
-      label: 'Agent Runs',
-      value: runHistory.length.toString(),
-      caption: 'local session history',
-      icon: <Bot size={18} />,
+      label: 'Done',
+      value: done.toString(),
+      caption: `of ${features.length} total features`,
+      icon: <CheckCircle2 size={18} />,
     },
     {
-      label: 'Bridge Mode',
-      value: isTauri ? 'LIVE' : 'DRY',
-      caption: isTauri ? 'Tauri Rust bridge active' : 'browser dev mode',
-      icon: <TerminalSquare size={18} />,
+      label: 'Active Runs',
+      value: activeRuns.length.toString(),
+      caption: activeRuns.length === 0 ? 'idle' : `${activeRuns.length} agent${activeRuns.length > 1 ? 's' : ''} running`,
+      icon: <Terminal size={18} />,
     },
   ];
 
-  return (
-    <AppShell projectName={project.name} projectRoot={project.root} bridgeStatus={bridgeStatus}>
-      <div className="space-y-5">
-        <MetricStrip items={metrics} />
+  const selectedActiveRun = selectedFeature
+    ? activeRuns.find((r) => r.featureId === selectedFeature.id)
+    : undefined;
+  const selectedHistory = selectedFeature
+    ? runHistory.filter((r) => r.featureId === selectedFeature.id)
+    : [];
 
-        <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+  const handleRowClick = (feature: Feature) => {
+    setSelectedFeature(feature === selectedFeature ? null : feature);
+  };
+
+  return (
+    <div className="space-y-5">
+      <MetricStrip items={metrics} />
+
+      <section className="space-y-3">
+        {/* Filter tabs */}
+        <div className="flex w-fit border border-stone-200/18">
+          {FILTER_OPTIONS.map((opt) => {
+            const count =
+              opt.value === 'all'
+                ? features.length
+                : features.filter((f) => f.status === opt.value).length;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => setStatusFilter(opt.value)}
+                className={`border-r border-stone-200/18 px-3 py-2 text-xs uppercase tracking-[0.14em] transition-colors last:border-r-0 ${
+                  statusFilter === opt.value
+                    ? 'bg-stone-100 font-medium text-[#071d1a]'
+                    : 'text-stone-400 hover:bg-white/5 hover:text-stone-100'
+                }`}
+              >
+                {opt.label}
+                <span className="ml-1.5 font-mono opacity-60">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+          {/* Feature Matrix */}
           <div className="min-w-0 border border-stone-200/18 bg-[#071d1a]/72">
-            <div className="flex flex-col justify-between gap-3 border-b border-stone-200/12 px-4 py-3 sm:flex-row sm:items-center">
+            <div className="flex items-center justify-between border-b border-stone-200/12 px-4 py-3">
               <div>
                 <h2 className="text-sm font-medium uppercase tracking-[0.16em] text-stone-50">
                   Feature Matrix
                 </h2>
                 <p className="mt-1 text-xs text-stone-400">
-                  Progress-as-code roadmap loaded from the local project config.
+                  {filtered.length} feature{filtered.length !== 1 ? 's' : ''}
+                  {statusFilter !== 'all'
+                    ? ` · ${statusFilter === 'on_hold' ? 'blocked' : statusFilter.replace('_', ' ')}`
+                    : ''}
+                  {' · '}click row to inspect
                 </p>
-              </div>
-              <div className="flex items-center gap-2 text-xs uppercase tracking-[0.14em] text-stone-400">
-                <GitPullRequestDraft size={15} />
-                {features.length} rows
               </div>
             </div>
             <TableCore
-              data={features}
-              onDispatch={setSelectedFeature}
-              onOpenFile={(feature) => {
-                setSelectedFeature(feature);
-              }}
+              data={filtered}
+              onRowClick={handleRowClick}
+              onDispatch={setDispatchingFeature}
             />
           </div>
 
-          <aside className="border border-stone-200/18 bg-[#071d1a]/72">
-            <div className="flex items-center justify-between border-b border-stone-200/12 px-4 py-3">
-              <h2 className="text-sm font-medium uppercase tracking-[0.16em] text-stone-50">
-                Run Inspector
-              </h2>
-              <span className="border border-amber-200/25 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-amber-100/80">
-                guarded
-              </span>
-            </div>
-            <div className="space-y-4 p-4">
-              {lastResult ? (
-                <>
-                  <div className="flex items-center gap-2 text-sm text-emerald-100">
-                    <CheckCircle2 size={16} />
-                    {lastResult.message}
-                  </div>
-                  <pre className="max-h-[360px] overflow-auto border border-stone-200/12 bg-[#03100f] p-3 text-xs leading-5 text-stone-200">
-                    {JSON.stringify(lastResult, null, 2)}
-                  </pre>
-                </>
-              ) : (
-                <div className="flex min-h-52 flex-col items-center justify-center border border-dashed border-stone-200/18 px-6 text-center">
-                  <TerminalSquare className="mb-3 text-stone-500" size={28} />
-                  <p className="text-sm uppercase tracking-[0.13em] text-stone-300">No dispatch yet</p>
-                  <p className="mt-2 text-xs leading-5 text-stone-500">
-                    Select a feature and confirm dispatch to inspect the bridge execution plan.
-                  </p>
-                </div>
-              )}
-
-              <div className="border-t border-stone-200/12 pt-4">
-                <h3 className="mb-3 text-xs uppercase tracking-[0.16em] text-stone-400">Session Runs</h3>
-                <div className="space-y-2">
-                  {runHistory.length === 0 ? (
-                    <p className="text-xs text-stone-500">No local run history in this browser session.</p>
-                  ) : (
-                    runHistory.map((run, index) => (
-                      <div
-                        key={`${run.command ?? 'run'}-${index}`}
-                        className="border border-stone-200/12 bg-white/[0.03] px-3 py-2"
-                      >
-                        <div className="flex items-center justify-between gap-3 text-xs">
-                          <span className="truncate font-mono text-stone-200">{run.command}</span>
-                          <span className="shrink-0 uppercase text-amber-100">
-                            {run.dryRun ? 'dry-run' : 'exec'}
-                          </span>
+          {/* Right Panel: Feature Detail or Run Inspector */}
+          {selectedFeature ? (
+            <FeatureDetailPanel
+              feature={selectedFeature}
+              runHistory={selectedHistory}
+              activeRun={selectedActiveRun}
+              onDispatch={() => setDispatchingFeature(selectedFeature)}
+              onClose={() => setSelectedFeature(null)}
+            />
+          ) : (
+            <aside className="border border-stone-200/18 bg-[#071d1a]/72">
+              <div className="flex items-center justify-between border-b border-stone-200/12 px-4 py-3">
+                <h2 className="text-sm font-medium uppercase tracking-[0.16em] text-stone-50">
+                  Run Inspector
+                </h2>
+                {activeRuns.length > 0 && (
+                  <span className="border border-emerald-200/30 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-emerald-200">
+                    {activeRuns.length} active
+                  </span>
+                )}
+              </div>
+              <div className="space-y-4 p-4">
+                {activeRuns.length > 0 ? (
+                  activeRuns.slice(0, 3).map((run) => (
+                    <div key={run.pid} className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm text-emerald-100">
+                        <Activity size={14} className="animate-pulse" />
+                        <span className="truncate">{run.featureName}</span>
+                        <span className="ml-auto shrink-0 font-mono text-xs text-stone-500">
+                          PID {run.pid}
+                        </span>
+                      </div>
+                      <div className="max-h-20 overflow-auto border border-stone-200/12 bg-[#03100f] p-2">
+                        <div className="font-mono text-xs leading-4 text-stone-300">
+                          {run.logs.length === 0 ? (
+                            <span className="animate-pulse text-stone-500">Waiting…</span>
+                          ) : (
+                            run.logs.slice(-6).map((line, i) => (
+                              <div key={i} className="whitespace-pre-wrap break-all">
+                                {line}
+                              </div>
+                            ))
+                          )}
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-          </aside>
-        </section>
-      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="flex min-h-48 flex-col items-center justify-center border border-dashed border-stone-200/18 px-6 text-center">
+                    <TerminalSquare className="mb-3 text-stone-500" size={28} />
+                    <p className="text-sm uppercase tracking-[0.13em] text-stone-300">
+                      No dispatch yet
+                    </p>
+                    <p className="mt-2 text-xs leading-5 text-stone-500">
+                      Click a row to inspect its detail, or Dispatch to run an agent.
+                    </p>
+                  </div>
+                )}
 
-      {selectedFeature && (
+                {runHistory.length > 0 && (
+                  <div className="border-t border-stone-200/12 pt-4">
+                    <h3 className="mb-3 text-xs uppercase tracking-[0.16em] text-stone-400">
+                      Session Runs
+                    </h3>
+                    <div className="space-y-2">
+                      {runHistory.slice(0, 5).map((run, i) => (
+                        <div
+                          key={i}
+                          className="border border-stone-200/12 bg-white/[0.03] px-3 py-2"
+                        >
+                          <div className="flex items-center justify-between gap-3 text-xs">
+                            <span className="truncate font-mono text-stone-300">
+                              {run.featureName}
+                            </span>
+                            <span
+                              className={`shrink-0 uppercase ${run.success ? 'text-emerald-300' : 'text-red-300'}`}
+                            >
+                              {run.success ? 'ok' : 'err'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </aside>
+          )}
+        </div>
+      </section>
+
+      {dispatchingFeature && (
         <TaskDispatchModal
-          feature={selectedFeature}
+          feature={dispatchingFeature}
           adapters={adapters}
           projectRoot={project.root}
-          onClose={() => setSelectedFeature(null)}
-          onExecuted={(result) => {
-            setLastResult(result);
-            setRunHistory((current) => [result, ...current].slice(0, 8));
-          }}
+          onClose={() => setDispatchingFeature(null)}
+          onExecuted={() => {}}
+          onRunStart={onRunStart}
+          onRunLog={onRunLog}
+          onRunEnd={onRunEnd}
         />
       )}
-    </AppShell>
+    </div>
   );
 }

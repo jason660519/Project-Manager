@@ -1,38 +1,38 @@
 'use client';
 
 import {
-  BarChart3,
-  Bot,
   Boxes,
   CircleGauge,
   DatabaseZap,
   FileInput,
   FolderGit2,
   History,
-  KeyRound,
   Settings,
   ShieldCheck,
 } from 'lucide-react';
+import { ViewId } from '../../lib/types';
 
-const navItems = [
-  { label: 'Dashboard', icon: CircleGauge, active: true },
-  { label: 'Features', icon: FolderGit2 },
-  { label: 'Runs', icon: History },
-  { label: 'Projects', icon: Boxes },
-  { label: 'Adapters', icon: Bot },
-  { label: 'Ingestion', icon: FileInput },
-  { label: 'Analytics', icon: BarChart3 },
-  { label: 'Settings', icon: Settings },
-  { label: 'Keys', icon: KeyRound },
-];
+const NAV_ITEMS: Array<{ id: ViewId; label: string; icon: React.ComponentType<{ size: number }> }> =
+  [
+    { id: 'dashboard', label: 'Dashboard', icon: CircleGauge },
+    { id: 'features', label: 'Features', icon: FolderGit2 },
+    { id: 'runs', label: 'Runs', icon: History },
+    { id: 'projects', label: 'Projects', icon: Boxes },
+    { id: 'ingestion', label: 'Ingestion', icon: FileInput },
+    { id: 'settings', label: 'Settings', icon: Settings },
+  ];
 
 interface SidebarProps {
+  currentView: ViewId;
+  onNavigate: (view: ViewId) => void;
   bridgeStatus: 'dry-run' | 'connected' | 'offline' | 'live';
+  activeRunCount: number;
 }
 
-export function Sidebar({ bridgeStatus }: SidebarProps) {
+export function Sidebar({ currentView, onNavigate, bridgeStatus, activeRunCount }: SidebarProps) {
   return (
     <aside className="hidden min-h-screen border-r border-stone-200/15 bg-[#061512]/85 lg:flex lg:flex-col">
+      {/* Logo */}
       <div className="border-b border-stone-200/15 px-5 py-5">
         <div className="text-lg font-black uppercase leading-4 tracking-[0.08em] text-stone-100">
           Dev
@@ -45,13 +45,15 @@ export function Sidebar({ bridgeStatus }: SidebarProps) {
         </div>
       </div>
 
+      {/* Navigation */}
       <nav className="flex-1 py-4">
-        {navItems.map((item) => (
+        {NAV_ITEMS.map((item) => (
           <button
-            key={item.label}
+            key={item.id}
+            onClick={() => onNavigate(item.id)}
             className={[
-              'flex h-11 w-full items-center gap-3 border-y border-transparent px-5 text-left text-xs uppercase tracking-[0.18em] transition-colors',
-              item.active
+              'relative flex h-11 w-full items-center gap-3 border-y border-transparent px-5 text-left text-xs uppercase tracking-[0.18em] transition-colors',
+              item.id === currentView
                 ? 'border-stone-100/80 bg-emerald-950/40 text-stone-50'
                 : 'text-stone-300/72 hover:border-stone-200/20 hover:bg-white/5 hover:text-stone-100',
             ].join(' ')}
@@ -59,10 +61,16 @@ export function Sidebar({ bridgeStatus }: SidebarProps) {
           >
             <item.icon size={15} />
             {item.label}
+            {item.id === 'runs' && activeRunCount > 0 && (
+              <span className="ml-auto flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-bold text-white">
+                {activeRunCount}
+              </span>
+            )}
           </button>
         ))}
       </nav>
 
+      {/* System Status */}
       <div className="border-t border-stone-200/15 px-5 py-5">
         <div className="mb-4 text-[10px] uppercase tracking-[0.22em] text-stone-400">System</div>
         <div className="space-y-2 text-xs text-stone-300/80">

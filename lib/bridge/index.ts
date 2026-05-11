@@ -104,6 +104,44 @@ export function onAgentExit(cb: (p: AgentExitPayload) => void): Promise<Unlisten
   return listen<AgentExitPayload>('agent-exit', cb);
 }
 
+// ── Config file watch ─────────────────────────────────────────────────────────
+
+export type ConfigChangedPayload = { path: string; config: DevPilotConfig };
+
+/** Start a 2-second poll loop in Rust for the given config path. No-op in browser. */
+export async function watchConfig(path: string): Promise<void> {
+  if (!isTauri()) return;
+  return invoke<void>('watch_config', { path });
+}
+
+/** Subscribe to config-changed events emitted by watchConfig. */
+export function onConfigChanged(
+  cb: (payload: ConfigChangedPayload) => void,
+): Promise<UnlistenFn> {
+  return listen<ConfigChangedPayload>('config-changed', cb);
+}
+
+// ── GitHub integration ────────────────────────────────────────────────────────
+
+export interface GitHubFeature {
+  id: string;
+  name: string;
+  category: string;
+  status: string;
+  progress: number;
+  daysIdle?: number;
+  notes?: string;
+}
+
+/** Fetch open PRs + issues from a GitHub repo and map them to feature cards. Tauri only. */
+export async function fetchGithubRepo(
+  token: string,
+  repoUrl: string,
+): Promise<GitHubFeature[]> {
+  if (!isTauri()) throw new Error('fetchGithubRepo requires Tauri runtime');
+  return invoke<GitHubFeature[]>('fetch_github_repo', { token, repoUrl });
+}
+
 // ── Anthropic API (via Rust — key never touches renderer) ────────────────────
 
 export interface AnthropicMessage {

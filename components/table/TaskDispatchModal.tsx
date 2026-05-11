@@ -2,12 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { killProcess, onAgentExit, onAgentStdout, spawnAgent } from '../../lib/bridge';
-import {
-  AgentAdapterConfig,
-  AnyAdapterConfig,
-  ExecutionResult,
-  Feature,
-} from '../../lib/types';
+import { AgentAdapterConfig, AnyAdapterConfig, ExecutionResult, Feature } from '../../lib/types';
 
 interface TaskDispatchModalProps {
   feature: Feature;
@@ -15,6 +10,15 @@ interface TaskDispatchModalProps {
   projectRoot: string;
   onClose: () => void;
   onExecuted: (result: ExecutionResult) => void;
+  onRunStart?: (
+    pid: number,
+    featureId: string,
+    featureName: string,
+    command: string,
+    args: string[],
+  ) => void;
+  onRunLog?: (pid: number, line: string) => void;
+  onRunEnd?: (pid: number, exitCode: number) => void;
 }
 
 type Phase = 'idle' | 'running' | 'done' | 'error';
@@ -25,6 +29,9 @@ export function TaskDispatchModal({
   projectRoot,
   onClose,
   onExecuted,
+  onRunStart,
+  onRunLog,
+  onRunEnd,
 }: TaskDispatchModalProps) {
   const [selectedAdapterId, setSelectedAdapterId] = useState(adapters[0]?.id ?? '');
   const [prompt, setPrompt] = useState(
@@ -36,12 +43,10 @@ export function TaskDispatchModal({
   const logEndRef = useRef<HTMLDivElement>(null);
   const unlistenRefs = useRef<Array<() => void>>([]);
 
-  // Auto-scroll log panel
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
 
-  // Cleanup event listeners on unmount
   useEffect(() => {
     return () => {
       unlistenRefs.current.forEach((fn) => fn());
@@ -74,22 +79,22 @@ export function TaskDispatchModal({
     const { command, args } = buildCommand(adapter);
 
     try {
-      // Register listeners before spawning to avoid missing early output
-      const unStdout = await onAgentStdout(({ line }) => {
+      const unStdout = await onAgentStdout(({ pid: eventPid, line }) => {
         setLogs((prev) => [...prev, line]);
+        onRunLog?.(eventPid, line);
       });
-      const unExit = await onAgentExit(({ pid, code }) => {
-        setLogs((prev) => [
-          ...prev,
-          `\n── process exited (PID ${pid}, code ${code}) ──`,
-        ]);
-        setPhase('done');
+      const unExit = await onAgentExit(({ pid: exitPid, code }) => {
+        const exitLine = `\n── process exited (PID ${exitPid}, code ${code}) ──`;
+        setLogs((prev) => [...prev, exitLine]);
+        setPhase(code === 0 ? 'done' : 'error');
         setActivePid(null);
+        onRunEnd?.(exitPid, code);
       });
       unlistenRefs.current.push(unStdout, unExit);
 
       const pid = await spawnAgent({ command, args, workingDir: projectRoot });
       setActivePid(pid);
+      onRunStart?.(pid, feature.id, feature.name, command, args);
 
       onExecuted({
         success: true,
@@ -121,7 +126,7 @@ export function TaskDispatchModal({
           <div>
             <h3 className="text-lg font-bold text-stone-50">任務派遣</h3>
             <p className="text-xs text-stone-400">
-              Feature: {feature.id} — {feature.name}
+              {feature.id} — {feature.name}
             </p>
           </div>
           <button
@@ -152,7 +157,6 @@ export function TaskDispatchModal({
                   ))}
                 </select>
               </div>
-
               <div>
                 <label className="mb-1 block text-sm font-medium text-stone-200">
                   開發指令 (Prompt)
@@ -167,7 +171,6 @@ export function TaskDispatchModal({
             </>
           )}
 
-          {/* Live log panel shown during / after execution */}
           {phase !== 'idle' && (
             <div>
               <div className="mb-1 flex items-center justify-between">
@@ -202,7 +205,6 @@ export function TaskDispatchModal({
           >
             {isRunning ? '背景執行' : '關閉'}
           </button>
-
           {isRunning && activePid != null && (
             <button
               onClick={handleKill}
@@ -211,7 +213,6 @@ export function TaskDispatchModal({
               Kill
             </button>
           )}
-
           {phase === 'idle' && (
             <button
               onClick={handleExecute}
