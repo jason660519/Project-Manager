@@ -1,93 +1,99 @@
 'use client';
 
+import Link from 'next/link';
 import {
   Boxes,
   CircleGauge,
   DatabaseZap,
-  FileInput,
-  FolderGit2,
-  History,
   Settings,
   ShieldCheck,
 } from 'lucide-react';
 import { ViewId } from '../../lib/types';
 
-const NAV_ITEMS: Array<{ id: ViewId; label: string; icon: React.ComponentType<{ size: number }> }> =
+const NAV_ITEMS: Array<{
+  id: ViewId;
+  label: string;
+  href: string;
+  hint: string;
+  icon: React.ComponentType<{ size: number }>;
+}> =
   [
-    { id: 'dashboard', label: 'Dashboard', icon: CircleGauge },
-    { id: 'features', label: 'Features', icon: FolderGit2 },
-    { id: 'runs', label: 'Runs', icon: History },
-    { id: 'projects', label: 'Projects', icon: Boxes },
-    { id: 'ingestion', label: 'Ingestion', icon: FileInput },
-    { id: 'settings', label: 'Settings', icon: Settings },
+    {
+      id: 'projects',
+      label: 'Projects',
+      href: '/projects',
+      hint: 'Switch projects and manage project-level configuration.',
+      icon: Boxes,
+    },
+    {
+      id: 'dashboard',
+      label: 'Dashboard',
+      href: '/dashboard',
+      hint: 'Overview metrics and project health at a glance.',
+      icon: CircleGauge,
+    },
+    {
+      id: 'settings',
+      label: 'Settings',
+      href: '/settings',
+      hint: 'Adjust bridge behavior and workspace preferences.',
+      icon: Settings,
+    },
   ];
 
 interface SidebarProps {
   currentView: ViewId;
-  onNavigate: (view: ViewId) => void;
   bridgeStatus: 'dry-run' | 'connected' | 'offline' | 'live';
   activeRunCount: number;
 }
 
-export function Sidebar({ currentView, onNavigate, bridgeStatus, activeRunCount }: SidebarProps) {
+export function Sidebar({ currentView, bridgeStatus, activeRunCount }: SidebarProps) {
   return (
-    <aside className="hidden min-h-screen border-r border-stone-200/15 bg-[#061512]/85 lg:flex lg:flex-col">
-      {/* Logo */}
-      <div className="border-b border-stone-200/15 px-5 py-5">
-        <div className="text-lg font-black uppercase leading-4 tracking-[0.08em] text-stone-100">
-          Dev
-          <br />
-          Pilot
-        </div>
-        <div className="mt-3 inline-flex items-center gap-2 border border-amber-200/25 px-2 py-1 text-[10px] uppercase tracking-[0.22em] text-amber-100/80">
-          <DatabaseZap size={12} />
-          Local Control
+    <aside className="hidden min-h-screen w-[68px] border-r border-stone-200/15 bg-[#061512]/95 lg:flex lg:flex-col">
+      <div className="flex h-16 items-center justify-center border-b border-stone-200/15">
+        <div className="inline-flex h-9 w-9 items-center justify-center border border-amber-200/25 text-amber-100/80">
+          <DatabaseZap size={16} />
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 py-4">
+      <nav className="flex-1 py-3">
         {NAV_ITEMS.map((item) => (
-          <button
+          <Link
             key={item.id}
-            onClick={() => onNavigate(item.id)}
+            href={item.href}
             className={[
-              'relative flex h-11 w-full items-center gap-3 border-y border-transparent px-5 text-left text-xs uppercase tracking-[0.18em] transition-colors',
+              'group relative mx-2 mb-1 flex h-11 items-center justify-center border transition-colors',
               item.id === currentView
-                ? 'border-stone-100/80 bg-emerald-950/40 text-stone-50'
-                : 'text-stone-300/72 hover:border-stone-200/20 hover:bg-white/5 hover:text-stone-100',
+                ? 'border-stone-100/80 bg-emerald-950/50 text-stone-50'
+                : 'border-transparent text-stone-300/78 hover:border-stone-200/20 hover:bg-white/5 hover:text-stone-100',
             ].join(' ')}
-            type="button"
           >
-            <item.icon size={15} />
-            {item.label}
-            {item.id === 'runs' && activeRunCount > 0 && (
-              <span className="ml-auto flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-bold text-white">
-                {activeRunCount}
+            <item.icon size={17} />
+
+            <span className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 z-50 hidden w-56 -translate-y-1/2 border border-stone-200/20 bg-[#061512] p-3 text-left group-hover:block">
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-100">
+                {item.label}
               </span>
-            )}
-          </button>
+              <span className="mt-1 block text-[11px] leading-4 text-stone-300/85">{item.hint}</span>
+            </span>
+          </Link>
         ))}
       </nav>
 
-      {/* System Status */}
-      <div className="border-t border-stone-200/15 px-5 py-5">
-        <div className="mb-4 text-[10px] uppercase tracking-[0.22em] text-stone-400">System</div>
-        <div className="space-y-2 text-xs text-stone-300/80">
-          <div className="flex items-center justify-between">
-            <span>Bridge</span>
-            <span className="uppercase text-amber-100">{bridgeStatus}</span>
+      <div className="border-t border-stone-200/15 py-4">
+        <div className="group relative flex justify-center">
+          <div className="inline-flex h-9 w-9 items-center justify-center border border-emerald-200/20 text-emerald-100">
+            <ShieldCheck size={16} />
           </div>
-          <div className="flex items-center justify-between">
-            <span>Execution</span>
-            <span className="uppercase text-emerald-200">guarded</span>
-          </div>
+          <span className="pointer-events-none absolute bottom-[calc(100%+10px)] left-[calc(100%+10px)] z-50 hidden w-56 border border-stone-200/20 bg-[#061512] p-3 text-left group-hover:block">
+            <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-100">
+              System Status
+            </span>
+            <span className="mt-1 block text-[11px] leading-4 text-stone-300/85">
+              Bridge: {bridgeStatus.toUpperCase()} · Execution: GUARDED
+            </span>
+          </span>
         </div>
-        <div className="mt-5 flex items-center gap-2 border border-emerald-200/20 px-3 py-2 text-xs text-emerald-100">
-          <ShieldCheck size={15} />
-          dry-run protected
-        </div>
-        <div className="mt-5 text-[10px] uppercase tracking-[0.22em] text-stone-500">v0.1.0</div>
       </div>
     </aside>
   );

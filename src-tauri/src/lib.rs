@@ -277,6 +277,22 @@ struct GitHubFeature {
     notes: Option<String>,
 }
 
+#[derive(Serialize, Clone)]
+struct GithubIssue {
+    id: u64,
+    number: u64,
+    title: String,
+    body: Option<String>,
+    state: String,
+    labels: Vec<String>,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+    #[serde(rename = "updatedAt")]
+    updated_at: String,
+    url: String,
+    user: Option<String>,
+}
+
 /// Convert an ISO 8601 date prefix ("YYYY-MM-DD…") to days since Unix epoch.
 fn parse_iso_days(s: &str) -> Option<u64> {
     let b = s.as_bytes();
@@ -445,6 +461,82 @@ async fn fetch_github_repo(token: String, repo_url: String) -> Result<Vec<GitHub
     fetch_github_repo_inner(&token, &repo_url).await
 }
 
+/// Fetch all GitHub issues (open and closed) from a repository.
+#[tauri::command]
+async fn fetch_github_issues(token: String, repo_url: String) -> Result<Vec<GithubIssue>, String> {
+    let parts: Vec<&str> = repo_url.trim_end_matches('/').split('/').collect();
+    if parts.len() < 2 {
+        return Err("Invalid GitHub URL — expected https://github.com/owner/repo".to_string());
+    }
+    let owner = parts[parts.len() - 2];
+    let repo = parts[parts.len() - 1];
+
+    let body = serde_json::json!({
+        "query": "query($owner:String!,$repo:String!){ repository(owner:$owner,name:$repo){ issues(first:50,orderBy:{field:UPDATED_AT,direction:DESC}){ nodes{ id number title body state createdAt updatedAt url author{login} labels(first:10){ nodes{ name } } } } } }",
+        "variables": { "owner": owner, "repo": repo }
+    });
+
+    let client = reqwest::Client::new();
+    let res = client
+        .post("https://api.github.com/graphql")
+        .header("Authorization", format!("Bearer {token}"))
+        .header("User-Agent", "DevPilot/0.1.0")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {e}"))?;
+
+    if !res.status().is_success() {
+        let status = res.status();
+        let text = res.text().await.unwrap_or_default();
+        return Err(format!("GitHub API {status}: {text}"));
+    }
+
+    let data: serde_json::Value = res.json().await.map_err(|e| format!("JSON parse: {e}"))?;
+
+    if let Some(errors) = data["errors"].as_array() {
+        let msg: Vec<&str> = errors.iter().filter_map(|e| e["message"].as_str()).collect();
+        return Err(format!("GitHub GraphQL: {}", msg.join(", ")));
+    }
+
+    let mut issues: Vec<GithubIssue> = Vec::new();
+
+    if let Some(issue_nodes) = data["data"]["repository"]["issues"]["nodes"].as_array() {
+        for issue_data in issue_nodes {
+            let id = issue_data["id"].as_str().unwrap_or("");
+            // Parse ID to extract numeric ID (GitHub GraphQL IDs are base64 encoded but we'll use number)
+            let number = issue_data["number"].as_u64().unwrap_or(0);
+            let title = issue_data["title"].as_str().unwrap_or("").to_string();
+            let body = issue_data["body"].as_str().map(String::from);
+            let state = issue_data["state"].as_str().unwrap_or("OPEN").to_string().to_lowercase();
+            let created_at = issue_data["createdAt"].as_str().unwrap_or("").to_string();
+            let updated_at = issue_data["updatedAt"].as_str().unwrap_or("").to_string();
+            let url = issue_data["url"].as_str().unwrap_or("").to_string();
+            let user = issue_data["author"]["login"].as_str().map(String::from);
+            
+            let labels = issue_data["labels"]["nodes"]
+                .as_array()
+                .map(|arr| arr.iter().filter_map(|l| l["name"].as_str().map(String::from)).collect())
+                .unwrap_or_default();
+
+            issues.push(GithubIssue {
+                id: number,
+                number,
+                title,
+                body,
+                state,
+                labels,
+                created_at,
+                updated_at,
+                url,
+                user,
+            });
+        }
+    }
+
+    Ok(issues)
+}
+
 // ── GitHub polling ────────────────────────────────────────────────────────────
 
 #[derive(Serialize, Clone)]
@@ -510,6 +602,7 @@ pub fn run() {
             call_anthropic,
             watch_config,
             fetch_github_repo,
+            fetch_github_issues,
             set_secret,
             get_secret,
             start_github_poll,

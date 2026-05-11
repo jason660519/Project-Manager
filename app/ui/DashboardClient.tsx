@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { Activity, AlertTriangle, CheckCircle2, Terminal, TerminalSquare } from 'lucide-react';
 import { TableCore } from '../../components/table/TableCore';
 import { TaskDispatchModal } from '../../components/table/TaskDispatchModal';
 import {
@@ -13,7 +12,6 @@ import {
   ProjectConfig,
 } from '../../lib/types';
 import { FeatureDetailPanel } from './FeatureDetailPanel';
-import { MetricItem, MetricStrip } from './MetricStrip';
 
 interface DashboardClientProps {
   project: ProjectConfig;
@@ -21,6 +19,7 @@ interface DashboardClientProps {
   adapters: AnyAdapterConfig[];
   activeRuns: ActiveRun[];
   runHistory: CompletedRun[];
+  dashboardProjectNames?: string[];
   onRunStart: (
     pid: number,
     featureId: string,
@@ -46,48 +45,21 @@ export function DashboardClient({
   adapters,
   activeRuns,
   runHistory,
+  dashboardProjectNames = [],
   onRunStart,
   onRunLog,
   onRunEnd,
 }: DashboardClientProps) {
   const [statusFilter, setStatusFilter] = useState<FeatureStatus | 'all'>('all');
-  const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
+  const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null);
   const [dispatchingFeature, setDispatchingFeature] = useState<Feature | null>(null);
-
-  const blocked = features.filter((f) => f.status === 'on_hold').length;
-  const inProgress = features.filter((f) => f.status === 'in_progress').length;
-  const ready = features.filter((f) => f.status === 'todo').length;
-  const done = features.filter((f) => f.status === 'done').length;
 
   const filtered =
     statusFilter === 'all' ? features : features.filter((f) => f.status === statusFilter);
 
-  const metrics: MetricItem[] = [
-    {
-      label: 'Blocked',
-      value: blocked.toString(),
-      caption: blocked === 0 ? 'no blockers today' : `${blocked} need attention`,
-      icon: <AlertTriangle size={18} />,
-    },
-    {
-      label: 'In Progress',
-      value: inProgress.toString(),
-      caption: `${ready} ready to start`,
-      icon: <Activity size={18} />,
-    },
-    {
-      label: 'Done',
-      value: done.toString(),
-      caption: `of ${features.length} total features`,
-      icon: <CheckCircle2 size={18} />,
-    },
-    {
-      label: 'Active Runs',
-      value: activeRuns.length.toString(),
-      caption: activeRuns.length === 0 ? 'idle' : `${activeRuns.length} agent${activeRuns.length > 1 ? 's' : ''} running`,
-      icon: <Terminal size={18} />,
-    },
-  ];
+  const selectedFeature = selectedFeatureId
+    ? features.find((feature) => feature.id === selectedFeatureId) ?? null
+    : null;
 
   const selectedActiveRun = selectedFeature
     ? activeRuns.find((r) => r.featureId === selectedFeature.id)
@@ -97,14 +69,22 @@ export function DashboardClient({
     : [];
 
   const handleRowClick = (feature: Feature) => {
-    setSelectedFeature(feature === selectedFeature ? null : feature);
+    setSelectedFeatureId((prev) => (prev === feature.id ? null : feature.id));
   };
+
+  const dispatchProjectRoot =
+    (dispatchingFeature?.metadata?.sourceProjectRoot as string | undefined) ?? project.root;
 
   return (
     <div className="space-y-5">
-      <MetricStrip items={metrics} />
-
       <section className="space-y-3">
+        {dashboardProjectNames.length > 0 && (
+          <p className="text-xs text-cyan-200/85">
+            Dashboard showing {dashboardProjectNames.length} selected project
+            {dashboardProjectNames.length > 1 ? 's' : ''}: {dashboardProjectNames.join(', ')}
+          </p>
+        )}
+
         {/* Filter tabs */}
         <div className="flex w-fit border border-stone-200/18">
           {FILTER_OPTIONS.map((opt) => {
@@ -129,7 +109,11 @@ export function DashboardClient({
           })}
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <div
+          className={`grid gap-5 ${
+            selectedFeature ? 'xl:grid-cols-[minmax(0,1fr)_380px]' : ''
+          }`}
+        >
           {/* Feature Matrix */}
           <div className="min-w-0 border border-stone-200/18 bg-[#071d1a]/72">
             <div className="flex items-center justify-between border-b border-stone-200/12 px-4 py-3">
@@ -153,93 +137,15 @@ export function DashboardClient({
             />
           </div>
 
-          {/* Right Panel: Feature Detail or Run Inspector */}
-          {selectedFeature ? (
+          {/* Right Panel: Feature Detail */}
+          {selectedFeature && (
             <FeatureDetailPanel
               feature={selectedFeature}
               runHistory={selectedHistory}
               activeRun={selectedActiveRun}
               onDispatch={() => setDispatchingFeature(selectedFeature)}
-              onClose={() => setSelectedFeature(null)}
+              onClose={() => setSelectedFeatureId(null)}
             />
-          ) : (
-            <aside className="border border-stone-200/18 bg-[#071d1a]/72">
-              <div className="flex items-center justify-between border-b border-stone-200/12 px-4 py-3">
-                <h2 className="text-sm font-medium uppercase tracking-[0.16em] text-stone-50">
-                  Run Inspector
-                </h2>
-                {activeRuns.length > 0 && (
-                  <span className="border border-emerald-200/30 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-emerald-200">
-                    {activeRuns.length} active
-                  </span>
-                )}
-              </div>
-              <div className="space-y-4 p-4">
-                {activeRuns.length > 0 ? (
-                  activeRuns.slice(0, 3).map((run) => (
-                    <div key={run.pid} className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm text-emerald-100">
-                        <Activity size={14} className="animate-pulse" />
-                        <span className="truncate">{run.featureName}</span>
-                        <span className="ml-auto shrink-0 font-mono text-xs text-stone-500">
-                          PID {run.pid}
-                        </span>
-                      </div>
-                      <div className="max-h-20 overflow-auto border border-stone-200/12 bg-[#03100f] p-2">
-                        <div className="font-mono text-xs leading-4 text-stone-300">
-                          {run.logs.length === 0 ? (
-                            <span className="animate-pulse text-stone-500">Waiting…</span>
-                          ) : (
-                            run.logs.slice(-6).map((line, i) => (
-                              <div key={i} className="whitespace-pre-wrap break-all">
-                                {line}
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="flex min-h-48 flex-col items-center justify-center border border-dashed border-stone-200/18 px-6 text-center">
-                    <TerminalSquare className="mb-3 text-stone-500" size={28} />
-                    <p className="text-sm uppercase tracking-[0.13em] text-stone-300">
-                      No dispatch yet
-                    </p>
-                    <p className="mt-2 text-xs leading-5 text-stone-500">
-                      Click a row to inspect its detail, or Dispatch to run an agent.
-                    </p>
-                  </div>
-                )}
-
-                {runHistory.length > 0 && (
-                  <div className="border-t border-stone-200/12 pt-4">
-                    <h3 className="mb-3 text-xs uppercase tracking-[0.16em] text-stone-400">
-                      Session Runs
-                    </h3>
-                    <div className="space-y-2">
-                      {runHistory.slice(0, 5).map((run, i) => (
-                        <div
-                          key={i}
-                          className="border border-stone-200/12 bg-white/[0.03] px-3 py-2"
-                        >
-                          <div className="flex items-center justify-between gap-3 text-xs">
-                            <span className="truncate font-mono text-stone-300">
-                              {run.featureName}
-                            </span>
-                            <span
-                              className={`shrink-0 uppercase ${run.success ? 'text-emerald-300' : 'text-red-300'}`}
-                            >
-                              {run.success ? 'ok' : 'err'}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </aside>
           )}
         </div>
       </section>
@@ -248,7 +154,7 @@ export function DashboardClient({
         <TaskDispatchModal
           feature={dispatchingFeature}
           adapters={adapters}
-          projectRoot={project.root}
+          projectRoot={dispatchProjectRoot}
           onClose={() => setDispatchingFeature(null)}
           onExecuted={() => {}}
           onRunStart={onRunStart}

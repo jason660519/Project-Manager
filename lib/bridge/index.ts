@@ -168,6 +168,28 @@ export function onGithubUpdated(
   return listen<GithubUpdatedPayload>('github-updated', cb);
 }
 
+export interface GithubIssuePayload {
+  id: number;
+  number: number;
+  title: string;
+  body?: string;
+  state: 'open' | 'closed';
+  labels: string[];
+  createdAt: string;
+  updatedAt: string;
+  url: string;
+  user?: string;
+}
+
+/** Fetch GitHub issues from a repository. Tauri only. */
+export async function fetchGithubIssues(
+  token: string,
+  repoUrl: string,
+): Promise<GithubIssuePayload[]> {
+  if (!isTauri()) throw new Error('fetchGithubIssues requires Tauri runtime');
+  return invoke<GithubIssuePayload[]>('fetch_github_issues', { token, repoUrl });
+}
+
 // ── OS Keychain ───────────────────────────────────────────────────────────────
 
 /**

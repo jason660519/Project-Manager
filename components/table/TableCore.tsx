@@ -31,6 +31,14 @@ const STATUS_LABELS: Record<FeatureStatus, string> = {
 
 const columnHelper = createColumnHelper<Feature>();
 
+function renderPathCell(value?: string) {
+  if (!value) {
+    return <span className="text-xs text-stone-500">-</span>;
+  }
+
+  return <span className="font-mono text-xs text-stone-300">{value}</span>;
+}
+
 export function TableCore({ data, onDispatch, onRowClick }: TableCoreProps) {
   const columns = useMemo(
     () => [
@@ -48,8 +56,38 @@ export function TableCore({ data, onDispatch, onRowClick }: TableCoreProps) {
         ),
       }),
       columnHelper.accessor('name', {
-        header: 'Name',
+        header: 'Function/Feature',
         cell: (info) => <span className="font-medium text-stone-100">{info.getValue()}</span>,
+      }),
+      columnHelper.accessor((row) => row.paths?.spec, {
+        id: 'featureDevSpec',
+        header: 'Feature Dev Spec',
+        cell: (info) => renderPathCell(info.getValue()),
+      }),
+      columnHelper.accessor((row) => row.paths?.tdd, {
+        id: 'tddSpec',
+        header: 'TDD Spec',
+        cell: (info) => renderPathCell(info.getValue()),
+      }),
+      columnHelper.accessor((row) => row.paths?.tddProgressReport, {
+        id: 'tddProgressReport',
+        header: 'TDD Progress Report',
+        cell: (info) => renderPathCell(info.getValue()),
+      }),
+      columnHelper.accessor((row) => row.paths?.unitIntegrationTest, {
+        id: 'unitAndIntergrationTest',
+        header: 'Unit and Intergration Test',
+        cell: (info) => renderPathCell(info.getValue()),
+      }),
+      columnHelper.accessor((row) => row.paths?.e2eAcceptanceTestScriptFolder ?? row.paths?.test, {
+        id: 'e2eAccptanceTestScriptFolder',
+        header: 'E2E Accptance Test Script Folder',
+        cell: (info) => renderPathCell(info.getValue()),
+      }),
+      columnHelper.accessor((row) => row.paths?.developmentLogSummaryFolder, {
+        id: 'devlopmentLogSummaryFolder',
+        header: 'Devlopment Log Summary Folder',
+        cell: (info) => renderPathCell(info.getValue()),
       }),
       columnHelper.accessor('status', {
         header: 'Status',
@@ -131,7 +169,10 @@ export function TableCore({ data, onDispatch, onRowClick }: TableCoreProps) {
           ))}
           {data.length === 0 && (
             <tr>
-              <td colSpan={6} className="px-4 py-8 text-center text-xs text-stone-500">
+              <td
+                colSpan={table.getVisibleLeafColumns().length}
+                className="px-4 py-8 text-center text-xs text-stone-500"
+              >
                 No features match the current filter.
               </td>
             </tr>

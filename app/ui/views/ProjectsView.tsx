@@ -7,7 +7,9 @@ import { CompletedRun, DevPilotConfig, Feature, ProjectEntry } from '../../../li
 interface ProjectsViewProps {
   projects: ProjectEntry[];
   selectedProjectId: string;
+  selectedDashboardProjectIds: string[];
   onSelectProject: (id: string) => void;
+  onToggleDashboardProject: (id: string, selected: boolean) => void;
   onAddProject: (entry: ProjectEntry) => void;
   runHistory: CompletedRun[];
 }
@@ -15,7 +17,9 @@ interface ProjectsViewProps {
 export function ProjectsView({
   projects,
   selectedProjectId,
+  selectedDashboardProjectIds,
   onSelectProject,
+  onToggleDashboardProject,
   onAddProject,
   runHistory,
 }: ProjectsViewProps) {
@@ -154,6 +158,9 @@ export function ProjectsView({
           <p className="mt-1 text-xs text-stone-400">
             {projects.length} project{projects.length !== 1 ? 's' : ''} loaded.
           </p>
+          <p className="mt-1 text-xs text-emerald-200/80">
+            Dashboard scope: {selectedDashboardProjectIds.length} selected
+          </p>
         </div>
         <div className="flex gap-2">
           <button
@@ -181,6 +188,7 @@ export function ProjectsView({
           const blocked = features.filter((f) => f.status === 'on_hold').length;
           const inProgress = features.filter((f) => f.status === 'in_progress').length;
           const isSelected = project.id === selectedProjectId;
+          const isDashboardSelected = selectedDashboardProjectIds.includes(project.id);
           const projectRuns = runHistory.filter((r) => features.some((f) => f.id === r.featureId));
 
           return (
@@ -192,8 +200,19 @@ export function ProjectsView({
                   : 'border-stone-200/18 hover:border-stone-200/30'
               }`}
             >
-              <div className="flex items-center justify-between px-4 py-3">
+              <div
+                className="flex cursor-pointer items-center justify-between px-4 py-3"
+                onClick={() => onSelectProject(project.id)}
+              >
                 <div className="flex min-w-0 items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={isDashboardSelected}
+                    onChange={(e) => onToggleDashboardProject(project.id, e.target.checked)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-4 w-4 cursor-pointer accent-emerald-400"
+                    title="Include this project in Dashboard"
+                  />
                   <FolderGit2
                     size={16}
                     className={isSelected ? 'text-emerald-300' : 'text-stone-400'}
@@ -203,9 +222,9 @@ export function ProjectsView({
                       <span className="font-medium text-stone-100">
                         {project.config.project.name}
                       </span>
-                      {isSelected && (
-                        <span className="border border-emerald-200/30 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.16em] text-emerald-200">
-                          Active
+                      {isDashboardSelected && (
+                        <span className="border border-cyan-200/30 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.16em] text-cyan-200">
+                          Dashboard
                         </span>
                       )}
                     </div>
@@ -214,25 +233,6 @@ export function ProjectsView({
                     </p>
                   </div>
                 </div>
-                {!isSelected && (
-                  <button
-                    onClick={() => onSelectProject(project.id)}
-                    className="border border-stone-200/20 px-3 py-1.5 text-xs text-stone-300 hover:bg-white/5"
-                  >
-                    Set Active
-                  </button>
-                )}
-              </div>
-              <div className="flex items-center gap-6 border-t border-stone-200/10 px-4 py-2 text-xs">
-                <span className="text-stone-400">{features.length} features</span>
-                {inProgress > 0 && (
-                  <span className="text-cyan-300">{inProgress} in progress</span>
-                )}
-                {blocked > 0 && <span className="text-amber-300">{blocked} blocked</span>}
-                {done > 0 && <span className="text-emerald-300">{done} done</span>}
-                {projectRuns.length > 0 && (
-                  <span className="ml-auto text-stone-500">{projectRuns.length} runs</span>
-                )}
               </div>
             </div>
           );

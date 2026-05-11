@@ -5,6 +5,10 @@ export type IDEId = 'Cursor' | 'VSCode' | 'Trae' | 'Antigravity';
 export interface FeaturePaths {
   spec?: string;          // 功能規格書路徑
   tdd?: string;           // TDD 規格書路徑
+  tddProgressReport?: string; // TDD 進度報告路徑
+  unitIntegrationTest?: string; // 單元與整合測試路徑
+  e2eAcceptanceTestScriptFolder?: string; // E2E 驗收測試腳本資料夾
+  developmentLogSummaryFolder?: string; // 開發日誌摘要資料夾
   test?: string;          // 測試腳本路徑
   implementation?: string; // 實作代碼路徑
 }
@@ -81,7 +85,22 @@ export interface DevPilotConfig {
 
 // ── App navigation & run-store types ─────────────────────────────────────────
 
-export type ViewId = 'dashboard' | 'features' | 'runs' | 'projects' | 'ingestion' | 'settings';
+export type ViewId = 'dashboard' | 'features' | 'projects' | 'settings';
+
+export type IssueState = 'open' | 'closed';
+
+export interface GithubIssue {
+  id: number;
+  number: number;
+  title: string;
+  body?: string;
+  state: IssueState;
+  labels: string[];
+  createdAt: string;
+  updatedAt: string;
+  url: string;
+  user?: string;
+}
 
 export interface ActiveRun {
   pid: number;
