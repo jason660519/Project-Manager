@@ -1,23 +1,53 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Eye, EyeOff, Key, Keyboard, Monitor, Server } from 'lucide-react';
+import { getSecret, setSecret } from '../../../lib/bridge';
+
+const KEYCHAIN_SERVICE = 'devpilot';
+const KEYCHAIN_KEY = 'anthropic-api-key';
+const LS_KEY = 'devpilot-api-key';
 
 export function SettingsView() {
-  const [apiKey, setApiKey] = useState(() =>
-    typeof window !== 'undefined' ? (localStorage.getItem('devpilot-api-key') ?? '') : '',
-  );
+  const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [keychainError, setKeychainError] = useState('');
   const [hotkeyEnabled, setHotkeyEnabled] = useState(false);
   const [trayEnabled, setTrayEnabled] = useState(false);
 
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
-  const handleSaveKey = () => {
-    localStorage.setItem('devpilot-api-key', apiKey);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  // Load API key on mount: Keychain in Tauri, localStorage in browser.
+  useEffect(() => {
+    if (isTauri) {
+      getSecret(KEYCHAIN_SERVICE, KEYCHAIN_KEY)
+        .then((val) => { if (val) setApiKey(val); })
+        .catch((e: unknown) => {
+          const msg = e instanceof Error ? e.message : String(e);
+          setKeychainError(`Keychain read error: ${msg}`);
+        });
+    } else {
+      const stored = localStorage.getItem(LS_KEY) ?? '';
+      if (stored) setApiKey(stored);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleSaveKey = async () => {
+    setKeychainError('');
+    try {
+      if (isTauri) {
+        await setSecret(KEYCHAIN_SERVICE, KEYCHAIN_KEY, apiKey);
+      } else {
+        localStorage.setItem(LS_KEY, apiKey);
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setKeychainError(`Keychain write error: ${msg}`);
+    }
   };
 
   return (
@@ -39,11 +69,16 @@ export function SettingsView() {
               dev: localStorage
             </span>
           )}
+          {isTauri && (
+            <span className="ml-auto border border-emerald-200/25 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-emerald-300/80">
+              macOS Keychain
+            </span>
+          )}
         </div>
         <div className="space-y-3 p-4">
           <p className="text-xs text-stone-400">
             {isTauri
-              ? 'Stored securely in macOS Keychain. Never exposed to the renderer process.'
+              ? 'Stored securely in macOS Keychain. The key is never exposed to the renderer process.'
               : 'In dev mode, stored in localStorage. In production (Tauri), stored in OS Keychain.'}
           </p>
           <div className="flex gap-2">
@@ -63,16 +98,19 @@ export function SettingsView() {
               </button>
             </div>
             <button
-              onClick={handleSaveKey}
+              onClick={() => void handleSaveKey()}
               className={`px-4 py-2 text-sm font-medium transition-colors ${
                 saved
                   ? 'bg-emerald-700 text-emerald-100'
                   : 'bg-stone-100 text-[#071d1a] hover:bg-amber-100'
               }`}
             >
-              {saved ? 'Saved' : 'Save Key'}
+              {saved ? 'Saved ✓' : 'Save Key'}
             </button>
           </div>
+          {keychainError && (
+            <p className="text-[11px] text-red-400">{keychainError}</p>
+          )}
         </div>
       </section>
 
@@ -171,6 +209,7 @@ export function SettingsView() {
           {[
             { label: 'Mode', value: isTauri ? 'Tauri (Live)' : 'Browser (Dry-run)', accent: isTauri },
             { label: 'AI API Route', value: 'Rust → reqwest', accent: true },
+            { label: 'Secret Storage', value: isTauri ? 'macOS Keychain' : 'localStorage', accent: isTauri },
             { label: 'Process Spawn', value: isTauri ? 'active' : 'disabled', accent: isTauri },
           ].map(({ label, value, accent }) => (
             <div key={label} className="flex items-center justify-between text-sm">

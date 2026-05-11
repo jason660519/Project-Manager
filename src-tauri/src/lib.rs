@@ -197,6 +197,30 @@ async fn kill_process(pid: u32) -> Result<(), String> {
     Ok(())
 }
 
+// ── OS Keychain ───────────────────────────────────────────────────────────────
+
+/// Store a secret in the OS keychain (macOS Keychain / Windows Credential Store /
+/// Linux Secret Service).  Keyed by `service` + `key` so different subsystems can
+/// share the same service name without collision.
+#[tauri::command]
+fn set_secret(service: String, key: String, value: String) -> Result<(), String> {
+    let entry = keyring::Entry::new(&service, &key).map_err(|e| e.to_string())?;
+    entry.set_password(&value).map_err(|e| e.to_string())
+}
+
+/// Retrieve a secret from the OS keychain.  Returns `None` when no entry exists
+/// yet (first launch before the user saves a key); returns `Err` only on genuine
+/// keychain access failures.
+#[tauri::command]
+fn get_secret(service: String, key: String) -> Result<Option<String>, String> {
+    let entry = keyring::Entry::new(&service, &key).map_err(|e| e.to_string())?;
+    match entry.get_password() {
+        Ok(val) => Ok(Some(val)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
 // ── File watch ────────────────────────────────────────────────────────────────
 
 #[derive(Serialize, Clone)]
@@ -439,6 +463,8 @@ pub fn run() {
             call_anthropic,
             watch_config,
             fetch_github_repo,
+            set_secret,
+            get_secret,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

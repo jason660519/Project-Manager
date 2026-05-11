@@ -142,6 +142,27 @@ export async function fetchGithubRepo(
   return invoke<GitHubFeature[]>('fetch_github_repo', { token, repoUrl });
 }
 
+// ── OS Keychain ───────────────────────────────────────────────────────────────
+
+/**
+ * Store a secret in the OS keychain (Tauri only).
+ * Uses `service` + `key` as the compound identifier so multiple secrets can
+ * share the same service name without collision.
+ */
+export async function setSecret(service: string, key: string, value: string): Promise<void> {
+  if (!isTauri()) throw new Error('setSecret requires Tauri runtime');
+  return invoke<void>('set_secret', { service, key, value });
+}
+
+/**
+ * Retrieve a secret from the OS keychain (Tauri only).
+ * Returns `null` when no entry has been saved yet; throws on genuine access errors.
+ */
+export async function getSecret(service: string, key: string): Promise<string | null> {
+  if (!isTauri()) throw new Error('getSecret requires Tauri runtime');
+  return invoke<string | null>('get_secret', { service, key });
+}
+
 // ── Anthropic API (via Rust — key never touches renderer) ────────────────────
 
 export interface AnthropicMessage {
