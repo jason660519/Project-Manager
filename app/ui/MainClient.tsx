@@ -16,6 +16,7 @@ import {
 import { AppShell } from './AppShell';
 import { DashboardClient } from './DashboardClient';
 import { FeaturesView } from './views/FeaturesView';
+import { ProjectFilesView } from './views/ProjectFilesView';
 import { ProjectsView } from './views/ProjectsView';
 import { SettingsView } from './views/SettingsView';
 
@@ -343,9 +344,6 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
   return (
     <AppShell
       currentView={currentView}
-      projects={projects}
-      selectedProjectId={selectedProjectId}
-      onSelectProject={setSelectedProjectId}
       projectName={selectedProject.config.project.name}
       projectRoot={selectedProject.config.project.root}
       bridgeStatus={bridgeStatus}
@@ -388,6 +386,12 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
         />
       )}
       {currentView === 'settings' && <SettingsView />}
+      {currentView === 'project-files' && (
+        <ProjectFilesView
+          projects={projects}
+          selectedDashboardProjectIds={selectedDashboardProjectIds}
+        />
+      )}
     </AppShell>
   );
 }

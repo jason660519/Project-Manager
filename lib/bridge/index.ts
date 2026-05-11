@@ -240,3 +240,22 @@ export async function callAnthropic(opts: {
     messages: opts.messages,
   });
 }
+
+// ── Project file tree ─────────────────────────────────────────────────────────
+
+export interface FileNode {
+  name: string;
+  path: string;
+  isDir: boolean;
+  children: FileNode[];
+}
+
+/**
+ * Recursively list files and directories under `root` up to `maxDepth` levels.
+ * Common build/cache folders (.git, node_modules, target, .next, …) are pruned.
+ * Tauri only — throws in browser dev mode.
+ */
+export async function listProjectFiles(root: string, maxDepth = 4): Promise<FileNode[]> {
+  if (!isTauri()) throw new Error('listProjectFiles requires Tauri runtime');
+  return invoke<FileNode[]>('list_project_files', { root, maxDepth });
+}

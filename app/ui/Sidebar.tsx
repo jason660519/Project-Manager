@@ -5,6 +5,7 @@ import {
   Boxes,
   CircleGauge,
   DatabaseZap,
+  Files,
   Settings,
   ShieldCheck,
 } from 'lucide-react';
@@ -27,10 +28,17 @@ const NAV_ITEMS: Array<{
     },
     {
       id: 'dashboard',
-      label: 'Dashboard',
-      href: '/dashboard',
+      label: 'Project Progress Dashboard',
+      href: '/project-progress-dashboard',
       hint: 'Overview metrics and project health at a glance.',
       icon: CircleGauge,
+    },
+    {
+      id: 'project-files',
+      label: 'Project Files',
+      href: '/project-files',
+      hint: 'Browse all files under your selected projects.',
+      icon: Files,
     },
     {
       id: 'settings',

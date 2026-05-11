@@ -33,15 +33,26 @@ const columnHelper = createColumnHelper<Feature>();
 
 function renderPathCell(value?: string) {
   if (!value) {
-    return <span className="text-xs text-stone-500">-</span>;
+    return <span className="text-xs text-stone-500">—</span>;
   }
 
-  return <span className="font-mono text-xs text-stone-300">{value}</span>;
+  return (
+    <span className="block max-w-[200px] truncate font-mono text-xs text-stone-300" title={value}>
+      {value}
+    </span>
+  );
 }
 
 export function TableCore({ data, onDispatch, onRowClick }: TableCoreProps) {
   const columns = useMemo(
     () => [
+      columnHelper.accessor((row) => (row.metadata?.sourceProjectName as string | undefined) ?? '—', {
+        id: 'col-project',
+        header: 'Project',
+        cell: (info) => (
+          <span className="whitespace-nowrap font-medium text-stone-100">{info.getValue()}</span>
+        ),
+      }),
       columnHelper.accessor('id', {
         header: 'ID',
         cell: (info) => <span className="font-mono text-xs">{info.getValue()}</span>,
@@ -60,33 +71,33 @@ export function TableCore({ data, onDispatch, onRowClick }: TableCoreProps) {
         cell: (info) => <span className="font-medium text-stone-100">{info.getValue()}</span>,
       }),
       columnHelper.accessor((row) => row.paths?.spec, {
-        id: 'featureDevSpec',
+        id: 'col-spec',
         header: 'Feature Dev Spec',
         cell: (info) => renderPathCell(info.getValue()),
       }),
       columnHelper.accessor((row) => row.paths?.tdd, {
-        id: 'tddSpec',
+        id: 'col-tdd',
         header: 'TDD Spec',
         cell: (info) => renderPathCell(info.getValue()),
       }),
       columnHelper.accessor((row) => row.paths?.tddProgressReport, {
-        id: 'tddProgressReport',
+        id: 'col-tdd-report',
         header: 'TDD Progress Report',
         cell: (info) => renderPathCell(info.getValue()),
       }),
       columnHelper.accessor((row) => row.paths?.unitIntegrationTest, {
-        id: 'unitAndIntergrationTest',
-        header: 'Unit and Intergration Test',
+        id: 'col-unit-test',
+        header: 'Unit & Integration Test',
         cell: (info) => renderPathCell(info.getValue()),
       }),
       columnHelper.accessor((row) => row.paths?.e2eAcceptanceTestScriptFolder ?? row.paths?.test, {
-        id: 'e2eAccptanceTestScriptFolder',
-        header: 'E2E Accptance Test Script Folder',
+        id: 'col-e2e',
+        header: 'E2E Acceptance Test',
         cell: (info) => renderPathCell(info.getValue()),
       }),
       columnHelper.accessor((row) => row.paths?.developmentLogSummaryFolder, {
-        id: 'devlopmentLogSummaryFolder',
-        header: 'Devlopment Log Summary Folder',
+        id: 'col-dev-log',
+        header: 'Dev Log Summary',
         cell: (info) => renderPathCell(info.getValue()),
       }),
       columnHelper.accessor('status', {
@@ -110,7 +121,7 @@ export function TableCore({ data, onDispatch, onRowClick }: TableCoreProps) {
         ),
       }),
       columnHelper.display({
-        id: 'actions',
+        id: 'col-actions',
         header: '',
         cell: (info) => (
           <button
@@ -139,7 +150,7 @@ export function TableCore({ data, onDispatch, onRowClick }: TableCoreProps) {
   return (
     <div className="overflow-x-auto bg-transparent">
       <table className="w-full border-collapse text-left">
-        <thead className="border-b border-stone-200/12 bg-white/[0.035]">
+        <thead className="sticky top-0 z-10 border-b border-stone-200/12 bg-[#071d1a]">
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
@@ -188,7 +199,7 @@ function StatusBadge({ status }: { status: FeatureStatus }) {
     todo: 'border-stone-300/20 bg-stone-200/10 text-stone-200',
     in_progress: 'border-cyan-200/20 bg-cyan-100/10 text-cyan-100',
     done: 'border-emerald-200/20 bg-emerald-100/10 text-emerald-100',
-    on_hold: 'border-amber-200/20 bg-amber-100/10 text-amber-100',
+    on_hold: 'border-red-400/20 bg-red-500/15 text-red-400',
   };
   return (
     <span className={cn('border px-2 py-0.5 text-xs font-medium', styles[status])}>

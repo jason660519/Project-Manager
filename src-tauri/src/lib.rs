@@ -578,6 +578,86 @@ async fn start_github_poll(
     Ok(())
 }
 
+// ── Project file tree ─────────────────────────────────────────────────────────
+
+#[derive(Serialize, Clone)]
+struct FileNode {
+    name: String,
+    path: String,
+    #[serde(rename = "isDir")]
+    is_dir: bool,
+    children: Vec<FileNode>,
+}
+
+const SKIP_DIRS: &[&str] = &[
+    ".git",
+    "node_modules",
+    "target",
+    ".next",
+    "dist",
+    "build",
+    ".cache",
+    "__pycache__",
+    ".venv",
+    "venv",
+    ".idea",
+    ".turbo",
+    "out",
+];
+
+fn list_dir_recursive(path: &std::path::Path, depth: u32, max_depth: u32) -> Vec<FileNode> {
+    if depth > max_depth {
+        return vec![];
+    }
+    let Ok(read_dir) = std::fs::read_dir(path) else {
+        return vec![];
+    };
+    let mut nodes: Vec<FileNode> = Vec::new();
+    for entry in read_dir.flatten() {
+        let file_name = entry.file_name();
+        let name = file_name.to_string_lossy().to_string();
+        // Skip hidden files/dirs (except root level and .dev-pilot.json)
+        if name.starts_with('.') && name != ".dev-pilot.json" && depth > 0 {
+            continue;
+        }
+        let entry_path = entry.path();
+        let path_str = entry_path.to_string_lossy().to_string();
+        let Ok(metadata) = entry.metadata() else {
+            continue;
+        };
+        if metadata.is_dir() {
+            if SKIP_DIRS.contains(&name.as_str()) {
+                continue;
+            }
+            let children = list_dir_recursive(&entry_path, depth + 1, max_depth);
+            nodes.push(FileNode { name, path: path_str, is_dir: true, children });
+        } else {
+            nodes.push(FileNode { name, path: path_str, is_dir: false, children: vec![] });
+        }
+    }
+    // Directories first, then files; both sorted alphabetically
+    nodes.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+    });
+    nodes
+}
+
+/// Recursively list files and directories under `root` up to `max_depth`.
+/// Common build/cache folders (.git, node_modules, target, .next, …) are pruned.
+#[tauri::command]
+async fn list_project_files(root: String, max_depth: u32) -> Result<Vec<FileNode>, String> {
+    let path = std::path::Path::new(&root);
+    if !path.exists() {
+        return Err(format!("Path does not exist: {root}"));
+    }
+    if !path.is_dir() {
+        return Err(format!("Path is not a directory: {root}"));
+    }
+    Ok(list_dir_recursive(path, 0, max_depth))
+}
+
 // ── App entry ─────────────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -606,6 +686,7 @@ pub fn run() {
             set_secret,
             get_secret,
             start_github_poll,
+            list_project_files,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

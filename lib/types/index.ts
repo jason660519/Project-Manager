@@ -85,7 +85,7 @@ export interface DevPilotConfig {
 
 // ── App navigation & run-store types ─────────────────────────────────────────
 
-export type ViewId = 'dashboard' | 'features' | 'projects' | 'settings';
+export type ViewId = 'dashboard' | 'features' | 'projects' | 'project-files' | 'settings';
 
 export type IssueState = 'open' | 'closed';
 

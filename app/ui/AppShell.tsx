@@ -1,16 +1,13 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { ProjectEntry, ViewId } from '../../lib/types';
+import { ViewId } from '../../lib/types';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 
 interface AppShellProps {
   children: ReactNode;
   currentView: ViewId;
-  projects: ProjectEntry[];
-  selectedProjectId: string;
-  onSelectProject: (id: string) => void;
   projectName: string;
   projectRoot: string;
   bridgeStatus: 'dry-run' | 'connected' | 'offline' | 'live';
@@ -20,9 +17,6 @@ interface AppShellProps {
 export function AppShell({
   children,
   currentView,
-  projects,
-  selectedProjectId,
-  onSelectProject,
   projectName,
   projectRoot,
   bridgeStatus,
@@ -41,12 +35,8 @@ export function AppShell({
         <div className="min-w-0 border-l border-stone-200/15">
           <Topbar
             currentView={currentView}
-            projects={projects}
-            selectedProjectId={selectedProjectId}
-            onSelectProject={onSelectProject}
             projectName={projectName}
             projectRoot={projectRoot}
-            bridgeStatus={bridgeStatus}
           />
           <div className="px-4 py-4 sm:px-6 lg:px-7 lg:py-6">{children}</div>
         </div>
