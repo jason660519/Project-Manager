@@ -3,6 +3,8 @@
 import { useRef, useState } from 'react';
 import { CheckCircle2, FileInput, Upload, X } from 'lucide-react';
 import { Feature, FeatureStatus, ProjectConfig } from '../../../lib/types';
+import { parseMarkdown } from '../../../lib/ingestion/parseMarkdown';
+import { callAnthropic } from '../../../lib/bridge';
 
 interface IngestionViewProps {
   project: ProjectConfig;
@@ -11,6 +13,7 @@ interface IngestionViewProps {
 
 type Phase = 'idle' | 'processing' | 'review' | 'done';
 
+/** Fallback when file type is unsupported or AI is unavailable. */
 function mockFeaturesFromFile(fileName: string): Feature[] {
   const baseName = fileName.replace(/\.(docx|xlsx|md)$/i, '');
   const id = `IMP-${Date.now().toString(36).toUpperCase().slice(-5)}`;
@@ -30,37 +33,112 @@ function mockFeaturesFromFile(fileName: string): Feature[] {
   ];
 }
 
+/**
+ * Use the Anthropic API (Tauri only) to generate feature stubs for a
+ * DOCX/XLSX file whose binary content cannot be parsed directly in JS.
+ * The AI receives the filename + file size and generates plausible stubs.
+ */
+async function parseWithAI(file: File, apiKey: string): Promise<Feature[]> {
+  const sizeKb = (file.size / 1024).toFixed(1);
+  const resp = await callAnthropic({
+    apiKey,
+    maxTokens: 1024,
+    messages: [
+      {
+        role: 'user',
+        content:
+          `A developer uploaded a spec document named "${file.name}" (${sizeKb} KB). ` +
+          'Generate 3–5 software feature requirement stubs that would plausibly appear in ' +
+          'such a document. Return ONLY a valid JSON array — no markdown fences, no extra text — ' +
+          'with this structure:\n' +
+          '[{"name": "...", "category": "...", "status": "todo", "notes": "..."}]\n' +
+          'Valid status values: "todo", "in_progress", "done", "on_hold".',
+      },
+    ],
+  });
+
+  const parsed = JSON.parse(resp.content) as Array<{
+    name: string;
+    category?: string;
+    status?: string;
+    notes?: string;
+  }>;
+
+  return parsed.map((item, i) => ({
+    id: `IMP-${Date.now().toString(36).toUpperCase().slice(-4)}${i.toString(36).toUpperCase()}`,
+    name: item.name,
+    category: item.category ?? 'Imported',
+    status: (item.status ?? 'todo') as FeatureStatus,
+    progress: 0,
+    paths: {},
+    notes: item.notes,
+  }));
+}
+
 export function IngestionView({ project, onImportFeatures }: IngestionViewProps) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [dragOver, setDragOver] = useState(false);
   const [fileName, setFileName] = useState('');
   const [draftFeatures, setDraftFeatures] = useState<Feature[]>([]);
+  const [parseMethod, setParseMethod] = useState<'md' | 'ai' | 'mock'>('mock');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
-  const processFile = (file: File) => {
+  const processFile = async (file: File) => {
     const allowed = ['.docx', '.xlsx', '.md'];
-    if (!allowed.some((ext) => file.name.endsWith(ext))) {
+    if (!allowed.some((ext) => file.name.toLowerCase().endsWith(ext))) {
       alert('Only .docx, .xlsx, .md files are supported.');
       return;
     }
+
     setFileName(file.name);
     setPhase('processing');
-    setTimeout(
-      () => {
-        setDraftFeatures(mockFeaturesFromFile(file.name));
-        setPhase('review');
-      },
-      isTauri ? 2000 : 900,
-    );
+
+    try {
+      let drafts: Feature[];
+
+      if (file.name.toLowerCase().endsWith('.md')) {
+        // Real Markdown parsing — works in browser and Tauri
+        const text = await file.text();
+        drafts = parseMarkdown(text, file.name);
+        setParseMethod('md');
+      } else if (isTauri) {
+        // DOCX / XLSX in Tauri — ask AI to generate plausible feature stubs
+        const apiKey =
+          typeof window !== 'undefined' ? (localStorage.getItem('devpilot-api-key') ?? '') : '';
+        if (apiKey) {
+          drafts = await parseWithAI(file, apiKey);
+          setParseMethod('ai');
+        } else {
+          // Tauri but no API key yet → mock + hint
+          await new Promise<void>((r) => setTimeout(r, 900));
+          drafts = mockFeaturesFromFile(file.name);
+          setParseMethod('mock');
+        }
+      } else {
+        // Browser dev mode — always mock
+        await new Promise<void>((r) => setTimeout(r, 900));
+        drafts = mockFeaturesFromFile(file.name);
+        setParseMethod('mock');
+      }
+
+      setDraftFeatures(drafts);
+      setPhase('review');
+    } catch (err) {
+      console.error('[IngestionView] processFile error:', err);
+      // Graceful fallback — show mock drafts so the review step is always reachable
+      setDraftFeatures(mockFeaturesFromFile(file.name));
+      setParseMethod('mock');
+      setPhase('review');
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
     const file = e.dataTransfer.files[0];
-    if (file) processFile(file);
+    if (file) void processFile(file);
   };
 
   const handleConfirm = () => {
@@ -70,6 +148,7 @@ export function IngestionView({ project, onImportFeatures }: IngestionViewProps)
       setPhase('idle');
       setFileName('');
       setDraftFeatures([]);
+      setParseMethod('mock');
     }, 2000);
   };
 
@@ -77,7 +156,18 @@ export function IngestionView({ project, onImportFeatures }: IngestionViewProps)
     setPhase('idle');
     setFileName('');
     setDraftFeatures([]);
+    setParseMethod('mock');
   };
+
+  /** Human-readable description of how the drafts were generated. */
+  const parseMethodLabel =
+    parseMethod === 'md'
+      ? 'Parsed from Markdown headings'
+      : parseMethod === 'ai'
+        ? 'Generated by AI (Claude) from filename'
+        : isTauri
+          ? 'Simulated — add API key in Settings for AI parsing'
+          : 'Simulated (dev mode)';
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -86,7 +176,7 @@ export function IngestionView({ project, onImportFeatures }: IngestionViewProps)
           Spec Ingestion
         </h1>
         <p className="mt-1 text-xs text-stone-400">
-          Drop a spec file to parse and generate feature drafts via AI.{' '}
+          Drop a spec file to parse and generate feature drafts.{' '}
           {!isTauri && (
             <span className="text-amber-100/70">Dry-run mode — AI parsing simulated.</span>
           )}
@@ -114,7 +204,10 @@ export function IngestionView({ project, onImportFeatures }: IngestionViewProps)
             type="file"
             accept=".docx,.xlsx,.md"
             className="hidden"
-            onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void processFile(file);
+            }}
           />
           <Upload className="mb-4 text-stone-400" size={36} />
           <p className="text-sm font-medium text-stone-200">Drop spec file here</p>
@@ -128,10 +221,14 @@ export function IngestionView({ project, onImportFeatures }: IngestionViewProps)
       {/* Processing */}
       {phase === 'processing' && (
         <div className="flex min-h-64 flex-col items-center justify-center border border-stone-200/18 bg-[#071d1a]/72">
-          <div className="mb-4 h-8 w-8 animate-spin rounded-full border-2 border-stone-600 border-t-emerald-400" />
+          <div className="mb-4 h-8 w-8 animate-spin border-2 border-stone-600 border-t-emerald-400" />
           <p className="text-sm text-stone-200">Parsing {fileName}…</p>
           <p className="mt-2 text-xs text-stone-500">
-            {isTauri ? 'Running AI ingestion pipeline' : 'Simulating ingestion (dev mode)'}
+            {fileName.toLowerCase().endsWith('.md')
+              ? 'Extracting features from Markdown headings'
+              : isTauri
+                ? 'Generating feature stubs via AI'
+                : 'Simulating ingestion (dev mode)'}
           </p>
         </div>
       )}
@@ -142,7 +239,10 @@ export function IngestionView({ project, onImportFeatures }: IngestionViewProps)
           <div className="flex items-center gap-3 border border-stone-200/18 bg-[#071d1a]/72 px-4 py-3">
             <FileInput size={16} className="text-amber-100" />
             <span className="text-sm text-stone-200">{fileName}</span>
-            <button onClick={reset} className="ml-auto text-stone-400 hover:text-stone-100">
+            <span className="ml-auto mr-3 text-[10px] uppercase tracking-[0.14em] text-stone-500">
+              {parseMethodLabel}
+            </span>
+            <button onClick={reset} className="text-stone-400 hover:text-stone-100">
               <X size={16} />
             </button>
           </div>
@@ -181,6 +281,7 @@ export function IngestionView({ project, onImportFeatures }: IngestionViewProps)
                         >
                           <option value="todo">To Do</option>
                           <option value="in_progress">In Progress</option>
+                          <option value="done">Done</option>
                           <option value="on_hold">Blocked</option>
                         </select>
                         <input
@@ -194,6 +295,9 @@ export function IngestionView({ project, onImportFeatures }: IngestionViewProps)
                           className="flex-1 border border-stone-200/20 bg-transparent px-2 py-1 text-xs text-stone-400 outline-none focus:ring-1 focus:ring-emerald-300/35"
                         />
                       </div>
+                      {feature.notes && (
+                        <p className="text-[11px] text-stone-500">{feature.notes}</p>
+                      )}
                     </div>
                   </div>
                 </div>
