@@ -1,146 +1,216 @@
-# DevPilot 目標客群分析
+# DevPilot Target Audience Analysis
 
-**版本**：v0.1  
-**日期**：2026-05-12
+Version: v0.1  
+Date: 2026-05-12
 
 ---
+
+## English Version
+
+## 1. Positioning
+
+DevPilot is not for all developers. It is for developers who already run AI-agent workflows and need a local control center for dispatch and execution visibility.
+
+## 2. Primary Segments
+
+### Segment A: AI-Native Solo Developers
+
+- Individual builders managing 3-10 projects.
+- Toolchain centered on Cursor/Claude Code/Codex + GitHub.
+- Highly automation-driven and ROI-sensitive.
+
+Motivation:
+
+- Unified task control across many projects.
+- Faster and repeatable agent dispatch.
+
+Pain:
+
+- Task information scattered across tools.
+- Manual prompt assembly for every dispatch.
+- Poor runtime visibility from terminal-only workflow.
+
+### Segment B: Tech Leads in Small Teams (2-10 engineers)
+
+- Team leads with delivery responsibility.
+- Need to keep feature throughput predictable.
+- Require practical security and auditability.
+
+Motivation:
+
+- Use DevPilot as an AI execution coordinator.
+- Convert inconsistent PM specs into executable features.
+- Keep traceable run history for review/debug.
+
+Pain:
+
+- Inconsistent input formats from stakeholders.
+- Extra review overhead after agent runs.
+- Existing tracker integrations are complex.
+
+### Segment C: Senior Individual Contributors
+
+- Staff/principal engineers in mid-large organizations.
+- Personal tooling decisions, power-user behavior.
+- Use agents to accelerate large scoped tasks.
+
+Motivation:
+
+- Maintain a private execution workflow with minimal friction.
+- Avoid heavy enterprise workflows for individual delivery.
+
+## 3. Secondary Segments (Not MVP Focus)
+
+| Segment | Why Not Primary in MVP |
+| --- | --- |
+| Non-engineering PM/Designer | Higher learning curve for CLI/agent concepts |
+| Enterprise procurement users | Need SSO/compliance/audit stack |
+| Students/beginners | Lower need for multi-project orchestration |
+
+## 4. Beachhead
+
+Primary MVP beachhead:
+
+**Segment A + GitHub + Claude Code/Cursor + macOS users**
+
+Why:
+
+- Fast onboarding and high tolerance for early products.
+- Strong feedback quality.
+- High concentration in public dev communities.
+
+## 5. Customer Journey
+
+Discovery -> Trial -> Habit -> Referral
+
+- Discovery: social dev channels and repository docs.
+- Trial: install, add first project, dispatch first agent task.
+- Habit: daily morning triage in DevPilot.
+- Referral: workflow sharing with peers.
+
+Critical conversion event: first successful dispatch with live log visibility.
+
+## 6. Jobs to Be Done
+
+| Job | Current Method | DevPilot Method |
+| --- | --- | --- |
+| Cross-project daily triage | Multiple tabs/tools | Unified dashboard |
+| Convert specs to tasks | Manual copy/paste | AI-assisted ingestion |
+| Dispatch agent task | Terminal command + manual prompt | Dispatch in <=3 clicks |
+| Monitor execution | Watch terminal manually | Live log with status |
+| Weekly reporting | Manual git/PR summary | One-click Markdown report |
+
+## 7. Pricing Direction (Reference)
+
+| Plan | Target | Direction |
+| --- | --- | --- |
+| Free | Early adopters | Unlimited local core usage |
+| Pro (Individual) | Segment A/C | Advanced AI and sync features |
+| Team | Segment B | Shared config and run history |
+
+MVP recommendation: keep free first, validate retention before monetization.
+
+---
+
+## 中文版本
 
 ## 1. 市場定位
 
-DevPilot 不是「所有工程師」的工具，而是**有 AI Agent 工作流程的工程師**的工具。這個族群在 2025～2026 年正在快速成長，但目前沒有一個專門為他們設計的任務指揮工具。
+DevPilot 不是面向所有工程師，而是面向已經在使用 AI Agent 工作流、需要本機任務指揮中心的工程師。
 
----
+## 2. 主要族群
 
-## 2. 主要族群（Primary Segments）
+### Segment A：AI-Native 獨立開發者
 
-### Segment A：AI-Native 獨立開發者（Solo Dev）
+- 一人管理 3 到 10 個專案。
+- 以 Cursor、Claude Code、Codex 與 GitHub 為核心工具鏈。
+- 高度重視自動化與工具 ROI。
 
-**人口特徵**
-- 1 人獨立開發，同時維護 3～10 個專案
-- 收入來源：接案、SaaS 產品、開源贊助
-- 工具棧：Cursor / Claude Code / Codex + GitHub + Vercel/Fly.io
+核心動機：
 
-**心理特徵**
-- 極度重視效率，會為了省 5 分鐘而花 2 小時自動化
-- 早期採用者，喜歡嘗試新工具
-- 對訂閱制敏感，但若工具有明顯 ROI 願意付費
+- 用單一介面管理多專案任務。
+- 降低每次 Agent 派遣的操作成本。
 
-**使用 DevPilot 的核心動機**
-- 同時管理多個專案的任務，不想在 10 個 terminal tab 間切換
-- 想要一個「任務指揮官」，把 agent 當工人派遣
+核心痛點：
 
-**痛點**
-- Notion 太重、Jira 太企業、GitHub Issues 太零散
-- 每次 dispatch agent 都要手動 copy-paste 規格給它
-- 不知道 agent 跑完了沒，要去 terminal 看
+- 任務資訊分散。
+- 每次都要手動組 Prompt。
+- 只能在 terminal 追執行狀態。
 
-**規模估計**：全球約 50 萬～100 萬人（AI-native solo dev 是 2025 新興族群）
+### Segment B：小型團隊 Tech Lead（2 到 10 人）
 
----
+- 需維持 feature 交付節奏與品質。
+- 對安全性與可追溯性有基本要求。
 
-### Segment B：小型工程團隊的 Tech Lead（2～10 人團隊）
+核心動機：
 
-**人口特徵**
-- 帶領 2～5 人工程師的 Tech Lead 或 CTO
-- 公司階段：Seed～Series A 新創，或小型軟體工作室
-- 需要跨越多個進行中的 feature，同時維持團隊節奏
+- 把 DevPilot 當作 AI 執行分配器。
+- 把格式不一的規格快速轉為可執行任務。
+- 保留執行紀錄，便於 review 與 debug。
 
-**心理特徵**
-- 有選工具的決策權，但需要對團隊說明理由
-- 重視工具能否融入現有工作流程（不想大改流程）
-- 對安全性和資料隱私有基本要求
+核心痛點：
 
-**使用 DevPilot 的核心動機**
-- 用 DevPilot 當「AI Agent 工作分配器」，分派給不同 agent 或工程師
-- 規格書（Word/Excel）匯入功能，解決 PM 傳來格式不一致的問題
-- 讓 agent 的執行記錄可追溯，出事了能 debug
+- PM 輸入格式不一致。
+- Agent 結果仍需人工覆核。
+- 現有整合方案設定複雜。
 
-**痛點**
-- PM 的規格書格式每次都不一樣（有時 Word、有時 Notion Export）
-- Agent 跑完的結果不知道有沒有做對，需要 review 流程
-- Linear / Jira 的 agent 整合太麻煩，設定複雜
+### Segment C：資深個人工程師
 
-**規模估計**：全球約 30 萬～80 萬人（早期採用的工程 lead）
+- 屬於中大型公司中的 Staff/Principal IC。
+- 偏好可程式化、快捷鍵與高效率工具。
 
----
+核心動機：
 
-### Segment C：有 AI Workflow 的資深個人工程師（Staff / Principal Eng）
+- 建立自己的任務與派遣節奏。
+- 避免沉重企業流程影響個人交付效率。
 
-**人口特徵**
-- 在大中型公司工作的資深工程師
-- 個人使用 DevPilot，不一定是公司決策
-- 用 AI Agent 處理自己負責的大型 feature
+## 3. 次要族群（MVP 非主力）
 
-**心理特徵**
-- 工具選擇自主性高，不需要老闆核准
-- 偏好 power user 功能（CLI、快捷鍵、可程式化）
-- 有能力自行評估工具的技術品質
+| 族群 | 暫不主力原因 |
+| --- | --- |
+| 非工程背景 PM/Designer | Agent/CLI 學習門檻較高 |
+| 企業採購角色 | 需要 SSO/合規/audit 能力 |
+| 學生與初學者 | 多專案與 Agent 協作需求較低 |
 
-**使用 DevPilot 的核心動機**
-- 管理自己負責的多個大型 feature，不想用公司的 Jira（太慢、太重）
-- 想要一個「私人 agent 指揮官」，配合自己的工作節奏
+## 4. Beachhead
 
-**規模估計**：全球約 20 萬～50 萬人
+MVP 先聚焦：
 
----
+**Segment A + GitHub + Claude Code/Cursor + macOS**
 
-## 3. 次要族群（Secondary Segments，暫不主力服務）
+原因：
 
-| 族群 | 為何暫不主力服務 |
-|------|----------------|
-| 非工程背景的 PM / Designer | 學習門檻：需理解 Agent、CLI 的概念 |
-| 大型企業採購（Enterprise） | 需要 SSO、audit log、合規認證，MVP 做不到 |
-| 學生 / 初學者 | 沒有多專案管理的需求；Agent workflow 不熟悉 |
+- 上手快，對早期產品容錯高。
+- 回饋密度與品質高。
+- 在開發者社群擴散速度快。
 
----
+## 5. 使用者旅程
 
-## 4. 早期採用者（Beachhead）
+發現 -> 試用 -> 習慣化 -> 推薦
 
-MVP 階段的 beachhead 應集中在：
+- 發現：社群與 repo 文檔。
+- 試用：安裝、導入第一個專案、派第一個任務。
+- 習慣化：每天早晨進行任務盤點。
+- 推薦：在團隊或社群分享工作流。
 
-> **Segment A × 有 GitHub + Claude Code / Cursor 工作流程 × macOS 用戶**
+關鍵轉化點：第一次成功派遣並看到 live log。
 
-這群人：
-- 技術能力足夠自行安裝 Tauri app、處理 `.json` 設定
-- 在 X/Twitter、Discord 上活躍，口碑傳播快
-- 對 Early Access 有耐受度，容易提供高品質 feedback
-- **macOS 優先**：這群人 Mac 比例高，縮小平台範圍降低開發複雜度
+## 6. JTBD
 
----
+| Job | 現況 | DevPilot 解法 |
+| --- | --- | --- |
+| 跨專案盤點 | 多工具分散查詢 | 單一 Dashboard |
+| 規格轉任務 | 手動複製貼上 | AI 匯入映射 |
+| 派遣任務 | terminal 手動指令 | 三步內完成 |
+| 監控執行 | 人工盯 terminal | Live log + 狀態 |
+| 週報彙整 | 手動整理 git/PR | 一鍵輸出 Markdown |
 
-## 5. 使用者旅程（Customer Journey）
+## 7. 定價方向（參考）
 
-```
-[發現] → [試用] → [習慣化] → [推薦]
+| 方案 | 目標族群 | 方向 |
+| --- | --- | --- |
+| Free | 早期採用者 | 本機核心功能免費 |
+| Pro（個人） | Segment A/C | 進階 AI 與同步功能 |
+| Team | Segment B | 共享設定與執行紀錄 |
 
-發現：X/Twitter 的 AI dev workflow 討論 / GitHub README
-試用：下載安裝 → 設定第一個專案 → 派第一個 Agent 任務
-習慣化：每天早晨開 DevPilot 盤點任務（取代開 Notion 的習慣）
-推薦：「我用這個管我的 agent，你們也試試」
-```
-
-**關鍵轉化點**：使用者在「第一次成功派遣 agent 並看到 live log」時，習慣化機率大幅提升。
-
----
-
-## 6. Jobs to be Done (JTBD)
-
-| Job | 現在怎麼做 | DevPilot 的解法 |
-|-----|-----------|----------------|
-| 早晨快速盤點所有專案進度 | 開多個瀏覽器分頁看 Notion / GitHub | 單一 Dashboard 聚合 |
-| 把 PM 的規格轉成可執行任務 | 手動 copy-paste，有時用 ChatGPT 整理 | 拖曳匯入，AI 自動映射 |
-| 觸發 agent 去執行某個任務 | 開 terminal，手動打指令 + 貼上 prompt | 3 次點擊完成 dispatch |
-| 確認 agent 有沒有做完 | 盯著 terminal 或等它 push commit | Live log 面板，有通知 |
-| 整理本週產出給 stakeholder | 手動翻 git log 或 GitHub PR | 一鍵產出週報 Markdown |
-
----
-
-## 7. Pricing 方向（供參考）
-
-| 方案 | 目標族群 | 定價思路 |
-|------|----------|---------|
-| Free | Segment A 早期採用者 | 無限本機使用，社群口碑 |
-| Pro（個人）| Segment A / C Power users | $9～$15 / 月：雲端同步、進階 AI 功能 |
-| Team | Segment B | $20～$30 / 人 / 月：多人共用設定、執行記錄共享 |
-
-> MVP 階段建議全部 Free，先驗證留存再談付費。
+MVP 建議先免費，優先驗證留存與工作流價值。

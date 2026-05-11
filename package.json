@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "next typegen && tsc --noEmit",
+    "docs:check": "./scripts/docs-governance-check.sh",
+    "docs:fix": "./scripts/docs-governance-fix.sh",
+    "docs:archive": "bash -lc './scripts/docs-governance-fix.sh . archive \"$npm_config_file\"'",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "tauri:icon": "tauri icon"

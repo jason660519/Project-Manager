@@ -1,144 +1,345 @@
-# DevPilot 使用者情境說明
+# DevPilot User Scenarios
 
-> 本文檔描述工程師在使用 DevPilot 桌面應用時的真實使用流程。
-> 每個情境都對應到一個核心功能需求，並標註對 Tauri / Rust bridge 的依賴程度。
+> This document describes realistic workflows for engineers using DevPilot.
+> Each scenario maps to a core product capability and required Tauri/Rust integration.
 
 ---
+
+## English Version
 
 ## Persona
 
-**主要使用者：Alex，獨立開發者 / 小型工程團隊的 Tech Lead**
-- 同時維護 3～8 個進行中的專案
-- 習慣使用 Cursor 或 VS Code + Claude Code
-- 有 AI Agent 工作流程（每天會觸發多次 agent 任務）
-- 痛點：任務分散在 Notion、GitHub Issues、Slack，每次要「派任務給 agent」都要手動拼湊上下文
+**Primary user: Alex (Solo Developer / Small-Team Tech Lead)**
+
+- Manages 3 to 8 active projects in parallel.
+- Uses Cursor or VS Code with Claude Code.
+- Runs AI-agent-based workflows daily.
+- Pain point: tasks and specs are spread across Notion, GitHub Issues, Slack, and terminal.
+
+## Scenario 1: Morning Triage (Multi-Source View)
+
+Trigger: Alex starts the day and needs to identify blocked items and dispatch-ready work.
+
+Flow:
+
+1. Open DevPilot.
+2. Dashboard aggregates:
+   - Local `.dev-pilot.json` tasks.
+   - GitHub issue status from connected repositories.
+   - PR progress and commit activity.
+3. Alex filters `blocked` and `in-progress` items.
+4. Alex opens a feature context panel with spec summary and execution history.
+
+OS interactions:
+
+- Read local JSON configs from multiple project paths.
+- Sync GitHub metadata and cache locally.
+- Watch `.dev-pilot.json` changes and refresh UI.
+
+Tauri dependencies: `fs::read`, `fs::watch`, `reqwest`.
+
+## Scenario 1.5: Add Project by GitHub URL
+
+Trigger: Alex wants to onboard an existing repository quickly.
+
+Flow:
+
+1. Click "Add Project".
+2. Paste repository URL (for example: `https://github.com/user/my-app`).
+3. DevPilot analyzes and caches:
+   - PR status (open/merged/blocked).
+   - Commit frequency.
+   - Milestone/project progress.
+   - Issue labels.
+4. DevPilot maps results to feature cards.
+
+Smart prompts:
+
+- If PR idle > 5 days -> suggest review dispatch.
+- If issue label is `blocked` -> increase priority.
+
+OS interactions:
+
+- Call GitHub GraphQL API with local token.
+- Cache metadata with TTL.
+- Run periodic background polling.
+
+Tauri dependencies: `reqwest`, keychain storage, `tokio`.
+
+## Scenario 2: Import Features from Specs
+
+Trigger: Alex receives a `.docx`/`.xlsx` spec and needs executable feature items.
+
+Flow:
+
+1. Drag and drop file into DevPilot.
+2. Run ingestion pipeline for AI mapping.
+3. Review generated feature draft.
+4. Save to `.dev-pilot.json`.
+
+OS interactions:
+
+- Drag/drop event handling.
+- Parse binary formats in Rust.
+- Optional external AI API call.
+
+Tauri dependencies: drag event, parser commands (`docx-rs`, `calamine`).
+
+## Scenario 3: One-Click Agent Dispatch
+
+Trigger: Alex selects a dispatch-ready feature.
+
+Flow:
+
+1. Click "Dispatch to Agent".
+2. DevPilot composes prompt using feature context.
+3. Alex reviews/edits prompt.
+4. DevPilot spawns process in target project directory.
+5. UI shows dispatch success toast and logs execution.
+
+OS interactions:
+
+- Spawn child process (`claude`, `cursor`, `code`).
+- Set working directory.
+- Stream stdout/stderr.
+
+Tauri dependencies: `std::process::Command`, event streaming.
+
+## Scenario 4: Live Execution Monitoring
+
+Trigger: Alex wants progress visibility without switching terminals.
+
+Flow:
+
+1. Open running tasks panel.
+2. Open live log for selected task.
+3. Detect stalled task and offer Kill/Retry.
+4. Update feature status on completion.
+
+OS interactions:
+
+- Async stdout/stderr reading.
+- Process lifecycle management.
+- Persist execution logs.
+
+Tauri dependencies: async IPC streaming, process control.
+
+## Scenario 5: Weekly Progress Report
+
+Trigger: Alex needs a stakeholder summary.
+
+Flow:
+
+1. Click "Generate Report".
+2. Aggregate completed features from all projects.
+3. Generate Markdown draft.
+4. Copy to clipboard or export file.
+
+OS interactions:
+
+- Read configs from multiple project paths.
+- Write `.md` report file.
+- Copy text to clipboard.
+
+Tauri dependencies: `fs::write`, clipboard API.
+
+## Scenario 6: Global Hotkey Overlay
+
+Trigger: Alex is inside IDE and wants instant task dispatch.
+
+Flow:
+
+1. Press global shortcut.
+2. Show mini overlay.
+3. Select project and feature, then dispatch.
+4. Return focus to IDE.
+
+OS interactions:
+
+- Register global hotkeys.
+- Control window focus.
+
+Tauri dependencies: `tauri-plugin-global-shortcut`, window focus API.
+
+## Tauri
+
+| Capability | API / Crate | Priority |
+| --- | --- | --- |
+| Local config read/write | `tauri-plugin-fs` | P0 |
+| Process spawn/kill | `std::process::Command` | P0 |
+| Output streaming | Tauri event emit | P0 |
+| File watch | `notify` | P1 |
+| Drag/drop ingestion | `tauri-plugin-drag` | P1 |
+| Doc parsing | `docx-rs`, `calamine` | P1 |
+| GitHub API calls | `reqwest` | P1 |
+| Token storage | keychain/native | P1 |
+| Background jobs | `tokio` | P1 |
+| Global hotkey | `tauri-plugin-global-shortcut` | P2 |
+| Clipboard | `tauri-plugin-clipboard-manager` | P2 |
 
 ---
 
-## 情境 1：早晨任務盤點
+## 中文版本
 
-**觸發點**：Alex 開始工作，想知道「今天哪些 feature 卡住了，哪些可以派給 agent 繼續跑」
+## Persona
 
-**流程**：
-1. 開啟 DevPilot（常駐在 Dock，視窗尺寸約 900×600 側邊欄模式）
-2. Dashboard 自動載入所有專案的 `.dev-pilot.json`，聚合顯示各 Feature 狀態
-3. Alex 掃視 `blocked` / `in-progress` 的卡片，確認今日優先序
-4. 點擊某個 Feature → 展開 Context Panel，看到該 feature 的規格摘要 + 上次 agent 執行記錄
+**主要使用者：Alex（獨立開發者 / 小型團隊 Tech Lead）**
 
-**本機 OS 互動**：
-- 讀取多個本機磁碟路徑的 JSON 設定（需 Rust FS 讀取）
-- 可能需要 watch 檔案變化（`.dev-pilot.json` 被其他工具更新時即時刷新）
+- 同時管理 3 到 8 個進行中專案。
+- 日常使用 Cursor 或 VS Code + Claude Code。
+- 每天都會執行 AI Agent 任務。
+- 核心痛點是任務、規格與執行資訊分散在多個工具。
 
-**Tauri 依賴**：`fs::read`、`fs::watch` ⭐⭐⭐
+## 情境 1：早晨任務盤點（多源聚合）
 
----
+觸發點：Alex 上班後需要快速看出阻塞項與可派遣項目。
 
-## 情境 2：從規格書匯入新 Feature
+流程：
 
-**觸發點**：PM 傳來一份 Word 或 Excel，Alex 需要把這份文件的需求拆解成可執行的 Feature 清單
+1. 開啟 DevPilot。
+2. Dashboard 聚合本機任務、GitHub 狀態與 PR/commit 活躍度。
+3. 篩選 `blocked` 與 `in-progress`。
+4. 打開 Feature 詳情，查看規格摘要與歷史紀錄。
 
-**流程**：
-1. 拖曳 `.docx` / `.xlsx` 到 DevPilot 視窗（Drag & Drop）
-2. DevPilot 觸發 Ingestion Pipeline：呼叫本機 LLM API 或 Anthropic API 進行 AI Mapping
-3. 顯示「建議的 Feature 清單草稿」供 Alex 確認 / 編輯
-4. 確認後寫入對應專案的 `.dev-pilot.json`
+OS 互動：
 
-**本機 OS 互動**：
-- Drag & Drop 檔案（Tauri drag event）
-- 解析 binary 格式（.docx / .xlsx）→ 需要 Rust crate：`docx-rs`, `calamine`
-- 呼叫外部 API（可在 JS 層完成，但大型文件的解析走 Rust 更快）
+- 讀取多個專案路徑下的 `.dev-pilot.json`。
+- 同步 GitHub 元資料並快取。
+- 監聽設定檔變化並即時更新 UI。
 
-**Tauri 依賴**：`drag-drop event`、Rust 文件解析 command ⭐⭐⭐
+依賴：`fs::read`、`fs::watch`、`reqwest`。
 
----
+## 情境 1.5：貼上 GitHub Repo URL 建立專案
+
+觸發點：Alex 想快速導入既有 repo。
+
+流程：
+
+1. 點擊「新增專案」。
+2. 貼上 repo URL。
+3. 系統分析 PR 狀態、commit 頻率、milestone 進度、issue 標籤。
+4. 對應結果自動映射成 Feature 卡片。
+
+智慧提醒：
+
+- PR 閒置超過 5 天時建議派發 code review。
+- 偵測到 `blocked` issue 時提高優先順序。
+
+OS 互動：
+
+- 透過本機 token 呼叫 GitHub GraphQL API。
+- 以 TTL 快取元資料。
+- 週期性背景輪詢。
+
+依賴：`reqwest`、keychain、`tokio`。
+
+## 情境 2：從規格文件匯入 Feature
+
+觸發點：Alex 收到 `.docx` 或 `.xlsx` 規格，需要快速拆成 Feature。
+
+流程：
+
+1. 拖曳檔案進入 DevPilot。
+2. 執行 Ingestion Pipeline 與 AI 映射。
+3. 檢查 Feature 草稿。
+4. 寫回 `.dev-pilot.json`。
+
+OS 互動：
+
+- 接收拖放事件。
+- 在 Rust 層解析二進位文件。
+- 視需要呼叫外部 AI API。
+
+依賴：拖放事件與 parser command（`docx-rs`、`calamine`）。
 
 ## 情境 3：一鍵派遣 Agent 任務
 
-**觸發點**：Alex 找到一個「可以讓 Claude Code 直接處理」的 Feature，想要觸發執行
+觸發點：Alex 選中可執行 Feature。
 
-**流程**：
-1. 在 Feature 卡片上點擊「▶ Dispatch to Agent」
-2. DevPilot 根據該 Feature 的規格 + 專案上下文，自動組出 Prompt
-3. 顯示 Prompt 預覽（Alex 可微調）
-4. 確認後，DevPilot 在背景執行：
-   - 切換到對應專案目錄
-   - 呼叫 `claude --prompt "..."` 或開啟 Cursor with pre-filled prompt
-5. 右下角 Toast 顯示「任務已派遣」，並記錄執行 log
+流程：
 
-**本機 OS 互動**：
-- `spawn` 子 process（`claude` CLI、`cursor`、`code`）
-- 設定 working directory
-- 捕捉 stdout/stderr 回傳給 UI
+1. 點擊「Dispatch to Agent」。
+2. 自動組裝 Prompt。
+3. 使用者預覽與微調。
+4. 以對應專案目錄啟動子程序。
+5. 顯示派遣成功與執行記錄。
 
-**Tauri 依賴**：`process::Command`（Rust spawn）⭐⭐⭐⭐（核心，純 JS 做不到）
+OS 互動：
 
----
+- 啟動 `claude`、`cursor`、`code` 子程序。
+- 設定 working directory。
+- 串流 stdout/stderr。
+
+依賴：`std::process::Command` 與事件串流。
 
 ## 情境 4：監控 Agent 執行進度
 
-**觸發點**：Agent 任務跑起來後，Alex 想知道它目前在幹嘛，不想切換到 terminal
+觸發點：Alex 不想切回 terminal，也要掌握執行狀態。
 
-**流程**：
-1. DevPilot 側邊顯示「執行中的任務」清單
-2. 點擊任務 → 展開 Live Log 視窗，即時串流 stdout
-3. 若偵測到 agent 卡住（超過 N 分鐘無輸出）→ 顯示警告，提供「Kill & Retry」選項
-4. 任務完成時，解析 agent 的 output，更新 Feature 狀態為 `done` 或 `needs-review`
+流程：
 
-**本機 OS 互動**：
-- 持續讀取 stdout stream（Rust async read）
-- Process 管理（kill PID）
-- 寫入執行 log 到本機
+1. 開啟執行中任務清單。
+2. 進入 Live Log。
+3. 偵測卡住任務並提供 Kill/Retry。
+4. 完成後回寫 Feature 狀態。
 
-**Tauri 依賴**：Rust async IPC streaming ⭐⭐⭐⭐
+OS 互動：
 
----
+- 非同步讀取輸出串流。
+- 管理程序生命週期。
+- 落地儲存執行 log。
 
-## 情境 5：跨專案任務彙整報告
+依賴：async IPC streaming、process control。
 
-**觸發點**：週五下午，Alex 要對 stakeholder 報告本週進度
+## 情境 5：跨專案週報輸出
 
-**流程**：
-1. 點擊「Generate Report」
-2. DevPilot 讀取所有專案的 `.dev-pilot.json`，彙整本週 `done` 的 Feature
-3. 產出 Markdown 報告草稿（可選擇複製到剪貼板 或 匯出 `.md` 檔）
-4. 選擇匯出 → 存到指定資料夾
+觸發點：Alex 需要對利害關係人回報本週進度。
 
-**本機 OS 互動**：
-- 讀取多個跨磁碟路徑的 JSON
-- 寫入 Markdown 檔案
-- 複製到 clipboard（Tauri clipboard API）
+流程：
 
-**Tauri 依賴**：`fs::write`、`clipboard` ⭐⭐
+1. 點擊「Generate Report」。
+2. 聚合所有專案已完成 Feature。
+3. 產生 Markdown 草稿。
+4. 複製到剪貼簿或匯出檔案。
 
----
+OS 互動：
+
+- 跨路徑讀取設定檔。
+- 寫出 `.md` 報告。
+- 複製內容到系統剪貼簿。
+
+依賴：`fs::write`、clipboard API。
 
 ## 情境 6：全域快捷鍵喚起
 
-**觸發點**：Alex 在 Cursor 裡工作，突然想快速派一個臨時任務，不想離開當前視窗太久
+觸發點：Alex 在 IDE 中需要瞬間派遣任務。
 
-**流程**：
-1. 按下全域快捷鍵（例如 `⌘⇧D`）
-2. DevPilot 以 mini-overlay 模式彈出（類似 Raycast）
-3. 快速選擇專案 + Feature，點擊 Dispatch
-4. overlay 自動消失，焦點回到 Cursor
+流程：
 
-**本機 OS 互動**：
-- 全域快捷鍵（OS 層級，需要 Tauri global shortcut plugin）
-- 視窗焦點控制
+1. 按下全域快捷鍵。
+2. 顯示 mini overlay。
+3. 選專案與 Feature 後派遣。
+4. 自動把焦點切回 IDE。
 
-**Tauri 依賴**：`global-shortcut`、`window::set_focus` ⭐⭐⭐（差異化功能，Electron 也能做但更重）
+OS 互動：
 
----
+- 註冊系統層快捷鍵。
+- 控制視窗焦點。
 
-## Tauri / Rust Bridge 需求摘要
+依賴：`tauri-plugin-global-shortcut`、window focus API。
 
-| 功能 | Tauri API / Rust Crate | 優先級 |
-|------|----------------------|--------|
-| 讀寫本機 JSON 設定 | `tauri-plugin-fs` | P0 |
-| 監聽檔案變化 | `notify` crate | P1 |
-| Spawn / Kill 子 process | `std::process::Command` | P0 |
-| stdout stream → UI | Tauri event emit | P0 |
-| Drag & Drop 檔案 | `tauri-plugin-drag` | P1 |
-| 解析 .docx / .xlsx | `docx-rs`, `calamine` | P1 |
+## Tauri 與 Rust 需求摘要
+
+| 功能 | API / Crate | 優先級 |
+| --- | --- | --- |
+| 本機設定讀寫 | `tauri-plugin-fs` | P0 |
+| 程序啟停 | `std::process::Command` | P0 |
+| 輸出串流 | Tauri event emit | P0 |
+| 檔案監聽 | `notify` | P1 |
+| 拖曳匯入 | `tauri-plugin-drag` | P1 |
+| 文件解析 | `docx-rs`、`calamine` | P1 |
+| GitHub API | `reqwest` | P1 |
+| Token 儲存 | keychain/native | P1 |
+| 背景任務 | `tokio` | P1 |
 | 全域快捷鍵 | `tauri-plugin-global-shortcut` | P2 |
-| 剪貼板操作 | `tauri-plugin-clipboard-manager` | P2 |
+| 剪貼簿 | `tauri-plugin-clipboard-manager` | P2 |

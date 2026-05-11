@@ -1,166 +1,217 @@
-# DevPilot PRD — Product Requirements Document
+# DevPilot PRD - Product Requirements Document
 
-**版本**：v0.1  
-**日期**：2026-05-12  
-**狀態**：Draft
+Version: v0.1  
+Date: 2026-05-12  
+Status: Draft
 
 ---
+
+## English Version
+
+## 1. Product Overview
+
+### 1.1 One-Line Definition
+
+DevPilot is a local mission-control app for engineering teams that unifies specs, tasks, and AI-agent execution in one desktop workflow.
+
+### 1.2 Problem Statement
+
+| Current Pain | DevPilot Solution |
+| --- | --- |
+| Specs in docs, tasks in trackers, execution in terminal | One desktop control surface |
+| Manual prompt context assembly for each dispatch | Context-aware prompt generation |
+| No visibility into running agents | Built-in live execution logs |
+| No unified progress across projects | Multi-project dashboard via `.dev-pilot.json` |
+
+### 1.3 Core Principles
+
+1. Progress as Code via project-scoped config.
+2. Context-aware dispatch for higher first-pass quality.
+3. Adapter architecture for multiple IDE/agent tools.
+4. Local-first and privacy-first execution model.
+
+## 2. Goals and Success Metrics
+
+### 2.1 MVP Goals
+
+- Complete loop: review -> select feature -> dispatch -> monitor.
+- Import specs from Word/Excel into feature drafts.
+- Desktop-first shipping, macOS priority.
+
+### 2.2 KPIs
+
+| Metric | Target |
+| --- | --- |
+| Clicks to dispatch one task | <= 3 |
+| Spec import to feature draft | < 30s |
+| Installer size | < 20 MB |
+| Active usage | 5 days/week |
+
+## 3. Functional Requirements
+
+### P0 (MVP)
+
+- F-01 Local project scan and config loading.
+- F-02 Feature dashboard with status filters.
+- F-03 Agent dispatch with prompt preview.
+- F-04 Live log streaming and process kill.
+- F-05 Settings for API key, default adapter, project roots.
+
+### P1
+
+- F-06 AI spec import (`.docx`, `.xlsx`, `.md`).
+- F-07 Live sync from config file changes.
+- F-08 Dispatch history and run records.
+- F-09 Weekly report generation.
+
+### P2
+
+- F-10 Global hotkey overlay.
+- F-11 System tray runtime summary.
+- F-12 Webhook/MCP status receiver.
+
+## 4. Non-Functional Requirements
+
+| Category | Requirement |
+| --- | --- |
+| Performance | Initial load < 2s; smooth at 100 features |
+| Security | API keys in OS keychain, not plain files |
+| Privacy | Local-first data flow; minimal API payload |
+| Offline | Dashboard and dispatch still usable |
+| Platform | macOS first, Windows next |
+| Package size | Keep under 20 MB target |
+
+## 5. Out of Scope
+
+- No centralized backend/database in MVP.
+- No real-time multi-user collaboration.
+- No built-in IDE code editing.
+- No custom model training.
+- No mobile app.
+
+## 6. Architecture Summary
+
+```
+[Tauri Shell]
+  ├── [Next.js / React Frontend]
+  └── [Rust Backend (Tauri Commands)]
+        ├── FS read/write/watch
+        ├── Process spawn/kill/stream
+        ├── Document parsing
+        └── Keychain access
+```
+
+## 7. Confirmed Decisions
+
+| ID | Decision |
+| --- | --- |
+| Q1 | Schema versioning required (`schemaVersion`) |
+| Q2 | Prompt assembly in frontend TypeScript |
+| Q3 | AI API call via Rust commands only |
+| Q4 | MVP beta uses AI persona simulation |
+
+---
+
+## 中文版本
 
 ## 1. 產品概述
 
 ### 1.1 一句話定義
 
-DevPilot 是工程師的**本機任務指揮中心**：把散落在各地的規格、任務、AI Agent 串接成一個可操作的桌面介面。
+DevPilot 是工程師的本機任務指揮中心，把規格、任務與 AI Agent 執行整合成單一桌面流程。
 
-### 1.2 核心問題陳述
+### 1.2 問題陳述
 
-| 現狀痛點 | DevPilot 的解法 |
-|----------|----------------|
-| 任務存在 Notion/Jira，規格在 Word/Excel，執行在 terminal，三個地方來回切換 | 單一桌面視窗聚合所有資訊 |
-| 每次派任務給 AI Agent 都要手動拼湊上下文 | 自動從規格書提取 Context，生成精準 Prompt |
-| 不知道 Agent 跑得怎樣，要開 terminal 去看 | 內建 Live Log，即時監控 stdout |
-| 多專案並行，不知道整體進度 | 跨專案 Dashboard，聚合所有 `.dev-pilot.json` |
+| 現有痛點 | DevPilot 解法 |
+| --- | --- |
+| 規格、任務、執行分散在不同工具 | 提供單一桌面控制面板 |
+| 每次派任務都要手動組 Prompt | 自動組裝上下文與 Prompt |
+| 看不到 Agent 執行過程 | 內建即時執行日誌 |
+| 難以掌握跨專案進度 | 用 `.dev-pilot.json` 聚合檢視 |
 
 ### 1.3 核心理念
 
-1. **Progress as Code**：進度數據隨專案走（`.dev-pilot.json`），不依賴中心化資料庫
-2. **Context-Aware Dispatch**：自動組裝 Prompt，讓 Agent 一次就做對
-3. **Adapter Pattern**：支援 Cursor、VS Code、Claude Code、Codex 等，不綁定單一工具
-4. **本機優先**：所有敏感資料留在本機，不強制上雲
-
----
+1. Progress as Code：進度跟著專案設定檔走。
+2. Context-Aware Dispatch：提升首次派遣成功率。
+3. Adapter Pattern：支援多種 IDE/Agent。
+4. Local-First：優先保留本機資料與隱私。
 
 ## 2. 目標與成功指標
 
-### 2.1 MVP 目標（v1.0，3 個月內）
+### 2.1 MVP 目標
 
-- 工程師可以在 DevPilot 中完成「查看進度 → 選 Feature → 派給 Agent → 監控執行」的完整迴圈
-- 支援從 Excel / Word 匯入需求，AI 自動映射成 Feature 清單
-- 跨平台桌面應用（macOS 優先，Windows 次之）
+- 完成查看 -> 選擇 -> 派遣 -> 監控的完整迴圈。
+- 支援從 Word/Excel 匯入需求草稿。
+- 以桌面版為主，macOS 優先。
 
-### 2.2 成功指標
+### 2.2 KPI
 
-| 指標 | 目標值 |
-|------|--------|
-| 派遣一個 Agent 任務所需的點擊次數 | ≤ 3 次 |
-| 從拖曳規格書到產出 Feature 草稿的時間 | < 30 秒 |
-| 安裝包大小（Tauri 目標） | < 20 MB |
-| 日活躍使用天數（自用 + beta 測試者） | 5 天 / 週 |
-
----
+| 指標 | 目標 |
+| --- | --- |
+| 單任務派遣點擊數 | <= 3 |
+| 規格匯入到草稿時間 | < 30 秒 |
+| 安裝包大小 | < 20 MB |
+| 活躍使用頻率 | 每週 5 天 |
 
 ## 3. 功能需求
 
-### P0 — MVP 核心（必須有才能 ship）
+### P0（MVP）
 
-#### F-01：本機專案掃描與設定載入
-- 掃描指定目錄下所有含 `.dev-pilot.json` 的專案
-- 支援手動新增專案路徑
-- 設定變更時自動熱重載（file watch）
+- F-01 本機專案掃描與設定載入。
+- F-02 Feature Dashboard 與狀態篩選。
+- F-03 Agent 派遣與 Prompt 預覽。
+- F-04 Live Log 串流與程序終止。
+- F-05 API key、預設 adapter、專案根目錄設定。
 
-#### F-02：Feature Dashboard
-- 以卡片或表格形式顯示所有 Feature
-- 狀態篩選：`todo` / `in-progress` / `blocked` / `done` / `needs-review`
-- 跨專案聚合視圖
+### P1
 
-#### F-03：Agent 派遣（Dispatch）
-- 根據 Feature 規格自動生成 Prompt 草稿
-- 支援 Adapter 選擇（Claude Code、Cursor、VS Code）
-- Spawn 子 process 並設定正確的 working directory
-- 執行前顯示 Prompt 預覽，使用者確認後才執行
+- F-06 AI 規格匯入（`.docx`、`.xlsx`、`.md`）。
+- F-07 設定檔變更即時同步。
+- F-08 派遣歷史與執行紀錄。
+- F-09 週報產生。
 
-#### F-04：Live Log 監控
-- 即時串流 agent stdout/stderr 到 UI
-- 顯示執行時間、狀態
-- 提供 Kill process 選項
+### P2
 
-#### F-05：基本設定介面
-- 設定 Anthropic API key（本機加密儲存）
-- 設定預設 Adapter
-- 設定專案根目錄
-
-### P1 — 重要（v1.1 補上）
-
-#### F-06：AI 規格書匯入
-- 支援拖曳 `.docx` / `.xlsx` / `.md`
-- 呼叫 AI API 進行欄位映射
-- 顯示草稿供使用者確認與編輯
-
-#### F-07：檔案 Watch 即時同步
-- 監聽 `.dev-pilot.json` 變化，UI 自動更新
-- 支援外部工具（另一個 AI Agent）也寫入同一份 JSON
-
-#### F-08：執行記錄與歷史
-- 每次 dispatch 都記錄 timestamp、Prompt、stdout 摘要
-- 可在 Feature 詳情頁瀏覽歷史執行記錄
-
-#### F-09：週報產生
-- 彙整本週 `done` Feature，產出 Markdown 報告
-- 支援複製到剪貼板或匯出 `.md` 檔
-
-### P2 — 加分（v2.0 或有資源再做）
-
-#### F-10：全域快捷鍵喚起
-- `⌘⇧D` 彈出 mini overlay（Raycast 風格）
-- 快速選擇 Feature 並 dispatch
-
-#### F-11：系統托盤（System Tray）
-- 常駐托盤，顯示正在執行的任務數量
-- 點擊托盤顯示執行摘要
-
-#### F-12：Webhook / MCP 接收端
-- 接收外部系統（GitHub Actions、CI）推送的狀態更新
-- 自動更新對應 Feature 狀態
-
----
+- F-10 全域快捷鍵 overlay。
+- F-11 系統托盤執行摘要。
+- F-12 Webhook/MCP 狀態接收。
 
 ## 4. 非功能需求
 
 | 類別 | 需求 |
-|------|------|
-| 效能 | 首次載入 < 2 秒；Dashboard 渲染 100 個 Feature 不卡頓 |
-| 安全性 | API Key 使用 OS keychain 儲存（`tauri-plugin-keyring`），不寫入明文檔案 |
-| 隱私 | 本機資料不主動上傳；呼叫 AI API 時僅送必要的 Feature 內容 |
-| 離線 | 核心功能（Dashboard、Dispatch）在離線狀態下可用 |
-| 平台 | macOS 13+（Apple Silicon + Intel）；Windows 11 次優先 |
-| 安裝包 | 使用 Tauri，目標 < 20 MB（vs Electron 典型 > 100 MB） |
+| --- | --- |
+| 效能 | 首屏小於 2 秒，100 筆 Feature 流暢 |
+| 安全 | API key 存入 OS keychain |
+| 隱私 | 本機優先，API 僅傳必要內容 |
+| 離線 | Dashboard 與派遣可在離線使用 |
+| 平台 | macOS 優先，Windows 次之 |
+| 安裝包 | 目標小於 20 MB |
 
----
+## 5. 範圍外
 
-## 5. 範圍外（Out of Scope）
+- MVP 不做中心化後端與資料庫。
+- 不做多人即時協作。
+- 不做 IDE 內建編輯器。
+- 不做自訓練模型。
+- 不做行動版。
 
-以下功能明確**不在** MVP 範圍內，避免過度設計：
-
-- ❌ 自建中心化後端 / 資料庫
-- ❌ 多人協作 / 即時同步（不是 Figma / Linear）
-- ❌ 直接編輯程式碼（不是 IDE）
-- ❌ 自建 AI Model（使用現有 API）
-- ❌ 行動版 App
-
----
-
-## 6. 技術架構摘要
+## 6. 架構摘要
 
 ```
 [Tauri Shell]
-  ├── [Next.js / React Frontend]  ← UI、狀態管理、API 呼叫
-  │     └── Tailwind + TanStack Table
+  ├── [Next.js / React Frontend]
   └── [Rust Backend (Tauri Commands)]
-        ├── FS 讀寫 / Watch
-        ├── Process spawn / kill / stream
-        ├── 文件解析（docx / xlsx）
-        └── OS keychain 存取
+        ├── 檔案讀寫與監聽
+        ├── 程序啟停與串流
+        ├── 文件解析
+        └── keychain 存取
 ```
 
-詳細 Tauri 技術決策見 [05-adr-tauri.md](./05-adr-tauri.md)。
+## 7. 已確認決策
 
----
-
-## 7. 已決策問題
-
-| # | 問題 | 決策 | 原因 |
-|---|------|------|------|
-| Q1 | `.dev-pilot.json` schema 是否要版本化？ | ✅ **要**，加入 `schemaVersion: number` 欄位 | 未來 breaking change 需要 migration 路徑 |
-| Q2 | Prompt 組裝邏輯放 Rust 還是 JS？ | ✅ **JS（前端）**，argsTemplate 替換留在 TypeScript | 開發速度優先；Prompt 是純字串操作，不需要 Rust 效能 |
-| Q3 | AI API 呼叫走本機 Rust 還是前端 fetch？ | ✅ **Rust（reqwest）** | API key 不能出現在 renderer process；Rust 的 `call_anthropic` command 是唯一入口 |
-| Q4 | 首批 beta 測試者如何招募？ | ✅ **AI 模擬**，用 Claude 扮演不同 Persona 測試 | 快速驗證 UX 流程，不需要等真實用戶；AI persona 可覆蓋 Segment A / B / C 各種情境 |
+| 編號 | 決策 |
+| --- | --- |
+| Q1 | 需要 schemaVersion 做版本化 |
+| Q2 | Prompt 組裝放前端 TypeScript |
+| Q3 | AI API 只走 Rust command |
+| Q4 | MVP beta 採 AI persona 模擬 |
