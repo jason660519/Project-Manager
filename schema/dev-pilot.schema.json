@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DevPilot Project Configuration",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "description": "Schema version. Increment when making breaking changes to the config structure.",
+      "minimum": 1
+    },
+    "project": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "root": { "type": "string", "description": "Absolute path to project root" },
+        "defaultIDE": {
+          "type": "string",
+          "enum": ["Cursor", "VSCode", "Trae", "Antigravity"],
+          "default": "Trae"
+        }
+      },
+      "required": ["name", "root", "defaultIDE"]
+    },
+    "features": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/feature" }
+    },
+    "adapters": {
+      "type": "object",
+      "properties": {
+        "ides": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "type": { "const": "ide" },
+              "command": { "type": "string", "description": "IDE CLI command" }
+            },
+            "required": ["id", "name", "type", "command"]
+          }
+        },
+        "agents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "type": { "const": "agent" },
+              "command": { "type": "string", "description": "CLI command to trigger agent" },
+              "argsTemplate": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Supports {prompt}, {featureId}, {root} placeholders"
+              }
+            },
+            "required": ["id", "name", "type", "command", "argsTemplate"]
+          }
+        }
+      }
+    }
+  },
+  "required": ["schemaVersion", "project", "features", "adapters"],
+  "definitions": {
+    "feature": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["todo", "in_progress", "done", "on_hold"],
+          "default": "todo"
+        },
+        "progress": { "type": "number", "minimum": 0, "maximum": 100 },
+        "paths": {
+          "type": "object",
+          "properties": {
+            "spec": { "type": "string" },
+            "tdd": { "type": "string" },
+            "test": { "type": "string" },
+            "implementation": { "type": "string" }
+          }
+        },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "name", "category", "status", "progress", "paths"]
+    }
+  }
+}

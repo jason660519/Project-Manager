@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: #071b18;
+  color: #f5f5f4;
+}
+
+button,
+select,
+textarea {
+  font: inherit;
+}
+
+::selection {
+  background: rgba(253, 230, 138, 0.35);
+}

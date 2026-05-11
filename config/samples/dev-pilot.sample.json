@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "Owner-Property-Management-AI-SPA",
+    "root": "/Volumes/KLEVV-4T-1/Real Estate Management Projects/Owner-Property-Management-AI-SPA",
+    "defaultIDE": "Trae"
+  },
+  "features": [
+    {
+      "id": "031",
+      "name": "房東的客戶 Grid模式",
+      "category": "Frontend/UI",
+      "status": "in_progress",
+      "progress": 45,
+      "paths": {
+        "spec": "docs/features/031-landlord-customer-grid.md",
+        "tdd": "apps/superadmin/unit_test/031/README.md",
+        "test": "apps/superadmin/e2e/031/",
+        "implementation": "apps/superadmin/app/superadmin/dashboard/customers/grid/"
+      },
+      "notes": "需要優化圖片讀取速度"
+    },
+    {
+      "id": "032",
+      "name": "租客合約自動生成",
+      "category": "Backend/AI",
+      "status": "todo",
+      "progress": 0,
+      "paths": {
+        "spec": "docs/features/032-contract-gen.md",
+        "tdd": "apps/superadmin/unit_test/032/README.md"
+      }
+    }
+  ],
+  "adapters": {
+    "ides": [
+      {
+        "id": "Trae",
+        "name": "Trae",
+        "type": "ide",
+        "command": "trae"
+      },
+      {
+        "id": "Cursor",
+        "name": "Cursor",
+        "type": "ide",
+        "command": "cursor"
+      },
+      {
+        "id": "VSCode",
+        "name": "Visual Studio Code",
+        "type": "ide",
+        "command": "code"
+      }
+    ],
+    "agents": [
+      {
+        "id": "codex",
+        "name": "Codex CLI",
+        "type": "agent",
+        "command": "codex",
+        "argsTemplate": ["exec", "--cwd", "{root}", "{prompt}"]
+      },
+      {
+        "id": "claude-code",
+        "name": "Claude Code",
+        "type": "agent",
+        "command": "claude",
+        "argsTemplate": ["--cwd", "{root}", "{prompt}"]
+      }
+    ]
+  }
+}
