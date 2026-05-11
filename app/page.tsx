@@ -9,6 +9,7 @@ import {
   CompletedRun,
   DevPilotConfig,
   Feature,
+  FeatureStatus,
   ProjectEntry,
   ViewId,
 } from '../lib/types';
@@ -73,6 +74,59 @@ export default function Home() {
       unlisten = await onConfigChanged(({ path, config }) => {
         setProjects((prev) =>
           prev.map((p) => (p.configPath === path ? { ...p, config } : p)),
+        );
+      });
+    })();
+    return () => unlisten?.();
+  }, [isTauri]);
+
+  // Track which GitHub URLs already have a background poll running.
+  const polledGithubUrls = useRef<Set<string>>(new Set());
+
+  // Start a Rust poll loop for any GitHub-sourced project that isn't already polled.
+  useEffect(() => {
+    if (!isTauri) return;
+    const githubProjects = projects.filter((p) =>
+      p.configPath.startsWith('https://github.com/'),
+    );
+    if (githubProjects.length === 0) return;
+
+    (async () => {
+      const { startGithubPoll } = await import('../lib/bridge');
+      const token =
+        typeof window !== 'undefined'
+          ? (localStorage.getItem('devpilot-github-token') ?? '')
+          : '';
+      for (const p of githubProjects) {
+        if (!polledGithubUrls.current.has(p.configPath)) {
+          polledGithubUrls.current.add(p.configPath);
+          startGithubPoll(token, p.configPath, 300).catch(() => {});
+        }
+      }
+    })();
+  }, [isTauri, projects]);
+
+  // Subscribe to github-updated events and refresh matching project features.
+  useEffect(() => {
+    if (!isTauri) return;
+    let unlisten: (() => void) | undefined;
+    (async () => {
+      const { onGithubUpdated } = await import('../lib/bridge');
+      unlisten = await onGithubUpdated(({ repoUrl, features: ghFeatures }) => {
+        const refreshedFeatures: Feature[] = ghFeatures.map((f) => ({
+          id: f.id,
+          name: f.name,
+          category: f.category,
+          status: f.status as FeatureStatus,
+          progress: f.progress,
+          notes: f.notes,
+          paths: { spec: '', tdd: '', implementation: '' },
+        }));
+        setProjects((prev) =>
+          prev.map((p) => {
+            if (p.configPath !== repoUrl) return p;
+            return { ...p, config: { ...p.config, features: refreshedFeatures } };
+          }),
         );
       });
     })();

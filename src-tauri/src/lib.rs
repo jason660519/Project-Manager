@@ -303,11 +303,9 @@ fn extract_labels(nodes: &serde_json::Value) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// Fetch open PRs and issues from a GitHub repo via GraphQL and map them to
-/// DevPilot feature cards.  PRs idle ≥ 5 days are flagged in `notes`; issues
-/// and PRs labelled blocked/hold/stuck become `on_hold`.
-#[tauri::command]
-async fn fetch_github_repo(token: String, repo_url: String) -> Result<Vec<GitHubFeature>, String> {
+/// Shared implementation for fetching PRs + issues from GitHub GraphQL API.
+/// Called both from the `fetch_github_repo` command and the `start_github_poll` loop.
+async fn fetch_github_repo_inner(token: &str, repo_url: &str) -> Result<Vec<GitHubFeature>, String> {
     let parts: Vec<&str> = repo_url.trim_end_matches('/').split('/').collect();
     if parts.len() < 2 {
         return Err("Invalid GitHub URL — expected https://github.com/owner/repo".to_string());
@@ -439,6 +437,55 @@ async fn fetch_github_repo(token: String, repo_url: String) -> Result<Vec<GitHub
     Ok(features)
 }
 
+/// Fetch open PRs and issues from a GitHub repo via GraphQL and map them to
+/// DevPilot feature cards.  PRs idle ≥ 5 days are flagged in `notes`; issues
+/// and PRs labelled blocked/hold/stuck become `on_hold`.
+#[tauri::command]
+async fn fetch_github_repo(token: String, repo_url: String) -> Result<Vec<GitHubFeature>, String> {
+    fetch_github_repo_inner(&token, &repo_url).await
+}
+
+// ── GitHub polling ────────────────────────────────────────────────────────────
+
+#[derive(Serialize, Clone)]
+struct GithubUpdatedEvent {
+    #[serde(rename = "repoUrl")]
+    repo_url: String,
+    features: Vec<GitHubFeature>,
+}
+
+/// Start a background poll for a GitHub repo at the given interval (seconds).
+/// On each tick, re-fetches PRs/issues and emits a `github-updated` event with
+/// the refreshed feature list.  The first tick is skipped so it doesn't
+/// double-fetch immediately after the initial import.  Runs until the app exits.
+#[tauri::command]
+async fn start_github_poll(
+    app: AppHandle,
+    token: String,
+    repo_url: String,
+    interval_secs: u64,
+) -> Result<(), String> {
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(tokio::time::Duration::from_secs(interval_secs));
+        ticker.tick().await; // skip first (immediate) tick
+        loop {
+            ticker.tick().await;
+            match fetch_github_repo_inner(&token, &repo_url).await {
+                Ok(features) => {
+                    let _ = app.emit(
+                        "github-updated",
+                        GithubUpdatedEvent { repo_url: repo_url.clone(), features },
+                    );
+                }
+                Err(e) => {
+                    log::warn!("[github-poll] {} — {}", repo_url, e);
+                }
+            }
+        }
+    });
+    Ok(())
+}
+
 // ── App entry ─────────────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -465,6 +512,7 @@ pub fn run() {
             fetch_github_repo,
             set_secret,
             get_secret,
+            start_github_poll,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

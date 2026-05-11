@@ -142,6 +142,32 @@ export async function fetchGithubRepo(
   return invoke<GitHubFeature[]>('fetch_github_repo', { token, repoUrl });
 }
 
+export interface GithubUpdatedPayload {
+  repoUrl: string;
+  features: GitHubFeature[];
+}
+
+/**
+ * Start a background poll for a GitHub repo. Emits `github-updated` events every
+ * `intervalSecs` seconds (default 300 = 5 min). No-op in browser dev mode.
+ * The first tick is skipped so it does not double-fetch after the initial import.
+ */
+export async function startGithubPoll(
+  token: string,
+  repoUrl: string,
+  intervalSecs = 300,
+): Promise<void> {
+  if (!isTauri()) return; // no-op in browser
+  return invoke<void>('start_github_poll', { token, repoUrl, intervalSecs });
+}
+
+/** Subscribe to `github-updated` events emitted by `startGithubPoll`. */
+export function onGithubUpdated(
+  cb: (payload: GithubUpdatedPayload) => void,
+): Promise<UnlistenFn> {
+  return listen<GithubUpdatedPayload>('github-updated', cb);
+}
+
 // ── OS Keychain ───────────────────────────────────────────────────────────────
 
 /**
