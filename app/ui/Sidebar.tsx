@@ -2,12 +2,20 @@
 
 import Link from 'next/link';
 import {
+  BookOpen,
   Boxes,
   CircleGauge,
   DatabaseZap,
   Files,
+  FileText,
+  KeyRound,
+  Plug,
+  Radio,
+  ScrollText,
   Settings,
   ShieldCheck,
+  Timer,
+  Users2,
 } from 'lucide-react';
 import { ViewId } from '../../lib/types';
 
@@ -39,6 +47,62 @@ const NAV_ITEMS: Array<{
       href: '/project-files',
       hint: 'Browse all files under your selected projects.',
       icon: Files,
+    },
+    {
+      id: 'plugins',
+      label: 'Plugins',
+      href: '/plugins',
+      hint: 'Configure AI providers, agent CLIs, and IDE integrations.',
+      icon: Plug,
+    },
+    {
+      id: 'engineers',
+      label: 'AI Engineers',
+      href: '/engineers',
+      hint: 'Configure engineer role presets — skills, system prompts, reference files.',
+      icon: Users2,
+    },
+    {
+      id: 'sessions',
+      label: 'Sessions',
+      href: '/sessions',
+      hint: 'Browse and search all AI agent conversation histories.',
+      icon: ScrollText,
+    },
+    {
+      id: 'channels',
+      label: 'Channels',
+      href: '/channels',
+      hint: 'Configure messaging channels (Telegram, WhatsApp, LINE, WeChat) to control DevPilot from your phone.',
+      icon: Radio,
+    },
+    {
+      id: 'cron-jobs',
+      label: 'Cron Jobs',
+      href: '/cron-jobs',
+      hint: 'Schedule recurring commands to run automatically while the app is open.',
+      icon: Timer,
+    },
+    {
+      id: 'logs',
+      label: 'Logs',
+      href: '/logs',
+      hint: 'Agent run logs, cron job history, and feature dev logs in one place.',
+      icon: FileText,
+    },
+    {
+      id: 'documentation',
+      label: 'Documentation',
+      href: '/documentation',
+      hint: 'Hermes Agent API reference — browse endpoints, params, and responses.',
+      icon: BookOpen,
+    },
+    {
+      id: 'keys',
+      label: 'Keys',
+      href: '/keys',
+      hint: 'Manage API keys and tokens. Stored in OS Keychain.',
+      icon: KeyRound,
     },
     {
       id: 'settings',

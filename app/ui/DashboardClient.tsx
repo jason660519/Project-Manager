@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { TableCore } from '../../components/table/TableCore';
 import { TaskDispatchModal } from '../../components/table/TaskDispatchModal';
 import {
@@ -52,7 +52,31 @@ export function DashboardClient({
 }: DashboardClientProps) {
   const [statusFilter, setStatusFilter] = useState<FeatureStatus | 'all'>('all');
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null);
-  const [dispatchingFeature, setDispatchingFeature] = useState<Feature | null>(null);
+  const [dispatchFeatureId, setDispatchFeatureId] = useState<string | null>(null);
+
+  // Sync dispatch param from URL on mount and browser back/forward
+  useEffect(() => {
+    const sync = () =>
+      setDispatchFeatureId(new URLSearchParams(window.location.search).get('dispatch'));
+    sync();
+    window.addEventListener('popstate', sync);
+    return () => window.removeEventListener('popstate', sync);
+  }, []);
+
+  const dispatchingFeature = dispatchFeatureId
+    ? (features.find((f) => f.id === dispatchFeatureId) ?? null)
+    : null;
+
+  const handleDispatch = (feature: Feature) => {
+    const id = feature.id;
+    window.history.pushState(null, '', `?dispatch=${encodeURIComponent(id)}`);
+    setDispatchFeatureId(id);
+  };
+
+  const handleDispatchClose = () => {
+    window.history.pushState(null, '', window.location.pathname);
+    setDispatchFeatureId(null);
+  };
 
   const filtered =
     statusFilter === 'all' ? features : features.filter((f) => f.status === statusFilter);
@@ -133,7 +157,7 @@ export function DashboardClient({
             <TableCore
               data={filtered}
               onRowClick={handleRowClick}
-              onDispatch={setDispatchingFeature}
+              onDispatch={handleDispatch}
             />
           </div>
 
@@ -143,7 +167,7 @@ export function DashboardClient({
               feature={selectedFeature}
               runHistory={selectedHistory}
               activeRun={selectedActiveRun}
-              onDispatch={() => setDispatchingFeature(selectedFeature)}
+              onDispatch={() => handleDispatch(selectedFeature)}
               onClose={() => setSelectedFeatureId(null)}
             />
           )}
@@ -155,7 +179,7 @@ export function DashboardClient({
           feature={dispatchingFeature}
           adapters={adapters}
           projectRoot={dispatchProjectRoot}
-          onClose={() => setDispatchingFeature(null)}
+          onClose={handleDispatchClose}
           onExecuted={() => {}}
           onRunStart={onRunStart}
           onRunLog={onRunLog}

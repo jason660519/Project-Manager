@@ -34,7 +34,7 @@ export function RunsView({ activeRuns, runHistory, onKillRun }: RunsViewProps) {
         <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">Runs</h1>
         <p className="mt-1 text-xs text-stone-400">
           {activeRuns.length > 0 ? `${activeRuns.length} active · ` : ''}
-          {runHistory.length} completed this session.
+          {runHistory.length} in history.
         </p>
       </div>
 

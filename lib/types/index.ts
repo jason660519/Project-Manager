@@ -3,14 +3,16 @@ export type AdapterType = 'ide' | 'agent';
 export type IDEId = 'Cursor' | 'VSCode' | 'Trae' | 'Antigravity';
 
 export interface FeaturePaths {
-  spec?: string;          // 功能規格書路徑
-  tdd?: string;           // TDD 規格書路徑
-  tddProgressReport?: string; // TDD 進度報告路徑
-  unitIntegrationTest?: string; // 單元與整合測試路徑
-  e2eAcceptanceTestScriptFolder?: string; // E2E 驗收測試腳本資料夾
-  developmentLogSummaryFolder?: string; // 開發日誌摘要資料夾
-  test?: string;          // 測試腳本路徑
-  implementation?: string; // 實作代碼路徑
+  spec?: string;                      // Feature dev spec (.md — source, editable)
+  tdd?: string;                       // TDD spec (.md — source, editable)
+  tddProgressReport?: string;         // TDD progress data (.md — raw data source)
+  tddProgressReportHtml?: string;     // TDD progress report (.html — generated artifact, rich display)
+  unitIntegrationTest?: string;       // Unit & integration test path
+  e2eAcceptanceTestScriptFolder?: string; // E2E acceptance test script folder
+  developmentLogSummaryFolder?: string;   // Dev log folder (raw logs)
+  devLogSummaryHtml?: string;         // Dev log summary (.html — generated artifact, rich display)
+  test?: string;                      // Test script path
+  implementation?: string;            // Implementation code path
 }
 
 export interface Feature {
@@ -21,6 +23,13 @@ export interface Feature {
   progress: number;
   paths: FeaturePaths;
   notes?: string;
+  // ── Sync audit fields (schema v2, ADR-006) ─────────────────────────────
+  /** ISO 8601 timestamp set when the feature was first created. */
+  createdAt?: string;
+  /** ISO 8601 timestamp bumped on every modification. */
+  updatedAt?: string;
+  /** Last editor identifier — e.g. github username or email. */
+  updatedBy?: string;
   metadata?: Record<string, any>;
 }
 
@@ -76,18 +85,102 @@ export interface ExecutionResult {
 export type AnyAdapterConfig = IDEAdapterConfig | AgentAdapterConfig;
 
 export interface DevPilotConfig {
-  /** Increment when making breaking changes to the config structure. Current: 1 */
+  /** Increment when making breaking changes to the config structure. Current: 2 */
   schemaVersion: number;
+  engineerRoles?: EngineerRole[];
+  // ── Sync identity + audit fields (schema v2, ADR-006) ──────────────────
+  /** Stable UUID. Required from v2 onward; back-filled by migration. */
+  id: string;
+  /** ISO 8601 timestamp when the project config was first created. */
+  createdAt?: string;
+  /** ISO 8601 timestamp bumped on every modification. */
+  updatedAt?: string;
+  /** Last editor identifier — e.g. github username or email. */
+  updatedBy?: string;
   project: ProjectConfig;
   features: Feature[];
   adapters: AdapterConfig;
+  cronJobs?: CronJob[];
 }
 
 // ── App navigation & run-store types ─────────────────────────────────────────
 
-export type ViewId = 'dashboard' | 'features' | 'projects' | 'project-files' | 'settings';
+export interface EngineerRole {
+  id: string;
+  name: string;
+  slug: string;
+  skills: string[];
+  commands: string[];
+  systemPrompt: string;
+  referenceFiles: string[];
+  defaultAgentId?: string;
+  notes?: string;
+}
+
+export type ViewId = 'dashboard' | 'features' | 'projects' | 'project-files' | 'plugins' | 'settings' | 'engineers' | 'channels' | 'sessions' | 'cron-jobs' | 'logs' | 'keys' | 'documentation';
 
 export type IssueState = 'open' | 'closed';
+
+// ── Sessions ──────────────────────────────────────────────────────────────────
+
+export interface SessionMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: string;
+  inputTokens?: number;
+  outputTokens?: number;
+}
+
+export interface AgentSession {
+  id: string;
+  title: string;
+  projectId?: string;
+  featureId?: string;
+  agentId?: string;
+  model: string;
+  messages: SessionMessage[];
+  startedAt: string;
+  completedAt?: string;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  status: 'active' | 'completed' | 'error';
+  tags?: string[];
+}
+
+// ── Cron Jobs ─────────────────────────────────────────────────────────────────
+
+export interface CronSchedule {
+  type: 'every';
+  value: number;
+  unit: 'minutes' | 'hours';
+}
+
+export interface CronAction {
+  type: 'run-command';
+  command: string;
+  args: string[];
+  workingDir: string;
+}
+
+export interface CronJob {
+  id: string;
+  name: string;
+  description?: string;
+  enabled: boolean;
+  schedule: CronSchedule;
+  action: CronAction;
+  lastRun?: string;
+  lastStatus?: 'ok' | 'error';
+  createdAt: string;
+}
+
+export interface CronRun {
+  jobId: string;
+  jobName: string;
+  firedAt: string;
+  status: 'ok' | 'error';
+  pid?: number;
+}
 
 export interface GithubIssue {
   id: number;

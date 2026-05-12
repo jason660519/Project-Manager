@@ -38,6 +38,14 @@ async fn write_config(path: String, config: serde_json::Value) -> Result<(), Str
         .map_err(|e| format!("Cannot write {path}: {e}"))
 }
 
+/// Read a plain-text file and return its content as a string.
+#[tauri::command]
+async fn read_file(path: String) -> Result<String, String> {
+    tokio::fs::read_to_string(&path)
+        .await
+        .map_err(|e| format!("Cannot read {path}: {e}"))
+}
+
 /// Scan a directory for projects that contain a `.dev-pilot.json`.
 #[tauri::command]
 async fn scan_projects(root: String) -> Result<Vec<String>, String> {
@@ -117,12 +125,19 @@ async fn spawn_agent(
 
 /// Call the Anthropic Messages API from the Rust layer so the API key never
 /// touches the renderer process or the network directly from JS.
+///
+/// Pass `session_id` + `sessions_dir` to automatically persist the conversation
+/// to `.dev-pilot/sessions/{session_id}.json` after a successful response.
 #[tauri::command]
 async fn call_anthropic(
     api_key: String,
     model: String,
     max_tokens: u32,
     messages: Vec<AnthropicMessage>,
+    session_id: Option<String>,
+    sessions_dir: Option<String>,
+    feature_id: Option<String>,
+    project_id: Option<String>,
 ) -> Result<AnthropicResponse, String> {
     let client = reqwest::Client::new();
 
@@ -156,6 +171,57 @@ async fn call_anthropic(
         .to_string();
     let input_tokens = raw["usage"]["input_tokens"].as_u64().unwrap_or(0) as u32;
     let output_tokens = raw["usage"]["output_tokens"].as_u64().unwrap_or(0) as u32;
+
+    // Auto-persist the conversation when caller provides session context.
+    if let (Some(sid), Some(sdir)) = (session_id, sessions_dir) {
+        let now = now_iso8601();
+        let title = messages
+            .first()
+            .map(|m| {
+                let truncated: String = m.content.chars().take(60).collect();
+                if m.content.len() > 60 { format!("{truncated}…") } else { truncated }
+            })
+            .unwrap_or_else(|| "Untitled Session".to_string());
+
+        let mut session_messages: Vec<SessionMessage> = messages
+            .iter()
+            .map(|m| SessionMessage {
+                role: m.role.clone(),
+                content: m.content.clone(),
+                timestamp: now.clone(),
+                input_tokens: None,
+                output_tokens: None,
+            })
+            .collect();
+
+        session_messages.push(SessionMessage {
+            role: "assistant".to_string(),
+            content: content.clone(),
+            timestamp: now_iso8601(),
+            input_tokens: Some(input_tokens),
+            output_tokens: Some(output_tokens),
+        });
+
+        let session = AgentSession {
+            id: sid.clone(),
+            title,
+            project_id,
+            feature_id,
+            agent_id: None,
+            model: model.clone(),
+            messages: session_messages,
+            started_at: now,
+            completed_at: Some(now_iso8601()),
+            total_input_tokens: input_tokens,
+            total_output_tokens: output_tokens,
+            status: "completed".to_string(),
+            tags: None,
+        };
+
+        if let Err(e) = write_session_file(&sdir, &session).await {
+            log::warn!("[sessions] Failed to save session {sid}: {e}");
+        }
+    }
 
     Ok(AnthropicResponse { content, input_tokens, output_tokens })
 }
@@ -658,6 +724,120 @@ async fn list_project_files(root: String, max_depth: u32) -> Result<Vec<FileNode
     Ok(list_dir_recursive(path, 0, max_depth))
 }
 
+// ── Sessions ──────────────────────────────────────────────────────────────────
+
+#[derive(Serialize, Deserialize, Clone)]
+struct SessionMessage {
+    role: String,
+    content: String,
+    timestamp: String,
+    #[serde(rename = "inputTokens", skip_serializing_if = "Option::is_none")]
+    input_tokens: Option<u32>,
+    #[serde(rename = "outputTokens", skip_serializing_if = "Option::is_none")]
+    output_tokens: Option<u32>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct AgentSession {
+    id: String,
+    title: String,
+    #[serde(rename = "projectId", skip_serializing_if = "Option::is_none")]
+    project_id: Option<String>,
+    #[serde(rename = "featureId", skip_serializing_if = "Option::is_none")]
+    feature_id: Option<String>,
+    #[serde(rename = "agentId", skip_serializing_if = "Option::is_none")]
+    agent_id: Option<String>,
+    model: String,
+    messages: Vec<SessionMessage>,
+    #[serde(rename = "startedAt")]
+    started_at: String,
+    #[serde(rename = "completedAt", skip_serializing_if = "Option::is_none")]
+    completed_at: Option<String>,
+    #[serde(rename = "totalInputTokens")]
+    total_input_tokens: u32,
+    #[serde(rename = "totalOutputTokens")]
+    total_output_tokens: u32,
+    status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tags: Option<Vec<String>>,
+}
+
+/// Return the current UTC time as an ISO 8601 string (e.g. "2026-05-12T10:30:00Z").
+/// Uses Hinnant's civil_from_days algorithm — no chrono dependency needed.
+fn now_iso8601() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let s = (secs % 60) as u32;
+    let m = ((secs / 60) % 60) as u32;
+    let h = ((secs / 3600) % 24) as u32;
+    let days = (secs / 86400) as i64;
+    let z = days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = (z - era * 146_097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let mon = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = if mon <= 2 { y + 1 } else { y };
+    format!("{year:04}-{mon:02}-{d:02}T{h:02}:{m:02}:{s:02}Z")
+}
+
+async fn write_session_file(sessions_dir: &str, session: &AgentSession) -> Result<(), String> {
+    tokio::fs::create_dir_all(sessions_dir)
+        .await
+        .map_err(|e| format!("Cannot create sessions dir: {e}"))?;
+    let path = format!("{}/{}.json", sessions_dir, session.id);
+    let content =
+        serde_json::to_string_pretty(session).map_err(|e| format!("Serialize error: {e}"))?;
+    tokio::fs::write(&path, content)
+        .await
+        .map_err(|e| format!("Cannot write session: {e}"))
+}
+
+/// List all agent sessions stored under `sessions_dir`, sorted newest-first.
+#[tauri::command]
+async fn list_sessions(sessions_dir: String) -> Result<Vec<AgentSession>, String> {
+    tokio::fs::create_dir_all(&sessions_dir).await.ok();
+    let mut dir = match tokio::fs::read_dir(&sessions_dir).await {
+        Ok(d) => d,
+        Err(_) => return Ok(vec![]),
+    };
+    let mut sessions: Vec<AgentSession> = Vec::new();
+    while let Ok(Some(entry)) = dir.next_entry().await {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+        if let Ok(content) = tokio::fs::read_to_string(&path).await {
+            if let Ok(session) = serde_json::from_str::<AgentSession>(&content) {
+                sessions.push(session);
+            }
+        }
+    }
+    sessions.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+    Ok(sessions)
+}
+
+/// Read a single session by ID from `sessions_dir`.
+#[tauri::command]
+async fn read_session(sessions_dir: String, session_id: String) -> Result<AgentSession, String> {
+    let path = format!("{}/{}.json", sessions_dir, session_id);
+    let content = tokio::fs::read_to_string(&path)
+        .await
+        .map_err(|e| format!("Cannot read session {session_id}: {e}"))?;
+    serde_json::from_str(&content).map_err(|e| format!("Invalid session JSON: {e}"))
+}
+
+/// Persist a session to `sessions_dir/{session.id}.json`.
+#[tauri::command]
+async fn save_session(sessions_dir: String, session: AgentSession) -> Result<(), String> {
+    write_session_file(&sessions_dir, &session).await
+}
+
 // ── App entry ─────────────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -687,6 +867,10 @@ pub fn run() {
             get_secret,
             start_github_poll,
             list_project_files,
+            read_file,
+            list_sessions,
+            read_session,
+            save_session,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

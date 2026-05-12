@@ -6,6 +6,7 @@
  * /api/bridge/execute HTTP route so the Next.js dev server still works.
  */
 
+import { migrateConfig } from '../storage';
 import type { DevPilotConfig } from '../types';
 
 // ── Tauri detection ───────────────────────────────────────────────────────────
@@ -22,7 +23,10 @@ async function invoke<T>(command: string, args?: Record<string, unknown>): Promi
 
 export async function readConfig(path: string): Promise<DevPilotConfig> {
   if (!isTauri()) throw new Error('readConfig requires Tauri runtime');
-  return invoke<DevPilotConfig>('read_config', { path });
+  // Pipe through schema migration so older v1 files on disk are transparently
+  // upgraded — the in-memory shape is always current (ADR-006).
+  const raw = await invoke<unknown>('read_config', { path });
+  return migrateConfig(raw);
 }
 
 export async function writeConfig(path: string, config: DevPilotConfig): Promise<void> {
@@ -211,6 +215,43 @@ export async function getSecret(service: string, key: string): Promise<string | 
   return invoke<string | null>('get_secret', { service, key });
 }
 
+// ── GitHub token (Keychain in Tauri, localStorage fallback in dev) ───────────
+
+const GITHUB_TOKEN_SERVICE = 'devpilot';
+const GITHUB_TOKEN_KEY = 'github-token';
+const GITHUB_TOKEN_LS_FALLBACK = 'devpilot-github-token';
+
+/**
+ * Read the user's GitHub token.  Lives in the OS Keychain under Tauri (so it
+ * never reaches the renderer until requested), and falls back to localStorage
+ * in `next dev` mode where Keychain isn't available.
+ */
+export async function getGithubToken(): Promise<string> {
+  if (isTauri()) {
+    const v = await getSecret(GITHUB_TOKEN_SERVICE, GITHUB_TOKEN_KEY);
+    return v ?? '';
+  }
+  if (typeof window === 'undefined') return '';
+  try {
+    return window.localStorage.getItem(GITHUB_TOKEN_LS_FALLBACK) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/** Persist the GitHub token to the appropriate backend for the current runtime. */
+export async function setGithubToken(value: string): Promise<void> {
+  if (isTauri()) {
+    return setSecret(GITHUB_TOKEN_SERVICE, GITHUB_TOKEN_KEY, value);
+  }
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(GITHUB_TOKEN_LS_FALLBACK, value);
+  } catch {
+    /* ignore */
+  }
+}
+
 // ── Anthropic API (via Rust — key never touches renderer) ────────────────────
 
 export interface AnthropicMessage {
@@ -229,16 +270,94 @@ export async function callAnthropic(opts: {
   model?: string;
   maxTokens?: number;
   messages: AnthropicMessage[];
+  /** UUID for this conversation — if provided alongside sessionsDir, auto-saves the session. */
+  sessionId?: string;
+  /** Absolute path to the sessions folder, e.g. `{projectRoot}/.dev-pilot/sessions`. */
+  sessionsDir?: string;
+  featureId?: string;
+  projectId?: string;
 }): Promise<AnthropicResponse> {
-  if (!isTauri()) {
-    throw new Error('callAnthropic requires Tauri runtime (API key must not be sent from browser)');
+  if (isTauri()) {
+    return invoke<AnthropicResponse>('call_anthropic', {
+      apiKey: opts.apiKey,
+      model: opts.model ?? 'claude-sonnet-4-6',
+      maxTokens: opts.maxTokens ?? 4096,
+      messages: opts.messages,
+      sessionId: opts.sessionId ?? null,
+      sessionsDir: opts.sessionsDir ?? null,
+      featureId: opts.featureId ?? null,
+      projectId: opts.projectId ?? null,
+    });
   }
-  return invoke<AnthropicResponse>('call_anthropic', {
-    apiKey: opts.apiKey,
-    model: opts.model ?? 'claude-sonnet-4-6',
-    maxTokens: opts.maxTokens ?? 4096,
-    messages: opts.messages,
+
+  // Browser/dev mode: proxy through Next.js server route so the API key
+  // stays on the server (read from ANTHROPIC_API_KEY env var), never in JS.
+  const res = await fetch('/api/anthropic', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: opts.model ?? 'claude-sonnet-4-6',
+      maxTokens: opts.maxTokens ?? 4096,
+      messages: opts.messages,
+    }),
   });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json() as Promise<AnthropicResponse>;
+}
+
+// ── Sessions ──────────────────────────────────────────────────────────────────
+
+export interface SessionMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: string;
+  inputTokens?: number;
+  outputTokens?: number;
+}
+
+export interface AgentSession {
+  id: string;
+  title: string;
+  projectId?: string;
+  featureId?: string;
+  agentId?: string;
+  model: string;
+  messages: SessionMessage[];
+  startedAt: string;
+  completedAt?: string;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  status: 'active' | 'completed' | 'error';
+  tags?: string[];
+}
+
+/** List all sessions under `sessionsDir`, sorted newest-first. No-op in browser (returns []). */
+export async function listSessions(sessionsDir: string): Promise<AgentSession[]> {
+  if (!isTauri()) return [];
+  return invoke<AgentSession[]>('list_sessions', { sessionsDir });
+}
+
+/** Read a full session by ID. Tauri only. */
+export async function readSession(sessionsDir: string, sessionId: string): Promise<AgentSession> {
+  if (!isTauri()) throw new Error('readSession requires Tauri runtime');
+  return invoke<AgentSession>('read_session', { sessionsDir, sessionId });
+}
+
+/** Persist a session to disk. Tauri only; silently no-ops in browser. */
+export async function saveSession(sessionsDir: string, session: AgentSession): Promise<void> {
+  if (!isTauri()) return;
+  return invoke<void>('save_session', { sessionsDir, session });
+}
+
+// ── Generic file read ─────────────────────────────────────────────────────────
+
+/**
+ * Read a plain-text file from disk and return its content.
+ * Returns an empty string in browser dev mode (no Tauri runtime).
+ */
+export async function readFile(path: string): Promise<string> {
+  if (!isTauri()) return '';
+  return invoke<string>('read_file', { path });
 }
 
 // ── Project file tree ─────────────────────────────────────────────────────────

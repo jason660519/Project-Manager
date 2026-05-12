@@ -5,6 +5,7 @@
 #   ./dev.sh install  force full install check
 #   ./dev.sh update   update npm deps + rebuild Rust
 #   ./dev.sh start    start the Tauri desktop app
+#   ./dev.sh web      start Next.js web server only (no Tauri)
 
 set -euo pipefail
 
@@ -234,6 +235,69 @@ is_installed() {
   [[ -f "$STATE_FILE" ]] && [[ -d "$SCRIPT_DIR/node_modules" ]]
 }
 
+# ── Auto-generate .dev-pilot.json ─────────────────────────────────────────────
+
+auto_generate_config() {
+  local config_file="$SCRIPT_DIR/.dev-pilot.json"
+
+  if [[ -f "$config_file" ]]; then
+    success ".dev-pilot.json already exists"
+    return 0
+  fi
+
+  info "Generating .dev-pilot.json from project structure…"
+
+  # Infer project name from package.json or directory name
+  local project_name
+  if [[ -f "$SCRIPT_DIR/package.json" ]] && require_cmd node; then
+    project_name=$(node -e "try{console.log(require('./package.json').name||'')}catch{console.log('')}" 2>/dev/null)
+  fi
+  project_name="${project_name:-$(basename "$SCRIPT_DIR")}"
+
+  # Detect default IDE from folder markers
+  local default_ide="Cursor"
+  local default_cmd="cursor"
+  if [[ -d "$SCRIPT_DIR/.trae" ]]; then
+    default_ide="Trae"; default_cmd="trae"
+  elif [[ -d "$SCRIPT_DIR/.vscode" ]]; then
+    default_ide="VSCode"; default_cmd="code"
+  elif [[ -d "$SCRIPT_DIR/.cursor" ]]; then
+    default_ide="Cursor"; default_cmd="cursor"
+  fi
+
+  # Build IDE adapters array
+  local ide_adapters="{ \"id\": \"$default_ide\", \"name\": \"$default_ide\", \"type\": \"ide\", \"command\": \"$default_cmd\" }"
+
+  # Detect agent CLIs
+  local agent_adapters=""
+  if [[ -d "$SCRIPT_DIR/.claude" ]] || command -v claude &>/dev/null; then
+    agent_adapters='{ "id": "claude-code", "name": "Claude Code", "type": "agent", "command": "claude", "argsTemplate": ["--cwd", "{root}", "{prompt}"] }'
+  fi
+
+  # Write the config
+  cat > "$config_file" << DEVPILOT_JSON
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "$project_name",
+    "root": "$SCRIPT_DIR",
+    "defaultIDE": "$default_ide"
+  },
+  "features": [],
+  "adapters": {
+    "ides": [
+      $ide_adapters
+    ],
+    "agents": [
+      ${agent_adapters:-}
+    ]
+  }
+}
+DEVPILOT_JSON
+
+  success "Generated .dev-pilot.json (features empty — use AI Scan in the UI to populate)"
+}
+
 # ── Commands ──────────────────────────────────────────────────────────────────
 
 cmd_install() {
@@ -245,6 +309,7 @@ cmd_install() {
   check_linux_deps
   npm_install
   rust_check
+  auto_generate_config
   mark_installed
   echo ""
   success "Installation complete. Run ./dev.sh start to launch DevPilot."
@@ -285,6 +350,33 @@ cmd_start() {
   npm run tauri:dev
 }
 
+cmd_web() {
+  header "DevPilot — Web Server (Next.js only)"
+
+  if ! is_installed; then
+    warn "First run detected — running install first…"
+    cmd_install
+    echo ""
+  fi
+
+  cd "$SCRIPT_DIR"
+
+  # Re-use an existing Next.js process rather than killing and restarting it.
+  local existing_pid
+  existing_pid="$(lsof -nP -iTCP:"$DEV_PORT" -sTCP:LISTEN -t 2>/dev/null | head -1 || true)"
+  if [[ -n "$existing_pid" ]] && is_next_process "$existing_pid"; then
+    success "Next.js dev server already running — http://localhost:${DEV_PORT}  (PID ${existing_pid})"
+    return 0
+  fi
+
+  ensure_dev_port_available
+
+  info "Starting Next.js dev server on http://localhost:${DEV_PORT}…"
+  echo -e "${CYAN}(Ctrl-C to stop)${RESET}"
+  echo ""
+  npm run dev
+}
+
 cmd_auto() {
   if is_installed; then
     cmd_start
@@ -314,10 +406,11 @@ case "$COMMAND" in
   install) cmd_install ;;
   update)  cmd_update  ;;
   start)   cmd_start   ;;
+  web)     cmd_web     ;;
   auto)    cmd_auto    ;;
   *)
     error "Unknown command: $COMMAND"
-    echo "Usage: $0 [install|update|start]"
+    echo "Usage: $0 [install|update|start|web]"
     exit 1
     ;;
 esac

@@ -1,5 +1,9 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
+  "id": "22222222-2222-4222-8222-222222222222",
+  "createdAt": "2026-05-12T00:00:00.000Z",
+  "updatedAt": "2026-05-12T00:00:00.000Z",
+  "updatedBy": "claude",
   "project": {
     "name": "DevPilot",
     "root": "/Volumes/KLEVV-4T-1/Dev-Pilot",
@@ -46,6 +50,74 @@
       "status": "todo",
       "progress": 0,
       "paths": { "spec": "docs/02-prd.md" }
+    },
+    {
+      "id": "F06",
+      "name": "Storage Abstraction & Schema v2 Sync Fields",
+      "category": "Core/Architecture",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "spec": "docs/architecture/ADR-006-schema-v2-sync-fields.md",
+        "implementation": "lib/storage/",
+        "developmentLogSummaryFolder": "docs/dev-logs/"
+      },
+      "notes": "Async ProjectsRepository + namespaced localStorage keys + GitHub token to OS Keychain + schema v1→v2 (id/createdAt/updatedAt/updatedBy) + ADR-006",
+      "createdAt": "2026-05-12T00:00:00.000Z",
+      "updatedAt": "2026-05-12T00:00:00.000Z",
+      "updatedBy": "claude"
+    }
+  ],
+  "engineerRoles": [
+    {
+      "id": "role-frontend",
+      "name": "Frontend Engineer",
+      "slug": "frontend",
+      "skills": ["React", "TypeScript", "Tailwind CSS", "Next.js", "TanStack Table"],
+      "commands": ["npm run dev", "npm run typecheck", "npm run build"],
+      "systemPrompt": "You are a senior frontend engineer specializing in React and TypeScript. Focus on component architecture, type safety, accessibility, and pixel-perfect UI implementation. Follow the project's existing patterns and conventions. Prefer composition over inheritance, keep components small and focused.",
+      "referenceFiles": ["CLAUDE.md", "docs/Architecture.md"],
+      "notes": ""
+    },
+    {
+      "id": "role-backend",
+      "name": "Backend Engineer",
+      "slug": "backend",
+      "skills": ["Rust", "Tauri", "TypeScript", "REST API"],
+      "commands": ["cargo check --manifest-path src-tauri/Cargo.toml", "cargo build --manifest-path src-tauri/Cargo.toml"],
+      "systemPrompt": "You are a senior backend engineer working with Rust and Tauri v2. Focus on Rust bridge commands, process management, security, and performance. Write safe Rust code, handle errors with Result types, and never expose secrets to the renderer.",
+      "referenceFiles": ["CLAUDE.md", "docs/Architecture.md", "docs/architecture/ADR-004-api-key-storage.md"],
+      "notes": "DevPilot backend is Tauri v2 + Rust"
+    },
+    {
+      "id": "role-fullstack",
+      "name": "Full-stack Engineer",
+      "slug": "fullstack",
+      "skills": ["React", "Rust", "TypeScript", "Tauri", "Next.js"],
+      "commands": ["npm run dev", "npm run tauri:dev"],
+      "systemPrompt": "You are a senior full-stack engineer working on a Tauri desktop app with Next.js frontend and Rust backend. Balance UI quality with solid Rust bridge design. Read the ADRs before making architectural decisions.",
+      "referenceFiles": ["CLAUDE.md", "docs/Architecture.md"],
+      "notes": ""
+    },
+    {
+      "id": "role-qa",
+      "name": "QA Engineer",
+      "slug": "qa",
+      "skills": ["Testing", "Vitest", "TypeScript", "Test Planning"],
+      "commands": ["npm run test", "npm run typecheck"],
+      "systemPrompt": "You are a senior QA engineer. Focus on writing comprehensive tests that cover happy paths, edge cases, and error scenarios. Prefer integration tests over pure mocks. Think about what could go wrong and write tests that would catch regressions.",
+      "referenceFiles": ["CLAUDE.md"],
+      "notes": ""
+    },
+    {
+      "id": "role-devops",
+      "name": "DevOps Engineer",
+      "slug": "devops",
+      "skills": ["Docker", "CI/CD", "GitHub Actions", "Tauri Build", "Shell"],
+      "commands": ["npm run build", "cargo build --release --manifest-path src-tauri/Cargo.toml"],
+      "systemPrompt": "You are a senior DevOps engineer. Focus on build pipelines, Tauri app packaging, and release automation. Prefer declarative configuration. Make builds reproducible and releases easy to roll back.",
+      "referenceFiles": ["CLAUDE.md"],
+      "notes": ""
     }
   ],
   "adapters": {

@@ -5,8 +5,27 @@
   "properties": {
     "schemaVersion": {
       "type": "integer",
-      "description": "Schema version. Increment when making breaking changes to the config structure.",
+      "description": "Schema version. Increment when making breaking changes to the config structure. Current: 2.",
       "minimum": 1
+    },
+    "id": {
+      "type": "string",
+      "description": "Stable UUID for the project config. Required in v2+; back-filled by migration on load.",
+      "minLength": 1
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp set when the project config was first created (v2)."
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp bumped on every modification (v2)."
+    },
+    "updatedBy": {
+      "type": "string",
+      "description": "Identifier of the last editor — e.g. GitHub login or email (v2)."
     },
     "project": {
       "type": "object",
@@ -24,6 +43,16 @@
     "features": {
       "type": "array",
       "items": { "$ref": "#/definitions/feature" }
+    },
+    "engineerRoles": {
+      "type": "array",
+      "description": "Per-project engineer role presets injected into AI dispatches as system context.",
+      "items": { "$ref": "#/definitions/engineerRole" }
+    },
+    "cronJobs": {
+      "type": "array",
+      "description": "Scheduled jobs that run commands on a recurring interval while the app is open.",
+      "items": { "$ref": "#/definitions/cronJob" }
     },
     "adapters": {
       "type": "object",
@@ -62,8 +91,55 @@
       }
     }
   },
-  "required": ["schemaVersion", "project", "features", "adapters"],
+  "required": ["schemaVersion", "id", "project", "features", "adapters"],
   "definitions": {
+    "cronJob": {
+      "type": "object",
+      "properties": {
+        "id":          { "type": "string" },
+        "name":        { "type": "string" },
+        "description": { "type": "string" },
+        "enabled":     { "type": "boolean" },
+        "schedule": {
+          "type": "object",
+          "properties": {
+            "type":  { "const": "every" },
+            "value": { "type": "number", "minimum": 1 },
+            "unit":  { "type": "string", "enum": ["minutes", "hours"] }
+          },
+          "required": ["type", "value", "unit"]
+        },
+        "action": {
+          "type": "object",
+          "properties": {
+            "type":       { "const": "run-command" },
+            "command":    { "type": "string" },
+            "args":       { "type": "array", "items": { "type": "string" } },
+            "workingDir": { "type": "string" }
+          },
+          "required": ["type", "command", "args", "workingDir"]
+        },
+        "lastRun":    { "type": "string", "format": "date-time" },
+        "lastStatus": { "type": "string", "enum": ["ok", "error"] },
+        "createdAt":  { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "enabled", "schedule", "action", "createdAt"]
+    },
+    "engineerRole": {
+      "type": "object",
+      "properties": {
+        "id":             { "type": "string" },
+        "name":           { "type": "string" },
+        "slug":           { "type": "string", "description": "Short identifier used in UI badges" },
+        "skills":         { "type": "array", "items": { "type": "string" } },
+        "commands":       { "type": "array", "items": { "type": "string" } },
+        "systemPrompt":   { "type": "string", "description": "Prepended to AI dispatch prompts" },
+        "referenceFiles": { "type": "array", "items": { "type": "string" }, "description": "Paths relative to project root" },
+        "defaultAgentId": { "type": "string" },
+        "notes":          { "type": "string" }
+      },
+      "required": ["id", "name", "slug", "skills", "commands", "systemPrompt", "referenceFiles"]
+    },
     "feature": {
       "type": "object",
       "properties": {
@@ -78,14 +154,35 @@
         "progress": { "type": "number", "minimum": 0, "maximum": 100 },
         "paths": {
           "type": "object",
+          "description": "Source .md files are editable inputs; *Html variants are generated HTML report artifacts.",
           "properties": {
-            "spec": { "type": "string" },
-            "tdd": { "type": "string" },
-            "test": { "type": "string" },
-            "implementation": { "type": "string" }
+            "spec": { "type": "string", "description": "Feature dev spec (.md)" },
+            "tdd": { "type": "string", "description": "TDD spec (.md)" },
+            "tddProgressReport": { "type": "string", "description": "TDD progress raw data (.md)" },
+            "tddProgressReportHtml": { "type": "string", "description": "TDD progress report (.html, generated)" },
+            "unitIntegrationTest": { "type": "string", "description": "Unit & integration test path" },
+            "e2eAcceptanceTestScriptFolder": { "type": "string", "description": "E2E acceptance test script folder" },
+            "developmentLogSummaryFolder": { "type": "string", "description": "Raw dev log folder" },
+            "devLogSummaryHtml": { "type": "string", "description": "Dev log summary (.html, generated)" },
+            "test": { "type": "string", "description": "Test script path" },
+            "implementation": { "type": "string", "description": "Implementation code path" }
           }
         },
-        "notes": { "type": "string" }
+        "notes": { "type": "string" },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when the feature was first created (v2)."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp bumped on every modification (v2)."
+        },
+        "updatedBy": {
+          "type": "string",
+          "description": "Identifier of the last editor — e.g. GitHub login or email (v2)."
+        }
       },
       "required": ["id", "name", "category", "status", "progress", "paths"]
     }

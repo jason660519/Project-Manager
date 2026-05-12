@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, FileInput, Upload, X } from 'lucide-react';
 import { Feature, FeatureStatus, ProjectConfig } from '../../../lib/types';
 import { parseMarkdown } from '../../../lib/ingestion/parseMarkdown';
@@ -83,7 +83,11 @@ export function IngestionView({ project, onImportFeatures }: IngestionViewProps)
   const [parseMethod, setParseMethod] = useState<'md' | 'ai' | 'mock'>('mock');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+  const [isTauri, setIsTauri] = useState(false);
+
+  useEffect(() => {
+    setIsTauri(typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window);
+  }, []);
 
   const processFile = async (file: File) => {
     const allowed = ['.docx', '.xlsx', '.md'];

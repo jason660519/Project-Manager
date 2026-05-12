@@ -5,9 +5,17 @@ import sampleConfig1 from '../../config/samples/dev-pilot.sample.json';
 import sampleConfig2 from '../../config/samples/dev-pilot-devpilot.sample.json';
 import { listAdapters } from '../../lib/adapters/registry';
 import {
+  getProjectsRepository,
+  resolveDashboardProjectIds,
+  resolveInitialProjectId,
+} from '../../lib/storage';
+import {
   ActiveRun,
   CompletedRun,
+  CronJob,
+  CronRun,
   DevPilotConfig,
+  EngineerRole,
   Feature,
   FeatureStatus,
   ProjectEntry,
@@ -16,9 +24,17 @@ import {
 import { AppShell } from './AppShell';
 import { DashboardClient } from './DashboardClient';
 import { FeaturesView } from './views/FeaturesView';
+import { EngineersView } from './views/EngineersView';
+import { PluginsView } from './views/PluginsView';
 import { ProjectFilesView } from './views/ProjectFilesView';
 import { ProjectsView } from './views/ProjectsView';
+import { ChannelsView } from './views/ChannelsView';
+import { CronJobsView } from './views/CronJobsView';
+import { LogsView } from './views/LogsView';
+import { SessionsView } from './views/SessionsView';
+import { KeysView } from './views/KeysView';
 import { SettingsView } from './views/SettingsView';
+import { DocumentationView } from './views/DocumentationView';
 
 const INITIAL_PROJECTS: ProjectEntry[] = [
   {
@@ -39,45 +55,6 @@ interface MainClientProps {
   initialProjectId?: string;
 }
 
-const PROJECTS_STORAGE_KEY = 'devpilot-projects';
-const SELECTED_PROJECT_STORAGE_KEY = 'devpilot-selected-project-id';
-const DASHBOARD_SELECTED_PROJECTS_STORAGE_KEY = 'devpilot-dashboard-selected-project-ids';
-
-function loadProjectsFromStorage(): ProjectEntry[] {
-  if (typeof window === 'undefined') return INITIAL_PROJECTS;
-  try {
-    const raw = window.localStorage.getItem(PROJECTS_STORAGE_KEY);
-    if (!raw) return INITIAL_PROJECTS;
-    const parsed = JSON.parse(raw) as ProjectEntry[];
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_PROJECTS;
-  } catch {
-    return INITIAL_PROJECTS;
-  }
-}
-
-function pickInitialProjectId(projects: ProjectEntry[], preferredId?: string): string {
-  if (preferredId && projects.some((p) => p.id === preferredId)) return preferredId;
-  if (typeof window !== 'undefined') {
-    const stored = window.localStorage.getItem(SELECTED_PROJECT_STORAGE_KEY);
-    if (stored && projects.some((p) => p.id === stored)) return stored;
-  }
-  return projects[0]?.id ?? '';
-}
-
-function loadDashboardSelectedProjectIds(projects: ProjectEntry[]): string[] {
-  if (typeof window === 'undefined') return projects[0] ? [projects[0].id] : [];
-  try {
-    const raw = window.localStorage.getItem(DASHBOARD_SELECTED_PROJECTS_STORAGE_KEY);
-    if (!raw) return projects[0] ? [projects[0].id] : [];
-    const parsed = JSON.parse(raw) as string[];
-    if (!Array.isArray(parsed)) return projects[0] ? [projects[0].id] : [];
-    const valid = parsed.filter((id) => projects.some((p) => p.id === id));
-    return valid.length > 0 ? valid : projects[0] ? [projects[0].id] : [];
-  } catch {
-    return projects[0] ? [projects[0].id] : [];
-  }
-}
-
 export function MainClient({ currentView, initialProjectId }: MainClientProps) {
   const [projects, setProjects] = useState<ProjectEntry[]>(INITIAL_PROJECTS);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
@@ -89,15 +66,68 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
   const [storageInitialized, setStorageInitialized] = useState(false);
   const [activeRuns, setActiveRuns] = useState<ActiveRun[]>([]);
   const [runHistory, setRunHistory] = useState<CompletedRun[]>([]);
+  const [cronHistory, setCronHistory] = useState<CronRun[]>([]);
+  const cronJobsRef = useRef<CronJob[]>([]);
+  const cronNextRunRef = useRef<Record<string, number>>({});
 
+  // Load persisted state from localStorage on mount.  The repository wraps a
+  // synchronous localStorage in Promises (for future SQLite/cloud backends),
+  // but we resolve them inline so the *first* post-mount render already
+  // reflects the persisted selection — no async race that could leave a stale
+  // [INITIAL_PROJECTS[0].id] selection sitting in state after navigation.
   useEffect(() => {
-    const loaded = loadProjectsFromStorage();
-    const safeProjects = loaded.length > 0 ? loaded : INITIAL_PROJECTS;
-    setProjects(safeProjects);
-    setSelectedProjectId(pickInitialProjectId(safeProjects, initialProjectId));
-    setSelectedDashboardProjectIds(loadDashboardSelectedProjectIds(safeProjects));
-    setStorageInitialized(true);
+    let cancelled = false;
+    const repo = getProjectsRepository();
+    Promise.all([
+      repo.listProjects(),
+      repo.getSelectedProjectId(),
+      repo.getDashboardProjectIds(),
+    ]).then(([stored, storedSelectedId, storedDashboardIds]) => {
+      if (cancelled) return;
+      // Always keep the canonical (bundled) sample projects with their latest
+      // config; append any user-added projects from storage as extras.
+      const fallbackIds = new Set(INITIAL_PROJECTS.map((p) => p.id));
+      const extras = stored.filter((p) => !fallbackIds.has(p.id));
+      const safeProjects =
+        stored.length > 0 ? [...INITIAL_PROJECTS, ...extras] : INITIAL_PROJECTS;
+      setProjects(safeProjects);
+      setSelectedProjectId(
+        resolveInitialProjectId(safeProjects, initialProjectId, storedSelectedId),
+      );
+      setSelectedDashboardProjectIds(
+        resolveDashboardProjectIds(safeProjects, storedDashboardIds),
+      );
+      setStorageInitialized(true);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [initialProjectId]);
+
+  // Cross-route sync: when *another* MainClient instance (e.g. on a different
+  // route opened from the sidebar) writes to localStorage, the `storage` event
+  // fires on every other tab/window.  Same-tab navigations within the App
+  // Router unmount/remount this component, so this listener mostly catches
+  // edits made from devtools or a second window.  Cheap insurance.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onStorage = (e: StorageEvent) => {
+      if (!e.key) return;
+      const repo = getProjectsRepository();
+      // Re-read whichever slice changed and push it back into React state.
+      if (e.key.endsWith('dashboardProjectIds') || e.key.endsWith('dashboard-selected-project-ids')) {
+        void repo.getDashboardProjectIds().then((ids) => {
+          if (ids) {
+            setSelectedDashboardProjectIds((prev) =>
+              JSON.stringify(prev) === JSON.stringify(ids) ? prev : ids,
+            );
+          }
+        });
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId) ?? projects[0];
   const adapters = listAdapters(selectedProject.config);
@@ -118,7 +148,32 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
     })),
   );
 
-  const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+  // Restore run history from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('devpilot:run-history');
+      if (stored) setRunHistory(JSON.parse(stored));
+    } catch {
+      // ignore malformed data
+    }
+  }, []);
+
+  // Persist run history to localStorage whenever it changes
+  useEffect(() => {
+    if (runHistory.length === 0) return;
+    try {
+      localStorage.setItem('devpilot:run-history', JSON.stringify(runHistory.slice(0, 100)));
+    } catch {
+      // ignore storage quota errors
+    }
+  }, [runHistory]);
+
+  const [isTauri, setIsTauri] = useState(false);
+
+  useEffect(() => {
+    setIsTauri(typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window);
+  }, []);
+
   const bridgeStatus = (isTauri ? 'live' : 'dry-run') as 'live' | 'dry-run';
 
   // Track which config paths are already being watched so we don't double-register.
@@ -153,25 +208,21 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
 
   // Persist projects and selected project across route changes/reloads.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
     if (!storageInitialized) return;
-    window.localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects));
+    getProjectsRepository().saveProjects(projects).catch(() => {});
   }, [projects, storageInitialized]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
     if (!storageInitialized) return;
     if (!selectedProjectId) return;
-    window.localStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, selectedProjectId);
+    getProjectsRepository().setSelectedProjectId(selectedProjectId).catch(() => {});
   }, [selectedProjectId, storageInitialized]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
     if (!storageInitialized) return;
-    window.localStorage.setItem(
-      DASHBOARD_SELECTED_PROJECTS_STORAGE_KEY,
-      JSON.stringify(selectedDashboardProjectIds),
-    );
+    getProjectsRepository()
+      .setDashboardProjectIds(selectedDashboardProjectIds)
+      .catch(() => {});
   }, [selectedDashboardProjectIds, storageInitialized]);
 
   // Keep selection valid when projects mutate.
@@ -183,17 +234,16 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
   }, [projects, selectedProjectId]);
 
   // Keep dashboard project multi-selection valid when projects mutate.
+  // Only drops IDs that no longer exist; never re-adds anything, so the user's
+  // intentional "empty selection" state is preserved.  Guarded by
+  // storageInitialized so the init effect's restored selection is never wiped.
   useEffect(() => {
-    if (projects.length === 0) {
-      setSelectedDashboardProjectIds([]);
-      return;
-    }
-
+    if (!storageInitialized) return;
     setSelectedDashboardProjectIds((prev) => {
       const valid = prev.filter((id) => projects.some((p) => p.id === id));
-      return valid.length > 0 ? valid : [projects[0].id];
+      return valid.length === prev.length ? prev : valid;
     });
-  }, [projects]);
+  }, [projects, storageInitialized]);
 
   // Respect route-provided project ID when opening /projects/[projectId].
   useEffect(() => {
@@ -216,9 +266,8 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
     if (githubProjects.length === 0) return;
 
     (async () => {
-      const { startGithubPoll } = await import('../../lib/bridge');
-      const token =
-        typeof window !== 'undefined' ? (localStorage.getItem('devpilot-github-token') ?? '') : '';
+      const { startGithubPoll, getGithubToken } = await import('../../lib/bridge');
+      const token = await getGithubToken();
       for (const p of githubProjects) {
         if (!polledGithubUrls.current.has(p.configPath)) {
           polledGithubUrls.current.add(p.configPath);
@@ -303,6 +352,31 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
     [handleRunEnd],
   );
 
+  const handleFeatureUpdate = useCallback(
+    (featureId: string, update: Partial<Pick<Feature, 'status' | 'progress'>>) => {
+      setProjects((prev) =>
+        prev.map((p) => {
+          if (p.id !== selectedProjectId) return p;
+          const updatedConfig = {
+            ...p.config,
+            features: p.config.features.map((f) =>
+              f.id === featureId
+                ? { ...f, ...update, updatedAt: new Date().toISOString() }
+                : f,
+            ),
+          };
+          if (isTauri && p.configPath) {
+            import('../../lib/bridge').then(({ writeConfig }) =>
+              writeConfig(p.configPath, updatedConfig).catch(() => {}),
+            );
+          }
+          return { ...p, config: updatedConfig };
+        }),
+      );
+    },
+    [isTauri, selectedProjectId],
+  );
+
   const handleAddProject = useCallback((entry: ProjectEntry) => {
     setProjects((prev) => [...prev, entry]);
     setSelectedProjectId(entry.id);
@@ -311,13 +385,149 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
 
   const handleToggleDashboardProject = useCallback((id: string, selected: boolean) => {
     setSelectedDashboardProjectIds((prev) => {
-      if (selected) {
-        return prev.includes(id) ? prev : [...prev, id];
-      }
-      const next = prev.filter((projectId) => projectId !== id);
-      return next.length > 0 ? next : [id];
+      const next = selected
+        ? prev.includes(id)
+          ? prev
+          : [...prev, id]
+        : prev.filter((projectId) => projectId !== id);
+      // Persist immediately too — the effect above also writes, but doing it
+      // here avoids the gap where a rapid second toggle reads the stale value.
+      getProjectsRepository().setDashboardProjectIds(next).catch(() => {});
+      return next;
     });
   }, []);
+
+  const handleRolesUpdate = useCallback(
+    (roles: EngineerRole[]) => {
+      setProjects((prev) =>
+        prev.map((p) => {
+          if (p.id !== selectedProjectId) return p;
+          const updatedConfig = { ...p.config, engineerRoles: roles };
+          if (isTauri && p.configPath) {
+            import('../../lib/bridge').then(({ writeConfig }) =>
+              writeConfig(p.configPath, updatedConfig).catch(() => {}),
+            );
+          }
+          return { ...p, config: updatedConfig };
+        }),
+      );
+    },
+    [isTauri, selectedProjectId],
+  );
+
+  const handleCronJobsUpdate = useCallback(
+    (jobs: CronJob[]) => {
+      setProjects((prev) =>
+        prev.map((p) => {
+          if (p.id !== selectedProjectId) return p;
+          const updatedConfig = { ...p.config, cronJobs: jobs };
+          if (isTauri && p.configPath) {
+            import('../../lib/bridge').then(({ writeConfig }) =>
+              writeConfig(p.configPath, updatedConfig).catch(() => {}),
+            );
+          }
+          return { ...p, config: updatedConfig };
+        }),
+      );
+    },
+    [isTauri, selectedProjectId],
+  );
+
+  // Keep the cron jobs ref in sync so the scheduler sees the latest list.
+  useEffect(() => {
+    const jobs = selectedProject?.config.cronJobs ?? [];
+    cronJobsRef.current = jobs;
+    const now = Date.now();
+    // Initialize nextRun for any newly-added enabled job.
+    jobs.forEach((job) => {
+      if (!job.enabled) return;
+      if (!cronNextRunRef.current[job.id]) {
+        const ms =
+          job.schedule.unit === 'hours'
+            ? job.schedule.value * 3_600_000
+            : job.schedule.value * 60_000;
+        cronNextRunRef.current[job.id] = now + ms;
+      }
+    });
+    // Remove stale entries for deleted jobs.
+    const ids = new Set(jobs.map((j) => j.id));
+    Object.keys(cronNextRunRef.current).forEach((id) => {
+      if (!ids.has(id)) delete cronNextRunRef.current[id];
+    });
+  }, [selectedProject?.config.cronJobs]);
+
+  // Heartbeat: check every 30s if any job is due.
+  useEffect(() => {
+    const tick = setInterval(() => {
+      const now = Date.now();
+      cronJobsRef.current.forEach((job) => {
+        if (!job.enabled) return;
+        const next = cronNextRunRef.current[job.id];
+        if (!next || next > now) return;
+
+        // Reschedule before firing so concurrent ticks don't double-fire.
+        const ms =
+          job.schedule.unit === 'hours'
+            ? job.schedule.value * 3_600_000
+            : job.schedule.value * 60_000;
+        cronNextRunRef.current[job.id] = now + ms;
+
+        const firedAt = new Date().toISOString();
+
+        import('../../lib/bridge')
+          .then(({ spawnAgent }) =>
+            spawnAgent({
+              command: job.action.command,
+              args: job.action.args,
+              workingDir: job.action.workingDir,
+            }),
+          )
+          .then((pid) => {
+            handleRunStart(pid, `cron:${job.id}`, job.name, job.action.command, job.action.args);
+            setCronHistory((h) =>
+              [...h, { jobId: job.id, jobName: job.name, firedAt, status: 'ok' as const, pid }].slice(-100),
+            );
+            setProjects((prev) =>
+              prev.map((p) => {
+                const jobs = p.config.cronJobs;
+                if (!jobs?.some((j) => j.id === job.id)) return p;
+                return {
+                  ...p,
+                  config: {
+                    ...p.config,
+                    cronJobs: jobs.map((j) =>
+                      j.id === job.id ? { ...j, lastRun: firedAt, lastStatus: 'ok' as const } : j,
+                    ),
+                  },
+                };
+              }),
+            );
+          })
+          .catch(() => {
+            setCronHistory((h) =>
+              [...h, { jobId: job.id, jobName: job.name, firedAt, status: 'error' as const }].slice(-100),
+            );
+            setProjects((prev) =>
+              prev.map((p) => {
+                const jobs = p.config.cronJobs;
+                if (!jobs?.some((j) => j.id === job.id)) return p;
+                return {
+                  ...p,
+                  config: {
+                    ...p.config,
+                    cronJobs: jobs.map((j) =>
+                      j.id === job.id ? { ...j, lastRun: firedAt, lastStatus: 'error' as const } : j,
+                    ),
+                  },
+                };
+              }),
+            );
+          });
+      });
+    }, 30_000);
+
+    return () => clearInterval(tick);
+  }, [handleRunStart]);
 
   const handleImportFeatures = useCallback(
     (newFeatures: Feature[]) => {
@@ -369,9 +579,11 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
           projectRoot={selectedProject.config.project.root}
           activeRuns={activeRuns}
           runHistory={runHistory}
+          engineerRoles={selectedProject.config.engineerRoles ?? []}
           onRunStart={handleRunStart}
           onRunLog={handleRunLog}
           onRunEnd={handleRunEnd}
+          onFeatureUpdate={handleFeatureUpdate}
         />
       )}
       {currentView === 'projects' && (
@@ -385,7 +597,38 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
           runHistory={runHistory}
         />
       )}
+      {currentView === 'plugins' && <PluginsView />}
+      {currentView === 'channels' && <ChannelsView />}
+      {currentView === 'sessions' && (
+        <SessionsView projectRoot={selectedProject.config.project.root} />
+      )}
+      {currentView === 'cron-jobs' && (
+        <CronJobsView
+          cronJobs={selectedProject.config.cronJobs ?? []}
+          cronHistory={cronHistory}
+          onCronJobsChange={handleCronJobsUpdate}
+        />
+      )}
+      {currentView === 'logs' && (
+        <LogsView
+          activeRuns={activeRuns}
+          runHistory={runHistory}
+          cronHistory={cronHistory}
+          projects={projects}
+          selectedProjectId={selectedProjectId}
+          onKillRun={handleKillRun}
+        />
+      )}
+      {currentView === 'keys' && <KeysView />}
       {currentView === 'settings' && <SettingsView />}
+      {currentView === 'documentation' && <DocumentationView />}
+      {currentView === 'engineers' && (
+        <EngineersView
+          roles={selectedProject.config.engineerRoles ?? []}
+          agents={adapters}
+          onRolesChange={handleRolesUpdate}
+        />
+      )}
       {currentView === 'project-files' && (
         <ProjectFilesView
           projects={projects}

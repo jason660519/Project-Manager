@@ -6,10 +6,16 @@ import { ViewId } from '../../lib/types';
 const VIEW_TITLES: Record<ViewId, string> = {
   dashboard: 'Project Progress Dashboard',
   features: 'Features',
-  runs: 'Runs',
   projects: 'Projects',
-  ingestion: 'Ingestion',
+  'project-files': 'Project Files',
+  plugins: 'Plugins',
   settings: 'Settings',
+  engineers: 'AI Engineers',
+  channels: 'Channels',
+  sessions: 'Sessions',
+  'cron-jobs': 'Cron Jobs',
+  logs: 'Logs',
+  keys: 'API Keys',
 };
 
 interface TopbarProps {

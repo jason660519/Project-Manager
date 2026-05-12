@@ -20,6 +20,8 @@ interface TableCoreProps {
   data: Feature[];
   onDispatch: (feature: Feature) => void;
   onRowClick: (feature: Feature) => void;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string) => void;
 }
 
 const STATUS_LABELS: Record<FeatureStatus, string> = {
@@ -43,9 +45,27 @@ function renderPathCell(value?: string) {
   );
 }
 
-export function TableCore({ data, onDispatch, onRowClick }: TableCoreProps) {
+export function TableCore({ data, onDispatch, onRowClick, selectedIds, onToggleSelect }: TableCoreProps) {
   const columns = useMemo(
     () => [
+      // Checkbox column — only rendered when selection handlers are provided
+      ...(onToggleSelect
+        ? [
+            columnHelper.display({
+              id: 'col-select',
+              header: '',
+              cell: (info) => (
+                <input
+                  type="checkbox"
+                  checked={selectedIds?.has(info.row.original.id) ?? false}
+                  onChange={() => onToggleSelect(info.row.original.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-3.5 w-3.5 cursor-pointer accent-emerald-400"
+                />
+              ),
+            }),
+          ]
+        : []),
       columnHelper.accessor((row) => (row.metadata?.sourceProjectName as string | undefined) ?? '—', {
         id: 'col-project',
         header: 'Project',
@@ -138,7 +158,7 @@ export function TableCore({ data, onDispatch, onRowClick }: TableCoreProps) {
         ),
       }),
     ],
-    [onDispatch],
+    [onDispatch, onToggleSelect, selectedIds],
   );
 
   const table = useReactTable({
@@ -165,19 +185,25 @@ export function TableCore({ data, onDispatch, onRowClick }: TableCoreProps) {
           ))}
         </thead>
         <tbody>
-          {table.getRowModel().rows.map((row) => (
-            <tr
-              key={row.id}
-              onClick={() => onRowClick(row.original)}
-              className="cursor-pointer border-b border-stone-200/10 transition-colors hover:bg-white/[0.045]"
-            >
-              {row.getVisibleCells().map((cell) => (
-                <td key={cell.id} className="px-4 py-3 text-sm text-stone-300">
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {table.getRowModel().rows.map((row) => {
+            const isSelected = selectedIds?.has(row.original.id);
+            return (
+              <tr
+                key={row.id}
+                onClick={() => onRowClick(row.original)}
+                className={cn(
+                  'cursor-pointer border-b border-stone-200/10 transition-colors hover:bg-white/[0.045]',
+                  isSelected && 'bg-emerald-950/20',
+                )}
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <td key={cell.id} className="px-4 py-3 text-sm text-stone-300">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
           {data.length === 0 && (
             <tr>
               <td

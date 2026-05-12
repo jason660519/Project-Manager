@@ -1,118 +1,38 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Eye, EyeOff, Key, Keyboard, Monitor, Server } from 'lucide-react';
-import { getSecret, setSecret } from '../../../lib/bridge';
-
-const KEYCHAIN_SERVICE = 'devpilot';
-const KEYCHAIN_KEY = 'anthropic-api-key';
-const LS_KEY = 'devpilot-api-key';
+import Link from 'next/link';
+import { KeyRound, Keyboard, Monitor, Server } from 'lucide-react';
 
 export function SettingsView() {
-  const [apiKey, setApiKey] = useState('');
-  const [showKey, setShowKey] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [keychainError, setKeychainError] = useState('');
   const [hotkeyEnabled, setHotkeyEnabled] = useState(false);
   const [trayEnabled, setTrayEnabled] = useState(false);
 
-  const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+  const [isTauri, setIsTauri] = useState(false);
 
-  // Load API key on mount: Keychain in Tauri, localStorage in browser.
   useEffect(() => {
-    if (isTauri) {
-      getSecret(KEYCHAIN_SERVICE, KEYCHAIN_KEY)
-        .then((val) => { if (val) setApiKey(val); })
-        .catch((e: unknown) => {
-          const msg = e instanceof Error ? e.message : String(e);
-          setKeychainError(`Keychain read error: ${msg}`);
-        });
-    } else {
-      const stored = localStorage.getItem(LS_KEY) ?? '';
-      if (stored) setApiKey(stored);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    setIsTauri(typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window);
   }, []);
-
-  const handleSaveKey = async () => {
-    setKeychainError('');
-    try {
-      if (isTauri) {
-        await setSecret(KEYCHAIN_SERVICE, KEYCHAIN_KEY, apiKey);
-      } else {
-        localStorage.setItem(LS_KEY, apiKey);
-      }
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setKeychainError(`Keychain write error: ${msg}`);
-    }
-  };
 
   return (
     <div className="max-w-2xl space-y-6">
       <div>
         <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">Settings</h1>
-        <p className="mt-1 text-xs text-stone-400">API keys, adapters, and system preferences.</p>
+        <p className="mt-1 text-xs text-stone-400">Adapters and system preferences.</p>
       </div>
 
-      {/* API Key */}
-      <section className="border border-stone-200/18 bg-[#071d1a]/72">
-        <div className="flex items-center gap-3 border-b border-stone-200/12 px-4 py-3">
-          <Key size={15} className="text-amber-100" />
-          <h2 className="text-sm font-medium uppercase tracking-[0.16em] text-stone-100">
-            Anthropic API Key
-          </h2>
-          {!isTauri && (
-            <span className="ml-auto border border-stone-200/20 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-stone-400">
-              dev: localStorage
-            </span>
-          )}
-          {isTauri && (
-            <span className="ml-auto border border-emerald-200/25 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-emerald-300/80">
-              macOS Keychain
-            </span>
-          )}
+      {/* Keys shortcut */}
+      <Link
+        href="/keys"
+        className="flex items-center gap-3 border border-stone-200/18 bg-[#071d1a]/72 px-4 py-3 transition-colors hover:border-stone-200/30 hover:bg-white/5"
+      >
+        <KeyRound size={15} className="text-amber-100" />
+        <div>
+          <p className="text-sm font-medium uppercase tracking-[0.16em] text-stone-100">API Keys &amp; Tokens</p>
+          <p className="mt-0.5 text-[11px] text-stone-400">Manage Anthropic, OpenAI, GitHub tokens and more.</p>
         </div>
-        <div className="space-y-3 p-4">
-          <p className="text-xs text-stone-400">
-            {isTauri
-              ? 'Stored securely in macOS Keychain. The key is never exposed to the renderer process.'
-              : 'In dev mode, stored in localStorage. In production (Tauri), stored in OS Keychain.'}
-          </p>
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <input
-                type={showKey ? 'text' : 'password'}
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="sk-ant-..."
-                className="w-full border border-stone-200/20 bg-[#03100f] px-3 py-2 pr-10 font-mono text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
-              />
-              <button
-                onClick={() => setShowKey((s) => !s)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-100"
-              >
-                {showKey ? <EyeOff size={15} /> : <Eye size={15} />}
-              </button>
-            </div>
-            <button
-              onClick={() => void handleSaveKey()}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
-                saved
-                  ? 'bg-emerald-700 text-emerald-100'
-                  : 'bg-stone-100 text-[#071d1a] hover:bg-amber-100'
-              }`}
-            >
-              {saved ? 'Saved ✓' : 'Save Key'}
-            </button>
-          </div>
-          {keychainError && (
-            <p className="text-[11px] text-red-400">{keychainError}</p>
-          )}
-        </div>
-      </section>
+        <span className="ml-auto text-stone-500">→</span>
+      </Link>
 
       {/* Global Hotkey */}
       <section className="border border-stone-200/18 bg-[#071d1a]/72">
@@ -146,8 +66,8 @@ export function SettingsView() {
               title={!isTauri ? 'Requires Tauri runtime' : undefined}
             >
               <span
-                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                  hotkeyEnabled ? 'translate-x-5' : 'translate-x-0.5'
+                className={`absolute left-0 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                  hotkeyEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'
                 }`}
               />
             </button>
@@ -185,8 +105,8 @@ export function SettingsView() {
               disabled={!isTauri}
             >
               <span
-                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                  trayEnabled ? 'translate-x-5' : 'translate-x-0.5'
+                className={`absolute left-0 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                  trayEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'
                 }`}
               />
             </button>
