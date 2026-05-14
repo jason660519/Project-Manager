@@ -16,6 +16,7 @@ const VIEW_TITLES: Record<ViewId, string> = {
   'cron-jobs': 'Cron Jobs',
   logs: 'Logs',
   keys: 'API Keys',
+  'keyboard-shortcuts': 'Keyboard Shortcuts',
   documentation: 'Documentation',
 };
 

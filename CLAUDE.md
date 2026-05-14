@@ -24,6 +24,7 @@ DevPilot is a cross-project engineering dashboard that ingests heterogeneous spe
 | `schema/dev-pilot.schema.json` | Canonical project schema |
 | `config/samples/` | Sample `.dev-pilot.json` |
 | `docs/architecture/ADR-*.md` | Closed architecture decisions |
+| `docs/engineering/` | Operational engineering docs for bridge, storage, ingestion, security, and verification |
 
 ## Architecture (short)
 
@@ -63,6 +64,7 @@ cargo build  --manifest-path src-tauri/Cargo.toml   # Rust build
 ## Pointers
 
 - ADRs: [`docs/architecture/`](docs/architecture/) — read before changing closed decisions.
+- Engineering docs: [`docs/engineering/README.md`](docs/engineering/README.md) — read before changing runtime bridge, storage/schema, ingestion, secrets, sessions, GitHub sync, or release checks.
 - PRD / scenarios / competitive analysis: [`docs/01-04-*.md`](docs/).
 - Doc governance: [`scripts/docs-governance-check.sh`](scripts/docs-governance-check.sh) and `/docs-governance` slash command.
 - TanStack Table patterns: use the `create-tanstack-table` skill before building or extending tables.

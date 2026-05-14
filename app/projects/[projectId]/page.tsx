@@ -6,6 +6,10 @@ interface ProjectDetailPageProps {
   }>;
 }
 
+export function generateStaticParams() {
+  return [{ projectId: 'owner-property' }, { projectId: 'devpilot' }];
+}
+
 export default async function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   const { projectId } = await params;
   return <MainClient currentView="projects" initialProjectId={decodeURIComponent(projectId)} />;

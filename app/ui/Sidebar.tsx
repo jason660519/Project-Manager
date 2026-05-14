@@ -8,6 +8,7 @@ import {
   Files,
   FileText,
   KeyRound,
+  Keyboard,
   Plug,
   Radio,
   ScrollText,
@@ -104,6 +105,13 @@ const NAV_ITEMS: Array<{
       icon: KeyRound,
     },
     {
+      id: 'keyboard-shortcuts',
+      label: 'Keyboard Shortcuts',
+      href: '/keyboard-shortcuts',
+      hint: 'Review dispatch, navigation, and runtime keyboard shortcuts.',
+      icon: Keyboard,
+    },
+    {
       id: 'settings',
       label: 'Settings',
       href: '/settings',
@@ -127,7 +135,7 @@ export function Sidebar({ currentView, bridgeStatus, activeRunCount }: SidebarPr
         </div>
       </div>
 
-      <nav className="flex-1 py-3">
+      <nav className="flex-1 overflow-y-auto py-3">
         {NAV_ITEMS.map((item) => (
           <Link
             key={item.id}

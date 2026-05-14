@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import sampleConfig1 from '../../config/samples/dev-pilot.sample.json';
 import sampleConfig2 from '../../config/samples/dev-pilot-devpilot.sample.json';
 import { listAdapters } from '../../lib/adapters/registry';
@@ -33,6 +34,7 @@ import { CronJobsView } from './views/CronJobsView';
 import { LogsView } from './views/LogsView';
 import { SessionsView } from './views/SessionsView';
 import { KeysView } from './views/KeysView';
+import { KeyboardShortcutsView } from './views/KeyboardShortcutsView';
 import { SettingsView } from './views/SettingsView';
 import { DocumentationView } from './views/DocumentationView';
 
@@ -56,6 +58,7 @@ interface MainClientProps {
 }
 
 export function MainClient({ currentView, initialProjectId }: MainClientProps) {
+  const router = useRouter();
   const [projects, setProjects] = useState<ProjectEntry[]>(INITIAL_PROJECTS);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
     initialProjectId ?? INITIAL_PROJECTS[0]?.id ?? '',
@@ -175,6 +178,25 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
   }, []);
 
   const bridgeStatus = (isTauri ? 'live' : 'dry-run') as 'live' | 'dry-run';
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const isTextInput =
+        target?.tagName === 'INPUT' ||
+        target?.tagName === 'TEXTAREA' ||
+        target?.tagName === 'SELECT' ||
+        target?.isContentEditable;
+      if (isTextInput) return;
+      if (event.shiftKey && (event.key === '?' || event.key === '/')) {
+        event.preventDefault();
+        router.push('/keyboard-shortcuts');
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [router]);
 
   // Track which config paths are already being watched so we don't double-register.
   const watchedPaths = useRef<Set<string>>(new Set());
@@ -620,6 +642,7 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
         />
       )}
       {currentView === 'keys' && <KeysView />}
+      {currentView === 'keyboard-shortcuts' && <KeyboardShortcutsView />}
       {currentView === 'settings' && <SettingsView />}
       {currentView === 'documentation' && <DocumentationView />}
       {currentView === 'engineers' && (

@@ -2,9 +2,9 @@
 
 > **Created Date**: 2026-05-12
 > **Created By**: GitHub Copilot
-> **Last Modified**: 2026-05-12
-> **Modified By**: GitHub Copilot
-> **Version**: 1.0
+> **Last Modified**: 2026-05-15
+> **Modified By**: Codex
+> **Version**: 1.1
 > **Document Type**: Architecture / ADR Index
 
 ---
@@ -30,6 +30,7 @@ ADR 記錄重要的技術決策、背景和決策理由，作為專案架構演�
 | [003](./ADR-003-prompt-assembly.md) | Prompt Assembly | Accepted | 2026-05-12 | Keep prompt template logic in TypeScript frontend |
 | [004](./ADR-004-api-call-security.md) | API Call Security | Accepted | 2026-05-12 | Route all API calls through Rust bridge for security |
 | [005](./ADR-005-beta-testing.md) | Beta Testing Strategy | Accepted | 2026-05-12 | Use AI personas for MVP testing instead of real users |
+| [006](./ADR-006-schema-v2-sync-fields.md) | Schema v2 Sync Fields | Accepted | 2026-05-12 | Add stable identity and audit fields for future sync |
 
 ---
 
@@ -98,6 +99,7 @@ Related documents, links, and resources.
 | Date       | Version | Modified By    | Changes                    |
 | ---------- | ------- | -------------- | -------------------------- |
 | 2026-05-12 | 1.0     | GitHub Copilot | Initial ADR index creation |
+| 2026-05-15 | 1.1     | Codex          | Added ADR-006 to index |
 
 ---
 

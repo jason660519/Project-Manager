@@ -2,9 +2,9 @@
 
 > **Created Date**: 2026-05-12
 > **Created By**: GitHub Copilot
-> **Last Modified**: 2026-05-12
-> **Modified By**: GitHub Copilot
-> **Version**: 1.3
+> **Last Modified**: 2026-05-15
+> **Modified By**: Codex
+> **Version**: 1.4
 > **Document Type**: Technical Documentation
 
 ---
@@ -77,6 +77,12 @@ docs/
 ├── 04-competitive-analysis.md
 ├── Architecture.md
 ├── file-naming-standards.md
+├── engineering/
+│   ├── README.md
+│   └── *.md
+├── design/
+├── dev-logs/
+├── project-process/
 ├── architecture/
 │   ├── README.md
 │   └── ADR-###-*.md
@@ -114,6 +120,7 @@ The checker validates:
 
 | Date | Version | Modified By | Changes |
 | --- | --- | --- | --- |
+| 2026-05-15 | 1.4 | Codex | Added engineering, design, dev-logs, and project-process folders to repo convention map |
 | 2026-05-12 | 1.3 | GitHub Copilot | Added governance fix script workflow |
 | 2026-05-12 | 1.2 | GitHub Copilot | Refactored into separated bilingual blocks |
 | 2026-05-12 | 1.1 | GitHub Copilot | Added bilingual layout policy |
@@ -189,6 +196,12 @@ docs/
 ├── 04-competitive-analysis.md
 ├── Architecture.md
 ├── file-naming-standards.md
+├── engineering/
+│   ├── README.md
+│   └── *.md
+├── design/
+├── dev-logs/
+├── project-process/
 ├── architecture/
 │   ├── README.md
 │   └── ADR-###-*.md
@@ -226,6 +239,7 @@ docs/
 
 | 日期 | 版本 | 修改者 | 變更 |
 | --- | --- | --- | --- |
+| 2026-05-15 | 1.4 | Codex | 新增 engineering、design、dev-logs、project-process 目錄慣例 |
 | 2026-05-12 | 1.3 | GitHub Copilot | 新增 fix 腳本流程 |
 | 2026-05-12 | 1.2 | GitHub Copilot | 改為雙語分層版型 |
 | 2026-05-12 | 1.1 | GitHub Copilot | 新增雙語版型規範 |
