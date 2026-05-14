@@ -4,8 +4,9 @@
 > **Created By**: GitHub Copilot
 > **Last Modified**: 2026-05-15
 > **Modified By**: Codex
-> **Version**: 1.4
+> **Version**: 1.5
 > **Document Type**: Technical Documentation
+> **Alignment Scope**: Company AI App Standards, DevPilot, SayDo
 
 ---
 
@@ -13,38 +14,54 @@
 
 ## 1. Core Principles
 
-1. Use English-only filenames and directory names.
-2. Keep naming predictable by file type.
-3. Preserve history by archiving deprecated docs instead of deleting.
-4. Use bilingual block layout for technical docs:
-   - English block first (`## English Version`)
-   - Chinese block second (`## 中文版本`)
-5. Never mix Chinese and English in the same heading, bullet, or table row.
+1. Use English-only filenames and directory names for source code, docs, scripts, and config.
+2. Use kebab-case for Markdown docs unless a framework convention or ADR pattern requires another shape.
+3. Keep docs in role-based folders so engineers know where a new document belongs before writing it.
+4. Preserve meaningful history by archiving deprecated docs instead of deleting them.
+5. Use repo-local ADRs for intentional deviations from company standards.
+6. Keep DevPilot and SayDo aligned: the same document role should use the same folder and filename pattern in both repos.
 
-## 2. Naming Rules
-
-### 2.1 Source Files
+## 2. Source File Naming
 
 | Type | Rule | Example |
 | --- | --- | --- |
 | React component | PascalCase | `TaskDispatchModal.tsx` |
-| TS utility | camelCase | `promptBuilder.ts` |
-| Hook | camelCase with `use` | `useAgentStatus.ts` |
+| TypeScript utility | camelCase | `promptBuilder.ts` |
+| Hook | camelCase with `use` prefix | `useAgentStatus.ts` |
 | Rust module | snake_case | `process_manager.rs` |
-| Config | kebab-case or conventional | `next.config.mjs` |
+| Shell script | kebab-case or snake_case, keep extension | `docs-governance-check.sh` |
+| Config | kebab-case or ecosystem convention | `next.config.mjs` |
 
-### 2.2 Documentation Files
+## 3. Documentation Naming
 
-| Type | Rule | Example |
-| --- | --- | --- |
-| Product docs | numeric prefix | `01-user-scenarios.md` |
-| ADR docs | `ADR-###-kebab-case.md` | `ADR-001-tauri-selection.md` |
-| Reports | date prefix | `20260512-weekly-report.md` |
-| Archived docs | `archived-YYYYMMDD-name.md` | `archived-20260512-05-adr-tauri.md` |
+| Document Type | Folder | Filename Rule | Example |
+| --- | --- | --- | --- |
+| Product strategy, PRD, comparison, feature plan | `docs/product/` | English kebab-case | `competitive-analysis.md` |
+| Engineering spec or runbook | `docs/engineering/` | English kebab-case | `runtime-bridge.md` |
+| UI/design guidance | `docs/design/` | English kebab-case | `shared-ai-desktop-style.md` |
+| Architecture decision | `docs/architecture/` | `ADR-###-kebab-case.md` | `ADR-006-schema-v2-sync-fields.md` |
+| Project progress or handoff report | `docs/project-process/` | `YYYY-MM-DD-kebab-case.md` | `2026-05-15-technical-documentation-update.md` |
+| Deprecated document | `docs/archive/` | `archived-YYYYMMDD-kebab-case.md` | `archived-20260512-adr-tauri.md` |
 
-## 3. Documentation Layout Standard
+## 4. Folder Conventions
 
-All technical docs under `docs/` should use this structure:
+DevPilot and SayDo use the same folder meanings:
+
+```text
+docs/
+├── architecture/       # ADR index and ADR-### records
+├── archive/            # Deprecated docs only
+├── design/             # UI/design system and design briefs
+├── engineering/        # Engineering specs, command contracts, runbooks
+├── product/            # Product strategy, PRDs, feature plans, comparisons
+└── project-process/    # Progress reports, handoffs, daily/weekly logs
+```
+
+No product, engineering, design, or architecture overview documents should live in the repo root or `docs/` root. Root-level `docs/*.md` files are reserved for repository-wide governance documents only, such as this file.
+
+## 5. Documentation Layout
+
+Root technical docs under `docs/` should use bilingual block layout:
 
 ```markdown
 # Title
@@ -60,67 +77,57 @@ All technical docs under `docs/` should use this structure:
 ### 1. ...
 ```
 
-## 4. Archiving Policy
+Subfolder docs may be English-only when they are implementation contracts, but filenames remain English.
 
-1. Do not delete deprecated technical docs.
-2. Move deprecated files to `docs/archive/`.
-3. Rename with `archived-YYYYMMDD-` prefix.
-4. Add a short deprecation note at top of archived file.
+## 6. Archiving Policy
 
-## 5. Folder Conventions for This Repo
+Archive instead of deleting when a document has historical or decision value.
 
-```text
-docs/
-├── 01-user-scenarios.md
-├── 02-prd.md
-├── 03-target-audience.md
-├── 04-competitive-analysis.md
-├── Architecture.md
-├── file-naming-standards.md
-├── engineering/
-│   ├── README.md
-│   └── *.md
-├── design/
-├── dev-logs/
-├── project-process/
-├── architecture/
-│   ├── README.md
-│   └── ADR-###-*.md
-└── archive/
-```
+Use this process:
 
-## 6. Quality Gate
+1. Move the old file to `docs/archive/`.
+2. Rename it to `archived-YYYYMMDD-kebab-case.md`.
+3. Add a short note at the top explaining why it was archived and what replaces it.
+4. Update all indexes and incoming links.
+5. If the document was replaced by a new architecture decision, link to the ADR.
 
-Run this before merging docs changes:
+Use deletion only for generated output, empty placeholders, accidental duplicates, or files with no project value.
 
-```bash
-./scripts/docs-governance-check.sh
-```
+## 7. Root Directory Rules
 
-If check fails, run auto-fix for common issues:
+Allowed root Markdown files:
+
+| File | Purpose |
+| --- | --- |
+| `README.md` | Project entry point |
+| `AGENTS.md` | AI engineer instructions |
+| `CLAUDE.md` | Claude/Codex engineer hints |
+| `DESIGN.md` | UI implementation guide |
+
+Avoid adding new root docs. Put new material in the role-based `docs/` folder.
+
+## 8. Quality Gates
+
+Run before merging docs changes:
 
 ```bash
-./scripts/docs-governance-fix.sh
+npm run docs:check
+npm run standards:check
 ```
 
-Archive one deprecated file via fix script:
-
-```bash
-./scripts/docs-governance-fix.sh . archive docs/some-file.md
-```
-
-The checker validates:
+The DevPilot docs checker validates:
 
 - filename safety
-- bilingual section existence
-- section order (English above Chinese)
-- mixed-language heading pattern
+- repo-local docs layout and bilingual section order where applicable
+- English block before Chinese block
+- mixed-language heading patterns
 
-## 7. Change History
+## 9. Change History
 
 | Date | Version | Modified By | Changes |
 | --- | --- | --- | --- |
-| 2026-05-15 | 1.4 | Codex | Added engineering, design, dev-logs, and project-process folders to repo convention map |
+| 2026-05-15 | 1.5 | Codex | Aligned DevPilot and SayDo folder roles, archive policy, and product-doc location rules |
+| 2026-05-15 | 1.4 | Codex | Added engineering, design, and project-process folders to repo convention map |
 | 2026-05-12 | 1.3 | GitHub Copilot | Added governance fix script workflow |
 | 2026-05-12 | 1.2 | GitHub Copilot | Refactored into separated bilingual blocks |
 | 2026-05-12 | 1.1 | GitHub Copilot | Added bilingual layout policy |
@@ -132,38 +139,54 @@ The checker validates:
 
 ## 1. 核心原則
 
-1. 所有檔案與資料夾名稱都使用英文。
-2. 不同類型檔案使用固定命名規則。
-3. 過時文件用歸檔，不直接刪除。
-4. 技術文件採雙語分層：
-   - 英文區塊在上（`## English Version`）
-   - 中文區塊在下（`## 中文版本`）
-5. 同一個標題、條列或表格列不得混用中英文。
+1. Source code、docs、scripts、config 的檔案與資料夾名稱一律使用英文。
+2. Markdown 文件預設使用 kebab-case，除非框架慣例或 ADR 格式另有要求。
+3. 文件依角色放入固定資料夾，讓工程師在寫新文件前就知道該放哪裡。
+4. 有歷史或決策價值的舊文件要歸檔，不直接刪除。
+5. 若刻意偏離公司標準，使用 repo-local ADR 記錄。
+6. DevPilot 與 SayDo 對齊：同一種文件角色，在兩個 repo 使用同一套資料夾與檔名規則。
 
-## 2. 命名規範
-
-### 2.1 程式碼檔案
+## 2. Source File 命名
 
 | 類型 | 規則 | 範例 |
 | --- | --- | --- |
-| React 元件 | PascalCase | `TaskDispatchModal.tsx` |
-| TS 工具檔 | camelCase | `promptBuilder.ts` |
+| React component | PascalCase | `TaskDispatchModal.tsx` |
+| TypeScript utility | camelCase | `promptBuilder.ts` |
 | Hook | camelCase + `use` 前綴 | `useAgentStatus.ts` |
-| Rust 模組 | snake_case | `process_manager.rs` |
-| 設定檔 | kebab-case 或慣例名稱 | `next.config.mjs` |
+| Rust module | snake_case | `process_manager.rs` |
+| Shell script | kebab-case 或 snake_case，保留副檔名 | `docs-governance-check.sh` |
+| Config | kebab-case 或生態系慣例 | `next.config.mjs` |
 
-### 2.2 文件檔案
+## 3. 文件命名
 
-| 類型 | 規則 | 範例 |
-| --- | --- | --- |
-| 產品文件 | 數字前綴 | `01-user-scenarios.md` |
-| ADR 文件 | `ADR-###-kebab-case.md` | `ADR-001-tauri-selection.md` |
-| 報告文件 | 日期前綴 | `20260512-weekly-report.md` |
-| 歸檔文件 | `archived-YYYYMMDD-name.md` | `archived-20260512-05-adr-tauri.md` |
+| 文件類型 | 資料夾 | 檔名規則 | 範例 |
+| --- | --- | --- | --- |
+| 產品策略、PRD、比較報告、feature plan | `docs/product/` | 英文 kebab-case | `competitive-analysis.md` |
+| 工程規格或 runbook | `docs/engineering/` | 英文 kebab-case | `runtime-bridge.md` |
+| UI/design guidance | `docs/design/` | 英文 kebab-case | `shared-ai-desktop-style.md` |
+| Architecture decision | `docs/architecture/` | `ADR-###-kebab-case.md` | `ADR-006-schema-v2-sync-fields.md` |
+| 專案進度或 handoff report | `docs/project-process/` | `YYYY-MM-DD-kebab-case.md` | `2026-05-15-technical-documentation-update.md` |
+| 過時文件 | `docs/archive/` | `archived-YYYYMMDD-kebab-case.md` | `archived-20260512-adr-tauri.md` |
 
-## 3. 文件版型標準
+## 4. 資料夾慣例
 
-`docs/` 下技術文件一律使用以下結構：
+DevPilot 與 SayDo 使用相同資料夾語意：
+
+```text
+docs/
+├── architecture/       # ADR index and ADR-### records
+├── archive/            # Deprecated docs only
+├── design/             # UI/design system and design briefs
+├── engineering/        # Engineering specs, command contracts, runbooks
+├── product/            # Product strategy, PRDs, feature plans, comparisons
+└── project-process/    # Progress reports, handoffs, daily/weekly logs
+```
+
+產品、工程、設計或 architecture overview 文件不應放在 repo root 或 `docs/` root。`docs/*.md` 根層只保留全 repo governance 文件，例如本文件。
+
+## 5. 文件版型
+
+全 repo governance 文件應使用雙語分層：
 
 ```markdown
 # 標題
@@ -179,67 +202,57 @@ The checker validates:
 ### 1. ...
 ```
 
-## 4. 歸檔規則
+子資料夾內的實作 contract 可使用英文-only，但檔名仍要是英文。
 
-1. 過時技術文件不可直接刪除。
-2. 一律移到 `docs/archive/`。
-3. 檔名前加 `archived-YYYYMMDD-`。
-4. 檔案開頭加上簡短停用說明。
+## 6. 歸檔規則
 
-## 5. 本專案目錄慣例
+有歷史或決策價值的文件應歸檔，不直接刪除。
 
-```text
-docs/
-├── 01-user-scenarios.md
-├── 02-prd.md
-├── 03-target-audience.md
-├── 04-competitive-analysis.md
-├── Architecture.md
-├── file-naming-standards.md
-├── engineering/
-│   ├── README.md
-│   └── *.md
-├── design/
-├── dev-logs/
-├── project-process/
-├── architecture/
-│   ├── README.md
-│   └── ADR-###-*.md
-└── archive/
-```
+流程：
 
-## 6. 合併前檢查
+1. 將舊文件移到 `docs/archive/`。
+2. 改名為 `archived-YYYYMMDD-kebab-case.md`。
+3. 在檔案開頭加簡短說明，指出為何歸檔與替代文件。
+4. 更新所有索引與 incoming links。
+5. 若該文件被新的 architecture decision 取代，連到對應 ADR。
 
-請在提交前執行：
+只有 generated output、空 placeholder、誤建重複檔、或沒有專案價值的檔案才直接刪除。
 
-```bash
-./scripts/docs-governance-check.sh
-```
+## 7. 根目錄規則
 
-若檢查未通過，可先執行自動修正常見問題：
+允許的根目錄 Markdown：
+
+| 檔案 | 用途 |
+| --- | --- |
+| `README.md` | 專案入口 |
+| `AGENTS.md` | AI engineer instructions |
+| `CLAUDE.md` | Claude/Codex engineer hints |
+| `DESIGN.md` | UI implementation guide |
+
+避免新增根目錄文件。新內容應放到 role-based `docs/` 資料夾。
+
+## 8. 品質檢查
+
+Docs change 合併前執行：
 
 ```bash
-./scripts/docs-governance-fix.sh
+npm run docs:check
+npm run standards:check
 ```
 
-若要一併歸檔單一過時文件：
-
-```bash
-./scripts/docs-governance-fix.sh . archive docs/some-file.md
-```
-
-檢查項目包含：
+DevPilot docs checker 會檢查：
 
 - 檔名安全性
-- 雙語章節是否存在
-- 英文章節是否在中文章節之前
-- 是否有混合語言標題
+- repo-local docs layout 與適用文件的雙語區塊順序
+- English block 是否在 Chinese block 前
+- 是否有混合語言 heading pattern
 
-## 7. 修改歷史
+## 9. 修改歷史
 
 | 日期 | 版本 | 修改者 | 變更 |
 | --- | --- | --- | --- |
-| 2026-05-15 | 1.4 | Codex | 新增 engineering、design、dev-logs、project-process 目錄慣例 |
+| 2026-05-15 | 1.5 | Codex | 對齊 DevPilot 與 SayDo 的資料夾角色、歸檔規則與產品文件位置 |
+| 2026-05-15 | 1.4 | Codex | 新增 engineering、design、project-process 目錄慣例 |
 | 2026-05-12 | 1.3 | GitHub Copilot | 新增 fix 腳本流程 |
 | 2026-05-12 | 1.2 | GitHub Copilot | 改為雙語分層版型 |
 | 2026-05-12 | 1.1 | GitHub Copilot | 新增雙語版型規範 |

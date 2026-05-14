@@ -9,12 +9,13 @@ Before implementation, read:
 1. `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/ai-engineer-workflow.md`
 2. `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/ui-design-system.md`
 3. `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/file-naming-standards.md`
-4. `./DESIGN.md`
-5. `./docs/design/shared-ai-desktop-style.md`
-6. `./README.md`
-7. `./CLAUDE.md`
-8. `./docs/Architecture.md`
-9. `./docs/architecture/README.md`
+4. `./docs/file-naming-standards.md`
+5. `./DESIGN.md`
+6. `./docs/design/shared-ai-desktop-style.md`
+7. `./README.md`
+8. `./CLAUDE.md`
+9. `./docs/architecture/architecture-overview.md`
+10. `./docs/architecture/README.md`
 
 ## Project Overrides
 
@@ -22,6 +23,7 @@ DevPilot-specific implementation rules live in:
 
 - `./DESIGN.md`
 - `./CLAUDE.md`
+- `./docs/file-naming-standards.md`
 - `./docs/design/shared-ai-desktop-style.md`
 - `./docs/architecture/`
 

@@ -14,11 +14,12 @@ This folder contains operational engineering documentation for DevPilot. Product
 
 ## 2. Read Order
 
-1. [runtime-bridge.md](./runtime-bridge.md)
-2. [storage-and-schema.md](./storage-and-schema.md)
-3. [ingestion-pipeline.md](./ingestion-pipeline.md)
-4. [security-and-secrets.md](./security-and-secrets.md)
-5. [verification-runbook.md](./verification-runbook.md)
+1. [../file-naming-standards.md](../file-naming-standards.md)
+2. [runtime-bridge.md](./runtime-bridge.md)
+3. [storage-and-schema.md](./storage-and-schema.md)
+4. [ingestion-pipeline.md](./ingestion-pipeline.md)
+5. [security-and-secrets.md](./security-and-secrets.md)
+6. [verification-runbook.md](./verification-runbook.md)
 
 ## 3. Ownership Map
 
@@ -44,11 +45,12 @@ Update the relevant document whenever an implementation change changes a command
 
 ## 2. 建議閱讀順序
 
-1. [runtime-bridge.md](./runtime-bridge.md)
-2. [storage-and-schema.md](./storage-and-schema.md)
-3. [ingestion-pipeline.md](./ingestion-pipeline.md)
-4. [security-and-secrets.md](./security-and-secrets.md)
-5. [verification-runbook.md](./verification-runbook.md)
+1. [../file-naming-standards.md](../file-naming-standards.md)
+2. [runtime-bridge.md](./runtime-bridge.md)
+3. [storage-and-schema.md](./storage-and-schema.md)
+4. [ingestion-pipeline.md](./ingestion-pipeline.md)
+5. [security-and-secrets.md](./security-and-secrets.md)
+6. [verification-runbook.md](./verification-runbook.md)
 
 ## 3. 責任對照
 

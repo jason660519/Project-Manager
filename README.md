@@ -76,7 +76,9 @@ npm run tauri build           # 打包成 .app / .exe
 
 ## 技術文件入口
 
-- [Architecture.md](./docs/Architecture.md): 系統資料流、雙模式執行與文件格式策略。
+- [Architecture Overview](./docs/architecture/architecture-overview.md): 系統資料流、雙模式執行與文件格式策略。
+- [File Naming Standards](./docs/file-naming-standards.md): DevPilot/SayDo 對齊後的檔案命名與歸檔規則。
+- [Product Docs](./docs/product/README.md): 產品文件入口。
 - [Engineering Docs](./docs/engineering/README.md): runtime bridge、storage/schema、ingestion、security、verification runbooks。
-- [Technical Documentation Audit](./docs/05-technical-documentation-audit.md): 目前文件缺口、已補文件與下一批建議。
+- [Technical Documentation Audit](./docs/engineering/technical-documentation-audit.md): 目前文件缺口、已補文件與下一批建議。
 - [ADR Index](./docs/architecture/README.md): 已接受的架構決策。

@@ -16,9 +16,9 @@ This document tracks the technical documentation gaps found during the May 2026 
 
 | Area | Status | Owner Document |
 | --- | --- | --- |
-| Product scope and requirements | Covered | [02-prd.md](./02-prd.md) |
-| User workflows | Covered | [01-user-scenarios.md](./01-user-scenarios.md) |
-| System architecture | Updated | [Architecture.md](./Architecture.md) |
+| Product scope and requirements | Covered | [devpilot-prd.md](../product/devpilot-prd.md) |
+| User workflows | Covered | [user-scenarios.md](../product/user-scenarios.md) |
+| System architecture | Updated | [architecture-overview.md](../architecture/architecture-overview.md) |
 | Architecture decisions | Updated | [architecture/README.md](./architecture/README.md) |
 | UI design system | Covered | [DESIGN.md](../DESIGN.md), [shared-ai-desktop-style.md](./design/shared-ai-desktop-style.md) |
 | Runtime bridge contract | Added | [engineering/runtime-bridge.md](./engineering/runtime-bridge.md) |
@@ -64,9 +64,9 @@ When code changes touch bridge commands, schema fields, ingestion behavior, secr
 
 | 區域 | 狀態 | 負責文件 |
 | --- | --- | --- |
-| 產品範圍與需求 | 已有 | [02-prd.md](./02-prd.md) |
-| 使用者工作流 | 已有 | [01-user-scenarios.md](./01-user-scenarios.md) |
-| 系統架構 | 已更新 | [Architecture.md](./Architecture.md) |
+| 產品範圍與需求 | 已有 | [devpilot-prd.md](../product/devpilot-prd.md) |
+| 使用者工作流 | 已有 | [user-scenarios.md](../product/user-scenarios.md) |
+| 系統架構 | 已更新 | [architecture-overview.md](../architecture/architecture-overview.md) |
 | 架構決策 | 已更新 | [architecture/README.md](./architecture/README.md) |
 | UI 設計系統 | 已有 | [DESIGN.md](../DESIGN.md), [shared-ai-desktop-style.md](./design/shared-ai-desktop-style.md) |
 | Runtime bridge contract | 已新增 | [engineering/runtime-bridge.md](./engineering/runtime-bridge.md) |

@@ -89,11 +89,11 @@ HTML artifacts are **disposable derivatives** of the source data. They are not c
 
 Detailed operating notes live under `docs/engineering/`:
 
-- Runtime bridge and command/event contracts: [runtime-bridge.md](./engineering/runtime-bridge.md)
-- Storage, schema, and migration rules: [storage-and-schema.md](./engineering/storage-and-schema.md)
-- Spec ingestion behavior: [ingestion-pipeline.md](./engineering/ingestion-pipeline.md)
-- Secret handling and API boundaries: [security-and-secrets.md](./engineering/security-and-secrets.md)
-- Verification and release checks: [verification-runbook.md](./engineering/verification-runbook.md)
+- Runtime bridge and command/event contracts: [runtime-bridge.md](../engineering/runtime-bridge.md)
+- Storage, schema, and migration rules: [storage-and-schema.md](../engineering/storage-and-schema.md)
+- Spec ingestion behavior: [ingestion-pipeline.md](../engineering/ingestion-pipeline.md)
+- Secret handling and API boundaries: [security-and-secrets.md](../engineering/security-and-secrets.md)
+- Verification and release checks: [verification-runbook.md](../engineering/verification-runbook.md)
 
 ---
 
@@ -211,8 +211,8 @@ HTML 產物是來源資料的**可拋棄衍生物**，不作為來源真相提�
 
 細節操作文件放在 `docs/engineering/`：
 
-- Runtime bridge 與 command/event contract：[runtime-bridge.md](./engineering/runtime-bridge.md)
-- Storage、schema 與 migration 規則：[storage-and-schema.md](./engineering/storage-and-schema.md)
-- 規格攝取行為：[ingestion-pipeline.md](./engineering/ingestion-pipeline.md)
-- Secret handling 與 API 邊界：[security-and-secrets.md](./engineering/security-and-secrets.md)
-- 驗證與 release checks：[verification-runbook.md](./engineering/verification-runbook.md)
+- Runtime bridge 與 command/event contract：[runtime-bridge.md](../engineering/runtime-bridge.md)
+- Storage、schema 與 migration 規則：[storage-and-schema.md](../engineering/storage-and-schema.md)
+- 規格攝取行為：[ingestion-pipeline.md](../engineering/ingestion-pipeline.md)
+- Secret handling 與 API 邊界：[security-and-secrets.md](../engineering/security-and-secrets.md)
+- 驗證與 release checks：[verification-runbook.md](../engineering/verification-runbook.md)

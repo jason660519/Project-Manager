@@ -13,7 +13,7 @@ Before changing DevPilot UI, read these files in order:
 3. `docs/design/shared-ai-desktop-style.md` - shared visual language for DevPilot/SayDo family apps.
 4. `README.md` - app purpose and current operating modes.
 5. `CLAUDE.md` - engineering conventions and project structure.
-6. `docs/Architecture.md` and `docs/architecture/README.md` - architecture and ADR index.
+6. `docs/architecture/architecture-overview.md` and `docs/architecture/README.md` - architecture and ADR index.
 
 ## Product Personality
 

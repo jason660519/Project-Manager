@@ -33,7 +33,7 @@ Traditionally, this requires recruiting beta testers, coordinating schedules, an
 ### Testing Process
 
 1. Create detailed persona prompts (solo dev, team lead, agent enthusiast)
-2. Ask Claude to walk through complete user scenarios (01-user-scenarios.md)
+2. Ask Claude to walk through complete user scenarios ([user-scenarios.md](../product/user-scenarios.md))
 3. Claude records confusion points, missing features, UI issues
 4. Compile feedback into prioritized issue list
 5. Fix critical issues before real beta testing

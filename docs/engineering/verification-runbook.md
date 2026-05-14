@@ -27,7 +27,7 @@ Use narrower checks for small documentation-only changes, but `docs:check` and `
 
 | Command | Covers | Notes |
 | --- | --- | --- |
-| `npm run docs:check` | Filename safety, bilingual root docs, heading order | Required after docs edits. |
+| `npm run docs:check` | Filename safety, repo-local docs layout, bilingual heading order | Required after docs edits. |
 | `npm run standards:check` | Company baseline standards | May report P2 advisory findings. |
 | `npm run typecheck` | Next typegen and TypeScript correctness | Required after TS or UI edits. |
 | `npm run test` | Vitest unit and component tests | Required after storage, UI state, parser, or helper changes. |
@@ -84,7 +84,7 @@ npm run build
 
 | Command | Covers | 說明 |
 | --- | --- | --- |
-| `npm run docs:check` | Filename safety、bilingual root docs、heading order | Docs edits 後必跑。 |
+| `npm run docs:check` | Filename safety、repo-local docs layout、bilingual heading order | Docs edits 後必跑。 |
 | `npm run standards:check` | Company baseline standards | 可能回報 P2 advisory findings。 |
 | `npm run typecheck` | Next typegen 與 TypeScript correctness | TS 或 UI edits 後必跑。 |
 | `npm run test` | Vitest unit 與 component tests | Storage、UI state、parser、helper changes 後必跑。 |

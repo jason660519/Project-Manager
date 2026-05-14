@@ -36,7 +36,7 @@ Source (Word/Excel/MD/Folder)
   -> Runtime Adapters -> Local IDE / Agent CLI (via Rust bridge)
 ```
 
-Full diagram: [`docs/Architecture.md`](docs/Architecture.md).
+Full diagram: [`docs/architecture/architecture-overview.md`](docs/architecture/architecture-overview.md).
 
 ## Key Conventions
 
