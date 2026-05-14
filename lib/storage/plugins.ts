@@ -1,5 +1,17 @@
 import type { AgentPluginEntry, IdePluginEntry, PluginCatalog, ProviderEntry } from '../types/plugins';
+import { getSecret, setSecret } from '../bridge';
 import { KEY_SHARED_PLUGINS } from './keys';
+
+// API keys live in the OS Keychain under Tauri (ADR-004 — keys must never sit
+// in the renderer's localStorage). In `next dev` mode there is no Tauri runtime
+// so we fall back to localStorage purely so the UI can be exercised in a browser;
+// shipped builds always use the keychain path.
+const SECRET_SERVICE = 'devpilot';
+const SECRET_KEY_PREFIX = 'apikey-';
+const LS_KEY_PREFIX = 'devpilot.personal.apikey.';
+
+const isTauri = (): boolean =>
+  typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 function readJSON<T>(key: string): T | null {
   if (typeof window === 'undefined') return null;
@@ -95,34 +107,47 @@ export function savePluginCatalog(catalog: PluginCatalog): void {
   writeJSON(KEY_SHARED_PLUGINS, catalog);
 }
 
-// API keys are stored separately from catalog metadata to keep secrets
-// out of the main JSON blob. In a future Tauri release these will migrate
-// to per-provider keychain entries; for now localStorage is fine for dev.
+// Provider API keys — stored in the OS Keychain via the Rust bridge when
+// running inside Tauri, with a localStorage fallback for `next dev` only.
 
-export function getProviderApiKey(providerId: string): string {
+export async function getProviderApiKey(providerId: string): Promise<string> {
+  if (isTauri()) {
+    try {
+      const v = await getSecret(SECRET_SERVICE, `${SECRET_KEY_PREFIX}${providerId}`);
+      return v ?? '';
+    } catch {
+      return '';
+    }
+  }
   if (typeof window === 'undefined') return '';
   try {
-    return window.localStorage.getItem(`devpilot.personal.apikey.${providerId}`) ?? '';
+    return window.localStorage.getItem(`${LS_KEY_PREFIX}${providerId}`) ?? '';
   } catch {
     return '';
   }
 }
 
-export function setProviderApiKey(providerId: string, value: string): void {
+export async function setProviderApiKey(providerId: string, value: string): Promise<void> {
+  if (isTauri()) {
+    // setSecret with an empty string effectively clears the entry server-side.
+    await setSecret(SECRET_SERVICE, `${SECRET_KEY_PREFIX}${providerId}`, value);
+    return;
+  }
   if (typeof window === 'undefined') return;
   try {
     if (value) {
-      window.localStorage.setItem(`devpilot.personal.apikey.${providerId}`, value);
+      window.localStorage.setItem(`${LS_KEY_PREFIX}${providerId}`, value);
     } else {
-      window.localStorage.removeItem(`devpilot.personal.apikey.${providerId}`);
+      window.localStorage.removeItem(`${LS_KEY_PREFIX}${providerId}`);
     }
   } catch {
     /* ignore */
   }
 }
 
-export function loadAllApiKeys(providers: ProviderEntry[]): Record<string, string> {
-  return Object.fromEntries(
-    providers.map((p) => [p.id, getProviderApiKey(p.id)]),
+export async function loadAllApiKeys(providers: ProviderEntry[]): Promise<Record<string, string>> {
+  const entries = await Promise.all(
+    providers.map(async (p) => [p.id, await getProviderApiKey(p.id)] as const),
   );
+  return Object.fromEntries(entries);
 }

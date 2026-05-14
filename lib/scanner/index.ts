@@ -100,6 +100,7 @@ const SKIP_DIRS = new Set([
 // ── Server-side helpers (Node.js fs) ─────────────────────────────────────────
 
 import { readdir, readFile, stat } from 'fs/promises';
+import type { Dirent } from 'fs';
 import { join, basename } from 'path';
 
 /**
@@ -112,7 +113,7 @@ async function buildTree(root: string, maxDepth = 3): Promise<string> {
   async function walk(dir: string, prefix: string, depth: number) {
     if (depth > maxDepth) return;
 
-    let entries: Awaited<ReturnType<typeof readdir>>;
+    let entries: Dirent[];
     try {
       entries = await readdir(dir, { withFileTypes: true });
     } catch {

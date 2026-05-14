@@ -1,0 +1,331 @@
+{
+  "schemaVersion": 2,
+  "id": "11111111-d3v1-4000-8000-devpilot00001",
+  "createdAt": "2026-05-12T00:00:00.000Z",
+  "updatedAt": "2026-05-12T17:00:00.000Z",
+  "updatedBy": "Claude Sonnet 4.6",
+  "project": {
+    "name": "DevPilot",
+    "root": "/Volumes/KLEVV-4T-1/Dev-Pilot",
+    "defaultIDE": "Cursor"
+  },
+  "features": [
+    {
+      "id": "F01",
+      "name": "Sidebar Navigation",
+      "category": "Frontend/UI",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "implementation": "app/ui/Sidebar.tsx"
+      },
+      "updatedAt": "2026-05-12T00:00:00.000Z",
+      "updatedBy": "claude"
+    },
+    {
+      "id": "F02",
+      "name": "Feature Filter Tabs",
+      "category": "Frontend/UX",
+      "status": "in_progress",
+      "progress": 65,
+      "paths": {
+        "implementation": "app/ui/DashboardClient.tsx"
+      },
+      "updatedAt": "2026-05-12T00:00:00.000Z",
+      "updatedBy": "claude"
+    },
+    {
+      "id": "F03",
+      "name": "Live Run Inspector",
+      "category": "Frontend/Monitor",
+      "status": "in_progress",
+      "progress": 30,
+      "paths": {
+        "implementation": "app/ui/views/RunsView.tsx"
+      },
+      "updatedAt": "2026-05-12T00:00:00.000Z",
+      "updatedBy": "claude"
+    },
+    {
+      "id": "F04",
+      "name": "Add Project by GitHub URL",
+      "category": "Core/Integration",
+      "status": "in_progress",
+      "progress": 60,
+      "paths": {
+        "spec": "docs/01-user-scenarios.md",
+        "implementation": "app/ui/views/IngestionView.tsx"
+      },
+      "notes": "背景輪詢 5 分鐘 refresh 已完成，live feature sync 完成",
+      "updatedAt": "2026-05-12T00:00:00.000Z",
+      "updatedBy": "claude"
+    },
+    {
+      "id": "F05",
+      "name": "Spec Ingestion Pipeline",
+      "category": "Core/AI",
+      "status": "in_progress",
+      "progress": 70,
+      "paths": {
+        "spec": "docs/02-prd.md",
+        "implementation": "lib/ingestion/"
+      },
+      "notes": "Markdown parser 已完成，DOCX/XLSX AI fallback 完成",
+      "updatedAt": "2026-05-12T00:00:00.000Z",
+      "updatedBy": "claude"
+    },
+    {
+      "id": "F06",
+      "name": "Storage Abstraction & Schema v2",
+      "category": "Core/Architecture",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "spec": "docs/architecture/ADR-006-schema-v2-sync-fields.md",
+        "implementation": "lib/storage/",
+        "developmentLogSummaryFolder": "docs/dev-logs/"
+      },
+      "notes": "Async ProjectsRepository + namespaced localStorage + schema v1→v2 migration + ADR-006",
+      "updatedAt": "2026-05-12T00:00:00.000Z",
+      "updatedBy": "claude"
+    },
+    {
+      "id": "F07",
+      "name": "Multi-view Dashboard Shell",
+      "category": "Frontend/UI",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "implementation": "app/ui/MainClient.tsx"
+      },
+      "notes": "13-view shell：Projects, Dashboard, Project Files, Plugins, AI Engineers, Sessions, Channels, Cron Jobs, Logs, Documentation, Keys, Settings, Features。lifted run state, CronJob engine, app shell routing 完成",
+      "updatedAt": "2026-05-12T12:30:00.000Z",
+      "updatedBy": "Claude Sonnet 4.6"
+    },
+    {
+      "id": "F08",
+      "name": "Project Files View",
+      "category": "Frontend/UI",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "implementation": "app/ui/views/ProjectFilesView.tsx"
+      },
+      "updatedAt": "2026-05-12T12:00:00.000Z",
+      "updatedBy": "Claude Sonnet 4.6"
+    },
+    {
+      "id": "F09",
+      "name": "API Key Storage in OS Keychain",
+      "category": "Core/Security",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "spec": "docs/architecture/ADR-004-api-key-storage.md",
+        "implementation": "src-tauri/src/lib.rs"
+      },
+      "notes": "keyring crate，API key 不進 renderer",
+      "updatedAt": "2026-05-12T00:00:00.000Z",
+      "updatedBy": "claude"
+    },
+    {
+      "id": "F10",
+      "name": "Plugins View",
+      "category": "Frontend/UI",
+      "status": "in_progress",
+      "progress": 80,
+      "paths": {
+        "implementation": "app/ui/views/PluginsView.tsx"
+      },
+      "notes": "Providers / AI Agents / IDEs CRUD 完成；enable/disable toggle 完成；enabled?: boolean 加入 lib/types/plugins.ts",
+      "updatedAt": "2026-05-12T12:30:00.000Z",
+      "updatedBy": "Claude Sonnet 4.6"
+    },
+    {
+      "id": "F11",
+      "name": "Documentation View",
+      "category": "Frontend/UI",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "implementation": "app/ui/views/DocumentationView.tsx",
+        "spec": "app/documentation/page.tsx"
+      },
+      "notes": "Hermes Agent API Explorer：fetch /openapi.json，11 個群組側欄，method badge 色碼，endpoint 展開顯示 params/requestBody/responses，LIVE/OFFLINE 狀態指示器。Group.match TS 型別修正完成。",
+      "updatedAt": "2026-05-12T12:30:00.000Z",
+      "updatedBy": "Claude Sonnet 4.6"
+    },
+    {
+      "id": "F12",
+      "name": "Sessions View — AI Conversation History",
+      "category": "Frontend/Monitor",
+      "status": "in_progress",
+      "progress": 70,
+      "paths": {
+        "implementation": "app/ui/views/SessionsView.tsx"
+      },
+      "notes": "基礎建設完成：AgentSession/SessionMessage 型別、雙欄 UI、Sidebar nav、/sessions 路由。待完成：callAnthropic 呼叫方傳 sessionId + sessionsDir 讓對話自動記錄",
+      "updatedAt": "2026-05-12T12:00:00.000Z",
+      "updatedBy": "Claude Sonnet 4.6"
+    },
+    {
+      "id": "F13",
+      "name": "Channels View",
+      "category": "Core/Integration",
+      "status": "in_progress",
+      "progress": 40,
+      "paths": {
+        "implementation": "app/ui/views/ChannelsView.tsx"
+      },
+      "notes": "Phase 1 純 UI 完成：Telegram/WhatsApp/LINE/WeChat 設定表單、inline edit、enable toggle、secrets 分開存放（devpilot.personal.channel.<id>.<field>）、Command Mappings（/help /status /report /run）、Getting Started guide。Phase 2（Telegram polling Rust bridge）待實作。",
+      "updatedAt": "2026-05-12T12:30:00.000Z",
+      "updatedBy": "Claude Sonnet 4.6"
+    },
+    {
+      "id": "F14",
+      "name": "Cron Jobs View",
+      "category": "Core/Integration",
+      "status": "in_progress",
+      "progress": 65,
+      "paths": {
+        "implementation": "app/ui/views/CronJobsView.tsx"
+      },
+      "notes": "UI 完成（新增/編輯/刪除/啟用、next run 倒計時、歷史紀錄）。Engine 在 MainClient setInterval（dev only），Tauri Rust cron_tick command 待實作。",
+      "updatedAt": "2026-05-12T12:30:00.000Z",
+      "updatedBy": "Claude Sonnet 4.6"
+    },
+    {
+      "id": "F15",
+      "name": "Logs View",
+      "category": "Frontend/Monitor",
+      "status": "in_progress",
+      "progress": 65,
+      "paths": {
+        "implementation": "app/ui/views/LogsView.tsx"
+      },
+      "notes": "三 tab（Runs / Cron / Dev Logs）完成；agent runs + cron history 接通；dev logs tab 需掃描 projectRoot，後端支援待做。",
+      "updatedAt": "2026-05-12T12:30:00.000Z",
+      "updatedBy": "Claude Sonnet 4.6"
+    },
+    {
+      "id": "F16",
+      "name": "Keys View",
+      "category": "Core/Security",
+      "status": "in_progress",
+      "progress": 85,
+      "paths": {
+        "implementation": "app/ui/views/KeysView.tsx"
+      },
+      "notes": "Anthropic / OpenAI / Gemini / GitHub PAT 統一管理；Tauri 走 OS Keychain、瀏覽器走 localStorage；show/hide toggle 完成。",
+      "updatedAt": "2026-05-12T12:30:00.000Z",
+      "updatedBy": "Claude Sonnet 4.6"
+    },
+    {
+      "id": "F17",
+      "name": "AI Engineers Setting",
+      "category": "Frontend/UI",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "implementation": "app/ui/views/EngineersView.tsx"
+      },
+      "notes": "master-detail 兩欄 UI；5 個預設角色模板（Frontend/Backend/Fullstack/QA/DevOps）；EngineerRole 存於 DevPilotConfig.engineerRoles（project-level）；TaskDispatchModal 整合：角色選擇器 + systemPrompt + referenceFiles 自動注入 prompt；schema.json 加 engineerRole definition",
+      "updatedAt": "2026-05-12T17:00:00.000Z",
+      "updatedBy": "Claude Sonnet 4.6"
+    }
+  ],
+  "engineerRoles": [
+    {
+      "id": "role-frontend",
+      "name": "Frontend Engineer",
+      "slug": "frontend",
+      "skills": [
+        "React",
+        "TypeScript",
+        "Tailwind CSS",
+        "Next.js",
+        "TanStack Table"
+      ],
+      "commands": [
+        "npm run dev",
+        "npm run typecheck",
+        "npm run build"
+      ],
+      "systemPrompt": "You are a senior frontend engineer specializing in React and TypeScript. Focus on component architecture, type safety, and pixel-perfect UI. Follow the project's existing patterns. Prefer composition over inheritance, keep components small and focused.",
+      "referenceFiles": [
+        "CLAUDE.md",
+        "docs/Architecture.md"
+      ]
+    },
+    {
+      "id": "role-backend",
+      "name": "Backend Engineer",
+      "slug": "backend",
+      "skills": [
+        "Rust",
+        "Tauri",
+        "TypeScript"
+      ],
+      "commands": [
+        "cargo check --manifest-path src-tauri/Cargo.toml",
+        "cargo build --manifest-path src-tauri/Cargo.toml"
+      ],
+      "systemPrompt": "You are a senior backend engineer working with Rust and Tauri v2. Focus on Rust bridge commands, process management, security, and performance. Write safe Rust code, handle errors with Result types, never expose secrets to the renderer.",
+      "referenceFiles": [
+        "CLAUDE.md",
+        "docs/Architecture.md",
+        "docs/architecture/ADR-004-api-key-storage.md"
+      ]
+    },
+    {
+      "id": "role-fullstack",
+      "name": "Full-stack Engineer",
+      "slug": "fullstack",
+      "skills": [
+        "React",
+        "Rust",
+        "TypeScript",
+        "Tauri",
+        "Next.js"
+      ],
+      "commands": [
+        "npm run dev",
+        "npm run tauri:dev"
+      ],
+      "systemPrompt": "You are a senior full-stack engineer working on a Tauri desktop app with Next.js frontend and Rust backend. Balance UI quality with solid Rust bridge design. Read the ADRs before making architectural decisions.",
+      "referenceFiles": [
+        "CLAUDE.md",
+        "docs/Architecture.md"
+      ]
+    }
+  ],
+  "adapters": {
+    "ides": [
+      {
+        "id": "Cursor",
+        "name": "Cursor",
+        "type": "ide",
+        "command": "cursor"
+      },
+      {
+        "id": "VSCode",
+        "name": "Visual Studio Code",
+        "type": "ide",
+        "command": "code"
+      }
+    ],
+    "agents": [
+      {
+        "id": "claude-code",
+        "name": "Claude Code",
+        "type": "agent",
+        "command": "claude",
+        "argsTemplate": [
+          "--cwd",
+          "{root}",
+          "{prompt}"
+        ]
+      }
+    ]
+  }
+}

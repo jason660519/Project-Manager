@@ -4,6 +4,7 @@ export interface ProviderEntry {
   baseUrl: string;
   defaultModel: string;
   models: string[];
+  enabled?: boolean;
 }
 
 export interface AgentPluginEntry {
@@ -12,12 +13,14 @@ export interface AgentPluginEntry {
   command: string;
   argsTemplate: string[];
   providerId?: string;
+  enabled?: boolean;
 }
 
 export interface IdePluginEntry {
   id: string;
   name: string;
   command: string;
+  enabled?: boolean;
 }
 
 export interface PluginCatalog {

@@ -39,6 +39,7 @@ Full diagram: [`docs/Architecture.md`](docs/Architecture.md).
 
 ## Key Conventions
 
+- **Design system**: read [`DESIGN.md`](DESIGN.md) and [`docs/design/shared-ai-desktop-style.md`](docs/design/shared-ai-desktop-style.md) before UI changes. Keep the DP rail, dense dashboard layout, semantic status badges, and guarded-execution UX intact.
 - **Static export**: Next.js produces a static bundle for Tauri. `app/api/` only runs under `next dev`. Anything that must exist in the shipped app belongs in Rust.
 - **Bridge discipline**: never call `invoke()` directly from a component. Add a typed wrapper in `lib/bridge/index.ts`.
 - **Anthropic API key never reaches the renderer** (ADR-004). Always proxy through `call_anthropic` in Rust; storage uses `keyring`.

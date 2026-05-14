@@ -14,8 +14,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { buildProjectContext, buildScanPrompt, parseScanResponse } from '../../../../lib/scanner';
-import type { ScanResult } from '../../../../lib/scanner';
+import { buildProjectContext, buildScanPrompt, parseScanResponse } from '../../../lib/scanner';
+import type { ScanResult } from '../../../lib/scanner';
 
 export async function POST(request: NextRequest) {
   try {

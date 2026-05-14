@@ -57,6 +57,7 @@ interface Group {
   key: string;
   label: string;
   endpoints: Endpoint[];
+  match: (p: string) => boolean;
 }
 
 // ── Grouping config ───────────────────────────────────────────────────────────

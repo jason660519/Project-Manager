@@ -5,7 +5,6 @@ import {
   BookOpen,
   Boxes,
   CircleGauge,
-  DatabaseZap,
   Files,
   FileText,
   KeyRound,
@@ -123,8 +122,8 @@ export function Sidebar({ currentView, bridgeStatus, activeRunCount }: SidebarPr
   return (
     <aside className="hidden min-h-screen w-[68px] border-r border-stone-200/15 bg-[#061512]/95 lg:flex lg:flex-col">
       <div className="flex h-16 items-center justify-center border-b border-stone-200/15">
-        <div className="inline-flex h-9 w-9 items-center justify-center border border-amber-200/25 text-amber-100/80">
-          <DatabaseZap size={16} />
+        <div className="inline-flex h-9 w-9 items-center justify-center border border-amber-200/25 text-[11px] font-black tracking-normal text-amber-100/90">
+          DP
         </div>
       </div>
 
