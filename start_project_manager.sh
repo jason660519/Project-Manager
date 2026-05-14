@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # DevPilot — one-click install / update / start
 # Usage:
-#   ./dev.sh          auto-detect and start (installs if needed)
-#   ./dev.sh install  force full install check
-#   ./dev.sh update   update npm deps + rebuild Rust
-#   ./dev.sh start    start the Tauri desktop app
-#   ./dev.sh web      start Next.js web server only (no Tauri)
+#   ./start_project_manager.sh          auto-detect and start (installs if needed)
+#   ./start_project_manager.sh install  force full install check
+#   ./start_project_manager.sh update   update npm deps + rebuild Rust
+#   ./start_project_manager.sh start    start the Tauri desktop app
+#   ./start_project_manager.sh web      start Next.js web server only (no Tauri)
 
 set -euo pipefail
 
@@ -80,7 +80,7 @@ ensure_dev_port_available() {
     error "Port $DEV_PORT is used by a non-Next process (PID $pid): ${cmdline:-unknown}"
     echo ""
     echo "To proceed, either stop that process or run with:"
-    echo "  DEVPILOT_FORCE_KILL_PORT=1 ./dev.sh start"
+    echo "  DEVPILOT_FORCE_KILL_PORT=1 ./start_project_manager.sh start"
     exit 1
   done
 
@@ -312,7 +312,7 @@ cmd_install() {
   auto_generate_config
   mark_installed
   echo ""
-  success "Installation complete. Run ./dev.sh start to launch DevPilot."
+  success "Installation complete. Run ./start_project_manager.sh start to launch DevPilot."
 }
 
 cmd_update() {

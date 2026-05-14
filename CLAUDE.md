@@ -52,6 +52,13 @@ Full diagram: [`docs/architecture/architecture-overview.md`](docs/architecture/a
 ## Common Commands
 
 ```bash
+# One-click wrapper (auto-installs deps on first run, then launches)
+./start_project_manager.sh           # Auto-detect and start (Tauri app)
+./start_project_manager.sh web       # Next.js web server only (no Tauri)
+./start_project_manager.sh install   # Force full install check
+./start_project_manager.sh update    # Update npm deps + rebuild Rust
+
+# Underlying npm / cargo commands (used by the wrapper)
 npm run dev          # Next.js only on :43187 (browser preview)
 npm run tauri:dev    # Full desktop app (recommended)
 npm run typecheck    # next typegen + tsc --noEmit
