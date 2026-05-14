@@ -145,7 +145,7 @@ export function SessionsView({ projectRoot }: SessionsViewProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const sessionsDir = projectRoot ? `${projectRoot}/.dev-pilot/sessions` : null;
+  const sessionsDir = projectRoot ? `${projectRoot}/.project-manager/sessions` : null;
 
   useEffect(() => {
     if (!sessionsDir) return;

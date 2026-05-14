@@ -1,10 +1,10 @@
 ---
 name: 'Create TanStack Table'
-description: 'Build or extend data tables in Dev-Pilot using raw TanStack Table v8. Triggered when creating a new table, adding columns, or modifying TableCore. Covers column patterns, numeric sort rules, complex cell extraction, layout pitfalls, and the project colour system.'
+description: 'Build or extend data tables in Project-Manager using raw TanStack Table v8. Triggered when creating a new table, adding columns, or modifying TableCore. Covers column patterns, numeric sort rules, complex cell extraction, layout pitfalls, and the project colour system.'
 applyTo: 'components/table/**,app/ui/views/**'
 ---
 
-# Create TanStack Table — Dev-Pilot
+# Create TanStack Table — Project-Manager
 
 Build data tables using **raw TanStack Table v8** (no wrapper). Reference implementation:
 `components/table/TableCore.tsx`
@@ -89,7 +89,7 @@ cell: (info) => {
 
 ## Colour System (dark theme tokens)
 
-Dev-Pilot uses a dark stone/emerald palette. Use these instead of hardcoded colours:
+Project-Manager uses a dark stone/emerald palette. Use these instead of hardcoded colours:
 
 | Purpose | Token |
 |---|---|

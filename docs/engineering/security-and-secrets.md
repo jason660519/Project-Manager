@@ -10,7 +10,7 @@
 
 ## 1. Boundary
 
-DevPilot is local-first, but it can execute local commands and call external APIs. Security documentation must focus on two boundaries:
+Project Manager is local-first, but it can execute local commands and call external APIs. Security documentation must focus on two boundaries:
 
 1. Secrets must not be written to plaintext production storage.
 2. Local command execution must remain visible and user-controlled.
@@ -20,7 +20,7 @@ DevPilot is local-first, but it can execute local commands and call external API
 | Secret | Tauri Mode | Browser Development Mode | Notes |
 | --- | --- | --- | --- |
 | Provider API keys | OS Keychain through `set_secret` and `get_secret` | `localStorage` fallback | Dev fallback only; not production. |
-| GitHub token | OS Keychain service `devpilot`, key `github-token` | `localStorage` fallback | Used by GitHub import and polling. |
+| GitHub token | OS Keychain service `projectmanager`, key `github-token` | `localStorage` fallback | Used by GitHub import and polling. |
 | Anthropic API key for `/api/anthropic` | Not used by shipped Tauri path | Server environment variable | Browser development server only. |
 
 UI must show configured or missing state, not raw secret values.
@@ -72,7 +72,7 @@ Required UX:
 
 ## 1. Boundary
 
-DevPilot 是 local-first，但它可以執行本機 command，也可以呼叫外部 API。Security 文件必須聚焦兩條邊界：
+Project Manager 是 local-first，但它可以執行本機 command，也可以呼叫外部 API。Security 文件必須聚焦兩條邊界：
 
 1. Secrets 不可寫入 production plaintext storage。
 2. Local command execution 必須可見且由使用者控制。
@@ -82,7 +82,7 @@ DevPilot 是 local-first，但它可以執行本機 command，也可以呼叫外
 | Secret | Tauri Mode | Browser Development Mode | 說明 |
 | --- | --- | --- | --- |
 | Provider API keys | 透過 `set_secret` 與 `get_secret` 存 OS Keychain | `localStorage` fallback | 僅供 dev fallback，不是 production。 |
-| GitHub token | OS Keychain service `devpilot`，key `github-token` | `localStorage` fallback | GitHub import 與 polling 使用。 |
+| GitHub token | OS Keychain service `projectmanager`，key `github-token` | `localStorage` fallback | GitHub import 與 polling 使用。 |
 | `/api/anthropic` 的 Anthropic API key | Shipped Tauri path 不使用 | Server environment variable | 僅限 browser development server。 |
 
 UI 必須顯示 configured 或 missing state，不顯示 raw secret values。

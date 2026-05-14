@@ -11,7 +11,7 @@
 
 ## Background
 
-DevPilot needs to:
+Project Manager needs to:
 1. Fetch GitHub repository metadata (PR status, commit history, issues)
 2. Call Anthropic API for spec parsing and task generation
 3. Manage API keys (GitHub tokens, Anthropic API keys)
@@ -119,7 +119,7 @@ GITHUB_TOKEN=ghp_...
 
 **Option C: Config File (Less Secure)**
 ```json
-// ~/.dev-pilot/config.json
+// ~/.project-manager/config.json
 {
   "anthropic_key": "...",
   "github_token": "..."

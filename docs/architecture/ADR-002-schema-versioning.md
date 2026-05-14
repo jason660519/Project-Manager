@@ -1,4 +1,4 @@
-# ADR-002: Schema Versioning Strategy for `.dev-pilot.json`
+# ADR-002: Schema Versioning Strategy for `.project-manager.json`
 
 > **Created Date**: 2026-05-12
 > **Created By**: Jason (Project Lead)
@@ -11,19 +11,19 @@
 
 ## Background
 
-`.dev-pilot.json` is the core configuration file format that travels with each project. As the product evolves, the schema will need to accommodate:
+`.project-manager.json` is the core configuration file format that travels with each project. As the product evolves, the schema will need to accommodate:
 
 - New optional fields (e.g., GitHub repository URL, AI model preferences)
 - Breaking changes (e.g., restructuring task format)
 - Backward compatibility concerns
 
-Without a versioning strategy, older projects will become incompatible with newer DevPilot versions, creating a poor user experience.
+Without a versioning strategy, older projects will become incompatible with newer Project Manager versions, creating a poor user experience.
 
 ---
 
 ## Decision
 
-Implement schema versioning using a top-level `schemaVersion: number` field in `.dev-pilot.json`.
+Implement schema versioning using a top-level `schemaVersion: number` field in `.project-manager.json`.
 
 **Current version:** `1`
 
@@ -52,14 +52,14 @@ Implement schema versioning using a top-level `schemaVersion: number` field in `
 
 ```typescript
 // lib/bridge/migrate.ts
-import { DevPilotConfig } from '@/lib/types';
+import { ProjectManagerConfig } from '@/lib/types';
 
 interface RawConfig {
   schemaVersion?: number;
   [key: string]: any;
 }
 
-export function migrateConfig(raw: unknown): DevPilotConfig {
+export function migrateConfig(raw: unknown): ProjectManagerConfig {
   const config = raw as RawConfig;
   const version = config.schemaVersion ?? 0;
 
@@ -71,10 +71,10 @@ export function migrateConfig(raw: unknown): DevPilotConfig {
     return migrate_1_to_2(config);
   }
 
-  return config as DevPilotConfig;
+  return config as ProjectManagerConfig;
 }
 
-function migrate_0_to_1(config: RawConfig): DevPilotConfig {
+function migrate_0_to_1(config: RawConfig): ProjectManagerConfig {
   // v0 → v1: Rename 'tasks' to 'features'
   return {
     schemaVersion: 1,
@@ -84,7 +84,7 @@ function migrate_0_to_1(config: RawConfig): DevPilotConfig {
   };
 }
 
-function migrate_1_to_2(config: RawConfig): DevPilotConfig {
+function migrate_1_to_2(config: RawConfig): ProjectManagerConfig {
   // Future migration example
   return {
     schemaVersion: 2,
@@ -97,7 +97,7 @@ function migrate_1_to_2(config: RawConfig): DevPilotConfig {
 
 ```typescript
 // lib/types/index.ts
-export interface DevPilotConfig {
+export interface ProjectManagerConfig {
   schemaVersion: number;  // ← NEW
   projectName: string;
   features: Feature[];
@@ -118,7 +118,7 @@ export interface Feature {
 **v0 (old format):**
 ```json
 {
-  "projectName": "DevPilot",
+  "projectName": "Project Manager",
   "tasks": [
     { "id": "t1", "title": "Implement Tauri bridge" }
   ]
@@ -129,7 +129,7 @@ export interface Feature {
 ```json
 {
   "schemaVersion": 1,
-  "projectName": "DevPilot",
+  "projectName": "Project Manager",
   "features": [
     { "id": "f1", "title": "Implement Tauri bridge" }
   ]
@@ -199,7 +199,7 @@ export interface Feature {
 ## Consequences
 
 **Positive:**
-- Users can upgrade DevPilot without breaking projects
+- Users can upgrade Project Manager without breaking projects
 - Schema changes are tracked and explicit
 - New features don't require manual config updates
 
@@ -213,7 +213,7 @@ export interface Feature {
 
 - **Backward compatibility window**: Support last 3 versions; deprecate older
 - **Schema dump utility**: CLI tool to show which version a config is
-- **Automatic backup**: Create `.dev-pilot.json.backup` before migration
+- **Automatic backup**: Create `.project-manager.json.backup` before migration
 
 ---
 

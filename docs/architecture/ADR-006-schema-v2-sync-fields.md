@@ -12,9 +12,9 @@
 
 ## Background
 
-DevPilot ships today as a single-user desktop tool: every `.dev-pilot.json` lives in a project folder and the dashboard reads it from disk. As the product moves toward multi-user / multi-machine usage (cross-region engineering teams collaborating on the same project pipeline), three pieces of state become unavoidable:
+Project Manager ships today as a single-user desktop tool: every `.project-manager.json` lives in a project folder and the dashboard reads it from disk. As the product moves toward multi-user / multi-machine usage (cross-region engineering teams collaborating on the same project pipeline), three pieces of state become unavoidable:
 
-1. **Stable identity** — a project must be referenceable across machines without depending on its filesystem path. Today, two machines that mount the same repo at different roots see two unrelated `.dev-pilot.json` documents.
+1. **Stable identity** — a project must be referenceable across machines without depending on its filesystem path. Today, two machines that mount the same repo at different roots see two unrelated `.project-manager.json` documents.
 2. **Monotonic clocks** — any future sync (peer-to-peer, cloud-backed, or git-based merge) needs a per-document and per-feature timestamp to drive last-write-wins or conflict surfacing.
 3. **Authorship** — when multiple engineers can mutate feature status, knowing *who* last touched a row is a prerequisite for any kind of activity feed or audit log.
 
@@ -26,7 +26,7 @@ Adding the fields **now** — even before any sync code exists — costs almost 
 
 ## Decision
 
-Bump `.dev-pilot.json` `schemaVersion` from `1` to `2`. The new shape adds four fields at the document root and three on each feature.
+Bump `.project-manager.json` `schemaVersion` from `1` to `2`. The new shape adds four fields at the document root and three on each feature.
 
 ### Document root (additions)
 
@@ -71,7 +71,7 @@ Path identity breaks the moment two engineers mount the same repo at different r
 
 ### Why ISO 8601 strings instead of epoch numbers?
 
-- Human-readable in `git diff` and in raw editors — engineers will look at `.dev-pilot.json` directly.
+- Human-readable in `git diff` and in raw editors — engineers will look at `.project-manager.json` directly.
 - JSON Schema has a standard `format: "date-time"` validator.
 - The 8-byte cost over an epoch number is negligible and never hot-path.
 
@@ -154,7 +154,7 @@ Adding a UUID per feature would double the noise in the document with no real be
 
 - When the sync layer lands, `updatedBy` should be populated from the authenticated identity (GitHub login / email).
 - Consider a `schemaMinor` field for additive-only changes that don't warrant a major bump but should still be visible to consumers.
-- Backup-on-migrate (`/.dev-pilot.json.backup`) — not in scope here, but referenced in ADR-002's "Future Considerations" and increasingly relevant as the migration pipeline grows.
+- Backup-on-migrate (`/.project-manager.json.backup`) — not in scope here, but referenced in ADR-002's "Future Considerations" and increasingly relevant as the migration pipeline grows.
 
 ---
 

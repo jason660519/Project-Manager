@@ -1,4 +1,4 @@
-# DevPilot Engineering Documentation
+# Project Manager Engineering Documentation
 
 > Status: Active  
 > Last updated: 2026-05-15  
@@ -10,7 +10,7 @@
 
 ## 1. Purpose
 
-This folder contains operational engineering documentation for DevPilot. Product documents explain what the app should do; these documents explain how the current implementation is wired and what must be kept stable when changing it.
+This folder contains operational engineering documentation for Project Manager. Product documents explain what the app should do; these documents explain how the current implementation is wired and what must be kept stable when changing it.
 
 ## 2. Read Order
 
@@ -26,7 +26,7 @@ This folder contains operational engineering documentation for DevPilot. Product
 | Topic | Primary Files | Document |
 | --- | --- | --- |
 | Tauri commands, browser fallbacks, event contracts | `src-tauri/src/lib.rs`, `lib/bridge/index.ts`, `app/api/*` | [runtime-bridge.md](./runtime-bridge.md) |
-| Project list, selected project, schema migration | `lib/storage/*`, `schema/dev-pilot.schema.json`, `config/samples/*` | [storage-and-schema.md](./storage-and-schema.md) |
+| Project list, selected project, schema migration | `lib/storage/*`, `schema/project-manager.schema.json`, `config/samples/*` | [storage-and-schema.md](./storage-and-schema.md) |
 | Markdown import and AI-assisted spec import | `lib/ingestion/*`, `app/ui/views/IngestionView.tsx` | [ingestion-pipeline.md](./ingestion-pipeline.md) |
 | API keys, provider keys, GitHub token, API call boundary | `lib/storage/plugins.ts`, `lib/bridge/index.ts`, `src-tauri/src/lib.rs`, `app/api/anthropic/route.ts` | [security-and-secrets.md](./security-and-secrets.md) |
 | Pre-handoff checks and release verification | `package.json`, `scripts/*`, `src-tauri/Cargo.toml` | [verification-runbook.md](./verification-runbook.md) |
@@ -41,7 +41,7 @@ Update the relevant document whenever an implementation change changes a command
 
 ## 1. 目的
 
-此目錄保存 DevPilot 的工程技術文件。產品文件說明 app 應該做什麼；本目錄說明目前實作如何接線，以及修改時哪些 contract 不能破壞。
+此目錄保存 Project Manager 的工程技術文件。產品文件說明 app 應該做什麼；本目錄說明目前實作如何接線，以及修改時哪些 contract 不能破壞。
 
 ## 2. 建議閱讀順序
 
@@ -57,7 +57,7 @@ Update the relevant document whenever an implementation change changes a command
 | 主題 | 主要檔案 | 文件 |
 | --- | --- | --- |
 | Tauri commands、browser fallbacks、event contracts | `src-tauri/src/lib.rs`, `lib/bridge/index.ts`, `app/api/*` | [runtime-bridge.md](./runtime-bridge.md) |
-| Project list、selected project、schema migration | `lib/storage/*`, `schema/dev-pilot.schema.json`, `config/samples/*` | [storage-and-schema.md](./storage-and-schema.md) |
+| Project list、selected project、schema migration | `lib/storage/*`, `schema/project-manager.schema.json`, `config/samples/*` | [storage-and-schema.md](./storage-and-schema.md) |
 | Markdown import 與 AI-assisted spec import | `lib/ingestion/*`, `app/ui/views/IngestionView.tsx` | [ingestion-pipeline.md](./ingestion-pipeline.md) |
 | API keys、provider keys、GitHub token、API call boundary | `lib/storage/plugins.ts`, `lib/bridge/index.ts`, `src-tauri/src/lib.rs`, `app/api/anthropic/route.ts` | [security-and-secrets.md](./security-and-secrets.md) |
 | 交付前檢查與 release verification | `package.json`, `scripts/*`, `src-tauri/Cargo.toml` | [verification-runbook.md](./verification-runbook.md) |

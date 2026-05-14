@@ -11,7 +11,7 @@
 
 ## Background
 
-When dispatching a task to an agent, DevPilot must assemble a prompt using a template with variable substitution. The template string contains placeholders like:
+When dispatching a task to an agent, Project Manager must assemble a prompt using a template with variable substitution. The template string contains placeholders like:
 
 ```
 Agent, please implement this feature:

@@ -10,7 +10,7 @@ if [[ ! -d "$DOCS_DIR" ]]; then
   exit 1
 fi
 
-echo "== DevPilot Docs Governance Check =="
+echo "== Project Manager Docs Governance Check =="
 
 # 1) Ensure markdown filenames are English-safe.
 echo "\n[1/4] Checking markdown filenames (ASCII-safe)..."

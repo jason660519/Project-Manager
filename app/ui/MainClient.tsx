@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import sampleConfig1 from '../../config/samples/dev-pilot.sample.json';
-import sampleConfig2 from '../../config/samples/dev-pilot-devpilot.sample.json';
+import sampleConfig1 from '../../config/samples/project-manager.sample.json';
+import sampleConfig2 from '../../config/samples/project-manager-self.sample.json';
 import { listAdapters } from '../../lib/adapters/registry';
 import {
   getProjectsRepository,
@@ -15,7 +15,7 @@ import {
   CompletedRun,
   CronJob,
   CronRun,
-  DevPilotConfig,
+  ProjectManagerConfig,
   EngineerRole,
   Feature,
   FeatureStatus,
@@ -41,14 +41,14 @@ import { DocumentationView } from './views/DocumentationView';
 const INITIAL_PROJECTS: ProjectEntry[] = [
   {
     id: 'owner-property',
-    config: sampleConfig1 as DevPilotConfig,
+    config: sampleConfig1 as ProjectManagerConfig,
     configPath:
-      '/Volumes/KLEVV-4T-1/Real Estate Management Projects/Owner-Property-Management-AI-SPA/.dev-pilot.json',
+      '/Volumes/KLEVV-4T-1/Real Estate Management Projects/Owner-Property-Management-AI-SPA/.project-manager.json',
   },
   {
-    id: 'devpilot',
-    config: sampleConfig2 as DevPilotConfig,
-    configPath: '/Volumes/KLEVV-4T-1/Dev-Pilot/.dev-pilot.json',
+    id: 'project-manager',
+    config: sampleConfig2 as ProjectManagerConfig,
+    configPath: '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager.json',
   },
 ];
 
@@ -154,7 +154,7 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
   // Restore run history from localStorage on mount
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('devpilot:run-history');
+      const stored = localStorage.getItem('projectManager:run-history');
       if (stored) setRunHistory(JSON.parse(stored));
     } catch {
       // ignore malformed data
@@ -165,7 +165,7 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
   useEffect(() => {
     if (runHistory.length === 0) return;
     try {
-      localStorage.setItem('devpilot:run-history', JSON.stringify(runHistory.slice(0, 100)));
+      localStorage.setItem('projectManager:run-history', JSON.stringify(runHistory.slice(0, 100)));
     } catch {
       // ignore storage quota errors
     }

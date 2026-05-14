@@ -1,6 +1,6 @@
 /**
  * Project Scanner — analyses a project directory or GitHub repo
- * and generates a `.dev-pilot.json` config via AI.
+ * and generates a `.project-manager.json` config via AI.
  *
  * This module provides:
  *  - `buildProjectContext()` — collects directory tree + key file contents
@@ -9,7 +9,7 @@
  *  - `scanProjectLocal()` — end-to-end scan for a local path (server-side)
  */
 
-import type { DevPilotConfig } from '../types';
+import type { ProjectManagerConfig } from '../types';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -30,7 +30,7 @@ export interface ProjectContext {
 
 export interface ScanResult {
   success: boolean;
-  config?: DevPilotConfig;
+  config?: ProjectManagerConfig;
   context?: ProjectContext;
   error?: string;
   /** Raw AI response for debugging */
@@ -53,7 +53,7 @@ const KEY_FILES = [
   'Gemfile',
   'composer.json',
   'tsconfig.json',
-  '.dev-pilot.json',
+  '.project-manager.json',
 ];
 
 /** IDE detection markers. */
@@ -252,8 +252,8 @@ export function buildScanPrompt(context: ProjectContext): string {
     .map(([name, content]) => `### ${name}\n\`\`\`\n${content}\n\`\`\``)
     .join('\n\n');
 
-  return `You are a project analyst for DevPilot, a developer productivity tool.
-Analyse the following project structure and generate a DevPilot configuration file.
+  return `You are a project analyst for Project Manager, a developer productivity tool.
+Analyse the following project structure and generate a Project Manager configuration file.
 
 ## OUTPUT FORMAT
 Return ONLY a valid JSON object (no markdown fences, no commentary). The JSON must strictly follow this schema:
@@ -329,16 +329,16 @@ ${keyFilesBlock || '(no key files found)'}
 // ── Response parsing ─────────────────────────────────────────────────────────
 
 /**
- * Parse and validate the AI response into a DevPilotConfig.
+ * Parse and validate the AI response into a ProjectManagerConfig.
  */
-export function parseScanResponse(raw: string): DevPilotConfig {
+export function parseScanResponse(raw: string): ProjectManagerConfig {
   // Strip markdown code fences if present
   let cleaned = raw.trim();
   if (cleaned.startsWith('```')) {
     cleaned = cleaned.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
   }
 
-  const config = JSON.parse(cleaned) as DevPilotConfig;
+  const config = JSON.parse(cleaned) as ProjectManagerConfig;
 
   // Basic validation
   if (typeof config.schemaVersion !== 'number') {

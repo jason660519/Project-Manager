@@ -13,7 +13,7 @@ import type { ProjectEntry } from '../lib/types';
 
 const makeProject = (id: string): ProjectEntry => ({
   id,
-  configPath: `/projects/${id}/.dev-pilot.json`,
+  configPath: `/projects/${id}/.project-manager.json`,
   config: {
     schemaVersion: 2,
     id: `${id}-doc-id`,

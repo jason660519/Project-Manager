@@ -19,7 +19,7 @@ struct ExitEvent {
 
 // ── Commands ──────────────────────────────────────────────────────────────────
 
-/// Read and parse a `.dev-pilot.json` config file.
+/// Read and parse a `.project-manager.json` config file.
 #[tauri::command]
 async fn read_config(path: String) -> Result<serde_json::Value, String> {
     let content = tokio::fs::read_to_string(&path)
@@ -28,7 +28,7 @@ async fn read_config(path: String) -> Result<serde_json::Value, String> {
     serde_json::from_str(&content).map_err(|e| format!("Invalid JSON in {path}: {e}"))
 }
 
-/// Write a JSON value back to a `.dev-pilot.json` config file.
+/// Write a JSON value back to a `.project-manager.json` config file.
 #[tauri::command]
 async fn write_config(path: String, config: serde_json::Value) -> Result<(), String> {
     let content =
@@ -46,7 +46,7 @@ async fn read_file(path: String) -> Result<String, String> {
         .map_err(|e| format!("Cannot read {path}: {e}"))
 }
 
-/// Scan a directory for projects that contain a `.dev-pilot.json`.
+/// Scan a directory for projects that contain a `.project-manager.json`.
 #[tauri::command]
 async fn scan_projects(root: String) -> Result<Vec<String>, String> {
     let mut found: Vec<String> = Vec::new();
@@ -55,7 +55,7 @@ async fn scan_projects(root: String) -> Result<Vec<String>, String> {
         .map_err(|e| format!("Cannot read dir {root}: {e}"))?;
 
     while let Ok(Some(entry)) = dir.next_entry().await {
-        let config_path = entry.path().join(".dev-pilot.json");
+        let config_path = entry.path().join(".project-manager.json");
         if config_path.exists() {
             if let Some(p) = config_path.to_str() {
                 found.push(p.to_string());
@@ -127,7 +127,7 @@ async fn spawn_agent(
 /// touches the renderer process or the network directly from JS.
 ///
 /// Pass `session_id` + `sessions_dir` to automatically persist the conversation
-/// to `.dev-pilot/sessions/{session_id}.json` after a successful response.
+/// to `.project-manager/sessions/{session_id}.json` after a successful response.
 #[tauri::command]
 async fn call_anthropic(
     api_key: String,
@@ -295,7 +295,7 @@ struct ConfigChangedEvent {
     config: serde_json::Value,
 }
 
-/// Poll a `.dev-pilot.json` for changes every 2 s; emit `config-changed` with
+/// Poll a `.project-manager.json` for changes every 2 s; emit `config-changed` with
 /// the new parsed config whenever the file modification time advances.
 #[tauri::command]
 async fn watch_config(app: AppHandle, path: String) -> Result<(), String> {
@@ -404,7 +404,7 @@ async fn fetch_github_repo_inner(token: &str, repo_url: &str) -> Result<Vec<GitH
     let res = client
         .post("https://api.github.com/graphql")
         .header("Authorization", format!("Bearer {token}"))
-        .header("User-Agent", "DevPilot/0.1.0")
+        .header("User-Agent", "ProjectManager/0.1.0")
         .json(&body)
         .send()
         .await
@@ -520,7 +520,7 @@ async fn fetch_github_repo_inner(token: &str, repo_url: &str) -> Result<Vec<GitH
 }
 
 /// Fetch open PRs and issues from a GitHub repo via GraphQL and map them to
-/// DevPilot feature cards.  PRs idle ≥ 5 days are flagged in `notes`; issues
+/// Project Manager feature cards.  PRs idle ≥ 5 days are flagged in `notes`; issues
 /// and PRs labelled blocked/hold/stuck become `on_hold`.
 #[tauri::command]
 async fn fetch_github_repo(token: String, repo_url: String) -> Result<Vec<GitHubFeature>, String> {
@@ -546,7 +546,7 @@ async fn fetch_github_issues(token: String, repo_url: String) -> Result<Vec<Gith
     let res = client
         .post("https://api.github.com/graphql")
         .header("Authorization", format!("Bearer {token}"))
-        .header("User-Agent", "DevPilot/0.1.0")
+        .header("User-Agent", "ProjectManager/0.1.0")
         .json(&body)
         .send()
         .await
@@ -682,8 +682,8 @@ fn list_dir_recursive(path: &std::path::Path, depth: u32, max_depth: u32) -> Vec
     for entry in read_dir.flatten() {
         let file_name = entry.file_name();
         let name = file_name.to_string_lossy().to_string();
-        // Skip hidden files/dirs (except root level and .dev-pilot.json)
-        if name.starts_with('.') && name != ".dev-pilot.json" && depth > 0 {
+        // Skip hidden files/dirs (except root level and .project-manager.json)
+        if name.starts_with('.') && name != ".project-manager.json" && depth > 0 {
             continue;
         }
         let entry_path = entry.path();

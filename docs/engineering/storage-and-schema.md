@@ -2,7 +2,7 @@
 
 > Status: Active  
 > Last updated: 2026-05-15  
-> Primary files: `lib/storage/*`, `lib/types/index.ts`, `schema/dev-pilot.schema.json`, `config/samples/*`
+> Primary files: `lib/storage/*`, `lib/types/index.ts`, `schema/project-manager.schema.json`, `config/samples/*`
 
 ---
 
@@ -10,10 +10,10 @@
 
 ## 1. Source of Truth
 
-DevPilot uses project-scoped `.dev-pilot.json` documents as the long-term source of truth. UI state and imported project lists can be cached locally, but the project config format is owned by:
+Project Manager uses project-scoped `.project-manager.json` documents as the long-term source of truth. UI state and imported project lists can be cached locally, but the project config format is owned by:
 
 1. `lib/types/index.ts`
-2. `schema/dev-pilot.schema.json`
+2. `schema/project-manager.schema.json`
 3. `lib/storage/migrate.ts`
 4. Sample configs under `config/samples/`
 
@@ -63,8 +63,8 @@ Local browser storage is split by future sync intent:
 
 | Namespace | Meaning | Examples |
 | --- | --- | --- |
-| `devpilot.shared.*` | Data that may eventually sync | project list, plugin catalog |
-| `devpilot.personal.*` | Per-user local preferences | selected project, dashboard project IDs, dev-mode key fallback |
+| `projectManager.shared.*` | Data that may eventually sync | project list, plugin catalog |
+| `projectManager.personal.*` | Per-user local preferences | selected project, dashboard project IDs, dev-mode key fallback |
 
 The current project repository implementation is `LocalStorageProjectsRepository`. It implements the async `ProjectsRepository` interface so SQLite, Tauri storage, or cloud sync can replace it without changing consumers.
 
@@ -73,7 +73,7 @@ The current project repository implementation is `LocalStorageProjectsRepository
 Tauri sessions are stored under the project root:
 
 ```text
-.dev-pilot/
+.project-manager/
 └── sessions/
     └── {sessionId}.json
 ```
@@ -85,7 +85,7 @@ Tauri sessions are stored under the project root:
 Before changing schema or storage:
 
 1. Update `lib/types/index.ts`.
-2. Update `schema/dev-pilot.schema.json`.
+2. Update `schema/project-manager.schema.json`.
 3. Update `lib/storage/migrate.ts`.
 4. Update sample configs.
 5. Add or update tests for migration and repository behavior.
@@ -97,10 +97,10 @@ Before changing schema or storage:
 
 ## 1. Source of Truth
 
-DevPilot 以專案內的 `.dev-pilot.json` 作為長期 source of truth。UI state 與 imported project list 可以在本機快取，但 project config format 由以下檔案共同定義：
+Project Manager 以專案內的 `.project-manager.json` 作為長期 source of truth。UI state 與 imported project list 可以在本機快取，但 project config format 由以下檔案共同定義：
 
 1. `lib/types/index.ts`
-2. `schema/dev-pilot.schema.json`
+2. `schema/project-manager.schema.json`
 3. `lib/storage/migrate.ts`
 4. `config/samples/` 內的 sample configs
 
@@ -150,8 +150,8 @@ Local browser storage 依未來 sync 意圖拆分：
 
 | Namespace | 意義 | 範例 |
 | --- | --- | --- |
-| `devpilot.shared.*` | 未來可能同步的資料 | project list、plugin catalog |
-| `devpilot.personal.*` | 每位使用者本機偏好 | selected project、dashboard project IDs、dev-mode key fallback |
+| `projectManager.shared.*` | 未來可能同步的資料 | project list、plugin catalog |
+| `projectManager.personal.*` | 每位使用者本機偏好 | selected project、dashboard project IDs、dev-mode key fallback |
 
 目前 project repository implementation 是 `LocalStorageProjectsRepository`。它實作 async `ProjectsRepository` interface，讓未來 SQLite、Tauri storage 或 cloud sync 可以替換，不用改 consumers。
 
@@ -160,7 +160,7 @@ Local browser storage 依未來 sync 意圖拆分：
 Tauri sessions 存在 project root 底下：
 
 ```text
-.dev-pilot/
+.project-manager/
 └── sessions/
     └── {sessionId}.json
 ```
@@ -172,7 +172,7 @@ Tauri sessions 存在 project root 底下：
 變更 schema 或 storage 前：
 
 1. 更新 `lib/types/index.ts`。
-2. 更新 `schema/dev-pilot.schema.json`。
+2. 更新 `schema/project-manager.schema.json`。
 3. 更新 `lib/storage/migrate.ts`。
 4. 更新 sample configs。
 5. 新增或更新 migration 與 repository behavior tests。

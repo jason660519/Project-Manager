@@ -100,7 +100,7 @@ const MARKETPLACE: MarketplacePlugin[] = [
     defaultAgent: { name: 'GitHub', command: 'gh', argsTemplate: [] },
   },
   {
-    id: 'linear', name: 'Linear', description: 'Pull issues and cycles into DevPilot features.',
+    id: 'linear', name: 'Linear', description: 'Pull issues and cycles into Project Manager features.',
     category: 'pm', kind: 'agent', accentColor: 'bg-[#5e6ad2]', initials: 'LN',
     defaultAgent: { name: 'Linear', command: 'linear', argsTemplate: [] },
   },

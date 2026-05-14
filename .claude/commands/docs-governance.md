@@ -1,6 +1,6 @@
 # /docs-governance
 
-Run DevPilot documentation governance workflow.
+Run Project Manager documentation governance workflow.
 
 ## What it does
 

@@ -84,7 +84,7 @@ export interface ExecutionResult {
 
 export type AnyAdapterConfig = IDEAdapterConfig | AgentAdapterConfig;
 
-export interface DevPilotConfig {
+export interface ProjectManagerConfig {
   /** Increment when making breaking changes to the config structure. Current: 2 */
   schemaVersion: number;
   engineerRoles?: EngineerRole[];
@@ -221,7 +221,7 @@ export interface CompletedRun {
 
 export interface ProjectEntry {
   id: string;
-  config: DevPilotConfig;
+  config: ProjectManagerConfig;
   configPath: string;
 }
 

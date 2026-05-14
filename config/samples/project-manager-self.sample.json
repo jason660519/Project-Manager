@@ -5,8 +5,8 @@
   "updatedAt": "2026-05-12T00:00:00.000Z",
   "updatedBy": "claude",
   "project": {
-    "name": "DevPilot",
-    "root": "/Volumes/KLEVV-4T-1/Dev-Pilot",
+    "name": "Project Manager",
+    "root": "/Volumes/KLEVV-4T-1/Project-Manager",
     "defaultIDE": "Cursor"
   },
   "features": [
@@ -87,7 +87,7 @@
       "commands": ["cargo check --manifest-path src-tauri/Cargo.toml", "cargo build --manifest-path src-tauri/Cargo.toml"],
       "systemPrompt": "You are a senior backend engineer working with Rust and Tauri v2. Focus on Rust bridge commands, process management, security, and performance. Write safe Rust code, handle errors with Result types, and never expose secrets to the renderer.",
       "referenceFiles": ["CLAUDE.md", "docs/Architecture.md", "docs/architecture/ADR-004-api-key-storage.md"],
-      "notes": "DevPilot backend is Tauri v2 + Rust"
+      "notes": "Project Manager backend is Tauri v2 + Rust"
     },
     {
       "id": "role-fullstack",

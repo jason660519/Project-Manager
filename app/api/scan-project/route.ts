@@ -2,7 +2,7 @@
  * POST /api/scan-project
  *
  * Accepts a local project path, scans its structure, calls OpenAI to
- * generate a `.dev-pilot.json` config, and returns the result.
+ * generate a `.project-manager.json` config, and returns the result.
  *
  * Request body:
  *   { "path": "/absolute/path/to/project" }

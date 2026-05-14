@@ -40,7 +40,7 @@ export class AgentAdapter implements RuntimeAdapter {
       args,
       dryRun: true,
       logs: `Dry run: ${this.command} ${args.map((arg) => JSON.stringify(arg)).join(' ')}`,
-      externalUrl: `dev-pilot://tasks/${feature.id}`,
+      externalUrl: `project-manager://tasks/${feature.id}`,
     };
   }
 }

@@ -1,17 +1,17 @@
 import type { ProjectEntry } from '../types';
 
 /**
- * Storage abstraction for DevPilot project list + per-user UI state.
+ * Storage abstraction for Project Manager project list + per-user UI state.
  *
  * Today the only implementation is `LocalStorageProjectsRepository`. The
  * interface is async so a future Tauri-SQLite or cloud-backed implementation
  * (for cross-device sync) can be swapped in without touching call sites.
  *
  * Naming convention used by every implementation:
- *   - `devpilot.shared.*`   — data that should one day sync across machines
- *                              (project list, feature status, …)
- *   - `devpilot.personal.*` — per-user UI preference, never synced
- *                              (selected project, dashboard multi-selection)
+ *   - `projectManager.shared.*`   — data that should one day sync across machines
+ *                                   (project list, feature status, …)
+ *   - `projectManager.personal.*` — per-user UI preference, never synced
+ *                                   (selected project, dashboard multi-selection)
  */
 export interface ProjectsRepository {
   // ── Shared ────────────────────────────────────────────────────────────

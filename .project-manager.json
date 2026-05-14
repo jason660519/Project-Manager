@@ -5,8 +5,8 @@
   "updatedAt": "2026-05-12T17:00:00.000Z",
   "updatedBy": "Claude Sonnet 4.6",
   "project": {
-    "name": "DevPilot",
-    "root": "/Volumes/KLEVV-4T-1/Dev-Pilot",
+    "name": "Project Manager",
+    "root": "/Volumes/KLEVV-4T-1/Project-Manager",
     "defaultIDE": "Cursor"
   },
   "features": [
@@ -177,7 +177,7 @@
       "paths": {
         "implementation": "app/ui/views/ChannelsView.tsx"
       },
-      "notes": "Phase 1 純 UI 完成：Telegram/WhatsApp/LINE/WeChat 設定表單、inline edit、enable toggle、secrets 分開存放（devpilot.personal.channel.<id>.<field>）、Command Mappings（/help /status /report /run）、Getting Started guide。Phase 2（Telegram polling Rust bridge）待實作。",
+      "notes": "Phase 1 純 UI 完成：Telegram/WhatsApp/LINE/WeChat 設定表單、inline edit、enable toggle、secrets 分開存放（projectManager.personal.channel.<id>.<field>）、Command Mappings（/help /status /report /run）、Getting Started guide。Phase 2（Telegram polling Rust bridge）待實作。",
       "updatedAt": "2026-05-12T12:30:00.000Z",
       "updatedBy": "Claude Sonnet 4.6"
     },
@@ -229,7 +229,7 @@
       "paths": {
         "implementation": "app/ui/views/EngineersView.tsx"
       },
-      "notes": "master-detail 兩欄 UI；5 個預設角色模板（Frontend/Backend/Fullstack/QA/DevOps）；EngineerRole 存於 DevPilotConfig.engineerRoles（project-level）；TaskDispatchModal 整合：角色選擇器 + systemPrompt + referenceFiles 自動注入 prompt；schema.json 加 engineerRole definition",
+      "notes": "master-detail 兩欄 UI；5 個預設角色模板（Frontend/Backend/Fullstack/QA/DevOps）；EngineerRole 存於 ProjectManagerConfig.engineerRoles（project-level）；TaskDispatchModal 整合：角色選擇器 + systemPrompt + referenceFiles 自動注入 prompt；schema.json 加 engineerRole definition",
       "updatedAt": "2026-05-12T17:00:00.000Z",
       "updatedBy": "Claude Sonnet 4.6"
     }

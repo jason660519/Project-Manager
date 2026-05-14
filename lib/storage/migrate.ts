@@ -1,7 +1,7 @@
-import type { DevPilotConfig, Feature } from '../types';
+import type { ProjectManagerConfig, Feature } from '../types';
 
 /**
- * Pure migration pipeline for `.dev-pilot.json` documents.
+ * Pure migration pipeline for `.project-manager.json` documents.
  *
  * v1 → v2 (ADR-006): adds a stable root `id` (UUID) plus `createdAt` /
  * `updatedAt` / `updatedBy` audit fields on the root and on every feature.
@@ -24,15 +24,15 @@ interface RawConfig {
 
 export const CURRENT_SCHEMA_VERSION = 2;
 
-export function migrateConfig(raw: unknown): DevPilotConfig {
+export function migrateConfig(raw: unknown): ProjectManagerConfig {
   const cfg = (raw && typeof raw === 'object' ? (raw as RawConfig) : {}) as RawConfig;
   const version = typeof cfg.schemaVersion === 'number' ? cfg.schemaVersion : 1;
   let next: RawConfig = { ...cfg };
   if (version < 2) next = migrate_1_to_2(next);
   // Cast through unknown: `RawConfig` is intentionally a permissive bag,
   // and the migration steps above are responsible for ensuring the result
-  // matches `DevPilotConfig`.
-  return next as unknown as DevPilotConfig;
+  // matches `ProjectManagerConfig`.
+  return next as unknown as ProjectManagerConfig;
 }
 
 function migrate_1_to_2(cfg: RawConfig): RawConfig {

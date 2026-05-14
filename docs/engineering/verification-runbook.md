@@ -52,7 +52,7 @@ Before a packaged desktop build:
 1. Run the full check order.
 2. Run `npm run tauri:build`.
 3. Verify Browser mode still starts on port `43187`.
-4. Verify Tauri mode can read a local `.dev-pilot.json`.
+4. Verify Tauri mode can read a local `.project-manager.json`.
 5. Verify secrets show configured state without rendering raw values.
 6. Verify live agent dispatch shows command, working directory, PID, logs, and exit state.
 7. Verify failed or blocked commands are not shown as successful.
@@ -109,7 +109,7 @@ Desktop packaged build 前：
 1. 執行 full check order。
 2. 執行 `npm run tauri:build`。
 3. 確認 Browser mode 仍在 port `43187` 啟動。
-4. 確認 Tauri mode 可讀本機 `.dev-pilot.json`。
+4. 確認 Tauri mode 可讀本機 `.project-manager.json`。
 5. 確認 secrets 只顯示 configured state，不 render raw values。
 6. 確認 live agent dispatch 顯示 command、working directory、PID、logs、exit state。
 7. 確認 failed 或 blocked commands 不會被顯示為 successful。

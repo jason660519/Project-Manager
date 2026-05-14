@@ -1,4 +1,4 @@
-# DevPilot Product Documents
+# Project Manager Product Documents
 
 > Status: Product documentation index  
 > Last updated: 2026-05-15
@@ -9,14 +9,14 @@
 
 ## 1. Purpose
 
-This folder is the only location for DevPilot product strategy, user-scenario, PRD, audience, and market-positioning documents.
+This folder is the only location for Project Manager product strategy, user-scenario, PRD, audience, and market-positioning documents.
 
 ## 2. Current Product Sources
 
 | Document | Purpose |
 | --- | --- |
 | [user-scenarios.md](./user-scenarios.md) | User workflows and Tauri dependencies |
-| [devpilot-prd.md](./devpilot-prd.md) | Product requirements and MVP scope |
+| [project-manager-prd.md](./project-manager-prd.md) | Product requirements and MVP scope |
 | [target-audience.md](./target-audience.md) | Target audience and JTBD |
 | [competitive-analysis.md](./competitive-analysis.md) | Competitive positioning |
 
@@ -34,14 +34,14 @@ This folder is the only location for DevPilot product strategy, user-scenario, P
 
 ## 1. 目的
 
-此目錄是 DevPilot 產品策略、使用情境、PRD、客群與市場定位文件的唯一標準位置。
+此目錄是 Project Manager 產品策略、使用情境、PRD、客群與市場定位文件的唯一標準位置。
 
 ## 2. 目前產品文件來源
 
 | 文件 | 用途 |
 | --- | --- |
 | [user-scenarios.md](./user-scenarios.md) | 使用者工作流與 Tauri dependencies |
-| [devpilot-prd.md](./devpilot-prd.md) | 產品需求與 MVP scope |
+| [project-manager-prd.md](./project-manager-prd.md) | 產品需求與 MVP scope |
 | [target-audience.md](./target-audience.md) | 目標客群與 JTBD |
 | [competitive-analysis.md](./competitive-analysis.md) | 競品定位 |
 

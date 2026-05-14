@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "DevPilot Project Configuration",
+  "title": "Project Manager Configuration",
   "type": "object",
   "properties": {
     "schemaVersion": {

@@ -110,7 +110,7 @@ export function IngestionView({ project, onImportFeatures }: IngestionViewProps)
       } else if (isTauri) {
         // DOCX / XLSX in Tauri — ask AI to generate plausible feature stubs
         const apiKey =
-          typeof window !== 'undefined' ? (localStorage.getItem('devpilot-api-key') ?? '') : '';
+          typeof window !== 'undefined' ? (localStorage.getItem('projectManager-api-key') ?? '') : '';
         if (apiKey) {
           drafts = await parseWithAI(file, apiKey);
           setParseMethod('ai');
@@ -340,7 +340,7 @@ export function IngestionView({ project, onImportFeatures }: IngestionViewProps)
         {!isTauri && (
           <p className="mt-3 text-[11px] text-amber-100/60">
             Dev mode: features added to in-memory state only. In production they write to
-            .dev-pilot.json via Tauri bridge.
+            .project-manager.json via Tauri bridge.
           </p>
         )}
       </div>

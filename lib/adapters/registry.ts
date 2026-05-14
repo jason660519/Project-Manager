@@ -1,13 +1,13 @@
 import {
   AdapterDescriptor,
   AnyAdapterConfig,
-  DevPilotConfig,
+  ProjectManagerConfig,
   RuntimeAdapter,
 } from '../types';
 import { AgentAdapter } from './agent-adapter';
 import { LocalIDEAdapter } from './local-ide-adapter';
 
-export function listAdapterDescriptors(config: DevPilotConfig): AdapterDescriptor[] {
+export function listAdapterDescriptors(config: ProjectManagerConfig): AdapterDescriptor[] {
   return [...config.adapters.ides, ...config.adapters.agents].map(({ id, name, type }) => ({
     id,
     name,
@@ -15,12 +15,12 @@ export function listAdapterDescriptors(config: DevPilotConfig): AdapterDescripto
   }));
 }
 
-export function listAdapters(config: DevPilotConfig): AnyAdapterConfig[] {
+export function listAdapters(config: ProjectManagerConfig): AnyAdapterConfig[] {
   return [...config.adapters.ides, ...config.adapters.agents];
 }
 
 export function createRuntimeAdapter(
-  config: DevPilotConfig,
+  config: ProjectManagerConfig,
   adapterId: string,
 ): RuntimeAdapter | null {
   const ide = config.adapters.ides.find((adapter) => adapter.id === adapterId);

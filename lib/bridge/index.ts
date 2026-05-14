@@ -7,7 +7,7 @@
  */
 
 import { migrateConfig } from '../storage';
-import type { DevPilotConfig } from '../types';
+import type { ProjectManagerConfig } from '../types';
 
 // ── Tauri detection ───────────────────────────────────────────────────────────
 
@@ -21,7 +21,7 @@ async function invoke<T>(command: string, args?: Record<string, unknown>): Promi
 
 // ── Config operations ─────────────────────────────────────────────────────────
 
-export async function readConfig(path: string): Promise<DevPilotConfig> {
+export async function readConfig(path: string): Promise<ProjectManagerConfig> {
   if (!isTauri()) throw new Error('readConfig requires Tauri runtime');
   // Pipe through schema migration so older v1 files on disk are transparently
   // upgraded — the in-memory shape is always current (ADR-006).
@@ -29,7 +29,7 @@ export async function readConfig(path: string): Promise<DevPilotConfig> {
   return migrateConfig(raw);
 }
 
-export async function writeConfig(path: string, config: DevPilotConfig): Promise<void> {
+export async function writeConfig(path: string, config: ProjectManagerConfig): Promise<void> {
   if (!isTauri()) throw new Error('writeConfig requires Tauri runtime');
   return invoke<void>('write_config', { path, config });
 }
@@ -110,7 +110,7 @@ export function onAgentExit(cb: (p: AgentExitPayload) => void): Promise<Unlisten
 
 // ── Config file watch ─────────────────────────────────────────────────────────
 
-export type ConfigChangedPayload = { path: string; config: DevPilotConfig };
+export type ConfigChangedPayload = { path: string; config: ProjectManagerConfig };
 
 /** Start a 2-second poll loop in Rust for the given config path. No-op in browser. */
 export async function watchConfig(path: string): Promise<void> {
@@ -217,9 +217,9 @@ export async function getSecret(service: string, key: string): Promise<string | 
 
 // ── GitHub token (Keychain in Tauri, localStorage fallback in dev) ───────────
 
-const GITHUB_TOKEN_SERVICE = 'devpilot';
+const GITHUB_TOKEN_SERVICE = 'projectmanager';
 const GITHUB_TOKEN_KEY = 'github-token';
-const GITHUB_TOKEN_LS_FALLBACK = 'devpilot-github-token';
+const GITHUB_TOKEN_LS_FALLBACK = 'projectManager-github-token';
 
 /**
  * Read the user's GitHub token.  Lives in the OS Keychain under Tauri (so it
@@ -272,7 +272,7 @@ export async function callAnthropic(opts: {
   messages: AnthropicMessage[];
   /** UUID for this conversation — if provided alongside sessionsDir, auto-saves the session. */
   sessionId?: string;
-  /** Absolute path to the sessions folder, e.g. `{projectRoot}/.dev-pilot/sessions`. */
+  /** Absolute path to the sessions folder, e.g. `{projectRoot}/.project-manager/sessions`. */
   sessionsDir?: string;
   featureId?: string;
   projectId?: string;

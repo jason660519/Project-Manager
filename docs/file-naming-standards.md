@@ -1,4 +1,4 @@
-# DevPilot File Naming and Archiving Standards
+# Project Manager File Naming and Archiving Standards
 
 > **Created Date**: 2026-05-12
 > **Created By**: GitHub Copilot
@@ -6,7 +6,7 @@
 > **Modified By**: Codex
 > **Version**: 1.5
 > **Document Type**: Technical Documentation
-> **Alignment Scope**: Company AI App Standards, DevPilot, SayDo
+> **Alignment Scope**: Company AI App Standards, Project Manager, SayDo
 
 ---
 
@@ -19,7 +19,7 @@
 3. Keep docs in role-based folders so engineers know where a new document belongs before writing it.
 4. Preserve meaningful history by archiving deprecated docs instead of deleting them.
 5. Use repo-local ADRs for intentional deviations from company standards.
-6. Keep DevPilot and SayDo aligned: the same document role should use the same folder and filename pattern in both repos.
+6. Keep Project Manager and SayDo aligned: the same document role should use the same folder and filename pattern in both repos.
 
 ## 2. Source File Naming
 
@@ -45,7 +45,7 @@
 
 ## 4. Folder Conventions
 
-DevPilot and SayDo use the same folder meanings:
+Project Manager and SayDo use the same folder meanings:
 
 ```text
 docs/
@@ -115,7 +115,7 @@ npm run docs:check
 npm run standards:check
 ```
 
-The DevPilot docs checker validates:
+The Project Manager docs checker validates:
 
 - filename safety
 - repo-local docs layout and bilingual section order where applicable
@@ -126,7 +126,7 @@ The DevPilot docs checker validates:
 
 | Date | Version | Modified By | Changes |
 | --- | --- | --- | --- |
-| 2026-05-15 | 1.5 | Codex | Aligned DevPilot and SayDo folder roles, archive policy, and product-doc location rules |
+| 2026-05-15 | 1.5 | Codex | Aligned Project Manager and SayDo folder roles, archive policy, and product-doc location rules |
 | 2026-05-15 | 1.4 | Codex | Added engineering, design, and project-process folders to repo convention map |
 | 2026-05-12 | 1.3 | GitHub Copilot | Added governance fix script workflow |
 | 2026-05-12 | 1.2 | GitHub Copilot | Refactored into separated bilingual blocks |
@@ -144,7 +144,7 @@ The DevPilot docs checker validates:
 3. 文件依角色放入固定資料夾，讓工程師在寫新文件前就知道該放哪裡。
 4. 有歷史或決策價值的舊文件要歸檔，不直接刪除。
 5. 若刻意偏離公司標準，使用 repo-local ADR 記錄。
-6. DevPilot 與 SayDo 對齊：同一種文件角色，在兩個 repo 使用同一套資料夾與檔名規則。
+6. Project Manager 與 SayDo 對齊：同一種文件角色，在兩個 repo 使用同一套資料夾與檔名規則。
 
 ## 2. Source File 命名
 
@@ -170,7 +170,7 @@ The DevPilot docs checker validates:
 
 ## 4. 資料夾慣例
 
-DevPilot 與 SayDo 使用相同資料夾語意：
+Project Manager 與 SayDo 使用相同資料夾語意：
 
 ```text
 docs/
@@ -240,7 +240,7 @@ npm run docs:check
 npm run standards:check
 ```
 
-DevPilot docs checker 會檢查：
+Project Manager docs checker 會檢查：
 
 - 檔名安全性
 - repo-local docs layout 與適用文件的雙語區塊順序
@@ -251,7 +251,7 @@ DevPilot docs checker 會檢查：
 
 | 日期 | 版本 | 修改者 | 變更 |
 | --- | --- | --- | --- |
-| 2026-05-15 | 1.5 | Codex | 對齊 DevPilot 與 SayDo 的資料夾角色、歸檔規則與產品文件位置 |
+| 2026-05-15 | 1.5 | Codex | 對齊 Project Manager 與 SayDo 的資料夾角色、歸檔規則與產品文件位置 |
 | 2026-05-15 | 1.4 | Codex | 新增 engineering、design、project-process 目錄慣例 |
 | 2026-05-12 | 1.3 | GitHub Copilot | 新增 fix 腳本流程 |
 | 2026-05-12 | 1.2 | GitHub Copilot | 改為雙語分層版型 |

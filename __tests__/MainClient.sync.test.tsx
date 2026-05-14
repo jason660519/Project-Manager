@@ -3,7 +3,7 @@
  *
  * Core scenario:
  *   1. User visits /projects (MainClient currentView='projects')
- *   2. User toggles the 'devpilot' checkbox → selection persisted to localStorage
+ *   2. User toggles the 'project-manager' checkbox → selection persisted to localStorage
  *   3. User navigates to /project-progress-dashboard or /project-files
  *      (new MainClient instance mounts)
  *   4. New instance reads localStorage → shows the updated selection
@@ -46,7 +46,7 @@ vi.mock('../app/ui/views/ProjectFilesView', () => ({
 
 /**
  * ProjectsView stub renders the current selection and exposes
- * a "Toggle devpilot" button that calls onToggleDashboardProject.
+ * a "Toggle project-manager" button that calls onToggleDashboardProject.
  */
 vi.mock('../app/ui/views/ProjectsView', () => ({
   ProjectsView: ({
@@ -59,16 +59,16 @@ vi.mock('../app/ui/views/ProjectsView', () => ({
     <div data-testid="projects">
       <span data-testid="current-selection">{JSON.stringify(selectedDashboardProjectIds)}</span>
       <button
-        data-testid="toggle-devpilot-on"
-        onClick={() => onToggleDashboardProject('devpilot', true)}
+        data-testid="toggle-project-manager-on"
+        onClick={() => onToggleDashboardProject('project-manager', true)}
       >
-        Add devpilot
+        Add project-manager
       </button>
       <button
-        data-testid="toggle-devpilot-off"
-        onClick={() => onToggleDashboardProject('devpilot', false)}
+        data-testid="toggle-project-manager-off"
+        onClick={() => onToggleDashboardProject('project-manager', false)}
       >
-        Remove devpilot
+        Remove project-manager
       </button>
     </div>
   ),
@@ -108,34 +108,34 @@ beforeEach(() => {
 });
 
 describe('checkbox toggle → localStorage sync', () => {
-  it('adds devpilot to localStorage immediately when checkbox is checked', async () => {
+  it('adds project-manager to localStorage immediately when checkbox is checked', async () => {
     const user = userEvent.setup();
     const { unmount } = render(<MainClient currentView="projects" />);
     await flushEffects();
 
-    await user.click(screen.getByTestId('toggle-devpilot-on'));
+    await user.click(screen.getByTestId('toggle-project-manager-on'));
 
     const stored = getStoredDashboardIds();
-    expect(stored).toContain('devpilot');
+    expect(stored).toContain('project-manager');
     expect(stored).toContain('owner-property'); // original project preserved
     unmount();
   });
 
-  it('removes devpilot from localStorage when checkbox is unchecked', async () => {
-    // Seed localStorage so devpilot is already selected
+  it('removes project-manager from localStorage when checkbox is unchecked', async () => {
+    // Seed localStorage so project-manager is already selected
     localStorage.setItem(
       DASHBOARD_SELECTED_PROJECTS_STORAGE_KEY,
-      JSON.stringify(['owner-property', 'devpilot']),
+      JSON.stringify(['owner-property', 'project-manager']),
     );
 
     const user = userEvent.setup();
     const { unmount } = render(<MainClient currentView="projects" />);
     await flushEffects();
 
-    await user.click(screen.getByTestId('toggle-devpilot-off'));
+    await user.click(screen.getByTestId('toggle-project-manager-off'));
 
     const stored = getStoredDashboardIds();
-    expect(stored).not.toContain('devpilot');
+    expect(stored).not.toContain('project-manager');
     unmount();
   });
 
@@ -143,20 +143,20 @@ describe('checkbox toggle → localStorage sync', () => {
     // Both projects selected to start
     localStorage.setItem(
       DASHBOARD_SELECTED_PROJECTS_STORAGE_KEY,
-      JSON.stringify(['owner-property', 'devpilot']),
+      JSON.stringify(['owner-property', 'project-manager']),
     );
 
     const user = userEvent.setup();
     const { unmount } = render(<MainClient currentView="projects" />);
     await flushEffects();
 
-    // Remove devpilot — selection should drop to just owner-property
-    await user.click(screen.getByTestId('toggle-devpilot-off'));
+    // Remove project-manager — selection should drop to just owner-property
+    await user.click(screen.getByTestId('toggle-project-manager-off'));
     let stored = getStoredDashboardIds();
     expect(stored).toEqual(['owner-property']);
 
     // The stub button can also exercise the toggle-off code path for the
-    // remaining project ID, indirectly through DevPilot's filter; but the
+    // remaining project ID, indirectly through Project Manager's filter; but the
     // important property here is that the empty state is reachable and
     // persisted (no auto-re-add).
     unmount();
@@ -164,13 +164,13 @@ describe('checkbox toggle → localStorage sync', () => {
 });
 
 describe('cross-route persistence: /projects → /project-files', () => {
-  it('project-files view sees devpilot selected after it was toggled in projects view', async () => {
+  it('project-files view sees project-manager selected after it was toggled in projects view', async () => {
     const user = userEvent.setup();
 
-    // Mount /projects and add devpilot
+    // Mount /projects and add project-manager
     const { unmount: unmount1 } = render(<MainClient currentView="projects" />);
     await flushEffects();
-    await user.click(screen.getByTestId('toggle-devpilot-on'));
+    await user.click(screen.getByTestId('toggle-project-manager-on'));
     unmount1();
 
     // Mount /project-files in a fresh instance
@@ -180,21 +180,21 @@ describe('cross-route persistence: /projects → /project-files', () => {
     const panel = screen.getByTestId('project-files');
     const selected: string[] = JSON.parse(panel.getAttribute('data-selected') ?? '[]');
 
-    expect(selected).toContain('devpilot');
+    expect(selected).toContain('project-manager');
     expect(selected).toContain('owner-property');
   });
 
-  it('project-files view correctly shows only owner-property when devpilot is deselected', async () => {
+  it('project-files view correctly shows only owner-property when project-manager is deselected', async () => {
     // Seed both selected
     localStorage.setItem(
       DASHBOARD_SELECTED_PROJECTS_STORAGE_KEY,
-      JSON.stringify(['owner-property', 'devpilot']),
+      JSON.stringify(['owner-property', 'project-manager']),
     );
 
     const user = userEvent.setup();
     const { unmount: unmount1 } = render(<MainClient currentView="projects" />);
     await flushEffects();
-    await user.click(screen.getByTestId('toggle-devpilot-off'));
+    await user.click(screen.getByTestId('toggle-project-manager-off'));
     unmount1();
 
     render(<MainClient currentView="project-files" />);
@@ -203,18 +203,18 @@ describe('cross-route persistence: /projects → /project-files', () => {
     const panel = screen.getByTestId('project-files');
     const selected: string[] = JSON.parse(panel.getAttribute('data-selected') ?? '[]');
 
-    expect(selected).not.toContain('devpilot');
+    expect(selected).not.toContain('project-manager');
     expect(selected).toContain('owner-property');
   });
 });
 
 describe('cross-route persistence: /projects → /project-progress-dashboard', () => {
-  it('dashboard receives updated feature list after devpilot is added', async () => {
+  it('dashboard receives updated feature list after project-manager is added', async () => {
     const user = userEvent.setup();
 
     const { unmount: unmount1 } = render(<MainClient currentView="projects" />);
     await flushEffects();
-    await user.click(screen.getByTestId('toggle-devpilot-on'));
+    await user.click(screen.getByTestId('toggle-project-manager-on'));
     unmount1();
 
     render(<MainClient currentView="dashboard" />);
@@ -230,7 +230,7 @@ describe('init: localStorage state is restored on fresh mount', () => {
   it('reads previously saved dashboard selection on mount', async () => {
     localStorage.setItem(
       DASHBOARD_SELECTED_PROJECTS_STORAGE_KEY,
-      JSON.stringify(['owner-property', 'devpilot']),
+      JSON.stringify(['owner-property', 'project-manager']),
     );
 
     render(<MainClient currentView="projects" />);
@@ -240,7 +240,7 @@ describe('init: localStorage state is restored on fresh mount', () => {
     const selection: string[] = JSON.parse(selectionEl.textContent ?? '[]');
 
     expect(selection).toContain('owner-property');
-    expect(selection).toContain('devpilot');
+    expect(selection).toContain('project-manager');
   });
 
   it('defaults to first project when localStorage is empty', async () => {

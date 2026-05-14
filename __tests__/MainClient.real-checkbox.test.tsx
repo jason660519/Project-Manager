@@ -2,8 +2,8 @@
  * Integration test using the REAL ProjectsView checkbox (not a mocked button).
  *
  * Reproduces the user-reported scenario:
- *   - On /projects, checking the devpilot checkbox should:
- *     1. Show the DASHBOARD badge next to devpilot's name
+ *   - On /projects, checking the project-manager checkbox should:
+ *     1. Show the DASHBOARD badge next to project-manager's name
  *     2. Bump "Dashboard scope: N" to 2
  *     3. Persist to localStorage so /project-progress-dashboard sees both
  */
@@ -75,7 +75,7 @@ beforeEach(() => {
 });
 
 describe('real ProjectsView checkbox behavior', () => {
-  it('clicking devpilot checkbox shows DASHBOARD badge and bumps scope to 2', async () => {
+  it('clicking project-manager checkbox shows DASHBOARD badge and bumps scope to 2', async () => {
     const { MainClient } = await freshImport();
     const user = userEvent.setup();
     render(<MainClient currentView="projects" />);
@@ -85,15 +85,15 @@ describe('real ProjectsView checkbox behavior', () => {
     const checkboxes = screen.getAllByRole('checkbox');
     expect(checkboxes).toHaveLength(2);
 
-    // Initial state: owner-property checked, devpilot unchecked.
+    // Initial state: owner-property checked, project-manager unchecked.
     expect((checkboxes[0] as HTMLInputElement).checked).toBe(true);
     expect((checkboxes[1] as HTMLInputElement).checked).toBe(false);
 
-    // Click devpilot's checkbox.
+    // Click project-manager's checkbox.
     await user.click(checkboxes[1]);
     await flushEffects();
 
-    // Devpilot's checkbox should now be checked.
+    // Project-Manager's checkbox should now be checked.
     expect((checkboxes[1] as HTMLInputElement).checked).toBe(true);
 
     // Two DASHBOARD badges should now appear (one per project row).
@@ -111,12 +111,12 @@ describe('real ProjectsView checkbox behavior', () => {
     await flushEffects();
 
     const checkboxes = screen.getAllByRole('checkbox');
-    await user.click(checkboxes[1]); // toggle devpilot on
+    await user.click(checkboxes[1]); // toggle project-manager on
     await flushEffects();
 
     const stored = await getProjectsRepository().getDashboardProjectIds();
     expect(stored).toContain('owner-property');
-    expect(stored).toContain('devpilot');
+    expect(stored).toContain('project-manager');
     unmount();
 
     // Mount a fresh /project-files instance — it should see both projects.
@@ -125,23 +125,23 @@ describe('real ProjectsView checkbox behavior', () => {
 
     const panel = screen.getByTestId('project-files');
     const selected: string[] = JSON.parse(panel.getAttribute('data-selected') ?? '[]');
-    expect(selected).toContain('devpilot');
+    expect(selected).toContain('project-manager');
     expect(selected).toContain('owner-property');
   });
 
-  it('unchecks devpilot when toggled off (does not stick like the first project)', async () => {
+  it('unchecks project-manager when toggled off (does not stick like the first project)', async () => {
     const { MainClient } = await freshImport();
     const user = userEvent.setup();
     render(<MainClient currentView="projects" />);
     await flushEffects();
 
     const checkboxes = screen.getAllByRole('checkbox');
-    // Check devpilot first
+    // Check project-manager first
     await user.click(checkboxes[1]);
     await flushEffects();
     expect((checkboxes[1] as HTMLInputElement).checked).toBe(true);
 
-    // Uncheck devpilot — should actually toggle off (not blocked by guard)
+    // Uncheck project-manager — should actually toggle off (not blocked by guard)
     await user.click(checkboxes[1]);
     await flushEffects();
     expect((checkboxes[1] as HTMLInputElement).checked).toBe(false);
@@ -151,7 +151,7 @@ describe('real ProjectsView checkbox behavior', () => {
     // Simulate a user upgrading from the old flat-key version of the app.
     localStorage.setItem(
       'devpilot-dashboard-selected-project-ids',
-      JSON.stringify(['owner-property', 'devpilot']),
+      JSON.stringify(['owner-property', 'project-manager']),
     );
 
     const { MainClient } = await freshImport();

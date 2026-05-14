@@ -1,23 +1,23 @@
-# DevPilot Design Guide
+# Project Manager Design Guide
 
-Status: Source of truth for DevPilot UI implementation  
+Status: Source of truth for Project Manager UI implementation  
 Audience: AI engineers, frontend engineers, product/design collaborators  
 Last updated: 2026-05-14
 
 ## Read This First
 
-Before changing DevPilot UI, read these files in order:
+Before changing Project Manager UI, read these files in order:
 
 1. `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/ui-design-system.md` - company baseline design system.
 2. `DESIGN.md` - this repo-specific implementation guide.
-3. `docs/design/shared-ai-desktop-style.md` - shared visual language for DevPilot/SayDo family apps.
+3. `docs/design/shared-ai-desktop-style.md` - shared visual language for Project Manager/SayDo family apps.
 4. `README.md` - app purpose and current operating modes.
 5. `CLAUDE.md` - engineering conventions and project structure.
 6. `docs/architecture/architecture-overview.md` and `docs/architecture/README.md` - architecture and ADR index.
 
 ## Product Personality
 
-DevPilot is an AI engineering operations dashboard. It helps a user manage projects, features, agent runs, AI engineers, channels, keys, logs, and recurring work.
+Project Manager is an AI engineering operations dashboard. It helps a user manage projects, features, agent runs, AI engineers, channels, keys, logs, and recurring work.
 
 It should feel like:
 
@@ -42,15 +42,15 @@ Current implementation files:
 - `app/ui/Topbar.tsx`
 - `app/globals.css`
 
-DevPilot uses this app shell:
+Project Manager uses this app shell:
 
 ```text
-DP icon rail | sticky project topbar | scrollable operational view
+PM icon rail | sticky project topbar | scrollable operational view
 ```
 
 Rules:
 
-- Keep the `DP` rail mark visible.
+- Keep the `PM` rail mark visible.
 - Keep global navigation in the left icon rail.
 - Keep selected project context visible in the topbar.
 - Main views should be dense, scannable, and action-oriented.
@@ -115,7 +115,7 @@ Do not bury state in long prose.
 
 Use `docs/design/shared-ai-desktop-style.md` as the shared token source.
 
-DevPilot-specific notes:
+Project Manager-specific notes:
 
 - Emerald shell is the default.
 - Amber should mark identity, MVP/beta labels, or important highlights.
@@ -128,7 +128,7 @@ DevPilot-specific notes:
 ### Navigation
 
 - Use `lucide-react` icons for rail navigation.
-- The rail mark is text `DP`, not a generic icon.
+- The rail mark is text `PM`, not a generic icon.
 - Rail tooltips should include label and short hint.
 - Active nav must be visually obvious with border and background.
 
@@ -176,7 +176,7 @@ Key UI must:
 
 ## Agent Execution UX
 
-DevPilot controls tools that can run commands or contact external providers. Execution state must be explicit.
+Project Manager controls tools that can run commands or contact external providers. Execution state must be explicit.
 
 Required states:
 
@@ -225,7 +225,7 @@ When implementing UI:
 
 ## Acceptance Checklist
 
-Before calling a DevPilot UI change done:
+Before calling a Project Manager UI change done:
 
 - Root `DESIGN.md` and shared style guide were followed.
 - `npm run typecheck` passes.

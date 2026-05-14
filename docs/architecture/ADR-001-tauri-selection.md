@@ -11,7 +11,7 @@
 
 ## Background
 
-DevPilot was originally a Next.js web app running on `localhost:43187` as a local service. While functional, this architecture has fundamental limitations:
+Project Manager was originally a Next.js web app running on `localhost:43187` as a local service. While functional, this architecture has fundamental limitations:
 
 1. **Process Spawning**: Browsers cannot directly spawn child processes (`claude`, `cursor`, `code` CLI) without a separate bridge server
 2. **File Watching**: No native FS watch API in browsers; requires polling or SSE workarounds
@@ -105,10 +105,10 @@ Tauri offers:
 ```rust
 // FS Operations
 #[tauri::command]
-async fn read_project_config(path: String) -> Result<DevPilotConfig, String>
+async fn read_project_config(path: String) -> Result<ProjectManagerConfig, String>
 
 #[tauri::command]
-async fn write_project_config(path: String, config: DevPilotConfig) -> Result<(), String>
+async fn write_project_config(path: String, config: ProjectManagerConfig) -> Result<(), String>
 
 #[tauri::command]
 async fn watch_project_config(path: String, window: Window) -> Result<(), String>
@@ -159,7 +159,7 @@ async fn keychain_set(key: String, value: String) -> Result<(), String>
 3. Frontend uses `@tauri-apps/api::invoke()` to call Rust Commands
 4. Frontend uses `@tauri-apps/api::event::listen()` to receive Rust events
 
-**Recommendation:** MVP uses static export (`output: 'export'`) for simplicity; DevPilot pages don't require SSR
+**Recommendation:** MVP uses static export (`output: 'export'`) for simplicity; Project Manager pages don't require SSR
 
 ---
 

@@ -119,7 +119,7 @@ const PLATFORM_CREDS: Record<ChannelPlatform, CredField[]> = {
       label: 'Relay Server URL',
       placeholder: 'https://your-worker.workers.dev/whatsapp',
       secret: false,
-      hint: 'URL of your Cloudflare Worker / proxy that forwards webhooks to DevPilot',
+      hint: 'URL of your Cloudflare Worker / proxy that forwards webhooks to Project Manager',
     },
   ],
   line: [
@@ -652,7 +652,7 @@ function CommandMappingsSection({
 
       <div className="border-t border-stone-200/12 p-4">
         <p className="text-[11px] leading-4 text-stone-500">
-          Send any of the triggers above from any connected channel. Commands reach DevPilot via
+          Send any of the triggers above from any connected channel. Commands reach Project Manager via
           the polling loop (Telegram) or your relay server (WhatsApp / LINE / WeChat).
         </p>
       </div>
@@ -674,7 +674,7 @@ function SetupGuideSection() {
           <ol className="space-y-1 text-[11px] leading-5 text-stone-400">
             <li>1. Message <span className="font-mono text-stone-200">@BotFather</span> on Telegram → <span className="font-mono text-stone-200">/newbot</span></li>
             <li>2. Copy the Bot Token into a new Telegram channel above</li>
-            <li>3. Set Mode to <span className="font-mono text-stone-200">polling</span> — DevPilot will fetch messages automatically</li>
+            <li>3. Set Mode to <span className="font-mono text-stone-200">polling</span> — Project Manager will fetch messages automatically</li>
             <li>4. Send <span className="font-mono text-stone-200">/help</span> from Telegram to verify the connection</li>
           </ol>
         </div>
@@ -684,7 +684,7 @@ function SetupGuideSection() {
           </p>
           <ol className="space-y-1 text-[11px] leading-5 text-stone-400">
             <li>1. Deploy a Cloudflare Worker to receive platform webhooks</li>
-            <li>2. Worker forwards messages to DevPilot via WebSocket / SSE</li>
+            <li>2. Worker forwards messages to Project Manager via WebSocket / SSE</li>
             <li>3. Enter the platform credentials and your relay URL above</li>
           </ol>
         </div>
@@ -712,7 +712,7 @@ export function ChannelsView() {
       <div>
         <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">Channels</h1>
         <p className="mt-1 text-xs text-stone-400">
-          Configure messaging channels so you can monitor and control DevPilot from your phone.
+          Configure messaging channels so you can monitor and control Project Manager from your phone.
           Changes are saved immediately.
         </p>
       </div>

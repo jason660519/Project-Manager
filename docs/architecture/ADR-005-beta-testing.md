@@ -11,7 +11,7 @@
 
 ## Background
 
-Before launching DevPilot publicly, we need to test:
+Before launching Project Manager publicly, we need to test:
 
 1. **User flows**: Can users complete key workflows?
 2. **Pain points**: Where do users get stuck?
@@ -46,7 +46,7 @@ You use Cursor with Claude Code as your primary development tool.
 You're comfortable with terminal but prefer GUI tools when available.
 You manage projects across GitHub and local configs.
 
-Your task: Set up DevPilot with one of your projects, then dispatch a feature to Claude Code.
+Your task: Set up Project Manager with one of your projects, then dispatch a feature to Claude Code.
 
 As you go through the flow, note:
 - Where did you get confused?
@@ -217,7 +217,7 @@ Create GitHub issues from feedback:
 ### Instructions to Claude
 
 ```
-You are Alex, a solo developer. You've just downloaded DevPilot for the first time.
+You are Alex, a solo developer. You've just downloaded Project Manager for the first time.
 
 You want to:
 1. Set up a GitHub project (use: https://github.com/user/my-app)
@@ -242,7 +242,7 @@ After completion, provide:
 ### Sample Feedback Output
 
 ```markdown
-## Alex's DevPilot Testing Session
+## Alex's Project Manager Testing Session
 
 ### Workflow Walkthrough
 - ✅ Downloaded and installed cleanly

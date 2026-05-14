@@ -2,7 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "DevPilot Dev",
+      "name": "Project Manager Dev",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["next", "dev"],
       "port": 43187,

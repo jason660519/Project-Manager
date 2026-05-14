@@ -1,4 +1,4 @@
-# DevPilot PRD - Product Requirements Document
+# Project Manager PRD - Product Requirements Document
 
 Version: v0.1  
 Date: 2026-05-12  
@@ -12,16 +12,16 @@ Status: Draft
 
 ### 1.1 One-Line Definition
 
-DevPilot is a local mission-control app for engineering teams that unifies specs, tasks, and AI-agent execution in one desktop workflow.
+Project Manager is a local mission-control app for engineering teams that unifies specs, tasks, and AI-agent execution in one desktop workflow.
 
 ### 1.2 Problem Statement
 
-| Current Pain | DevPilot Solution |
+| Current Pain | Project Manager Solution |
 | --- | --- |
 | Specs in docs, tasks in trackers, execution in terminal | One desktop control surface |
 | Manual prompt context assembly for each dispatch | Context-aware prompt generation |
 | No visibility into running agents | Built-in live execution logs |
-| No unified progress across projects | Multi-project dashboard via `.dev-pilot.json` |
+| No unified progress across projects | Multi-project dashboard via `.project-manager.json` |
 
 ### 1.3 Core Principles
 
@@ -118,16 +118,16 @@ DevPilot is a local mission-control app for engineering teams that unifies specs
 
 ### 1.1 一句話定義
 
-DevPilot 是工程師的本機任務指揮中心，把規格、任務與 AI Agent 執行整合成單一桌面流程。
+Project Manager 是工程師的本機任務指揮中心，把規格、任務與 AI Agent 執行整合成單一桌面流程。
 
 ### 1.2 問題陳述
 
-| 現有痛點 | DevPilot 解法 |
+| 現有痛點 | Project Manager 解法 |
 | --- | --- |
 | 規格、任務、執行分散在不同工具 | 提供單一桌面控制面板 |
 | 每次派任務都要手動組 Prompt | 自動組裝上下文與 Prompt |
 | 看不到 Agent 執行過程 | 內建即時執行日誌 |
-| 難以掌握跨專案進度 | 用 `.dev-pilot.json` 聚合檢視 |
+| 難以掌握跨專案進度 | 用 `.project-manager.json` 聚合檢視 |
 
 ### 1.3 核心理念
 

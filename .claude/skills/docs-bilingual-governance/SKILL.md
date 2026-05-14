@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Standardize and maintain DevPilot documentation with bilingual block layout:
+Standardize and maintain Project Manager documentation with bilingual block layout:
 
 1. English section on top (`## English Version`)
 2. Chinese section below (`## 中文版本`)

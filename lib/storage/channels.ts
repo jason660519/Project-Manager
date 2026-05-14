@@ -48,12 +48,12 @@ export function saveChannelCatalog(catalog: ChannelCatalog): void {
 }
 
 // Sensitive credentials are stored outside the catalog JSON to keep secrets
-// out of the main blob. Key pattern: devpilot.personal.channel.<channelId>.<field>
+// out of the main blob. Key pattern: projectManager.personal.channel.<channelId>.<field>
 
 export function getChannelSecret(channelId: string, field: string): string {
   if (typeof window === 'undefined') return '';
   try {
-    return window.localStorage.getItem(`devpilot.personal.channel.${channelId}.${field}`) ?? '';
+    return window.localStorage.getItem(`projectManager.personal.channel.${channelId}.${field}`) ?? '';
   } catch {
     return '';
   }
@@ -62,7 +62,7 @@ export function getChannelSecret(channelId: string, field: string): string {
 export function setChannelSecret(channelId: string, field: string, value: string): void {
   if (typeof window === 'undefined') return;
   try {
-    const key = `devpilot.personal.channel.${channelId}.${field}`;
+    const key = `projectManager.personal.channel.${channelId}.${field}`;
     if (value) {
       window.localStorage.setItem(key, value);
     } else {
@@ -77,7 +77,7 @@ export function deleteChannelSecrets(channelId: string, fields: string[]): void 
   if (typeof window === 'undefined') return;
   for (const field of fields) {
     try {
-      window.localStorage.removeItem(`devpilot.personal.channel.${channelId}.${field}`);
+      window.localStorage.removeItem(`projectManager.personal.channel.${channelId}.${field}`);
     } catch {
       /* ignore */
     }

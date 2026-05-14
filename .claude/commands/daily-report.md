@@ -1,20 +1,20 @@
-根據今日對話中完成的所有工作，自動產生每日進度報告，並把進度寫回 DevPilot 自己的 `.dev-pilot.json`（讓 `/project-progress-dashboard` 自動 reflect）。
+根據今日對話中完成的所有工作，自動產生每日進度報告，並把進度寫回 Project Manager 自己的 `.project-manager.json`（讓 `/project-progress-dashboard` 自動 reflect）。
 
 ## 旗標
 
 | 旗標 | 行為 |
 | :-- | :-- |
 | `--dry-run` | 只輸出將寫入的內容，不實際修改檔案。供預覽用。 |
-| `--no-devlog` | 跳過步驟二，只更新 `.dev-pilot.json`。供小幅進度更新使用。 |
+| `--no-devlog` | 跳過步驟二，只更新 `.project-manager.json`。供小幅進度更新使用。 |
 
-## DevPilot 與 Owner-Property 的差異（為什麼這份 command 不一樣）
+## Project Manager 與 Owner-Property 的差異（為什麼這份 command 不一樣）
 
-| 項目 | Owner-Property | DevPilot |
+| 項目 | Owner-Property | Project Manager |
 | :-- | :-- | :-- |
-| 進度資料來源 | `apps/superadmin/app/data/roadmap.ts`（TS 陣列） | `.dev-pilot.json`（schema v2，ADR-006） |
+| 進度資料來源 | `apps/superadmin/app/data/roadmap.ts`（TS 陣列） | `.project-manager.json`（schema v2，ADR-006） |
 | Dev log 目錄 | `project-process/dev-logs/` | `docs/dev-logs/` |
 | Issue tracker | VIS Paperclip（內建系統） | 無對外 tracker；GitHub 整合可選 |
-| Dashboard | superadmin 自帶 | DevPilot 自己的 `/project-progress-dashboard`（讀 `.dev-pilot.json`） |
+| Dashboard | superadmin 自帶 | Project Manager 自己的 `/project-progress-dashboard`（讀 `.project-manager.json`） |
 
 ## 完整流程（依序執行）
 
@@ -22,7 +22,7 @@
 
 - 回顧本次對話中所有已完成的任務（程式碼修改、bug 修復、功能開發、ADR、文件撰寫等）
 - 彙整每項任務的交付物（檔案路徑）與完成度百分比
-- 對照 sample 已存在的 features（`config/samples/dev-pilot-devpilot.sample.json`）— 屬於既有 feature 的更新，還是新 feature
+- 對照 sample 已存在的 features（`config/samples/project-manager-self.sample.json`）— 屬於既有 feature 的更新，還是新 feature
 
 ### 步驟二：撰寫 Dev Log Markdown（除非 `--no-devlog`）
 
@@ -35,14 +35,14 @@
   4. **下次避免措施**（流程優化、工具導入、自動化需求）
   5. **明日優先工作**（預估工時、相依性、風險）
 
-### 步驟三：更新 `.dev-pilot.json`（dashboard 的真相來源）
+### 步驟三：更新 `.project-manager.json`（dashboard 的真相來源）
 
-DevPilot dashboard 顯示優先序：
-1. Root `.dev-pilot.json`（若存在 — 透過 Rust `watchConfig` 2 秒輪詢自動 reflect）
-2. Fallback：`config/samples/dev-pilot-devpilot.sample.json`（hard-coded import in `app/ui/MainClient.tsx`）
+Project Manager dashboard 顯示優先序：
+1. Root `.project-manager.json`（若存在 — 透過 Rust `watchConfig` 2 秒輪詢自動 reflect）
+2. Fallback：`config/samples/project-manager-self.sample.json`（hard-coded import in `app/ui/MainClient.tsx`）
 
 **判斷要更新哪一個：**
-- root `.dev-pilot.json` 存在 → 更新 root（並同步更新 sample，讓 fresh clone 也看到）
+- root `.project-manager.json` 存在 → 更新 root（並同步更新 sample，讓 fresh clone 也看到）
 - root 不存在 → 只更新 sample（dashboard 透過 import 直接 reflect）
 
 **對應 feature 的欄位更新：**
@@ -65,7 +65,7 @@ DevPilot dashboard 顯示優先序：
 
 ### 步驟四：判斷是否要在 GitHub 建 Issue（可選）
 
-DevPilot 已有 `fetchGithubIssues` / `startGithubPoll`（[lib/bridge/index.ts](../../lib/bridge/index.ts)）但目前還沒對 DevPilot 自己的 repo 啟動 polling。若未來 self-tracking 上線，這裡可以擴充。
+Project Manager 已有 `fetchGithubIssues` / `startGithubPoll`（[lib/bridge/index.ts](../../lib/bridge/index.ts)）但目前還沒對 Project Manager 自己的 repo 啟動 polling。若未來 self-tracking 上線，這裡可以擴充。
 
 **目前行為：** 跳過此步驟。
 
@@ -77,7 +77,7 @@ DevPilot 已有 `fetchGithubIssues` / `startGithubPoll`（[lib/bridge/index.ts](
 ✅ 已完成每日進度報告
 
 📄 Dev Log: docs/dev-logs/dev-xxx-YYYY-MM-DD.md
-📊 .dev-pilot.json: F0X 已更新（{舊%} → {新%}）{若新增 feature, "新增 F0Y"}
+📊 .project-manager.json: F0X 已更新（{舊%} → {新%}）{若新增 feature, "新增 F0Y"}
 🌐 Dashboard: http://localhost:43187/project-progress-dashboard
    （Tauri 模式下透過 watchConfig 2 秒自動 reload；dev mode 由 Next.js HMR 觸發）
 ```

@@ -1,7 +1,7 @@
 # Shared AI Desktop Style Guide
 
 Status: Baseline design system guidance  
-Scope: DevPilot and SayDo family desktop apps  
+Scope: Project Manager and SayDo family desktop apps  
 Audience: AI engineers, frontend engineers, designers
 
 ## Purpose
@@ -61,7 +61,7 @@ Rules:
 
 Use the rail for stable global navigation and identity.
 
-- App mark is text-based: `DP` for DevPilot, `SD` for SayDo.
+- App mark is text-based: `PM` for Project Manager, `SD` for SayDo.
 - Rail icons/buttons are square, border-based, and compact.
 - Active state uses a clear border and subtle emerald background.
 - Tooltip or title must clarify short labels/icons.
@@ -163,7 +163,7 @@ Do not use large illustrations for empty operational pages.
 Every error message should answer:
 
 1. What failed.
-2. What DevPilot preserved or already did.
+2. What Project Manager preserved or already did.
 3. What the user can do next.
 
 For agent workflows, never imply success if a run failed, was blocked, or executed in dry-run mode.

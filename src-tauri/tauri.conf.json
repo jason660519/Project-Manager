@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "DevPilot",
+  "productName": "Project Manager",
   "version": "0.1.0",
-  "identifier": "io.devpilot.app",
+  "identifier": "io.projectmanager.app",
   "build": {
     "frontendDist": "../out",
     "devUrl": "http://localhost:43187",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "DevPilot",
+        "title": "Project Manager",
         "width": 1200,
         "height": 800,
         "minWidth": 900,

@@ -6,9 +6,9 @@ import { KEY_SHARED_PLUGINS } from './keys';
 // in the renderer's localStorage). In `next dev` mode there is no Tauri runtime
 // so we fall back to localStorage purely so the UI can be exercised in a browser;
 // shipped builds always use the keychain path.
-const SECRET_SERVICE = 'devpilot';
+const SECRET_SERVICE = 'projectmanager';
 const SECRET_KEY_PREFIX = 'apikey-';
-const LS_KEY_PREFIX = 'devpilot.personal.apikey.';
+const LS_KEY_PREFIX = 'projectManager.personal.apikey.';
 
 const isTauri = (): boolean =>
   typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;

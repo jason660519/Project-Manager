@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import sampleConfig from '../../../../config/samples/dev-pilot.sample.json';
+import sampleConfig from '../../../../config/samples/project-manager.sample.json';
 import { createRuntimeAdapter } from '../../../../lib/adapters/registry';
-import { DevPilotConfig } from '../../../../lib/types';
+import { ProjectManagerConfig } from '../../../../lib/types';
 
-const config = sampleConfig as DevPilotConfig;
+const config = sampleConfig as ProjectManagerConfig;
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);

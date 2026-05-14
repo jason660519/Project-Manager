@@ -11,7 +11,7 @@ if [[ ! -d "$DOCS_DIR" ]]; then
   exit 1
 fi
 
-echo "== DevPilot Docs Governance Fix =="
+echo "== Project Manager Docs Governance Fix =="
 echo "[INFO] Root: $ROOT_DIR"
 echo "[INFO] Mode: $MODE"
 

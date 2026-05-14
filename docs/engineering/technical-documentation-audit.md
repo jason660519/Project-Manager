@@ -1,4 +1,4 @@
-# DevPilot Technical Documentation Audit
+# Project Manager Technical Documentation Audit
 
 Version: v0.1  
 Date: 2026-05-15  
@@ -16,7 +16,7 @@ This document tracks the technical documentation gaps found during the May 2026 
 
 | Area | Status | Owner Document |
 | --- | --- | --- |
-| Product scope and requirements | Covered | [devpilot-prd.md](../product/devpilot-prd.md) |
+| Product scope and requirements | Covered | [project-manager-prd.md](../product/project-manager-prd.md) |
 | User workflows | Covered | [user-scenarios.md](../product/user-scenarios.md) |
 | System architecture | Updated | [architecture-overview.md](../architecture/architecture-overview.md) |
 | Architecture decisions | Updated | [architecture/README.md](./architecture/README.md) |
@@ -64,7 +64,7 @@ When code changes touch bridge commands, schema fields, ingestion behavior, secr
 
 | 區域 | 狀態 | 負責文件 |
 | --- | --- | --- |
-| 產品範圍與需求 | 已有 | [devpilot-prd.md](../product/devpilot-prd.md) |
+| 產品範圍與需求 | 已有 | [project-manager-prd.md](../product/project-manager-prd.md) |
 | 使用者工作流 | 已有 | [user-scenarios.md](../product/user-scenarios.md) |
 | 系統架構 | 已更新 | [architecture-overview.md](../architecture/architecture-overview.md) |
 | 架構決策 | 已更新 | [architecture/README.md](./architecture/README.md) |

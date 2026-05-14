@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { Eye, EyeOff, Github, KeyRound, Sparkles } from 'lucide-react';
 import { getSecret, setSecret } from '../../../lib/bridge';
 
-const KEYCHAIN_SERVICE = 'devpilot';
-const LS_PREFIX = 'devpilot-key:';
+const KEYCHAIN_SERVICE = 'projectmanager';
+const LS_PREFIX = 'projectManager-key:';
 
 interface KeyEntry {
   id: string;

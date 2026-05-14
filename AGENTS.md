@@ -19,7 +19,7 @@ Before implementation, read:
 
 ## Project Overrides
 
-DevPilot-specific implementation rules live in:
+Project Manager-specific implementation rules live in:
 
 - `./DESIGN.md`
 - `./CLAUDE.md`
@@ -27,11 +27,11 @@ DevPilot-specific implementation rules live in:
 - `./docs/design/shared-ai-desktop-style.md`
 - `./docs/architecture/`
 
-If DevPilot must deviate from company standards, create an ADR under `docs/architecture/`.
+If Project Manager must deviate from company standards, create an ADR under `docs/architecture/`.
 
 ## Documentation Standards
 
-Use the company documentation rules plus DevPilot's repo-local docs governance:
+Use the company documentation rules plus Project Manager's repo-local docs governance:
 
 ```bash
 npm run standards:check

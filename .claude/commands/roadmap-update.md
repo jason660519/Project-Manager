@@ -1,8 +1,8 @@
-更新 Dev-Pilot 自身的功能進度追蹤檔案 `.dev-pilot.json`（位於專案根目錄）。
+更新 Project-Manager 自身的功能進度追蹤檔案 `.project-manager.json`（位於專案根目錄）。
 
 ## 流程
 
-1. 讀取 `.dev-pilot.json` 了解現有 `features[]` 內容
+1. 讀取 `.project-manager.json` 了解現有 `features[]` 內容
 2. 若 `$ARGUMENTS` 有指定功能名稱或 Feature ID（如 `F10`），以此為依據；否則根據最近的 git diff / commit 推斷本次完成的工作
 3. **確認 Feature ID**（見下方防呆規則）
 4. 找到對應 feature 更新，或在 `features[]` 末端新增
@@ -13,9 +13,9 @@
 
 ## Feature ID 防呆規則
 
-**唯一真值是 `.dev-pilot.json` 每個 feature 物件的 `id` 欄位**（`F01`、`F02`…），禁止用陣列順序推算。
+**唯一真值是 `.project-manager.json` 每個 feature 物件的 `id` 欄位**（`F01`、`F02`…），禁止用陣列順序推算。
 
-- 若 user 提供 ID（如 `F10`），先在 `.dev-pilot.json` 搜尋 `"id": "F10"` 核對 `name`
+- 若 user 提供 ID（如 `F10`），先在 `.project-manager.json` 搜尋 `"id": "F10"` 核對 `name`
 - 若只有功能名稱，從 `id` 欄位查詢後再核對，不要反推
 - 若兩者不一致，**停下來查明原因，不要直接改檔**
 
@@ -85,7 +85,7 @@
 更新完成後，請回應：
 
 ```
-✅ 已更新 .dev-pilot.json
+✅ 已更新 .project-manager.json
 
 Feature ID: F__
 功能名稱: [name]

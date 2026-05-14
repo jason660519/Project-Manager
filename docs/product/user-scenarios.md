@@ -1,6 +1,6 @@
-# DevPilot User Scenarios
+# Project Manager User Scenarios
 
-> This document describes realistic workflows for engineers using DevPilot.
+> This document describes realistic workflows for engineers using Project Manager.
 > Each scenario maps to a core product capability and required Tauri/Rust integration.
 
 ---
@@ -22,9 +22,9 @@ Trigger: Alex starts the day and needs to identify blocked items and dispatch-re
 
 Flow:
 
-1. Open DevPilot.
+1. Open Project Manager.
 2. Dashboard aggregates:
-   - Local `.dev-pilot.json` tasks.
+   - Local `.project-manager.json` tasks.
    - GitHub issue status from connected repositories.
    - PR progress and commit activity.
 3. Alex filters `blocked` and `in-progress` items.
@@ -34,7 +34,7 @@ OS interactions:
 
 - Read local JSON configs from multiple project paths.
 - Sync GitHub metadata and cache locally.
-- Watch `.dev-pilot.json` changes and refresh UI.
+- Watch `.project-manager.json` changes and refresh UI.
 
 Tauri dependencies: `fs::read`, `fs::watch`, `reqwest`.
 
@@ -46,12 +46,12 @@ Flow:
 
 1. Click "Add Project".
 2. Paste repository URL (for example: `https://github.com/user/my-app`).
-3. DevPilot analyzes and caches:
+3. Project Manager analyzes and caches:
    - PR status (open/merged/blocked).
    - Commit frequency.
    - Milestone/project progress.
    - Issue labels.
-4. DevPilot maps results to feature cards.
+4. Project Manager maps results to feature cards.
 
 Smart prompts:
 
@@ -72,10 +72,10 @@ Trigger: Alex receives a `.docx`/`.xlsx` spec and needs executable feature items
 
 Flow:
 
-1. Drag and drop file into DevPilot.
+1. Drag and drop file into Project Manager.
 2. Run ingestion pipeline for AI mapping.
 3. Review generated feature draft.
-4. Save to `.dev-pilot.json`.
+4. Save to `.project-manager.json`.
 
 OS interactions:
 
@@ -92,9 +92,9 @@ Trigger: Alex selects a dispatch-ready feature.
 Flow:
 
 1. Click "Dispatch to Agent".
-2. DevPilot composes prompt using feature context.
+2. Project Manager composes prompt using feature context.
 3. Alex reviews/edits prompt.
-4. DevPilot spawns process in target project directory.
+4. Project Manager spawns process in target project directory.
 5. UI shows dispatch success toast and logs execution.
 
 OS interactions:
@@ -196,14 +196,14 @@ Tauri dependencies: `tauri-plugin-global-shortcut`, window focus API.
 
 流程：
 
-1. 開啟 DevPilot。
+1. 開啟 Project Manager。
 2. Dashboard 聚合本機任務、GitHub 狀態與 PR/commit 活躍度。
 3. 篩選 `blocked` 與 `in-progress`。
 4. 打開 Feature 詳情，查看規格摘要與歷史紀錄。
 
 OS 互動：
 
-- 讀取多個專案路徑下的 `.dev-pilot.json`。
+- 讀取多個專案路徑下的 `.project-manager.json`。
 - 同步 GitHub 元資料並快取。
 - 監聽設定檔變化並即時更新 UI。
 
@@ -239,10 +239,10 @@ OS 互動：
 
 流程：
 
-1. 拖曳檔案進入 DevPilot。
+1. 拖曳檔案進入 Project Manager。
 2. 執行 Ingestion Pipeline 與 AI 映射。
 3. 檢查 Feature 草稿。
-4. 寫回 `.dev-pilot.json`。
+4. 寫回 `.project-manager.json`。
 
 OS 互動：
 

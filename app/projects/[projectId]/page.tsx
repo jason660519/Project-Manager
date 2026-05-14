@@ -7,7 +7,7 @@ interface ProjectDetailPageProps {
 }
 
 export function generateStaticParams() {
-  return [{ projectId: 'owner-property' }, { projectId: 'devpilot' }];
+  return [{ projectId: 'owner-property' }, { projectId: 'project-manager' }];
 }
 
 export default async function ProjectDetailPage({ params }: ProjectDetailPageProps) {

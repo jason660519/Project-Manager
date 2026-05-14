@@ -1,4 +1,4 @@
-# DevPilot Target Audience Analysis
+# Project Manager Target Audience Analysis
 
 Version: v0.1  
 Date: 2026-05-12
@@ -9,7 +9,7 @@ Date: 2026-05-12
 
 ## 1. Positioning
 
-DevPilot is not for all developers. It is for developers who already run AI-agent workflows and need a local control center for dispatch and execution visibility.
+Project Manager is not for all developers. It is for developers who already run AI-agent workflows and need a local control center for dispatch and execution visibility.
 
 ## 2. Primary Segments
 
@@ -38,7 +38,7 @@ Pain:
 
 Motivation:
 
-- Use DevPilot as an AI execution coordinator.
+- Use Project Manager as an AI execution coordinator.
 - Convert inconsistent PM specs into executable features.
 - Keep traceable run history for review/debug.
 
@@ -85,14 +85,14 @@ Discovery -> Trial -> Habit -> Referral
 
 - Discovery: social dev channels and repository docs.
 - Trial: install, add first project, dispatch first agent task.
-- Habit: daily morning triage in DevPilot.
+- Habit: daily morning triage in Project Manager.
 - Referral: workflow sharing with peers.
 
 Critical conversion event: first successful dispatch with live log visibility.
 
 ## 6. Jobs to Be Done
 
-| Job | Current Method | DevPilot Method |
+| Job | Current Method | Project Manager Method |
 | --- | --- | --- |
 | Cross-project daily triage | Multiple tabs/tools | Unified dashboard |
 | Convert specs to tasks | Manual copy/paste | AI-assisted ingestion |
@@ -116,7 +116,7 @@ MVP recommendation: keep free first, validate retention before monetization.
 
 ## 1. 市場定位
 
-DevPilot 不是面向所有工程師，而是面向已經在使用 AI Agent 工作流、需要本機任務指揮中心的工程師。
+Project Manager 不是面向所有工程師，而是面向已經在使用 AI Agent 工作流、需要本機任務指揮中心的工程師。
 
 ## 2. 主要族群
 
@@ -144,7 +144,7 @@ DevPilot 不是面向所有工程師，而是面向已經在使用 AI Agent 工�
 
 核心動機：
 
-- 把 DevPilot 當作 AI 執行分配器。
+- 把 Project Manager 當作 AI 執行分配器。
 - 把格式不一的規格快速轉為可執行任務。
 - 保留執行紀錄，便於 review 與 debug。
 
@@ -197,7 +197,7 @@ MVP 先聚焦：
 
 ## 6. JTBD
 
-| Job | 現況 | DevPilot 解法 |
+| Job | 現況 | Project Manager 解法 |
 | --- | --- | --- |
 | 跨專案盤點 | 多工具分散查詢 | 單一 Dashboard |
 | 規格轉任務 | 手動複製貼上 | AI 匯入映射 |
