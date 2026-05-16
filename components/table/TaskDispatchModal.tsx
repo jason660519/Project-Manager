@@ -1,7 +1,17 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { killProcess, onAgentExit, onAgentStdout, readFile, spawnAgent } from '../../lib/bridge';
+import {
+  augmentArgsWithMcp,
+  killProcess,
+  mcpInjectionFlag,
+  onAgentExit,
+  onAgentStdout,
+  readFile,
+  spawnAgent,
+  spawnTerminal,
+} from '../../lib/bridge';
+import { collectEnabledMcpServers } from '../../lib/storage/plugins';
 import { AgentAdapterConfig, AnyAdapterConfig, EngineerRole, ExecutionResult, Feature } from '../../lib/types';
 
 // ── Prompt templates ──────────────────────────────────────────────────────────
@@ -109,6 +119,7 @@ export function TaskDispatchModal({
   const [logs, setLogs] = useState<string[]>([]);
   const [activePid, setActivePid] = useState<number | null>(null);
   const [specLoading, setSpecLoading] = useState(false);
+  const [mcpInjection, setMcpInjection] = useState<{ count: number; flag: string } | null>(null);
 
   const logEndRef = useRef<HTMLDivElement>(null);
   const unlistenRefs = useRef<Array<() => void>>([]);
@@ -153,6 +164,22 @@ export function TaskDispatchModal({
       cancelled = true;
     };
   }, [feature, projectRoot]);
+
+  // Recompute MCP injection preview whenever adapter or project root changes.
+  useEffect(() => {
+    if (!selectedAdapter || selectedAdapter.type === 'ide') {
+      setMcpInjection(null);
+      return;
+    }
+    const flag = mcpInjectionFlag(selectedAdapter.command);
+    if (!flag) {
+      setMcpInjection(null);
+      return;
+    }
+    const servers = collectEnabledMcpServers(projectRoot);
+    const count = Object.keys(servers).length;
+    setMcpInjection(count > 0 ? { count, flag } : null);
+  }, [selectedAdapter, projectRoot]);
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -215,7 +242,8 @@ export function TaskDispatchModal({
 
     onFeatureUpdate?.(feature.id, { status: 'in_progress' });
 
-    const { command, args } = buildCommand(adapter);
+    const { command, args: baseArgs } = buildCommand(adapter);
+    const args = await augmentArgsWithMcp(command, baseArgs, collectEnabledMcpServers(projectRoot));
 
     try {
       const unStdout = await onAgentStdout(({ pid: eventPid, line }) => {
@@ -254,6 +282,33 @@ export function TaskDispatchModal({
     } catch (err) {
       setLogs((prev) => [...prev, `Error: ${err}`]);
       setPhase('error');
+    }
+  };
+
+  const handleOpenInTerminal = async () => {
+    const adapter = adapters.find((a) => a.id === selectedAdapterId);
+    if (!adapter) return;
+
+    const { command, args: baseArgs } = buildCommand(adapter);
+    const args = await augmentArgsWithMcp(command, baseArgs, collectEnabledMcpServers(projectRoot));
+    // AppleScript `do script` injects newlines as Enter mid-typing on macOS,
+    // so collapse literal newlines in args into spaces before spawning.
+    const flatArgs = args.map((a) => a.replace(/\r?\n/g, ' '));
+
+    try {
+      await spawnTerminal({ command, args: flatArgs, cwd: projectRoot });
+      onFeatureUpdate?.(feature.id, { status: 'in_progress' });
+      onExecuted({
+        success: true,
+        message: `${adapter.name} 已在新 Terminal 視窗開啟`,
+        command,
+        args: flatArgs,
+        dryRun: false,
+      });
+      onClose();
+    } catch (err) {
+      setPhase('error');
+      setLogs([`Failed to open terminal: ${err}`]);
     }
   };
 
@@ -341,6 +396,12 @@ export function TaskDispatchModal({
                     </option>
                   ))}
                 </select>
+                {mcpInjection && (
+                  <p className="mt-1.5 text-[11px] text-emerald-300/80">
+                    + {mcpInjection.count} MCP server{mcpInjection.count > 1 ? 's' : ''} 將透過{' '}
+                    <span className="font-mono">{mcpInjection.flag}</span> 注入
+                  </p>
+                )}
               </div>
 
               {isIDE ? (
@@ -430,13 +491,23 @@ export function TaskDispatchModal({
               Kill
             </button>
           )}
+          {phase === 'idle' && !isIDE && (
+            <button
+              onClick={handleOpenInTerminal}
+              disabled={specLoading}
+              className="border border-stone-200/25 px-4 py-2 text-sm font-medium text-stone-200 hover:bg-white/5 disabled:opacity-50"
+              title="開新的系統 Terminal 視窗執行（PM 不攔截 stdout）"
+            >
+              在 Terminal 開啟
+            </button>
+          )}
           {phase === 'idle' && (
             <button
               onClick={handleExecute}
               disabled={specLoading}
               className="bg-stone-100 px-4 py-2 text-sm font-medium text-[#071d1a] hover:bg-amber-100 disabled:opacity-50"
             >
-              確認派遣
+              {isIDE ? '確認派遣' : '在 PM 內執行'}
             </button>
           )}
         </div>

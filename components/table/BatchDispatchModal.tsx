@@ -2,7 +2,14 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
-import { onAgentExit, onAgentStdout, spawnAgent } from '../../lib/bridge';
+import {
+  augmentArgsWithMcp,
+  mcpInjectionFlag,
+  onAgentExit,
+  onAgentStdout,
+  spawnAgent,
+} from '../../lib/bridge';
+import { collectEnabledMcpServers } from '../../lib/storage/plugins';
 import { AgentAdapterConfig, AnyAdapterConfig, Feature } from '../../lib/types';
 
 // ── Batch prompt templates ────────────────────────────────────────────────────
@@ -106,6 +113,12 @@ export function BatchDispatchModal({
 
   const adapter = agentAdapters.find((a) => a.id === selectedAdapterId);
 
+  const mcpServerCount = adapter
+    ? Object.keys(collectEnabledMcpServers(projectRoot)).length
+    : 0;
+  const mcpFlag = adapter ? mcpInjectionFlag(adapter.command) : null;
+  const mcpInjection = mcpFlag && mcpServerCount > 0 ? { count: mcpServerCount, flag: mcpFlag } : null;
+
   const buildArgs = (feature: Feature): string[] => {
     if (!adapter) return [];
     const agent = adapter as AgentAdapterConfig;
@@ -121,6 +134,10 @@ export function BatchDispatchModal({
   const handleDispatchAll = async () => {
     if (!adapter) return;
     setBatchPhase('running');
+
+    // Same MCP config is reused across every feature in this batch, so build
+    // it once before spawning instead of per-feature.
+    const mcpServers = collectEnabledMcpServers(projectRoot);
 
     // Map pid → featureId for event routing
     const pidToFeatureId = new Map<number, string>();
@@ -168,7 +185,8 @@ export function BatchDispatchModal({
       items.map(async (item) => {
         const { feature } = item;
         try {
-          const args = buildArgs(feature);
+          const baseArgs = buildArgs(feature);
+          const args = await augmentArgsWithMcp(adapter.command, baseArgs, mcpServers);
           onFeatureUpdate?.(feature.id, { status: 'in_progress' });
           const pid = await spawnAgent({ command: adapter.command, args, workingDir: projectRoot });
           pidToFeatureId.set(pid, feature.id);
@@ -235,6 +253,13 @@ export function BatchDispatchModal({
                     ))}
                   </select>
                 </div>
+              )}
+
+              {mcpInjection && (
+                <p className="text-[11px] text-emerald-300/80">
+                  + {mcpInjection.count} MCP server{mcpInjection.count > 1 ? 's' : ''} 將透過{' '}
+                  <span className="font-mono">{mcpInjection.flag}</span> 注入每一個派遣
+                </p>
               )}
 
               {/* Task template selector */}
