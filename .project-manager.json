@@ -2,8 +2,8 @@
   "schemaVersion": 2,
   "id": "11111111-d3v1-4000-8000-devpilot00001",
   "createdAt": "2026-05-12T00:00:00.000Z",
-  "updatedAt": "2026-05-12T17:00:00.000Z",
-  "updatedBy": "Claude Sonnet 4.6",
+  "updatedAt": "2026-05-17T00:00:00.000Z",
+  "updatedBy": "Claude Opus 4.7",
   "project": {
     "name": "Project Manager",
     "root": "/Volumes/KLEVV-4T-1/Project-Manager",
@@ -132,14 +132,14 @@
       "id": "F10",
       "name": "Plugins View",
       "category": "Frontend/UI",
-      "status": "in_progress",
-      "progress": 80,
+      "status": "done",
+      "progress": 100,
       "paths": {
         "implementation": "app/ui/views/PluginsView.tsx"
       },
-      "notes": "Providers / AI Agents / IDEs CRUD 完成；enable/disable toggle 完成；enabled?: boolean 加入 lib/types/plugins.ts",
-      "updatedAt": "2026-05-12T12:30:00.000Z",
-      "updatedBy": "Claude Sonnet 4.6"
+      "notes": "v2 catalog（discriminated union: provider/cli/editor/mcp/skill）+ v1→v2 一次性 migration + Marketplace 三 tab UI（Installed / Marketplace / Skills）+ Configure 展開表單。共用 selector helpers 在 lib/storage/plugins.ts。",
+      "updatedAt": "2026-05-17T00:00:00.000Z",
+      "updatedBy": "Claude Opus 4.7"
     },
     {
       "id": "F11",
@@ -232,6 +232,50 @@
       "notes": "master-detail 兩欄 UI；5 個預設角色模板（Frontend/Backend/Fullstack/QA/DevOps）；EngineerRole 存於 ProjectManagerConfig.engineerRoles（project-level）；TaskDispatchModal 整合：角色選擇器 + systemPrompt + referenceFiles 自動注入 prompt；schema.json 加 engineerRole definition",
       "updatedAt": "2026-05-12T17:00:00.000Z",
       "updatedBy": "Claude Sonnet 4.6"
+    },
+    {
+      "id": "F18",
+      "name": "MCP Server Lifecycle",
+      "category": "Core/Integration",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "implementation": "src-tauri/src/lib.rs",
+        "bridge": "lib/bridge/index.ts"
+      },
+      "notes": "Rust commands：mcp_spawn / mcp_kill / mcp_status_all / mcp_logs / mcp_logs_dir + write_mcp_config + open_path。In-memory rolling log buffer (2000 lines) + 持久檔。前端 PluginsView Installed tab 內 Start/Stop/Restart/Logs 控制 + onMcpStatus 事件即時更新。TaskDispatchModal/BatchDispatchModal 透過 augmentArgsWithMcp 把 enabled stdio MCP servers 注入 Claude/Aider CLI（--mcp-config flag）。",
+      "updatedAt": "2026-05-17T00:00:00.000Z",
+      "updatedBy": "Claude Opus 4.7"
+    },
+    {
+      "id": "F19",
+      "name": "Skills Marketplace",
+      "category": "Core/Integration",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "implementation": "src-tauri/src/lib.rs",
+        "bridge": "lib/bridge/index.ts",
+        "frontend": "app/ui/views/PluginsView.tsx"
+      },
+      "notes": "Rust commands：skill_default_dir / skill_list / skill_install_from_url / skill_uninstall / skill_move_files。前端 Plugins → Skills tab：URL 安裝、Rescan、Open folder、Browse skillsmp.com。SettingsView 可改 skills 目錄並提供 move-existing 對話框。預設 ~/.claude/skills 跨平台。",
+      "updatedAt": "2026-05-17T00:00:00.000Z",
+      "updatedBy": "Claude Opus 4.7"
+    },
+    {
+      "id": "F20",
+      "name": "Interactive Terminal Spawn",
+      "category": "Core/Integration",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "implementation": "src-tauri/src/lib.rs",
+        "bridge": "lib/bridge/index.ts"
+      },
+      "notes": "spawn_terminal Rust command：開新的系統 Terminal 視窗執行 CLI（PM 不接管 stdout），給 Claude Code interactive / Aider / Codex 互動模式用。TaskDispatchModal 提供「在 Terminal 開啟」按鈕，macOS 用 AppleScript do script，注意換行需 flatten。"
+,
+      "updatedAt": "2026-05-17T00:00:00.000Z",
+      "updatedBy": "Claude Opus 4.7"
     }
   ],
   "engineerRoles": [
