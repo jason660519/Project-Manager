@@ -15,6 +15,7 @@ export const KEY_PERSONAL_DASHBOARD_PROJECT_IDS = 'projectManager.personal.dashb
 
 export const KEY_SHARED_PLUGINS = 'projectManager.shared.plugins';
 export const KEY_SHARED_CHANNELS = 'projectManager.shared.channels';
+export const KEY_SHARED_SKILLS_DIR = 'projectManager.shared.skillsDir';
 
 export const LEGACY_KEY_PROJECTS = 'devpilot-projects';
 export const LEGACY_KEY_SELECTED_PROJECT_ID = 'devpilot-selected-project-id';

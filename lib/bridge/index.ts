@@ -85,6 +85,235 @@ export async function killProcess(pid: number): Promise<void> {
   return invoke<void>('kill_process', { pid });
 }
 
+export interface SpawnTerminalOptions {
+  /** The CLI binary name, e.g. "claude" */
+  command: string;
+  /** Pre-processed argument list (placeholders already substituted) */
+  args: string[];
+  /** Working directory the terminal opens in */
+  cwd: string;
+}
+
+/**
+ * Open a new system Terminal window running `command` with `args` in `cwd`.
+ *
+ * Unlike `spawnAgent`, the terminal app owns the process — PM does NOT
+ * capture stdout/stderr. Use for interactive CLI agents (Claude Code
+ * interactive mode, Aider, Codex) where the user types directly.
+ *
+ * Throws in `next dev` (no Tauri runtime).
+ */
+export async function spawnTerminal(opts: SpawnTerminalOptions): Promise<void> {
+  if (!isTauri()) throw new Error('spawnTerminal requires Tauri runtime');
+  return invoke<void>('spawn_terminal', {
+    command: opts.command,
+    args: opts.args,
+    cwd: opts.cwd,
+  });
+}
+
+// ── MCP server lifecycle ──────────────────────────────────────────────────────
+
+export type McpRunStatus =
+  | { phase: 'running'; pid: number }
+  | { phase: 'stopped'; code: number }
+  | { phase: 'errored'; message: string };
+
+export interface McpStatus {
+  pluginId: string;
+  status: McpRunStatus;
+  startedAt?: string;
+  lastStatusChange: string;
+}
+
+export interface McpSpawnOptions {
+  pluginId: string;
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+  cwd?: string;
+}
+
+/** Spawn an MCP server. Throws if the plugin is already Running. */
+export async function mcpSpawn(opts: McpSpawnOptions): Promise<McpStatus> {
+  if (!isTauri()) throw new Error('mcpSpawn requires Tauri runtime');
+  return invoke<McpStatus>('mcp_spawn', {
+    pluginId: opts.pluginId,
+    command: opts.command,
+    args: opts.args,
+    env: opts.env ?? null,
+    cwd: opts.cwd ?? null,
+  });
+}
+
+/** Signal the MCP server with this plugin_id to terminate. No-op if not running. */
+export async function mcpKill(pluginId: string): Promise<void> {
+  if (!isTauri()) return;
+  return invoke<void>('mcp_kill', { pluginId });
+}
+
+/** Convenience: kill then re-spawn with the same configuration. */
+export async function mcpRestart(opts: McpSpawnOptions): Promise<McpStatus> {
+  await mcpKill(opts.pluginId);
+  // The waiter task needs a tick to flip status; wait briefly so the next spawn
+  // doesn't trip the "already running" guard before the kill propagates.
+  await new Promise((r) => setTimeout(r, 50));
+  return mcpSpawn(opts);
+}
+
+/** All MCP servers PM currently tracks. Plugins never spawned are absent. */
+export async function mcpStatusAll(): Promise<McpStatus[]> {
+  if (!isTauri()) return [];
+  return invoke<McpStatus[]>('mcp_status_all');
+}
+
+/** Last `tail` lines from the in-memory rolling buffer. Empty if not tracked. */
+export async function mcpLogs(pluginId: string, tail = 200): Promise<string> {
+  if (!isTauri()) return '';
+  return invoke<string>('mcp_logs', { pluginId, tail });
+}
+
+/** Absolute path to the mcp-logs directory (creates it if missing). */
+export async function mcpLogsDir(): Promise<string> {
+  if (!isTauri()) throw new Error('mcpLogsDir requires Tauri runtime');
+  return invoke<string>('mcp_logs_dir');
+}
+
+export interface McpLogPayload {
+  pluginId: string;
+  level: 'stdout' | 'stderr';
+  line: string;
+  timestamp: string;
+}
+
+export interface McpStatusPayload {
+  pluginId: string;
+  status: McpRunStatus;
+}
+
+export function onMcpLog(cb: (p: McpLogPayload) => void): Promise<UnlistenFn> {
+  return listen<McpLogPayload>('mcp-log', cb);
+}
+
+export function onMcpStatus(cb: (p: McpStatusPayload) => void): Promise<UnlistenFn> {
+  return listen<McpStatusPayload>('mcp-status', cb);
+}
+
+/** Open a file or directory in the OS's default handler (Finder/Explorer/xdg-open). */
+export async function openPath(path: string): Promise<void> {
+  if (!isTauri()) throw new Error('openPath requires Tauri runtime');
+  return invoke<void>('open_path', { path });
+}
+
+// ── Skills (markdown packages on disk) ───────────────────────────────────────
+
+export interface SkillFileInfo {
+  relPath: string;
+  absPath: string;
+  modified: string;
+  size: number;
+}
+
+/** PM's default skills directory: ~/.claude/skills (cross-platform). */
+export async function skillDefaultDir(): Promise<string> {
+  if (!isTauri()) return '';
+  return invoke<string>('skill_default_dir');
+}
+
+/** Scan `skillsDir` for `.md` files (top level + 1 subdir deep). */
+export async function skillList(skillsDir: string): Promise<SkillFileInfo[]> {
+  if (!isTauri()) return [];
+  return invoke<SkillFileInfo[]>('skill_list', { skillsDir });
+}
+
+/**
+ * Download a `.md` from `url` into `skillsDir`. `fileName` overrides the
+ * basename derived from the URL. Returns the absolute path of the new file.
+ */
+export async function skillInstallFromUrl(
+  url: string,
+  skillsDir: string,
+  fileName?: string,
+): Promise<string> {
+  if (!isTauri()) throw new Error('skillInstallFromUrl requires Tauri runtime');
+  return invoke<string>('skill_install_from_url', {
+    url,
+    skillsDir,
+    fileName: fileName ?? null,
+  });
+}
+
+/** Delete a skill file. Refused if `path` is outside `skillsDir`. */
+export async function skillUninstall(path: string, skillsDir: string): Promise<void> {
+  if (!isTauri()) throw new Error('skillUninstall requires Tauri runtime');
+  return invoke<void>('skill_uninstall', { path, skillsDir });
+}
+
+/** Move existing skill files into `newDir`. Returns the new absolute paths. */
+export async function skillMoveFiles(paths: string[], newDir: string): Promise<string[]> {
+  if (!isTauri()) return [];
+  return invoke<string[]>('skill_move_files', { paths, newDir });
+}
+
+// ── MCP config injection (handed to child CLIs at dispatch time) ─────────────
+
+export interface McpServerConfig {
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+}
+
+/** CLI commands → flag template appended for MCP config injection. */
+const MCP_INJECTABLE_COMMANDS: Record<string, string[]> = {
+  claude: ['--mcp-config', '{mcpConfigPath}'],
+  aider: ['--mcp-config', '{mcpConfigPath}'],
+};
+
+/** Whether PM knows how to inject MCP into this CLI command. */
+export function supportsMcpInjection(command: string): boolean {
+  return command in MCP_INJECTABLE_COMMANDS;
+}
+
+/**
+ * The flag fragment PM appends for `command`, with the placeholder still in
+ * place. Useful for UI hints. Returns null when PM doesn't know the command.
+ */
+export function mcpInjectionFlag(command: string): string | null {
+  const tpl = MCP_INJECTABLE_COMMANDS[command];
+  return tpl ? tpl.join(' ') : null;
+}
+
+/** Write a temporary mcp_config.json and return its absolute path. Tauri only. */
+export async function writeMcpConfig(
+  servers: Record<string, McpServerConfig>,
+): Promise<string> {
+  if (!isTauri()) throw new Error('writeMcpConfig requires Tauri runtime');
+  return invoke<string>('write_mcp_config', { servers });
+}
+
+/**
+ * If PM knows how to inject MCP into `command`, write a temp config from the
+ * given servers and return baseArgs + the MCP flag. Returns baseArgs unchanged
+ * when the command is unknown, no servers are given, or the write fails (e.g.
+ * outside Tauri).
+ */
+export async function augmentArgsWithMcp(
+  command: string,
+  baseArgs: string[],
+  servers: Record<string, McpServerConfig>,
+): Promise<string[]> {
+  const template = MCP_INJECTABLE_COMMANDS[command];
+  if (!template) return baseArgs;
+  if (Object.keys(servers).length === 0) return baseArgs;
+  try {
+    const path = await writeMcpConfig(servers);
+    const mcpArgs = template.map((a) => a.replaceAll('{mcpConfigPath}', path));
+    return [...baseArgs, ...mcpArgs];
+  } catch {
+    return baseArgs;
+  }
+}
+
 // ── Event listeners ───────────────────────────────────────────────────────────
 
 export type AgentStdioPayload = { pid: number; line: string };
