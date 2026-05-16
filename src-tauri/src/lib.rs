@@ -1,7 +1,11 @@
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, VecDeque};
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use tauri::{AppHandle, Emitter};
-use tokio::io::AsyncBufReadExt;
+use std::sync::Arc;
+use tauri::{AppHandle, Emitter, Manager};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
+use tokio::sync::{oneshot, Mutex};
 
 // ── Event payloads emitted to frontend ────────────────────────────────────────
 
@@ -239,6 +243,143 @@ struct AnthropicResponse {
     input_tokens: u32,
     #[serde(rename = "outputTokens")]
     output_tokens: u32,
+}
+
+// ── Terminal spawn (interactive) ──────────────────────────────────────────────
+
+/// POSIX single-quote a string. Embedded single quotes use the `'\''` trick.
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+fn shell_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', "'\\''"))
+}
+
+/// Build a POSIX shell line: `cd '<cwd>' && '<command>' '<arg1>' ...`
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+fn build_shell_line(command: &str, args: &[String], cwd: &str) -> String {
+    let mut line = format!("cd {} && {}", shell_quote(cwd), shell_quote(command));
+    for arg in args {
+        line.push(' ');
+        line.push_str(&shell_quote(arg));
+    }
+    line
+}
+
+/// Build a Windows CMD command line with double-quoted args.
+#[cfg(target_os = "windows")]
+fn build_cmd_line(command: &str, args: &[String]) -> String {
+    let mut line = format!("\"{}\"", command.replace('"', "\\\""));
+    for arg in args {
+        line.push(' ');
+        line.push_str(&format!("\"{}\"", arg.replace('"', "\\\"")));
+    }
+    line
+}
+
+/// Open a new system Terminal window running `command` with `args` in `cwd`.
+///
+/// Unlike `spawn_agent`, this disowns the child — the terminal app owns the
+/// process, the user interacts directly, and PM does NOT capture stdout/stderr.
+/// Use for interactive CLI agents (Claude Code interactive mode, Aider, Codex).
+///
+/// Caller note: multi-line args may misbehave on macOS Terminal (newlines
+/// trigger Enter mid-stream). The renderer collapses literal newlines in args
+/// before invoking this command.
+///
+/// Platform behavior:
+///   - macOS:   AppleScript drives Terminal.app via `osascript`
+///   - Linux:   tries `x-terminal-emulator`, `gnome-terminal`, `konsole`, `xterm`
+///   - Windows: prefers Windows Terminal (`wt.exe`), falls back to `cmd /c start`
+#[tauri::command]
+async fn spawn_terminal(
+    command: String,
+    args: Vec<String>,
+    cwd: String,
+) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let shell_line = build_shell_line(&command, &args, &cwd);
+        // AppleScript string literal escaping: backslash first, then double quote,
+        // then literal CR/LF → \r / \n so `do script` doesn't press Enter mid-input.
+        let escaped = shell_line
+            .replace('\\', "\\\\")
+            .replace('"', "\\\"")
+            .replace('\r', "\\r")
+            .replace('\n', "\\n");
+        let script = format!(
+            "tell application \"Terminal\"\nactivate\ndo script \"{escaped}\"\nend tell"
+        );
+        let output = tokio::process::Command::new("osascript")
+            .args(["-e", &script])
+            .output()
+            .await
+            .map_err(|e| format!("osascript spawn failed: {e}"))?;
+        if !output.status.success() {
+            return Err(format!(
+                "osascript failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+        Ok(())
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let shell_line = build_shell_line(&command, &args, &cwd);
+        // (executable, prefix args before the shell-command string)
+        let candidates: &[(&str, &[&str])] = &[
+            ("x-terminal-emulator", &["-e", "bash", "-c"]),
+            ("gnome-terminal", &["--", "bash", "-c"]),
+            ("konsole", &["-e", "bash", "-c"]),
+            ("xterm", &["-e", "bash", "-c"]),
+        ];
+        for (term, prefix) in candidates {
+            let found = tokio::process::Command::new("which")
+                .arg(term)
+                .output()
+                .await
+                .map(|o| o.status.success())
+                .unwrap_or(false);
+            if !found {
+                continue;
+            }
+            let mut all_args: Vec<String> = prefix.iter().map(|s| s.to_string()).collect();
+            // `; exec bash` keeps the window open after the command finishes.
+            all_args.push(format!("{shell_line}; exec bash"));
+            tokio::process::Command::new(term)
+                .args(&all_args)
+                .spawn()
+                .map_err(|e| format!("{term} spawn failed: {e}"))?;
+            return Ok(());
+        }
+        Err("No supported terminal emulator found (tried x-terminal-emulator, gnome-terminal, konsole, xterm)".to_string())
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let inner = build_cmd_line(&command, &args);
+        let wt_found = tokio::process::Command::new("where")
+            .arg("wt.exe")
+            .output()
+            .await
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+        if wt_found {
+            tokio::process::Command::new("wt.exe")
+                .args(["-d", cwd.as_str(), "cmd", "/k", inner.as_str()])
+                .spawn()
+                .map_err(|e| format!("wt.exe spawn failed: {e}"))?;
+        } else {
+            tokio::process::Command::new("cmd")
+                .args(["/c", "start", "cmd", "/k", inner.as_str()])
+                .current_dir(&cwd)
+                .spawn()
+                .map_err(|e| format!("cmd start failed: {e}"))?;
+        }
+        Ok(())
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    {
+        let _ = (command, args, cwd);
+        Err("spawn_terminal is not supported on this platform".to_string())
+    }
 }
 
 /// Kill a running process by PID (SIGTERM on Unix).
@@ -569,8 +710,8 @@ async fn fetch_github_issues(token: String, repo_url: String) -> Result<Vec<Gith
 
     if let Some(issue_nodes) = data["data"]["repository"]["issues"]["nodes"].as_array() {
         for issue_data in issue_nodes {
-            let id = issue_data["id"].as_str().unwrap_or("");
-            // Parse ID to extract numeric ID (GitHub GraphQL IDs are base64 encoded but we'll use number)
+            // GitHub GraphQL "node id" is base64-encoded and not surfaced to the UI;
+            // PM keys issues by the numeric `number` field below.
             let number = issue_data["number"].as_u64().unwrap_or(0);
             let title = issue_data["title"].as_str().unwrap_or("").to_string();
             let body = issue_data["body"].as_str().map(String::from);
@@ -762,13 +903,10 @@ struct AgentSession {
     tags: Option<Vec<String>>,
 }
 
-/// Return the current UTC time as an ISO 8601 string (e.g. "2026-05-12T10:30:00Z").
-/// Uses Hinnant's civil_from_days algorithm — no chrono dependency needed.
-fn now_iso8601() -> String {
-    let secs = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
+/// Format a unix-epoch second count as an ISO 8601 UTC string
+/// (e.g. "2026-05-12T10:30:00Z"). Uses Hinnant's civil_from_days algorithm —
+/// no chrono dependency needed.
+fn iso8601_from_unix_secs(secs: u64) -> String {
     let s = (secs % 60) as u32;
     let m = ((secs / 60) % 60) as u32;
     let h = ((secs / 3600) % 24) as u32;
@@ -784,6 +922,22 @@ fn now_iso8601() -> String {
     let mon = if mp < 10 { mp + 3 } else { mp - 9 };
     let year = if mon <= 2 { y + 1 } else { y };
     format!("{year:04}-{mon:02}-{d:02}T{h:02}:{m:02}:{s:02}Z")
+}
+
+fn now_iso8601() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    iso8601_from_unix_secs(secs)
+}
+
+fn iso8601_from_systemtime(st: std::time::SystemTime) -> String {
+    let secs = st
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    iso8601_from_unix_secs(secs)
 }
 
 async fn write_session_file(sessions_dir: &str, session: &AgentSession) -> Result<(), String> {
@@ -838,11 +992,883 @@ async fn save_session(sessions_dir: String, session: AgentSession) -> Result<(),
     write_session_file(&sessions_dir, &session).await
 }
 
+// ── MCP server lifecycle ──────────────────────────────────────────────────────
+
+const MCP_MAX_MEMORY_LINES: usize = 1000;
+const MCP_MAX_DISK_BYTES: u64 = 5 * 1024 * 1024; // 5 MB
+const MCP_MAX_DISK_ROTATIONS: usize = 3;         // .log + .log.1 + .log.2
+
+/// Runtime status of an MCP server in the Rust-side registry.
+/// "Idle" is not represented here — renderers should treat a plugin missing
+/// from `mcp_status_all` as idle.
+#[derive(Clone, Serialize)]
+#[serde(tag = "phase", rename_all = "lowercase")]
+enum McpRunStatus {
+    Running { pid: u32 },
+    Stopped { code: i32 },
+    Errored { message: String },
+}
+
+#[derive(Clone, Serialize)]
+struct McpStatus {
+    #[serde(rename = "pluginId")]
+    plugin_id: String,
+    status: McpRunStatus,
+    #[serde(rename = "startedAt", skip_serializing_if = "Option::is_none")]
+    started_at: Option<String>,
+    #[serde(rename = "lastStatusChange")]
+    last_status_change: String,
+}
+
+struct McpServerState {
+    plugin_id: String,
+    status: McpRunStatus,
+    started_at: Option<String>,
+    last_status_change: String,
+    kill_tx: Option<oneshot::Sender<()>>,
+    log_buffer: Arc<Mutex<VecDeque<String>>>,
+}
+
+impl McpServerState {
+    fn snapshot(&self) -> McpStatus {
+        McpStatus {
+            plugin_id: self.plugin_id.clone(),
+            status: self.status.clone(),
+            started_at: self.started_at.clone(),
+            last_status_change: self.last_status_change.clone(),
+        }
+    }
+}
+
+type McpRegistry = Arc<Mutex<HashMap<String, McpServerState>>>;
+
+#[derive(Serialize, Clone)]
+struct McpLogEvent {
+    #[serde(rename = "pluginId")]
+    plugin_id: String,
+    level: String,
+    line: String,
+    timestamp: String,
+}
+
+#[derive(Serialize, Clone)]
+struct McpStatusEvent {
+    #[serde(rename = "pluginId")]
+    plugin_id: String,
+    status: McpRunStatus,
+}
+
+fn mcp_logs_root(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Cannot resolve app data dir: {e}"))?
+        .join("mcp-logs"))
+}
+
+fn mcp_log_file(app: &AppHandle, plugin_id: &str) -> Result<PathBuf, String> {
+    Ok(mcp_logs_root(app)?.join(format!("{plugin_id}.log")))
+}
+
+fn rotation_path(base: &Path, n: usize) -> PathBuf {
+    let mut s = base.as_os_str().to_owned();
+    s.push(format!(".{n}"));
+    PathBuf::from(s)
+}
+
+async fn rotate_log_if_needed(log_path: &Path) -> std::io::Result<()> {
+    let size = tokio::fs::metadata(log_path)
+        .await
+        .map(|m| m.len())
+        .unwrap_or(0);
+    if size < MCP_MAX_DISK_BYTES {
+        return Ok(());
+    }
+    // Shift older files: .log.1 → .log.2, drop the oldest.
+    for n in (1..MCP_MAX_DISK_ROTATIONS).rev() {
+        let from = rotation_path(log_path, n);
+        let to = rotation_path(log_path, n + 1);
+        if tokio::fs::metadata(&from).await.is_ok() {
+            let _ = tokio::fs::rename(&from, &to).await;
+        }
+    }
+    let p1 = rotation_path(log_path, 1);
+    let _ = tokio::fs::rename(log_path, &p1).await;
+    Ok(())
+}
+
+async fn append_disk(log_path: &Path, line: &str) -> std::io::Result<()> {
+    if let Some(parent) = log_path.parent() {
+        let _ = tokio::fs::create_dir_all(parent).await;
+    }
+    rotate_log_if_needed(log_path).await?;
+    let mut f = tokio::fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(log_path)
+        .await?;
+    f.write_all(line.as_bytes()).await?;
+    f.write_all(b"\n").await?;
+    Ok(())
+}
+
+async fn append_memory(buf: &Arc<Mutex<VecDeque<String>>>, line: String) {
+    let mut b = buf.lock().await;
+    b.push_back(line);
+    if b.len() > MCP_MAX_MEMORY_LINES {
+        b.pop_front();
+    }
+}
+
+/// Spawn an MCP server as a child process and start streaming its stdout/stderr
+/// to memory (last 1000 lines) and disk (rotating 5 MB × 3 files).
+///
+/// Rejects if a server with this `plugin_id` is already Running. Emits
+/// `mcp-status` and `mcp-log` events for live UI updates.
+#[tauri::command]
+async fn mcp_spawn(
+    app: AppHandle,
+    registry: tauri::State<'_, McpRegistry>,
+    plugin_id: String,
+    command: String,
+    args: Vec<String>,
+    env: Option<HashMap<String, String>>,
+    cwd: Option<String>,
+) -> Result<McpStatus, String> {
+    let log_path = mcp_log_file(&app, &plugin_id)?;
+
+    {
+        let map = registry.lock().await;
+        if let Some(s) = map.get(&plugin_id) {
+            if matches!(s.status, McpRunStatus::Running { .. }) {
+                return Err(format!("MCP server `{plugin_id}` is already running"));
+            }
+        }
+    }
+
+    let mut cmd = tokio::process::Command::new(&command);
+    cmd.args(&args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .stdin(Stdio::null());
+    if let Some(env_map) = env {
+        for (k, v) in env_map {
+            cmd.env(k, v);
+        }
+    }
+    if let Some(c) = cwd {
+        cmd.current_dir(c);
+    }
+
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("Failed to spawn `{command}`: {e}"))?;
+    let pid = child
+        .id()
+        .ok_or_else(|| "Process exited immediately".to_string())?;
+
+    let log_buffer: Arc<Mutex<VecDeque<String>>> =
+        Arc::new(Mutex::new(VecDeque::with_capacity(MCP_MAX_MEMORY_LINES)));
+    let (kill_tx, kill_rx) = oneshot::channel::<()>();
+    let now = now_iso8601();
+
+    let state = McpServerState {
+        plugin_id: plugin_id.clone(),
+        status: McpRunStatus::Running { pid },
+        started_at: Some(now.clone()),
+        last_status_change: now.clone(),
+        kill_tx: Some(kill_tx),
+        log_buffer: log_buffer.clone(),
+    };
+
+    let _ = app.emit(
+        "mcp-status",
+        McpStatusEvent {
+            plugin_id: plugin_id.clone(),
+            status: McpRunStatus::Running { pid },
+        },
+    );
+
+    // Stdout reader
+    if let Some(stdout) = child.stdout.take() {
+        let app_c = app.clone();
+        let buf_c = log_buffer.clone();
+        let path_c = log_path.clone();
+        let id_c = plugin_id.clone();
+        tokio::spawn(async move {
+            let mut lines = tokio::io::BufReader::new(stdout).lines();
+            while let Ok(Some(line)) = lines.next_line().await {
+                let ts = now_iso8601();
+                let formatted = format!("[{ts}] [stdout] {line}");
+                append_memory(&buf_c, formatted.clone()).await;
+                let _ = append_disk(&path_c, &formatted).await;
+                let _ = app_c.emit(
+                    "mcp-log",
+                    McpLogEvent {
+                        plugin_id: id_c.clone(),
+                        level: "stdout".to_string(),
+                        line,
+                        timestamp: ts,
+                    },
+                );
+            }
+        });
+    }
+
+    // Stderr reader
+    if let Some(stderr) = child.stderr.take() {
+        let app_c = app.clone();
+        let buf_c = log_buffer.clone();
+        let path_c = log_path.clone();
+        let id_c = plugin_id.clone();
+        tokio::spawn(async move {
+            let mut lines = tokio::io::BufReader::new(stderr).lines();
+            while let Ok(Some(line)) = lines.next_line().await {
+                let ts = now_iso8601();
+                let formatted = format!("[{ts}] [stderr] {line}");
+                append_memory(&buf_c, formatted.clone()).await;
+                let _ = append_disk(&path_c, &formatted).await;
+                let _ = app_c.emit(
+                    "mcp-log",
+                    McpLogEvent {
+                        plugin_id: id_c.clone(),
+                        level: "stderr".to_string(),
+                        line,
+                        timestamp: ts,
+                    },
+                );
+            }
+        });
+    }
+
+    // Waiter + kill-listener — owns the Child for the rest of its life.
+    let registry_clone: McpRegistry = registry.inner().clone();
+    let app_c = app.clone();
+    let id_c = plugin_id.clone();
+    tokio::spawn(async move {
+        let final_status = tokio::select! {
+            wait_result = child.wait() => {
+                let code = wait_result.map(|s| s.code().unwrap_or(-1)).unwrap_or(-1);
+                if code == 0 {
+                    McpRunStatus::Stopped { code }
+                } else {
+                    McpRunStatus::Errored {
+                        message: format!("Process exited with code {code}"),
+                    }
+                }
+            }
+            _ = kill_rx => {
+                let _ = child.kill().await;
+                let _ = child.wait().await;
+                McpRunStatus::Stopped { code: -1 }
+            }
+        };
+        let mut map = registry_clone.lock().await;
+        if let Some(s) = map.get_mut(&id_c) {
+            s.status = final_status.clone();
+            s.last_status_change = now_iso8601();
+            s.kill_tx = None;
+        }
+        drop(map);
+        let _ = app_c.emit(
+            "mcp-status",
+            McpStatusEvent {
+                plugin_id: id_c,
+                status: final_status,
+            },
+        );
+    });
+
+    {
+        let mut map = registry.lock().await;
+        map.insert(plugin_id.clone(), state);
+    }
+
+    Ok(McpStatus {
+        plugin_id,
+        status: McpRunStatus::Running { pid },
+        started_at: Some(now.clone()),
+        last_status_change: now,
+    })
+}
+
+/// Signal the running MCP server for this `plugin_id` to terminate.
+/// No-op if the server is not in the registry or not currently Running.
+#[tauri::command]
+async fn mcp_kill(
+    registry: tauri::State<'_, McpRegistry>,
+    plugin_id: String,
+) -> Result<(), String> {
+    let kill_tx = {
+        let mut map = registry.lock().await;
+        match map.get_mut(&plugin_id) {
+            Some(state) => state.kill_tx.take(),
+            None => None,
+        }
+    };
+    if let Some(tx) = kill_tx {
+        let _ = tx.send(());
+    }
+    Ok(())
+}
+
+/// Return runtime status snapshots for every MCP server PM has tracked.
+/// Plugins never spawned are absent from the result; the renderer should treat
+/// missing IDs as "idle".
+#[tauri::command]
+async fn mcp_status_all(
+    registry: tauri::State<'_, McpRegistry>,
+) -> Result<Vec<McpStatus>, String> {
+    let map = registry.lock().await;
+    Ok(map.values().map(|s| s.snapshot()).collect())
+}
+
+/// Return the last `tail` lines of buffered logs (in-memory rolling buffer).
+/// For older lines, the renderer should open the on-disk log file directly.
+#[tauri::command]
+async fn mcp_logs(
+    registry: tauri::State<'_, McpRegistry>,
+    plugin_id: String,
+    tail: Option<usize>,
+) -> Result<String, String> {
+    let buf_arc = {
+        let map = registry.lock().await;
+        map.get(&plugin_id).map(|s| s.log_buffer.clone())
+    };
+    if let Some(arc) = buf_arc {
+        let buf = arc.lock().await;
+        let n = tail.unwrap_or(MCP_MAX_MEMORY_LINES);
+        let start = buf.len().saturating_sub(n);
+        Ok(buf.iter().skip(start).cloned().collect::<Vec<_>>().join("\n"))
+    } else {
+        Ok(String::new())
+    }
+}
+
+/// Return the absolute path of the directory where MCP server log files live.
+/// Used by the UI's "Open log folder" button.
+#[tauri::command]
+async fn mcp_logs_dir(app: AppHandle) -> Result<String, String> {
+    let dir = mcp_logs_root(&app)?;
+    let _ = tokio::fs::create_dir_all(&dir).await;
+    Ok(dir.to_string_lossy().to_string())
+}
+
+// ── MCP config injection (temp file handed to child CLIs) ────────────────────
+
+#[derive(Deserialize, Serialize)]
+struct McpConfigServer {
+    command: String,
+    args: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    env: Option<HashMap<String, String>>,
+}
+
+#[derive(Serialize)]
+struct McpConfigFile {
+    #[serde(rename = "mcpServers")]
+    mcp_servers: HashMap<String, McpConfigServer>,
+}
+
+/// Drop config files older than 1 day so the temp dir doesn't accumulate
+/// forever between OS-level temp sweeps.
+async fn cleanup_old_mcp_configs(dir: &Path) {
+    let cutoff = match std::time::SystemTime::now()
+        .checked_sub(std::time::Duration::from_secs(86_400))
+    {
+        Some(c) => c,
+        None => return,
+    };
+    let Ok(mut rd) = tokio::fs::read_dir(dir).await else { return; };
+    while let Ok(Some(entry)) = rd.next_entry().await {
+        if let Ok(meta) = entry.metadata().await {
+            if let Ok(modified) = meta.modified() {
+                if modified < cutoff {
+                    let _ = tokio::fs::remove_file(entry.path()).await;
+                }
+            }
+        }
+    }
+}
+
+/// Write a temporary `mcp_config.json` for PM to hand to a child CLI via its
+/// `--mcp-config` flag (or equivalent). Each call writes a unique file under
+/// the OS temp dir; files older than 24 h are pruned on each call.
+///
+/// Returns the absolute path of the written file.
+#[tauri::command]
+async fn write_mcp_config(
+    servers: HashMap<String, McpConfigServer>,
+) -> Result<String, String> {
+    let dir = std::env::temp_dir().join("project-manager-mcp");
+    tokio::fs::create_dir_all(&dir)
+        .await
+        .map_err(|e| format!("Cannot create mcp temp dir: {e}"))?;
+    cleanup_old_mcp_configs(&dir).await;
+
+    let nano = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let path = dir.join(format!("launch-{nano}.json"));
+
+    let body = McpConfigFile { mcp_servers: servers };
+    let json = serde_json::to_string_pretty(&body)
+        .map_err(|e| format!("Serialize error: {e}"))?;
+    tokio::fs::write(&path, json)
+        .await
+        .map_err(|e| format!("Cannot write {}: {e}", path.display()))?;
+    Ok(path.to_string_lossy().to_string())
+}
+
+/// Open a file or directory in the OS's default handler (Finder/Explorer/xdg-open).
+/// Generic helper — also used by future Skills UI to reveal the skills dir.
+#[tauri::command]
+async fn open_path(path: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        tokio::process::Command::new("open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("open failed: {e}"))?;
+        Ok(())
+    }
+    #[cfg(target_os = "linux")]
+    {
+        tokio::process::Command::new("xdg-open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("xdg-open failed: {e}"))?;
+        Ok(())
+    }
+    #[cfg(target_os = "windows")]
+    {
+        tokio::process::Command::new("explorer")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("explorer failed: {e}"))?;
+        Ok(())
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    {
+        let _ = path;
+        Err("open_path is not supported on this platform".to_string())
+    }
+}
+
+// ── Skills (markdown packages) ────────────────────────────────────────────────
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SkillFileInfo {
+    /// Path relative to the skills directory (e.g. "foo.md" or "anthropic/SKILL.md").
+    rel_path: String,
+    /// Absolute path on disk.
+    abs_path: String,
+    /// Last-modified time as ISO 8601 UTC.
+    modified: String,
+    /// File size in bytes.
+    size: u64,
+}
+
+/// Replace path-separator and other unsafe characters with `_` so a derived
+/// filename can never escape the skills directory.
+fn sanitize_filename(name: &str) -> String {
+    name.chars()
+        .map(|c| match c {
+            '/' | '\\' | ':' | '\0' | '<' | '>' | '|' | '"' | '*' | '?' => '_',
+            _ => c,
+        })
+        .collect()
+}
+
+/// Return PM's default skills directory: `$HOME/.claude/skills` (Unix) /
+/// `%USERPROFILE%\.claude\skills` (Windows). Pure path-resolution — does not
+/// create the directory.
+#[tauri::command]
+async fn skill_default_dir() -> Result<String, String> {
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .map_err(|e| format!("Cannot resolve home directory: {e}"))?;
+    Ok(format!("{home}/.claude/skills"))
+}
+
+/// Scan `skills_dir` for `.md` files. Looks at the top level plus one
+/// subdirectory deep (so both `foo.md` and `subdir/SKILL.md` are picked up).
+/// Returns an empty list if the directory does not exist yet.
+#[tauri::command]
+async fn skill_list(skills_dir: String) -> Result<Vec<SkillFileInfo>, String> {
+    let base = PathBuf::from(&skills_dir);
+    if !base.exists() {
+        return Ok(vec![]);
+    }
+    let mut out: Vec<SkillFileInfo> = Vec::new();
+
+    let mut rd = tokio::fs::read_dir(&base)
+        .await
+        .map_err(|e| format!("read_dir {} failed: {e}", base.display()))?;
+    while let Ok(Some(entry)) = rd.next_entry().await {
+        let path = entry.path();
+        let Ok(meta) = entry.metadata().await else { continue };
+
+        if meta.is_file() && path.extension().and_then(|e| e.to_str()).map(|e| e.to_lowercase()) == Some("md".to_string()) {
+            push_skill(&base, &path, &meta, &mut out);
+        } else if meta.is_dir() {
+            // One level deep for `subdir/SKILL.md`-style packaged skills.
+            let Ok(mut inner) = tokio::fs::read_dir(&path).await else { continue };
+            while let Ok(Some(child)) = inner.next_entry().await {
+                let child_path = child.path();
+                let Ok(child_meta) = child.metadata().await else { continue };
+                if child_meta.is_file()
+                    && child_path
+                        .extension()
+                        .and_then(|e| e.to_str())
+                        .map(|e| e.to_lowercase())
+                        == Some("md".to_string())
+                {
+                    push_skill(&base, &child_path, &child_meta, &mut out);
+                }
+            }
+        }
+    }
+
+    out.sort_by(|a, b| a.rel_path.to_lowercase().cmp(&b.rel_path.to_lowercase()));
+    Ok(out)
+}
+
+fn push_skill(base: &Path, path: &Path, meta: &std::fs::Metadata, out: &mut Vec<SkillFileInfo>) {
+    let rel = path
+        .strip_prefix(base)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .to_string();
+    let abs = path.to_string_lossy().to_string();
+    let modified = meta
+        .modified()
+        .map(iso8601_from_systemtime)
+        .unwrap_or_default();
+    out.push(SkillFileInfo {
+        rel_path: rel,
+        abs_path: abs,
+        modified,
+        size: meta.len(),
+    });
+}
+
+/// Download the contents of `url` and save it as a `.md` file under `skills_dir`.
+/// `file_name` overrides the filename derived from the URL's last segment.
+/// Filename is sanitized so it cannot escape the skills directory.
+///
+/// Returns the absolute path of the newly created file.
+#[tauri::command]
+async fn skill_install_from_url(
+    url: String,
+    skills_dir: String,
+    file_name: Option<String>,
+) -> Result<String, String> {
+    let res = reqwest::get(&url)
+        .await
+        .map_err(|e| format!("Fetch failed: {e}"))?;
+    if !res.status().is_success() {
+        let status = res.status();
+        let text = res.text().await.unwrap_or_default();
+        return Err(format!("HTTP {status}: {text}"));
+    }
+    let body = res
+        .text()
+        .await
+        .map_err(|e| format!("Body read failed: {e}"))?;
+
+    let raw_name = file_name
+        .filter(|s| !s.trim().is_empty())
+        .or_else(|| {
+            url.trim_end_matches('/')
+                .rsplit('/')
+                .next()
+                .map(|s| s.to_string())
+                .filter(|s| !s.is_empty())
+        })
+        .unwrap_or_else(|| format!("skill-{}.md", now_iso8601().replace(':', "-")));
+
+    let mut name = sanitize_filename(raw_name.trim());
+    if !name.to_lowercase().ends_with(".md") {
+        name.push_str(".md");
+    }
+
+    let target_path = PathBuf::from(&skills_dir).join(&name);
+    if let Some(parent) = target_path.parent() {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| format!("Cannot create skills dir: {e}"))?;
+    }
+    tokio::fs::write(&target_path, body)
+        .await
+        .map_err(|e| format!("Write failed: {e}"))?;
+    Ok(target_path.to_string_lossy().to_string())
+}
+
+/// Delete a skill file. Validated that the canonicalized target is inside the
+/// canonicalized skills directory — refuses anything outside (so a malicious /
+/// stale catalog entry can't trick PM into deleting unrelated files).
+#[tauri::command]
+async fn skill_uninstall(path: String, skills_dir: String) -> Result<(), String> {
+    let target_canon = tokio::fs::canonicalize(&path)
+        .await
+        .map_err(|e| format!("Cannot resolve {path}: {e}"))?;
+    let dir_canon = tokio::fs::canonicalize(&skills_dir)
+        .await
+        .map_err(|e| format!("Cannot resolve skills dir {skills_dir}: {e}"))?;
+    if !target_canon.starts_with(&dir_canon) {
+        return Err(format!(
+            "Refused: {} is outside skills directory {}",
+            target_canon.display(),
+            dir_canon.display()
+        ));
+    }
+    tokio::fs::remove_file(&target_canon)
+        .await
+        .map_err(|e| format!("Delete failed: {e}"))?;
+    Ok(())
+}
+
+/// Move existing skill files (by absolute path) into `new_dir`. Preserves the
+/// basename. Skips files that no longer exist on disk. Returns the new absolute
+/// path for each successfully moved file.
+#[tauri::command]
+async fn skill_move_files(
+    paths: Vec<String>,
+    new_dir: String,
+) -> Result<Vec<String>, String> {
+    let dst_dir = PathBuf::from(&new_dir);
+    tokio::fs::create_dir_all(&dst_dir)
+        .await
+        .map_err(|e| format!("Cannot create destination: {e}"))?;
+
+    let mut moved: Vec<String> = Vec::new();
+    for p in paths {
+        let src = PathBuf::from(&p);
+        if !src.exists() {
+            continue;
+        }
+        let Some(name) = src.file_name() else { continue };
+        let dst = dst_dir.join(name);
+        if let Err(e) = tokio::fs::rename(&src, &dst).await {
+            return Err(format!("Move {} → {}: {e}", src.display(), dst.display()));
+        }
+        moved.push(dst.to_string_lossy().to_string());
+    }
+    Ok(moved)
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod skill_tests {
+    use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    fn unique_test_dir(label: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "pm-skill-test-{}-{}-{}",
+            label,
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ))
+    }
+
+    async fn cleanup(p: &Path) {
+        let _ = tokio::fs::remove_dir_all(p).await;
+    }
+
+    /// Spawn a one-shot HTTP server that responds with `body` to a single request.
+    /// Returns the URL to hit. Server self-terminates after one connection.
+    async fn one_shot_server(body: &'static str) -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let url = format!("http://{addr}/skill.md");
+        tokio::spawn(async move {
+            if let Ok((mut stream, _)) = listener.accept().await {
+                let mut buf = [0u8; 1024];
+                let _ = stream.read(&mut buf).await;
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: text/markdown\r\n\r\n{}",
+                    body.len(),
+                    body
+                );
+                let _ = stream.write_all(response.as_bytes()).await;
+            }
+        });
+        url
+    }
+
+    #[tokio::test]
+    async fn default_dir_is_under_home_dot_claude_skills() {
+        let dir = skill_default_dir().await.expect("default dir");
+        assert!(dir.contains(".claude/skills"), "got: {dir}");
+        assert!(dir.starts_with('/') || dir.contains(":\\"), "expected absolute path, got: {dir}");
+    }
+
+    #[tokio::test]
+    async fn list_returns_empty_when_dir_missing() {
+        let dir = unique_test_dir("missing");
+        // Don't create it.
+        let list = skill_list(dir.to_string_lossy().to_string())
+            .await
+            .expect("list");
+        assert!(list.is_empty());
+    }
+
+    #[tokio::test]
+    async fn list_picks_up_md_at_top_level_and_one_subdir_deep() {
+        let dir = unique_test_dir("list");
+        cleanup(&dir).await;
+        tokio::fs::create_dir_all(&dir).await.unwrap();
+        tokio::fs::write(dir.join("foo.md"), b"# Foo").await.unwrap();
+        tokio::fs::write(dir.join("ignored.txt"), b"not md").await.unwrap();
+        tokio::fs::create_dir_all(dir.join("anthropic")).await.unwrap();
+        tokio::fs::write(dir.join("anthropic/SKILL.md"), b"# Sub").await.unwrap();
+
+        let list = skill_list(dir.to_string_lossy().to_string())
+            .await
+            .expect("list");
+        let names: Vec<&str> = list.iter().map(|s| s.rel_path.as_str()).collect();
+        assert_eq!(list.len(), 2, "got entries: {names:?}");
+        assert!(names.iter().any(|n| n == &"foo.md"), "want foo.md in {names:?}");
+        assert!(
+            names.iter().any(|n| n.contains("anthropic") && n.ends_with("SKILL.md")),
+            "want anthropic/SKILL.md-ish in {names:?}"
+        );
+
+        cleanup(&dir).await;
+    }
+
+    #[tokio::test]
+    async fn install_from_url_writes_file_with_response_body() {
+        let url = one_shot_server("# Installed Skill\n\nHello").await;
+        let dir = unique_test_dir("install");
+        cleanup(&dir).await;
+
+        let path = skill_install_from_url(url, dir.to_string_lossy().to_string(), None)
+            .await
+            .expect("install");
+        assert!(path.ends_with(".md"), "expected .md suffix, got: {path}");
+        let content = tokio::fs::read_to_string(&path).await.expect("read");
+        assert!(content.contains("Installed Skill"));
+
+        cleanup(&dir).await;
+    }
+
+    #[tokio::test]
+    async fn install_from_url_sanitizes_traversal_in_filename() {
+        let url = one_shot_server("payload").await;
+        let dir = unique_test_dir("sanitize");
+        cleanup(&dir).await;
+
+        let path = skill_install_from_url(
+            url,
+            dir.to_string_lossy().to_string(),
+            Some("../../escape.md".to_string()),
+        )
+        .await
+        .expect("install");
+        // Slashes are replaced with `_`, so the file lives inside `dir`.
+        assert!(
+            path.starts_with(&dir.to_string_lossy().to_string()),
+            "expected file inside {}, got: {path}",
+            dir.display()
+        );
+        assert!(!path.contains("/escape.md"), "traversal not blocked: {path}");
+
+        cleanup(&dir).await;
+    }
+
+    #[tokio::test]
+    async fn uninstall_removes_a_file_inside_skills_dir() {
+        let dir = unique_test_dir("uninstall_inside");
+        cleanup(&dir).await;
+        tokio::fs::create_dir_all(&dir).await.unwrap();
+        let file = dir.join("victim.md");
+        tokio::fs::write(&file, b"doomed").await.unwrap();
+
+        skill_uninstall(
+            file.to_string_lossy().to_string(),
+            dir.to_string_lossy().to_string(),
+        )
+        .await
+        .expect("uninstall");
+        assert!(!file.exists(), "file should be deleted");
+
+        cleanup(&dir).await;
+    }
+
+    #[tokio::test]
+    async fn uninstall_refuses_files_outside_skills_dir() {
+        let dir = unique_test_dir("uninstall_safe_dir");
+        let outside = unique_test_dir("uninstall_safe_outside");
+        cleanup(&dir).await;
+        cleanup(&outside).await;
+        tokio::fs::create_dir_all(&dir).await.unwrap();
+        tokio::fs::create_dir_all(&outside).await.unwrap();
+        let intruder = outside.join("intruder.md");
+        tokio::fs::write(&intruder, b"protect me").await.unwrap();
+
+        let result = skill_uninstall(
+            intruder.to_string_lossy().to_string(),
+            dir.to_string_lossy().to_string(),
+        )
+        .await;
+        assert!(result.is_err(), "expected refusal");
+        assert!(intruder.exists(), "outside file must remain on disk");
+
+        cleanup(&dir).await;
+        cleanup(&outside).await;
+    }
+
+    #[tokio::test]
+    async fn move_files_relocates_into_new_dir() {
+        let src = unique_test_dir("move_src");
+        let dst = unique_test_dir("move_dst");
+        cleanup(&src).await;
+        cleanup(&dst).await;
+        tokio::fs::create_dir_all(&src).await.unwrap();
+
+        let a = src.join("a.md");
+        let b = src.join("b.md");
+        tokio::fs::write(&a, b"A").await.unwrap();
+        tokio::fs::write(&b, b"B").await.unwrap();
+
+        let moved = skill_move_files(
+            vec![
+                a.to_string_lossy().to_string(),
+                b.to_string_lossy().to_string(),
+            ],
+            dst.to_string_lossy().to_string(),
+        )
+        .await
+        .expect("move");
+
+        assert_eq!(moved.len(), 2);
+        assert!(!a.exists(), "src/a.md should be gone");
+        assert!(!b.exists(), "src/b.md should be gone");
+        assert!(dst.join("a.md").exists(), "dst/a.md should exist");
+        assert!(dst.join("b.md").exists(), "dst/b.md should exist");
+
+        cleanup(&src).await;
+        cleanup(&dst).await;
+    }
+}
+
 // ── App entry ─────────────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let mcp_registry: McpRegistry = Arc::new(Mutex::new(HashMap::new()));
+
     tauri::Builder::default()
+        .manage(mcp_registry)
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -858,6 +1884,7 @@ pub fn run() {
             write_config,
             scan_projects,
             spawn_agent,
+            spawn_terminal,
             kill_process,
             call_anthropic,
             watch_config,
@@ -871,6 +1898,18 @@ pub fn run() {
             list_sessions,
             read_session,
             save_session,
+            mcp_spawn,
+            mcp_kill,
+            mcp_status_all,
+            mcp_logs,
+            mcp_logs_dir,
+            write_mcp_config,
+            open_path,
+            skill_default_dir,
+            skill_list,
+            skill_install_from_url,
+            skill_uninstall,
+            skill_move_files,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
