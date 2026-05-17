@@ -1,13 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Check,
   Copy,
   Eye,
   EyeOff,
   MessageCircle,
+  Play,
   Plus,
+  Power,
   Radio,
   Trash2,
   Zap,
@@ -27,6 +29,17 @@ import {
   saveChannelCatalog,
   setChannelSecret,
 } from '../../../lib/storage/channels';
+import {
+  type TelegramMessagePayload,
+  type TelegramPollStatus,
+  type UnlistenFn,
+  onTelegramMessage,
+  onTelegramStatus,
+  telegramSendMessage,
+  telegramStartPoll,
+  telegramStatusAll,
+  telegramStopPoll,
+} from '../../../lib/bridge';
 
 // ── Platform metadata ─────────────────────────────────────────────────────────
 
@@ -406,12 +419,43 @@ function ChannelForm({
 
 // ── Channels section ──────────────────────────────────────────────────────────
 
+function PollStatusPill({ status }: { status?: TelegramPollStatus }) {
+  if (!status || status.status.phase === 'stopped') {
+    return (
+      <span className="border border-stone-700 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-stone-500">
+        Idle
+      </span>
+    );
+  }
+  if (status.status.phase === 'polling') {
+    return (
+      <span className="border border-emerald-400/40 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-emerald-300">
+        Polling
+      </span>
+    );
+  }
+  return (
+    <span
+      title={status.status.message}
+      className="border border-red-500/40 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-red-400"
+    >
+      Errored
+    </span>
+  );
+}
+
 function ChannelsSection({
   channels,
+  pollStatuses,
   onChange,
+  onStartPoll,
+  onStopPoll,
 }: {
   channels: ChannelConfig[];
+  pollStatuses: Map<string, TelegramPollStatus>;
   onChange: (c: ChannelConfig[]) => void;
+  onStartPoll: (channel: ChannelConfig) => void;
+  onStopPoll: (channelId: string) => void;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForms, setEditForms] = useState<Record<string, ChannelFormState>>({});
@@ -531,6 +575,9 @@ function ChannelsSection({
                       disabled
                     </span>
                   )}
+                  {ch.platform === 'telegram' && ch.webhookMode === 'polling' && (
+                    <PollStatusPill status={pollStatuses.get(ch.id)} />
+                  )}
                 </div>
                 {/* Show non-empty non-secret credential preview */}
                 {Object.entries(ch.credentials)
@@ -544,6 +591,25 @@ function ChannelsSection({
               </div>
 
               <div className="flex shrink-0 gap-2">
+                {ch.platform === 'telegram' && ch.webhookMode === 'polling' && ch.enabled && (
+                  pollStatuses.get(ch.id)?.status.phase === 'polling' ? (
+                    <button
+                      onClick={() => onStopPoll(ch.id)}
+                      title="Stop polling"
+                      className="border border-stone-200/18 px-2 py-1 text-xs text-stone-400 hover:border-red-500/30 hover:text-red-400"
+                    >
+                      <Power size={12} />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => onStartPoll(ch)}
+                      title="Start polling"
+                      className="border border-stone-200/18 px-2 py-1 text-xs text-stone-400 hover:border-emerald-400/40 hover:text-emerald-300"
+                    >
+                      <Play size={12} />
+                    </button>
+                  )
+                )}
                 <button
                   onClick={() => startEdit(ch)}
                   className="border border-stone-200/18 px-2 py-1 text-xs text-stone-400 hover:border-stone-200/35 hover:text-stone-100"
@@ -693,19 +759,193 @@ function SetupGuideSection() {
   );
 }
 
+// ── Inbound message log ───────────────────────────────────────────────────────
+
+function RecentActivitySection({
+  messages,
+  channels,
+}: {
+  messages: TelegramMessagePayload[];
+  channels: ChannelConfig[];
+}) {
+  const labelFor = (channelId: string) =>
+    channels.find((c) => c.id === channelId)?.label ?? channelId.slice(0, 6);
+
+  return (
+    <section className="border border-stone-200/18 bg-[#071d1a]/72">
+      <SectionHeader icon={MessageCircle} title="Recent Activity" count={messages.length} color="text-stone-400" />
+      <div className="max-h-72 overflow-y-auto">
+        {messages.length === 0 ? (
+          <p className="px-4 py-5 text-xs text-stone-500">
+            No inbound messages yet. Start polling on a Telegram channel above and send a message
+            (e.g. <span className="font-mono">/help</span>) from your phone.
+          </p>
+        ) : (
+          <div className="divide-y divide-stone-200/8 font-mono text-[11px]">
+            {messages.map((m) => (
+              <div key={`${m.channelId}-${m.updateId}`} className="px-4 py-2">
+                <div className="flex items-center gap-2 text-stone-500">
+                  <span>{new Date(m.timestamp).toLocaleTimeString()}</span>
+                  <span>·</span>
+                  <span className="text-sky-300/80">{labelFor(m.channelId)}</span>
+                  <span>·</span>
+                  <span className="text-stone-400">
+                    {m.fromUsername ? `@${m.fromUsername}` : m.fromName ?? `chat ${m.chatId}`}
+                  </span>
+                </div>
+                <p className="mt-0.5 break-all text-stone-200">{m.text}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// ── Command routing ───────────────────────────────────────────────────────────
+
+/**
+ * Resolve an inbound message against the catalog's command mappings and post
+ * a reply through the Telegram bridge. Silent no-op when the bot token can't
+ * be read or `telegramSendMessage` rejects (e.g. running outside Tauri).
+ */
+async function routeTelegramCommand(
+  msg: TelegramMessagePayload,
+  catalog: ChannelCatalog,
+): Promise<void> {
+  const channel = catalog.channels.find((c) => c.id === msg.channelId);
+  if (!channel) return;
+  const botToken = getChannelSecret(channel.id, 'botToken');
+  if (!botToken) return;
+
+  const enabled = catalog.commandMappings.filter((m) => m.enabled);
+  const firstToken = msg.text.trim().split(/\s+/)[0]?.toLowerCase() ?? '';
+  const matched = enabled.find((m) => m.trigger.toLowerCase() === firstToken);
+
+  let reply: string;
+  if (!matched) {
+    reply = `Unknown command "${firstToken}". Try /help to see what's available.`;
+  } else {
+    switch (matched.action) {
+      case 'help':
+        reply =
+          'Project Manager commands:\n' +
+          enabled.map((m) => `${m.trigger} — ${m.description}`).join('\n');
+        break;
+      case 'get_status':
+        // Phase 3 will wire this to the active ProjectsRepository.
+        reply =
+          'Status reporting via chat is queued for Phase 3. The polling loop and command routing are working — open the desktop app for the full feature board.';
+        break;
+      case 'daily_report':
+        reply = 'Daily report via chat is queued for Phase 3.';
+        break;
+      case 'run_feature':
+        reply = 'Feature dispatch via chat is queued for Phase 3.';
+        break;
+      default:
+        reply = `Action "${matched.action}" not implemented yet.`;
+    }
+  }
+
+  try {
+    await telegramSendMessage(botToken, msg.chatId, reply);
+  } catch {
+    /* swallow — surface in UI later */
+  }
+}
+
 // ── Main view ─────────────────────────────────────────────────────────────────
 
 export function ChannelsView() {
   const [catalog, setCatalog] = useState<ChannelCatalog>({ channels: [], commandMappings: [] });
+  const [pollStatuses, setPollStatuses] = useState<Map<string, TelegramPollStatus>>(new Map());
+  const [recentMessages, setRecentMessages] = useState<TelegramMessagePayload[]>([]);
+
+  // Keep a ref to the latest catalog so the message handler closure can route
+  // without re-subscribing each time the catalog mutates.
+  const catalogRef = useRef(catalog);
+  useEffect(() => {
+    catalogRef.current = catalog;
+  }, [catalog]);
 
   useEffect(() => {
     setCatalog(loadChannelCatalog());
+  }, []);
+
+  // Subscribe to Telegram polling status + inbound messages.
+  useEffect(() => {
+    let stopStatus: UnlistenFn | undefined;
+    let stopMessage: UnlistenFn | undefined;
+
+    telegramStatusAll()
+      .then((arr) => setPollStatuses(new Map(arr.map((s) => [s.channelId, s]))))
+      .catch(() => {
+        /* not in Tauri */
+      });
+
+    onTelegramStatus((s) => {
+      setPollStatuses((prev) => new Map(prev).set(s.channelId, s));
+    })
+      .then((fn) => {
+        stopStatus = fn;
+      })
+      .catch(() => {});
+
+    onTelegramMessage((msg) => {
+      setRecentMessages((prev) => [msg, ...prev].slice(0, 50));
+      void routeTelegramCommand(msg, catalogRef.current);
+    })
+      .then((fn) => {
+        stopMessage = fn;
+      })
+      .catch(() => {});
+
+    return () => {
+      stopStatus?.();
+      stopMessage?.();
+    };
   }, []);
 
   const updateCatalog = (next: ChannelCatalog) => {
     setCatalog(next);
     saveChannelCatalog(next);
   };
+
+  const handleStartPoll = useCallback(async (channel: ChannelConfig) => {
+    const botToken = getChannelSecret(channel.id, 'botToken');
+    if (!botToken) {
+      alert('Set the Bot Token first (Edit → Bot Token).');
+      return;
+    }
+    const allowedRaw = channel.credentials.allowedChatIds ?? '';
+    const allowedChatIds = allowedRaw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) => Number(s))
+      .filter((n) => Number.isFinite(n));
+    try {
+      const status = await telegramStartPoll({
+        channelId: channel.id,
+        botToken,
+        allowedChatIds,
+      });
+      setPollStatuses((prev) => new Map(prev).set(channel.id, status));
+    } catch (e) {
+      setPollStatuses((prev) =>
+        new Map(prev).set(channel.id, {
+          channelId: channel.id,
+          status: { phase: 'errored', message: String(e) },
+        }),
+      );
+    }
+  }, []);
+
+  const handleStopPoll = useCallback(async (channelId: string) => {
+    await telegramStopPoll(channelId);
+  }, []);
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -719,13 +959,18 @@ export function ChannelsView() {
 
       <ChannelsSection
         channels={catalog.channels}
+        pollStatuses={pollStatuses}
         onChange={(channels) => updateCatalog({ ...catalog, channels })}
+        onStartPoll={handleStartPoll}
+        onStopPoll={handleStopPoll}
       />
 
       <CommandMappingsSection
         mappings={catalog.commandMappings}
         onChange={(commandMappings) => updateCatalog({ ...catalog, commandMappings })}
       />
+
+      <RecentActivitySection messages={recentMessages} channels={catalog.channels} />
 
       <SetupGuideSection />
     </div>
