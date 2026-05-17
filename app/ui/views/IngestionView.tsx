@@ -4,7 +4,30 @@ import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, FileInput, Upload, X } from 'lucide-react';
 import { Feature, FeatureStatus, ProjectConfig } from '../../../lib/types';
 import { parseMarkdown } from '../../../lib/ingestion/parseMarkdown';
-import { callAnthropic } from '../../../lib/bridge';
+import { callAnthropic, getSecret } from '../../../lib/bridge';
+
+// Mirrors KeysView's storage convention so AI ingestion uses the user's saved key.
+const KEYCHAIN_SERVICE = 'projectmanager';
+const KEYCHAIN_ANTHROPIC_KEY = 'anthropic-api-key';
+const LS_ANTHROPIC_KEY = 'projectManager-key:anthropic';
+
+async function loadAnthropicKey(isTauri: boolean): Promise<string> {
+  if (isTauri) {
+    try {
+      return (await getSecret(KEYCHAIN_SERVICE, KEYCHAIN_ANTHROPIC_KEY)) ?? '';
+    } catch {
+      return '';
+    }
+  }
+  if (typeof window === 'undefined') return '';
+  return localStorage.getItem(LS_ANTHROPIC_KEY) ?? '';
+}
+
+function newSessionId(): string {
+  return typeof globalThis.crypto?.randomUUID === 'function'
+    ? globalThis.crypto.randomUUID()
+    : Math.random().toString(36).slice(2);
+}
 
 interface IngestionViewProps {
   project: ProjectConfig;
@@ -37,12 +60,22 @@ function mockFeaturesFromFile(fileName: string): Feature[] {
  * Use the Anthropic API (Tauri only) to generate feature stubs for a
  * DOCX/XLSX file whose binary content cannot be parsed directly in JS.
  * The AI receives the filename + file size and generates plausible stubs.
+ *
+ * The call carries session metadata so the Rust bridge auto-records the
+ * conversation under `{projectRoot}/.project-manager/sessions` for the
+ * Sessions view to pick up.
  */
-async function parseWithAI(file: File, apiKey: string): Promise<Feature[]> {
+async function parseWithAI(
+  file: File,
+  apiKey: string,
+  projectRoot: string,
+): Promise<Feature[]> {
   const sizeKb = (file.size / 1024).toFixed(1);
   const resp = await callAnthropic({
     apiKey,
     maxTokens: 1024,
+    sessionId: newSessionId(),
+    sessionsDir: `${projectRoot.replace(/\/$/, '')}/.project-manager/sessions`,
     messages: [
       {
         role: 'user',
@@ -109,10 +142,9 @@ export function IngestionView({ project, onImportFeatures }: IngestionViewProps)
         setParseMethod('md');
       } else if (isTauri) {
         // DOCX / XLSX in Tauri — ask AI to generate plausible feature stubs
-        const apiKey =
-          typeof window !== 'undefined' ? (localStorage.getItem('projectManager-api-key') ?? '') : '';
+        const apiKey = await loadAnthropicKey(isTauri);
         if (apiKey) {
-          drafts = await parseWithAI(file, apiKey);
+          drafts = await parseWithAI(file, apiKey, project.root);
           setParseMethod('ai');
         } else {
           // Tauri but no API key yet → mock + hint
