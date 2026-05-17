@@ -42,6 +42,28 @@ async fn write_config(path: String, config: serde_json::Value) -> Result<(), Str
         .map_err(|e| format!("Cannot write {path}: {e}"))
 }
 
+/// Delete a `.project-manager.json` config file from disk.
+/// Refuses any path whose basename is not `.project-manager.json` so a typo in
+/// the configPath can never wipe an unrelated file.
+#[tauri::command]
+async fn delete_config(path: String) -> Result<(), String> {
+    let basename = std::path::Path::new(&path)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("");
+    if basename != ".project-manager.json" {
+        return Err(format!(
+            "Refusing to delete {path}: basename must be .project-manager.json"
+        ));
+    }
+    match tokio::fs::remove_file(&path).await {
+        Ok(()) => Ok(()),
+        // Treat 'already gone' as success — the caller's intent is satisfied.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(format!("Cannot delete {path}: {e}")),
+    }
+}
+
 /// Read a plain-text file and return its content as a string.
 #[tauri::command]
 async fn read_file(path: String) -> Result<String, String> {
@@ -2183,6 +2205,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             read_config,
             write_config,
+            delete_config,
             scan_projects,
             spawn_agent,
             spawn_terminal,

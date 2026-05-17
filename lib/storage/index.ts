@@ -4,6 +4,8 @@ import type { ProjectsRepository } from './ProjectsRepository';
 
 export type { ProjectsRepository } from './ProjectsRepository';
 export { CURRENT_SCHEMA_VERSION, migrateConfig } from './migrate';
+export { mergeFeaturesById } from './mergeFeatures';
+export { resolveConfigPath } from './resolveConfigPath';
 
 let repoInstance: ProjectsRepository | null = null;
 

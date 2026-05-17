@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "11111111-d3v1-4000-8000-devpilot00001",
   "createdAt": "2026-05-12T00:00:00.000Z",
-  "updatedAt": "2026-05-17T03:00:00.000Z",
+  "updatedAt": "2026-05-17T11:00:00.000Z",
   "updatedBy": "Claude Opus 4.7",
   "project": {
     "name": "Project Manager",
@@ -280,9 +280,22 @@
         "implementation": "src-tauri/src/lib.rs",
         "bridge": "lib/bridge/index.ts"
       },
-      "notes": "spawn_terminal Rust command：開新的系統 Terminal 視窗執行 CLI（PM 不接管 stdout），給 Claude Code interactive / Aider / Codex 互動模式用。TaskDispatchModal 提供「在 Terminal 開啟」按鈕，macOS 用 AppleScript do script，注意換行需 flatten。"
-,
+      "notes": "spawn_terminal Rust command：開新的系統 Terminal 視窗執行 CLI（PM 不接管 stdout），給 Claude Code interactive / Aider / Codex 互動模式用。TaskDispatchModal 提供「在 Terminal 開啟」按鈕，macOS 用 AppleScript do script，注意換行需 flatten。",
       "updatedAt": "2026-05-17T00:00:00.000Z",
+      "updatedBy": "Claude Opus 4.7"
+    },
+    {
+      "id": "F21",
+      "name": "Project Sync & Delete Actions",
+      "category": "Frontend/UX",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "implementation": "app/ui/views/ProjectsView.tsx",
+        "unitIntegrationTest": "__tests__/"
+      },
+      "notes": "每張 project card 新增 hover-revealed Sync (RefreshCw) + Delete (Trash2) 按鈕，header 加 Sync All；Sync 依來源走 readConfig 或 fetchGithubRepo，再用 mergeFeaturesById 把 PM 端 status/progress/notes 合併回硬碟版本，順手 stamp lastSyncedAt。Delete 為二次確認 modal，預設只移除 PM 引用，opt-in 「同時刪除設定檔」會呼叫新加的 Rust delete_config 指令（限制 basename = .project-manager.json 防呆）。附帶修了 Add Project modal 兩個 bug：AI Scan 跟 Manual Add 的輸入框不再共用 state；Manual Add 用新的 resolveConfigPath() 自動把資料夾路徑補上 .project-manager.json，失敗時改顯示「No .project-manager.json found — Try AI Scan」友善訊息（取代 os error 21）。TDD：6 個 resolveConfigPath unit test + 4 個 ProjectsView integration test 全部 pass。",
+      "updatedAt": "2026-05-17T11:00:00.000Z",
       "updatedBy": "Claude Opus 4.7"
     }
   ],
@@ -348,6 +361,30 @@
       "referenceFiles": [
         "CLAUDE.md",
         "docs/Architecture.md"
+      ]
+    },
+    {
+      "id": "role-devex",
+      "name": "開發者體驗專員",
+      "slug": "devex",
+      "skills": [
+        "Developer Experience",
+        "CLI Design",
+        "Documentation",
+        "Onboarding",
+        "Error Messages",
+        "Tooling"
+      ],
+      "commands": [
+        "npm run docs:check",
+        "./start_project_manager.sh",
+        "npm run typecheck"
+      ],
+      "systemPrompt": "You are a senior Developer Experience (DX) specialist. Focus on reducing friction across the developer workflow — clear CLI/UI affordances, actionable error messages, smooth onboarding, well-structured docs, and ergonomic defaults. Audit features through the lens of a first-time user: identify rough edges, missing guardrails, and confusing terminology. Prefer small, polish-oriented improvements that compound over time. Cross-reference CLAUDE.md, ADRs, and bilingual docs before suggesting changes.",
+      "referenceFiles": [
+        "CLAUDE.md",
+        "docs/engineering/README.md",
+        "DESIGN.md"
       ]
     }
   ],

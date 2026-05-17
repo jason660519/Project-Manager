@@ -22,13 +22,14 @@ interface RawConfig {
   [key: string]: unknown;
 }
 
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 export function migrateConfig(raw: unknown): ProjectManagerConfig {
   const cfg = (raw && typeof raw === 'object' ? (raw as RawConfig) : {}) as RawConfig;
   const version = typeof cfg.schemaVersion === 'number' ? cfg.schemaVersion : 1;
   let next: RawConfig = { ...cfg };
   if (version < 2) next = migrate_1_to_2(next);
+  if (version < 3) next = migrate_2_to_3(next);
   // Cast through unknown: `RawConfig` is intentionally a permissive bag,
   // and the migration steps above are responsible for ensuring the result
   // matches `ProjectManagerConfig`.
@@ -51,6 +52,26 @@ function migrate_1_to_2(cfg: RawConfig): RawConfig {
     id,
     createdAt: typeof cfg.createdAt === 'string' ? cfg.createdAt : now,
     updatedAt: typeof cfg.updatedAt === 'string' ? cfg.updatedAt : now,
+    features,
+  };
+}
+
+/**
+ * v2 → v3: introduces the project-progress phase model. All existing features
+ * default to 'development' and `points: 1`; nothing else is required. Other
+ * phase-specific fields stay undefined so the UI shows them as "—".
+ */
+function migrate_2_to_3(cfg: RawConfig): RawConfig {
+  const features = Array.isArray(cfg.features)
+    ? (cfg.features as Feature[]).map((f) => ({
+        ...f,
+        phase: f.phase ?? 'development',
+        points: typeof f.points === 'number' && f.points > 0 ? f.points : 1,
+      }))
+    : [];
+  return {
+    ...cfg,
+    schemaVersion: 3,
     features,
   };
 }

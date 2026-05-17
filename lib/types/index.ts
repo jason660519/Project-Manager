@@ -2,6 +2,27 @@ export type FeatureStatus = 'todo' | 'in_progress' | 'done' | 'on_hold';
 export type AdapterType = 'ide' | 'agent';
 export type IDEId = 'Cursor' | 'VSCode' | 'Trae' | 'Antigravity';
 
+// ── Project-progress phase model (schema v3) ─────────────────────────────────
+export type FeaturePhase = 'development' | 'testing' | 'deployment' | 'operations';
+export type TestStatus = 'passed' | 'failed' | 'pending';
+export type DeployStatus = 'production' | 'staging' | 'not_deployed';
+
+/** Auto-loop prompt config stored per feature (used by task/[rowId] page). */
+export interface FeaturePromptConfig {
+  /** User-authored prompt body. */
+  body?: string;
+  /** Which adapter id to dispatch with (matches AdapterConfig.agents[].id). */
+  agentId?: string;
+  /** When true, the runner re-fires the prompt until stopCondition matches. */
+  autoLoop?: boolean;
+  /** Stop condition for the auto-loop: substring match against the last run output. */
+  stopCondition?: string;
+  /** Maximum number of iterations the runner will execute before giving up. */
+  maxIterations?: number;
+  /** Optional working directory override. Defaults to the project root. */
+  workingDir?: string;
+}
+
 export interface FeaturePaths {
   spec?: string;                      // Feature dev spec (.md — source, editable)
   tdd?: string;                       // TDD spec (.md — source, editable)
@@ -31,6 +52,27 @@ export interface Feature {
   /** Last editor identifier — e.g. github username or email. */
   updatedBy?: string;
   metadata?: Record<string, any>;
+  // ── Project-progress phase fields (schema v3) ──────────────────────────
+  /** Lifecycle phase. Defaults to 'development' at read time. */
+  phase?: FeaturePhase;
+  /** Story-point weight (defaults to 1 in aggregations). */
+  points?: number;
+  /** Estimated source page / route where the feature lives. */
+  locatedPage?: string;
+  // testing
+  testCoverage?: number;
+  testStatus?: TestStatus;
+  // deployment
+  deployStatus?: DeployStatus;
+  deployEnv?: string;
+  deployDate?: string;
+  // operations
+  uptimePercent?: number;
+  errorRate?: number;
+  avgResponseTime?: number;
+  lastIncident?: string;
+  // prompt engineer (row-level auto-loop config)
+  promptConfig?: FeaturePromptConfig;
 }
 
 export interface ProjectConfig {
@@ -85,7 +127,7 @@ export interface ExecutionResult {
 export type AnyAdapterConfig = IDEAdapterConfig | AgentAdapterConfig;
 
 export interface ProjectManagerConfig {
-  /** Increment when making breaking changes to the config structure. Current: 2 */
+  /** Increment when making breaking changes to the config structure. Current: 3 */
   schemaVersion: number;
   engineerRoles?: EngineerRole[];
   // ── Sync identity + audit fields (schema v2, ADR-006) ──────────────────
@@ -223,6 +265,8 @@ export interface ProjectEntry {
   id: string;
   config: ProjectManagerConfig;
   configPath: string;
+  /** ISO timestamp of the last successful sync from disk or GitHub. */
+  lastSyncedAt?: string;
 }
 
 // ── AI API types ──────────────────────────────────────────────────────────────
