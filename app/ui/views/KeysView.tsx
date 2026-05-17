@@ -95,6 +95,22 @@ function KeyRow({
     }
   };
 
+  const handleClear = async () => {
+    if (!value) return;
+    if (typeof window !== 'undefined' && !window.confirm(`Clear the ${entry.label} key?`)) return;
+    setError('');
+    try {
+      if (isTauri) {
+        await setSecret(KEYCHAIN_SERVICE, entry.keychainKey, '');
+      } else {
+        localStorage.removeItem(entry.lsKey);
+      }
+      setValue('');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   const isConfigured = loaded && value.length > 0;
 
   return (
@@ -145,6 +161,15 @@ function KeyRow({
         >
           {saved ? 'Saved ✓' : 'Save'}
         </button>
+        {isConfigured && (
+          <button
+            onClick={() => void handleClear()}
+            title="Clear this key"
+            className="px-3 py-2 text-sm text-stone-500 hover:text-red-400"
+          >
+            Clear
+          </button>
+        )}
       </div>
       {error && <p className="mt-1.5 text-[11px] text-red-400">{error}</p>}
     </div>
