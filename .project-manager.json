@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "11111111-d3v1-4000-8000-devpilot00001",
   "createdAt": "2026-05-12T00:00:00.000Z",
-  "updatedAt": "2026-05-17T01:00:00.000Z",
+  "updatedAt": "2026-05-17T02:00:00.000Z",
   "updatedBy": "Claude Opus 4.7",
   "project": {
     "name": "Project Manager",
@@ -173,15 +173,15 @@
       "id": "F13",
       "name": "Channels View",
       "category": "Core/Integration",
-      "status": "in_progress",
-      "progress": 80,
+      "status": "done",
+      "progress": 100,
       "paths": {
         "implementation": "app/ui/views/ChannelsView.tsx",
         "bridge": "lib/bridge/index.ts",
         "rust": "src-tauri/src/lib.rs"
       },
-      "notes": "Phase 1 設定表單完成 + Phase 2 Telegram polling 完成：Rust telegram_start_poll/stop/status_all/send_message，long-poll getUpdates、allowed_chat_ids gate、TelegramRegistry per-channel state、telegram-message/telegram-status events。前端 ChannelsView 加 Start/Stop 控制 + Polling 狀態 pill + Recent Activity 面板 + 自動 routeTelegramCommand 路由 /help（實作）和 /status /report /run（Phase 3 stub）。Phase 3：把 /status 等接通 ProjectsRepository 真實資料。",
-      "updatedAt": "2026-05-17T00:00:00.000Z",
+      "notes": "Phase 1（設定表單）+ Phase 2（Telegram long-poll Rust bridge、Start/Stop UI、Recent Activity）+ Phase 3（指令接通真實資料）：/help 列出啟用的指令、/status 多專案摘要與 /status <name> 單專案 in_progress 前 8、/report 過去 7 天 updatedAt 變動的功能、/run <featureId> 用該專案第一個 agent 派遣並回 PID。allowed_chat_ids gate + /run 預設 disabled 為兩層安全閥。",
+      "updatedAt": "2026-05-17T02:00:00.000Z",
       "updatedBy": "Claude Opus 4.7"
     },
     {
