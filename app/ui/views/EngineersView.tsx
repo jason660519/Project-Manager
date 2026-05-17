@@ -22,6 +22,7 @@ const SLUG_COLORS: Record<string, string> = {
   fullstack: 'border-violet-300/35 text-violet-300/80',
   qa:        'border-amber-300/35 text-amber-300/80',
   devops:    'border-orange-300/35 text-orange-300/80',
+  devex:     'border-sky-300/35 text-sky-300/80',
 };
 
 function slugColor(slug: string): string {
@@ -81,6 +82,17 @@ const DEFAULT_ROLES: EngineerRole[] = [
     commands: ['docker build .', 'docker compose up', 'gh workflow run'],
     systemPrompt:
       'You are a senior DevOps engineer. Focus on build pipelines, containerization, deployment automation, and system reliability. Prefer declarative configuration. Make deployments repeatable and rollbacks easy.',
+    referenceFiles: ['CLAUDE.md'],
+    notes: '',
+  },
+  {
+    id: 'role-devex',
+    name: '開發者體驗專員',
+    slug: 'devex',
+    skills: ['Developer Experience', 'CLI Design', 'Documentation', 'Onboarding', 'Error Messages', 'Tooling'],
+    commands: ['npm run docs:check', 'npm run typecheck'],
+    systemPrompt:
+      'You are a senior Developer Experience (DX) specialist. Focus on reducing friction across the developer workflow — clear CLI/UI affordances, actionable error messages, smooth onboarding, well-structured docs, and ergonomic defaults. Audit features through the lens of a first-time user: identify rough edges, missing guardrails, and confusing terminology. Prefer small, polish-oriented improvements that compound over time.',
     referenceFiles: ['CLAUDE.md'],
     notes: '',
   },
@@ -421,7 +433,7 @@ export function EngineersView({ roles, agents, onRolesChange }: EngineersViewPro
                 onClick={handleInitDefaults}
                 className="flex w-full items-center justify-center gap-1.5 border border-stone-200/18 px-3 py-1.5 text-xs text-stone-300 hover:bg-white/5"
               >
-                Initialize 5 Defaults
+                Initialize 6 Defaults
               </button>
             )}
           </div>

@@ -7,6 +7,8 @@ import sampleConfig2 from '../../config/samples/project-manager-self.sample.json
 import { listAdapters } from '../../lib/adapters/registry';
 import {
   getProjectsRepository,
+  mergeFeaturesById,
+  migrateConfig,
   resolveDashboardProjectIds,
   resolveInitialProjectId,
 } from '../../lib/storage';
@@ -18,12 +20,13 @@ import {
   ProjectManagerConfig,
   EngineerRole,
   Feature,
+  FeaturePromptConfig,
   FeatureStatus,
   ProjectEntry,
   ViewId,
 } from '../../lib/types';
 import { AppShell } from './AppShell';
-import { DashboardClient } from './DashboardClient';
+import { ProjectProgressClient } from '../project-progress-dashboard/ProjectProgressClient';
 import { FeaturesView } from './views/FeaturesView';
 import { EngineersView } from './views/EngineersView';
 import { PluginsView } from './views/PluginsView';
@@ -399,11 +402,147 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
     [isTauri, selectedProjectId],
   );
 
+  // Cross-project lookup: progress dashboard features may come from any project
+  // (their id is namespaced as "projectId::featureId"). Splits the namespaced
+  // id and routes the patch back to the originating project.
+  const handleFeaturePromptSave = useCallback(
+    (namespacedId: string, config: FeaturePromptConfig) => {
+      const sep = namespacedId.indexOf('::');
+      const projectId = sep > 0 ? namespacedId.slice(0, sep) : selectedProjectId;
+      const featureId = sep > 0 ? namespacedId.slice(sep + 2) : namespacedId;
+      setProjects((prev) =>
+        prev.map((p) => {
+          if (p.id !== projectId) return p;
+          const updatedConfig = {
+            ...p.config,
+            features: p.config.features.map((f) =>
+              f.id === featureId
+                ? { ...f, promptConfig: config, updatedAt: new Date().toISOString() }
+                : f,
+            ),
+          };
+          if (isTauri && p.configPath) {
+            import('../../lib/bridge').then(({ writeConfig }) =>
+              writeConfig(p.configPath, updatedConfig).catch(() => {}),
+            );
+          }
+          return { ...p, config: updatedConfig };
+        }),
+      );
+    },
+    [isTauri, selectedProjectId],
+  );
+
+  // Manual cron job run: same code path as the heartbeat would take, but
+  // synchronous and surfaced via the panel button.
+  const handleRunCronJob = useCallback(
+    async (job: CronJob): Promise<void> => {
+      const { spawnAgent } = await import('../../lib/bridge');
+      const pid = await spawnAgent({
+        command: job.action.command,
+        args: job.action.args,
+        workingDir: job.action.workingDir,
+      });
+      handleRunStart(pid, `cron:${job.id}`, job.name, job.action.command, job.action.args);
+      const firedAt = new Date().toISOString();
+      setCronHistory((h) =>
+        [...h, { jobId: job.id, jobName: job.name, firedAt, status: 'ok' as const, pid }].slice(-100),
+      );
+    },
+    [handleRunStart],
+  );
+
   const handleAddProject = useCallback((entry: ProjectEntry) => {
     setProjects((prev) => [...prev, entry]);
     setSelectedProjectId(entry.id);
     setSelectedDashboardProjectIds((prev) => (prev.includes(entry.id) ? prev : [...prev, entry.id]));
   }, []);
+
+  /**
+   * Remove a project from PM's tracked list. Always removes the in-memory entry
+   * (which then persists via the saveProjects effect); when `deleteConfigFile`
+   * is true and we're on Tauri, also deletes the `.project-manager.json` on disk.
+   * GitHub-sourced projects (configPath starts with https://) never touch disk.
+   */
+  const handleRemoveProject = useCallback(
+    async (id: string, deleteConfigFile: boolean) => {
+      const target = projects.find((p) => p.id === id);
+      if (!target) return;
+
+      if (deleteConfigFile && isTauri && !target.configPath.startsWith('https://')) {
+        try {
+          const { deleteConfig } = await import('../../lib/bridge');
+          await deleteConfig(target.configPath);
+        } catch (e) {
+          // Surface the error but still drop the PM reference — the user's
+          // primary intent ("remove from PM") shouldn't be blocked by a
+          // disk-side failure (file already gone, permission denied, …).
+          console.error('Failed to delete config file:', e);
+        }
+      }
+
+      setProjects((prev) => prev.filter((p) => p.id !== id));
+      setSelectedDashboardProjectIds((prev) => prev.filter((pid) => pid !== id));
+      // selectedProjectId fallback is handled by the existing "keep selection valid" effect.
+    },
+    [isTauri, projects],
+  );
+
+  /**
+   * Re-read a project from its source (local file or GitHub) and merge the
+   * remote feature list onto local PM-side edits (status / progress / notes).
+   * Stamps `lastSyncedAt` so the card can show "Synced X ago".
+   */
+  const handleSyncProject = useCallback(
+    async (id: string) => {
+      const target = projects.find((p) => p.id === id);
+      if (!target) throw new Error('Project not found');
+
+      const isGithub = target.configPath.startsWith('https://github.com/');
+      const bridge = await import('../../lib/bridge');
+
+      let remoteConfig: ProjectManagerConfig;
+      if (isGithub) {
+        if (!isTauri) throw new Error('GitHub sync requires Tauri runtime');
+        const token = await bridge.getGithubToken();
+        const ghFeatures = await bridge.fetchGithubRepo(token, target.configPath);
+        const remoteFeatures: Feature[] = ghFeatures.map((f) => ({
+          id: f.id,
+          name: f.name,
+          category: f.category,
+          status: f.status as FeatureStatus,
+          progress: f.progress,
+          notes: f.notes,
+          paths: { spec: '', tdd: '', implementation: '' },
+        }));
+        remoteConfig = migrateConfig({
+          ...target.config,
+          features: remoteFeatures,
+        });
+      } else {
+        if (!isTauri) throw new Error('Local sync requires Tauri runtime');
+        remoteConfig = await bridge.readConfig(target.configPath);
+      }
+
+      const mergedFeatures = mergeFeaturesById(remoteConfig.features, target.config.features);
+      const mergedConfig: ProjectManagerConfig = { ...remoteConfig, features: mergedFeatures };
+
+      setProjects((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? { ...p, config: mergedConfig, lastSyncedAt: new Date().toISOString() }
+            : p,
+        ),
+      );
+
+      // For local projects, write the merged result back so the next disk read
+      // already reflects PM-side edits. GitHub repos are read-only here.
+      if (!isGithub && isTauri) {
+        await bridge.writeConfig(target.configPath, mergedConfig).catch(() => {});
+      }
+    },
+    [isTauri, projects],
+  );
 
   const handleToggleDashboardProject = useCallback((id: string, selected: boolean) => {
     setSelectedDashboardProjectIds((prev) => {
@@ -582,16 +721,16 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
       activeRunCount={activeRuns.length}
     >
       {currentView === 'dashboard' && (
-        <DashboardClient
+        <ProjectProgressClient
           project={selectedProject.config.project}
           features={dashboardFeatures}
           adapters={adapters}
+          cronJobs={selectedProject.config.cronJobs ?? []}
           activeRuns={activeRuns}
-          runHistory={runHistory}
           dashboardProjectNames={effectiveDashboardProjects.map((p) => p.config.project.name)}
-          onRunStart={handleRunStart}
-          onRunLog={handleRunLog}
-          onRunEnd={handleRunEnd}
+          onCronJobsChange={handleCronJobsUpdate}
+          onFeaturePromptSave={handleFeaturePromptSave}
+          onRunCronJob={handleRunCronJob}
         />
       )}
       {currentView === 'features' && (
@@ -616,6 +755,8 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
           onSelectProject={setSelectedProjectId}
           onToggleDashboardProject={handleToggleDashboardProject}
           onAddProject={handleAddProject}
+          onRemoveProject={handleRemoveProject}
+          onSyncProject={handleSyncProject}
           runHistory={runHistory}
         />
       )}

@@ -34,6 +34,16 @@ export async function writeConfig(path: string, config: ProjectManagerConfig): P
   return invoke<void>('write_config', { path, config });
 }
 
+/**
+ * Delete a `.project-manager.json` config file from disk.
+ * Rust refuses paths whose basename is not `.project-manager.json` so this
+ * cannot wipe an unrelated file due to a typo in `configPath`.
+ */
+export async function deleteConfig(path: string): Promise<void> {
+  if (!isTauri()) throw new Error('deleteConfig requires Tauri runtime');
+  return invoke<void>('delete_config', { path });
+}
+
 export async function scanProjects(root: string): Promise<string[]> {
   if (!isTauri()) throw new Error('scanProjects requires Tauri runtime');
   return invoke<string[]>('scan_projects', { root });

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import {
+  AlertTriangle,
   BarChart3,
   Bot,
   Check,
@@ -12,11 +13,13 @@ import {
   Github,
   Loader2,
   Plus,
+  RefreshCw,
   Save,
   Sparkles,
+  Trash2,
   X,
 } from 'lucide-react';
-import { migrateConfig } from '../../../lib/storage';
+import { migrateConfig, resolveConfigPath } from '../../../lib/storage';
 import { CompletedRun, ProjectManagerConfig, Feature, ProjectEntry } from '../../../lib/types';
 
 interface ProjectsViewProps {
@@ -26,7 +29,23 @@ interface ProjectsViewProps {
   onSelectProject: (id: string) => void;
   onToggleDashboardProject: (id: string, selected: boolean) => void;
   onAddProject: (entry: ProjectEntry) => void;
+  onRemoveProject: (id: string, deleteConfigFile: boolean) => Promise<void> | void;
+  onSyncProject: (id: string) => Promise<void>;
   runHistory: CompletedRun[];
+}
+
+function formatRelativeTime(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return '';
+  const diffSecs = Math.floor((Date.now() - then) / 1000);
+  if (diffSecs < 5) return 'just now';
+  if (diffSecs < 60) return `${diffSecs}s ago`;
+  const mins = Math.floor(diffSecs / 60);
+  if (mins < 60) return `${mins} min${mins === 1 ? '' : 's'} ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} hr${hours === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
 }
 
 type ScanPhase = 'idle' | 'scanning' | 'preview' | 'error';
@@ -46,11 +65,20 @@ export function ProjectsView({
   onSelectProject,
   onToggleDashboardProject,
   onAddProject,
+  onRemoveProject,
+  onSyncProject,
   runHistory,
 }: ProjectsViewProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [addMode, setAddMode] = useState<'local' | 'github'>('local');
+  /** Folder path used by the AI Scan flow. */
   const [localPath, setLocalPath] = useState('');
+  /**
+   * Path used by the Manual Add flow. Kept separate from `localPath` so the
+   * two inputs don't mirror each other (they serve different intents — AI Scan
+   * wants a folder, Manual Add wants an existing config file).
+   */
+  const [manualConfigPath, setManualConfigPath] = useState('');
   const [githubUrl, setGithubUrl] = useState('');
   const [githubToken, setGithubToken] = useState('');
   const [adding, setAdding] = useState(false);
@@ -66,6 +94,15 @@ export function ProjectsView({
   const [editableJson, setEditableJson] = useState('');
   const [showRawJson, setShowRawJson] = useState(false);
 
+  // Sync state — track which project ids are currently syncing + any error.
+  const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set());
+  const [syncErrors, setSyncErrors] = useState<Record<string, string>>({});
+
+  // Delete confirmation modal state.
+  const [deleteTarget, setDeleteTarget] = useState<ProjectEntry | null>(null);
+  const [deleteAlsoFile, setDeleteAlsoFile] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   useEffect(() => {
     setIsTauri(typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window);
     let cancelled = false;
@@ -79,7 +116,7 @@ export function ProjectsView({
     };
   }, []);
 
-  // Reset scan state when modal closes
+  // Reset scan + manual-add state when modal closes so the next open starts clean.
   useEffect(() => {
     if (!showAddModal) {
       setScanPhase('idle');
@@ -87,6 +124,8 @@ export function ProjectsView({
       setScanError('');
       setEditableJson('');
       setShowRawJson(false);
+      setAddError('');
+      setManualConfigPath('');
     }
   }, [showAddModal]);
 
@@ -128,31 +167,48 @@ export function ProjectsView({
   };
 
   const handleAddLocal = async () => {
-    if (!localPath.trim()) return;
+    if (!manualConfigPath.trim()) return;
+    // Resolve `<folder>` → `<folder>/.project-manager.json` so Rust's read_config
+    // never sees a directory path (which would surface as `Is a directory (os error 21)`).
+    const resolvedPath = resolveConfigPath(manualConfigPath);
     setAdding(true);
     setAddError('');
     try {
       let config: ProjectManagerConfig;
       if (isTauri) {
         const { readConfig } = await import('../../../lib/bridge');
-        config = await readConfig(localPath);
+        config = await readConfig(resolvedPath);
       } else {
+        const folder = resolvedPath.replace(/\/\.project-manager\.json$/, '');
         config = migrateConfig({
           schemaVersion: 2,
           project: {
-            name: localPath.split('/').pop() ?? 'Project',
-            root: localPath,
+            name: folder.split('/').pop() || 'Project',
+            root: folder,
             defaultIDE: 'Cursor',
           },
           features: [],
           adapters: { ides: [], agents: [] },
         });
       }
-      onAddProject({ id: `proj-${Date.now()}`, config, configPath: localPath });
+      onAddProject({ id: `proj-${Date.now()}`, config, configPath: resolvedPath });
       setShowAddModal(false);
+      setManualConfigPath('');
       setLocalPath('');
     } catch (e) {
-      setAddError(`Failed to read config: ${e}`);
+      const raw = e instanceof Error ? e.message : String(e);
+      // Rust returns `No such file or directory (os error 2)` for missing
+      // files and `Is a directory (os error 21)` when handed a folder.
+      // Both mean the same thing from the user's perspective: there's no
+      // `.project-manager.json` at the location they pointed at. Translate
+      // it into actionable guidance instead of leaking the OS error.
+      if (/No such file or directory|Is a directory|os error 2\b|os error 21\b/i.test(raw)) {
+        setAddError(
+          `No .project-manager.json found at ${resolvedPath}. Try the AI Scan option above to generate one automatically.`,
+        );
+      } else {
+        setAddError(`Failed to read config: ${raw}`);
+      }
     } finally {
       setAdding(false);
     }
@@ -261,6 +317,54 @@ export function ProjectsView({
     setTimeout(() => setReportCopied(false), 2000);
   };
 
+  // ── Sync / Delete handlers ────────────────────────────────────────────────
+
+  const handleSyncOne = async (id: string) => {
+    setSyncingIds((prev) => new Set(prev).add(id));
+    setSyncErrors((prev) => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    try {
+      await onSyncProject(id);
+    } catch (e) {
+      setSyncErrors((prev) => ({
+        ...prev,
+        [id]: e instanceof Error ? e.message : String(e),
+      }));
+    } finally {
+      setSyncingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  };
+
+  const handleSyncAll = async () => {
+    // Fire in parallel — projects sync independently.
+    await Promise.all(projects.map((p) => handleSyncOne(p.id)));
+  };
+
+  const openDeleteConfirm = (project: ProjectEntry) => {
+    setDeleteTarget(project);
+    setDeleteAlsoFile(false);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await onRemoveProject(deleteTarget.id, deleteAlsoFile);
+      setDeleteTarget(null);
+      setDeleteAlsoFile(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   // ── Render: Scan Preview Modal Content ────────────────────────────────────
 
   const renderScanPreview = () => {
@@ -357,6 +461,15 @@ export function ProjectsView({
         </div>
         <div className="flex gap-2">
           <button
+            onClick={handleSyncAll}
+            disabled={projects.length === 0 || syncingIds.size > 0}
+            className="inline-flex h-9 items-center gap-2 border border-stone-200/20 px-3 text-xs uppercase tracking-[0.14em] text-stone-200 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+            title="Re-read every project from its source"
+          >
+            <RefreshCw size={14} className={syncingIds.size > 0 ? 'animate-spin' : ''} />
+            Sync All
+          </button>
+          <button
             onClick={handleGenerateReport}
             className="inline-flex h-9 items-center gap-2 border border-stone-200/20 px-3 text-xs uppercase tracking-[0.14em] text-stone-200 hover:bg-white/5"
           >
@@ -379,11 +492,14 @@ export function ProjectsView({
           const { features } = project.config;
           const isSelected = project.id === selectedProjectId;
           const isDashboardSelected = selectedDashboardProjectIds.includes(project.id);
+          const isSyncing = syncingIds.has(project.id);
+          const syncError = syncErrors[project.id];
+          const isGithub = project.configPath.startsWith('https://github.com/');
 
           return (
             <div
               key={project.id}
-              className={`border bg-[#071d1a]/72 transition-colors ${
+              className={`group border bg-[#071d1a]/72 transition-colors ${
                 isSelected
                   ? 'border-emerald-200/35'
                   : 'border-stone-200/18 hover:border-stone-200/30'
@@ -418,14 +534,65 @@ export function ProjectsView({
                       )}
                     </div>
                     <p className="mt-0.5 max-w-sm truncate text-xs text-stone-500">
-                      {project.config.project.root}
+                      {project.configPath}
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-stone-500">
+                      {project.lastSyncedAt
+                        ? `Synced ${formatRelativeTime(project.lastSyncedAt)}`
+                        : 'Not synced yet'}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-stone-400">
                   <span>{features.length} features</span>
+                  {/* Hover-revealed action group. Sync stays visible while spinning so users get feedback. */}
+                  <div
+                    className={`flex items-center gap-1 transition-opacity ${
+                      isSyncing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                    }`}
+                  >
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleSyncOne(project.id);
+                      }}
+                      disabled={isSyncing}
+                      title={isGithub ? 'Re-fetch from GitHub' : 'Re-read .project-manager.json from disk'}
+                      className="flex h-7 w-7 items-center justify-center text-stone-400 hover:bg-white/5 hover:text-stone-100 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <RefreshCw size={13} className={isSyncing ? 'animate-spin' : ''} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openDeleteConfirm(project);
+                      }}
+                      title="Remove project"
+                      className="flex h-7 w-7 items-center justify-center text-stone-400 hover:bg-red-500/15 hover:text-red-300"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 </div>
               </div>
+              {syncError && (
+                <div className="flex items-start gap-2 border-t border-red-500/25 bg-red-900/15 px-4 py-2 text-[11px] text-red-300">
+                  <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                  <span className="min-w-0 break-words">Sync failed: {syncError}</span>
+                  <button
+                    onClick={() =>
+                      setSyncErrors((prev) => {
+                        const next = { ...prev };
+                        delete next[project.id];
+                        return next;
+                      })
+                    }
+                    className="ml-auto shrink-0 text-red-400 hover:text-red-200"
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}
@@ -458,6 +625,84 @@ export function ProjectsView({
           <pre className="max-h-96 overflow-auto whitespace-pre-wrap p-4 font-mono text-xs leading-5 text-stone-300">
             {reportText}
           </pre>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md border border-red-400/30 bg-[#071d1a] shadow-2xl">
+            <div className="flex items-center gap-2 border-b border-stone-200/12 bg-red-500/10 px-6 py-4">
+              <AlertTriangle size={18} className="text-red-300" />
+              <h3 className="text-base font-semibold text-stone-50">Remove project?</h3>
+            </div>
+            <div className="space-y-4 px-6 py-5">
+              <div>
+                <p className="text-sm text-stone-200">
+                  Remove <span className="font-medium text-stone-50">{deleteTarget.config.project.name}</span> from Project Manager?
+                </p>
+                <p className="mt-1 truncate font-mono text-[11px] text-stone-500">
+                  {deleteTarget.configPath}
+                </p>
+              </div>
+              <p className="text-xs text-stone-400">
+                By default, this only removes the project from PM&apos;s tracked list. The{' '}
+                <code className="font-mono text-stone-300">.project-manager.json</code> on disk is left untouched.
+              </p>
+
+              {/* Disk-delete opt-in (disabled for GitHub-sourced projects) */}
+              {(() => {
+                const isGithubTarget = deleteTarget.configPath.startsWith('https://');
+                return (
+                  <label
+                    className={`flex items-start gap-2 border border-stone-200/12 px-3 py-2 text-xs ${
+                      isGithubTarget ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-white/5'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={deleteAlsoFile}
+                      onChange={(e) => setDeleteAlsoFile(e.target.checked)}
+                      disabled={isGithubTarget}
+                      className="mt-0.5 h-3.5 w-3.5 cursor-pointer accent-red-400 disabled:cursor-not-allowed"
+                    />
+                    <span className="text-stone-200">
+                      Also delete the <code className="font-mono">.project-manager.json</code> file on disk
+                      {isGithubTarget && (
+                        <span className="ml-1 text-stone-500">(N/A for GitHub-sourced projects)</span>
+                      )}
+                    </span>
+                  </label>
+                );
+              })()}
+            </div>
+            <div className="flex justify-end gap-3 border-t border-stone-200/12 bg-white/[0.035] px-6 py-4">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                className="px-4 py-2 text-sm text-stone-300 hover:bg-white/5 disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleting}
+                className="inline-flex items-center gap-2 bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 size={13} className="animate-spin" />
+                    Removing…
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={13} />
+                    {deleteAlsoFile ? 'Remove & Delete File' : 'Remove from PM'}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -553,11 +798,14 @@ export function ProjectsView({
                           Path to existing .project-manager.json
                         </label>
                         <input
-                          value={localPath}
-                          onChange={(e) => setLocalPath(e.target.value)}
+                          value={manualConfigPath}
+                          onChange={(e) => setManualConfigPath(e.target.value)}
                           placeholder="/path/to/project/.project-manager.json"
                           className="w-full border border-stone-200/20 bg-[#03100f] px-3 py-2 font-mono text-xs text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
                         />
+                        <p className="mt-1 text-[10px] text-stone-500">
+                          Folder paths are accepted — .project-manager.json will be appended automatically.
+                        </p>
                       </div>
 
                       {!isTauri && (
@@ -655,7 +903,9 @@ export function ProjectsView({
                     disabled={
                       adding ||
                       scanPhase === 'scanning' ||
-                      (addMode === 'local' ? !localPath.trim() : !githubUrl.trim() || !isTauri)
+                      (addMode === 'local'
+                        ? !manualConfigPath.trim()
+                        : !githubUrl.trim() || !isTauri)
                     }
                     className="bg-stone-100 px-4 py-2 text-sm font-medium text-[#071d1a] hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
                   >

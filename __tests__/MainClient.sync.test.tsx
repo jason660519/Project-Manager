@@ -21,8 +21,11 @@ vi.mock('../app/ui/AppShell', () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock('../app/ui/DashboardClient', () => ({
-  DashboardClient: ({ features }: { features: { id: string }[] }) => (
+// MainClient now renders ProjectProgressClient under the dashboard route;
+// stub it the same way the legacy DashboardClient stub worked so the existing
+// data-testid contract still holds.
+vi.mock('../app/project-progress-dashboard/ProjectProgressClient', () => ({
+  ProjectProgressClient: ({ features }: { features: { id: string }[] }) => (
     <div data-testid="dashboard" data-feature-count={features.length} />
   ),
 }));
