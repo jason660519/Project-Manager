@@ -607,3 +607,78 @@ export async function listProjectFiles(root: string, maxDepth = 4): Promise<File
   if (!isTauri()) throw new Error('listProjectFiles requires Tauri runtime');
   return invoke<FileNode[]>('list_project_files', { root, maxDepth });
 }
+
+// ── Telegram polling (Channels Phase 2) ──────────────────────────────────────
+
+export type TelegramPollPhase =
+  | { phase: 'polling' }
+  | { phase: 'stopped' }
+  | { phase: 'errored'; message: string };
+
+export interface TelegramPollStatus {
+  channelId: string;
+  status: TelegramPollPhase;
+  startedAt?: string;
+  lastUpdateAt?: string;
+}
+
+export interface TelegramMessagePayload {
+  channelId: string;
+  updateId: number;
+  messageId: number;
+  chatId: number;
+  fromId: number;
+  fromUsername?: string;
+  fromName?: string;
+  text: string;
+  timestamp: string;
+}
+
+/**
+ * Start a long-poll loop for a Telegram channel. Idempotent — if the channel
+ * is already polling, the existing loop is stopped first so new credentials
+ * take effect. Pass an empty `allowedChatIds` to disable the gate (not
+ * recommended — anyone who finds the bot can issue commands).
+ */
+export async function telegramStartPoll(opts: {
+  channelId: string;
+  botToken: string;
+  allowedChatIds: number[];
+}): Promise<TelegramPollStatus> {
+  if (!isTauri()) throw new Error('telegramStartPoll requires Tauri runtime');
+  return invoke<TelegramPollStatus>('telegram_start_poll', {
+    channelId: opts.channelId,
+    botToken: opts.botToken,
+    allowedChatIds: opts.allowedChatIds,
+  });
+}
+
+/** Signal the long-poll loop for `channelId` to terminate. No-op if idle. */
+export async function telegramStopPoll(channelId: string): Promise<void> {
+  if (!isTauri()) return;
+  return invoke<void>('telegram_stop_poll', { channelId });
+}
+
+/** All channels PM currently tracks. Channels never started are absent. */
+export async function telegramStatusAll(): Promise<TelegramPollStatus[]> {
+  if (!isTauri()) return [];
+  return invoke<TelegramPollStatus[]>('telegram_status_all');
+}
+
+/** POST a text reply to a Telegram chat. */
+export async function telegramSendMessage(
+  botToken: string,
+  chatId: number,
+  text: string,
+): Promise<void> {
+  if (!isTauri()) throw new Error('telegramSendMessage requires Tauri runtime');
+  return invoke<void>('telegram_send_message', { botToken, chatId, text });
+}
+
+export function onTelegramMessage(cb: (p: TelegramMessagePayload) => void): Promise<UnlistenFn> {
+  return listen<TelegramMessagePayload>('telegram-message', cb);
+}
+
+export function onTelegramStatus(cb: (p: TelegramPollStatus) => void): Promise<UnlistenFn> {
+  return listen<TelegramPollStatus>('telegram-status', cb);
+}

@@ -1861,14 +1861,315 @@ mod skill_tests {
     }
 }
 
+// ── Telegram polling (Channels Phase 2) ──────────────────────────────────────
+//
+// One long-poll task per Telegram channel, keyed by the renderer-side
+// channel_id. Inbound messages are emitted as `telegram-message` events; the
+// renderer handles command routing and replies via `telegram_send_message`.
+//
+// State is in-memory only — restarting the desktop app stops polling for every
+// channel until the renderer re-issues `telegram_start_poll` for each enabled
+// channel.
+
+#[derive(Clone, Serialize)]
+#[serde(tag = "phase", rename_all = "lowercase")]
+enum TelegramPollPhase {
+    Polling,
+    Stopped,
+    Errored { message: String },
+}
+
+#[derive(Clone, Serialize)]
+struct TelegramPollStatus {
+    #[serde(rename = "channelId")]
+    channel_id: String,
+    status: TelegramPollPhase,
+    #[serde(rename = "startedAt", skip_serializing_if = "Option::is_none")]
+    started_at: Option<String>,
+    #[serde(rename = "lastUpdateAt", skip_serializing_if = "Option::is_none")]
+    last_update_at: Option<String>,
+}
+
+#[derive(Clone, Serialize)]
+struct TelegramMessageEvent {
+    #[serde(rename = "channelId")]
+    channel_id: String,
+    #[serde(rename = "updateId")]
+    update_id: i64,
+    #[serde(rename = "messageId")]
+    message_id: i64,
+    #[serde(rename = "chatId")]
+    chat_id: i64,
+    #[serde(rename = "fromId")]
+    from_id: i64,
+    #[serde(rename = "fromUsername", skip_serializing_if = "Option::is_none")]
+    from_username: Option<String>,
+    #[serde(rename = "fromName", skip_serializing_if = "Option::is_none")]
+    from_name: Option<String>,
+    text: String,
+    timestamp: String,
+}
+
+struct TelegramPollState {
+    kill_tx: Option<oneshot::Sender<()>>,
+    status: TelegramPollPhase,
+    started_at: Option<String>,
+    last_update_at: Option<String>,
+}
+
+type TelegramRegistry = Arc<Mutex<HashMap<String, TelegramPollState>>>;
+
+async fn emit_telegram_status(app: &AppHandle, registry: &TelegramRegistry, channel_id: &str) {
+    let registry = registry.lock().await;
+    if let Some(state) = registry.get(channel_id) {
+        let status = TelegramPollStatus {
+            channel_id: channel_id.to_string(),
+            status: state.status.clone(),
+            started_at: state.started_at.clone(),
+            last_update_at: state.last_update_at.clone(),
+        };
+        let _ = app.emit("telegram-status", status);
+    }
+}
+
+/// Start a long-poll loop for a Telegram bot. Idempotent — if the channel is
+/// already polling, the existing loop is stopped first so the new credentials
+/// take effect.
+#[tauri::command]
+async fn telegram_start_poll(
+    app: AppHandle,
+    registry: tauri::State<'_, TelegramRegistry>,
+    channel_id: String,
+    bot_token: String,
+    allowed_chat_ids: Vec<i64>,
+) -> Result<TelegramPollStatus, String> {
+    // Stop any existing loop for this channel before starting a new one.
+    {
+        let mut reg = registry.lock().await;
+        if let Some(existing) = reg.get_mut(&channel_id) {
+            if let Some(tx) = existing.kill_tx.take() {
+                let _ = tx.send(());
+            }
+        }
+    }
+    // Give the dying loop a tick to release the slot.
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+    let (kill_tx, mut kill_rx) = oneshot::channel::<()>();
+    let started_at = now_iso8601();
+
+    {
+        let mut reg = registry.lock().await;
+        reg.insert(
+            channel_id.clone(),
+            TelegramPollState {
+                kill_tx: Some(kill_tx),
+                status: TelegramPollPhase::Polling,
+                started_at: Some(started_at.clone()),
+                last_update_at: None,
+            },
+        );
+    }
+    emit_telegram_status(&app, &*registry, &channel_id).await;
+
+    let app_clone = app.clone();
+    let registry_clone: TelegramRegistry = (*registry).clone();
+    let channel_id_clone = channel_id.clone();
+    let bot_token_clone = bot_token.clone();
+
+    tokio::spawn(async move {
+        let client = reqwest::Client::builder()
+            // Telegram long-poll caps at 50s; reqwest needs to outlast it.
+            .timeout(std::time::Duration::from_secs(60))
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
+
+        let mut last_update_id: i64 = 0;
+
+        loop {
+            tokio::select! {
+                _ = &mut kill_rx => {
+                    log::info!("[telegram-poll] {} stopped", channel_id_clone);
+                    let mut reg = registry_clone.lock().await;
+                    if let Some(state) = reg.get_mut(&channel_id_clone) {
+                        state.status = TelegramPollPhase::Stopped;
+                        state.kill_tx = None;
+                    }
+                    drop(reg);
+                    emit_telegram_status(&app_clone, &registry_clone, &channel_id_clone).await;
+                    break;
+                }
+                result = poll_telegram_once(&client, &bot_token_clone, last_update_id) => {
+                    match result {
+                        Ok(updates) => {
+                            for update in updates {
+                                if let Some(uid) = update.get("update_id").and_then(|v| v.as_i64()) {
+                                    last_update_id = uid;
+                                }
+                                let Some(msg) = update.get("message") else { continue };
+                                let chat_id = msg.get("chat").and_then(|c| c.get("id")).and_then(|v| v.as_i64()).unwrap_or(0);
+                                if !allowed_chat_ids.is_empty() && !allowed_chat_ids.contains(&chat_id) {
+                                    continue;
+                                }
+                                let text = msg.get("text").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                if text.is_empty() { continue }
+
+                                let from = msg.get("from");
+                                let event = TelegramMessageEvent {
+                                    channel_id: channel_id_clone.clone(),
+                                    update_id: last_update_id,
+                                    message_id: msg.get("message_id").and_then(|v| v.as_i64()).unwrap_or(0),
+                                    chat_id,
+                                    from_id: from.and_then(|f| f.get("id")).and_then(|v| v.as_i64()).unwrap_or(0),
+                                    from_username: from.and_then(|f| f.get("username")).and_then(|v| v.as_str()).map(String::from),
+                                    from_name: from.and_then(|f| f.get("first_name")).and_then(|v| v.as_str()).map(String::from),
+                                    text,
+                                    timestamp: now_iso8601(),
+                                };
+                                let _ = app_clone.emit("telegram-message", event);
+                            }
+                            let now = now_iso8601();
+                            let mut reg = registry_clone.lock().await;
+                            if let Some(state) = reg.get_mut(&channel_id_clone) {
+                                state.last_update_at = Some(now);
+                                state.status = TelegramPollPhase::Polling;
+                            }
+                        }
+                        Err(e) => {
+                            log::warn!("[telegram-poll] {} error: {}", channel_id_clone, e);
+                            {
+                                let mut reg = registry_clone.lock().await;
+                                if let Some(state) = reg.get_mut(&channel_id_clone) {
+                                    state.status = TelegramPollPhase::Errored { message: e.clone() };
+                                }
+                            }
+                            emit_telegram_status(&app_clone, &registry_clone, &channel_id_clone).await;
+                            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    Ok(TelegramPollStatus {
+        channel_id,
+        status: TelegramPollPhase::Polling,
+        started_at: Some(started_at),
+        last_update_at: None,
+    })
+}
+
+async fn poll_telegram_once(
+    client: &reqwest::Client,
+    bot_token: &str,
+    last_update_id: i64,
+) -> Result<Vec<serde_json::Value>, String> {
+    let url = format!("https://api.telegram.org/bot{bot_token}/getUpdates");
+    let offset_str = (last_update_id + 1).to_string();
+    let mut query: Vec<(&str, &str)> = vec![
+        ("timeout", "30"),
+        ("allowed_updates", "[\"message\"]"),
+    ];
+    if last_update_id > 0 {
+        query.push(("offset", &offset_str));
+    }
+    let res = client
+        .get(&url)
+        .query(&query)
+        .send()
+        .await
+        .map_err(|e| format!("getUpdates request failed: {e}"))?;
+    let status = res.status();
+    let body: serde_json::Value = res
+        .json()
+        .await
+        .map_err(|e| format!("getUpdates parse failed: {e}"))?;
+    if !status.is_success() || !body.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
+        let desc = body.get("description").and_then(|v| v.as_str()).unwrap_or("Unknown Telegram error");
+        return Err(format!("Telegram API {status}: {desc}"));
+    }
+    let result = body
+        .get("result")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    Ok(result)
+}
+
+/// Stop the long-poll loop for `channel_id`. No-op if it wasn't running.
+#[tauri::command]
+async fn telegram_stop_poll(
+    app: AppHandle,
+    registry: tauri::State<'_, TelegramRegistry>,
+    channel_id: String,
+) -> Result<(), String> {
+    {
+        let mut reg = registry.lock().await;
+        if let Some(state) = reg.get_mut(&channel_id) {
+            if let Some(tx) = state.kill_tx.take() {
+                let _ = tx.send(());
+            }
+        }
+    }
+    // Loop's select! arm will flip the status to Stopped; emit an immediate
+    // intermediate update so the UI doesn't appear unresponsive.
+    emit_telegram_status(&app, &*registry, &channel_id).await;
+    Ok(())
+}
+
+/// Snapshot every channel PM currently tracks. Channels that have never been
+/// started are absent (the renderer should treat that as `idle`).
+#[tauri::command]
+async fn telegram_status_all(
+    registry: tauri::State<'_, TelegramRegistry>,
+) -> Result<Vec<TelegramPollStatus>, String> {
+    let reg = registry.lock().await;
+    Ok(reg
+        .iter()
+        .map(|(channel_id, state)| TelegramPollStatus {
+            channel_id: channel_id.clone(),
+            status: state.status.clone(),
+            started_at: state.started_at.clone(),
+            last_update_at: state.last_update_at.clone(),
+        })
+        .collect())
+}
+
+/// Post a text message to a Telegram chat. The renderer uses this to reply to
+/// inbound `telegram-message` events.
+#[tauri::command]
+async fn telegram_send_message(
+    bot_token: String,
+    chat_id: i64,
+    text: String,
+) -> Result<(), String> {
+    let url = format!("https://api.telegram.org/bot{bot_token}/sendMessage");
+    let body = serde_json::json!({ "chat_id": chat_id, "text": text });
+    let res = reqwest::Client::new()
+        .post(&url)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("sendMessage request failed: {e}"))?;
+    if !res.status().is_success() {
+        let status = res.status();
+        let body = res.text().await.unwrap_or_default();
+        return Err(format!("Telegram sendMessage {status}: {body}"));
+    }
+    Ok(())
+}
+
 // ── App entry ─────────────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mcp_registry: McpRegistry = Arc::new(Mutex::new(HashMap::new()));
+    let telegram_registry: TelegramRegistry = Arc::new(Mutex::new(HashMap::new()));
 
     tauri::Builder::default()
         .manage(mcp_registry)
+        .manage(telegram_registry)
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -1910,6 +2211,10 @@ pub fn run() {
             skill_install_from_url,
             skill_uninstall,
             skill_move_files,
+            telegram_start_poll,
+            telegram_stop_poll,
+            telegram_status_all,
+            telegram_send_message,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
