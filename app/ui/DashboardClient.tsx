@@ -39,6 +39,21 @@ const FILTER_OPTIONS: Array<{ label: string; value: FeatureStatus | 'all' }> = [
   { label: 'Done', value: 'done' },
 ];
 
+const FILTER_STORAGE_KEY = 'projectManager.personal.dashboard.statusFilter';
+
+function readStoredFilter(): FeatureStatus | 'all' {
+  if (typeof window === 'undefined') return 'all';
+  try {
+    const raw = window.localStorage.getItem(FILTER_STORAGE_KEY);
+    if (raw && FILTER_OPTIONS.some((o) => o.value === raw)) {
+      return raw as FeatureStatus | 'all';
+    }
+  } catch {
+    /* localStorage disabled */
+  }
+  return 'all';
+}
+
 export function DashboardClient({
   project,
   features,
@@ -50,9 +65,18 @@ export function DashboardClient({
   onRunLog,
   onRunEnd,
 }: DashboardClientProps) {
-  const [statusFilter, setStatusFilter] = useState<FeatureStatus | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<FeatureStatus | 'all'>(readStoredFilter);
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null);
   const [dispatchFeatureId, setDispatchFeatureId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(FILTER_STORAGE_KEY, statusFilter);
+    } catch {
+      /* quota or disabled */
+    }
+  }, [statusFilter]);
 
   // Sync dispatch param from URL on mount and browser back/forward
   useEffect(() => {
