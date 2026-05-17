@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "11111111-d3v1-4000-8000-devpilot00001",
   "createdAt": "2026-05-12T00:00:00.000Z",
-  "updatedAt": "2026-05-17T00:00:00.000Z",
+  "updatedAt": "2026-05-17T01:00:00.000Z",
   "updatedBy": "Claude Opus 4.7",
   "project": {
     "name": "Project Manager",
@@ -159,27 +159,30 @@
       "id": "F12",
       "name": "Sessions View — AI Conversation History",
       "category": "Frontend/Monitor",
-      "status": "in_progress",
-      "progress": 70,
+      "status": "done",
+      "progress": 100,
       "paths": {
-        "implementation": "app/ui/views/SessionsView.tsx"
+        "implementation": "app/ui/views/SessionsView.tsx",
+        "bridge": "lib/bridge/index.ts"
       },
-      "notes": "基礎建設完成：AgentSession/SessionMessage 型別、雙欄 UI、Sidebar nav、/sessions 路由。待完成：callAnthropic 呼叫方傳 sessionId + sessionsDir 讓對話自動記錄",
-      "updatedAt": "2026-05-12T12:00:00.000Z",
-      "updatedBy": "Claude Sonnet 4.6"
+      "notes": "雙欄 UI + AgentSession/SessionMessage + Rust call_anthropic 自動寫入 sessions 目錄。IngestionView AI 解析帶 sessionId + sessionsDir，並改走 KeysView 統一的 anthropic 金鑰位置。",
+      "updatedAt": "2026-05-17T00:00:00.000Z",
+      "updatedBy": "Claude Opus 4.7"
     },
     {
       "id": "F13",
       "name": "Channels View",
       "category": "Core/Integration",
       "status": "in_progress",
-      "progress": 40,
+      "progress": 80,
       "paths": {
-        "implementation": "app/ui/views/ChannelsView.tsx"
+        "implementation": "app/ui/views/ChannelsView.tsx",
+        "bridge": "lib/bridge/index.ts",
+        "rust": "src-tauri/src/lib.rs"
       },
-      "notes": "Phase 1 純 UI 完成：Telegram/WhatsApp/LINE/WeChat 設定表單、inline edit、enable toggle、secrets 分開存放（projectManager.personal.channel.<id>.<field>）、Command Mappings（/help /status /report /run）、Getting Started guide。Phase 2（Telegram polling Rust bridge）待實作。",
-      "updatedAt": "2026-05-12T12:30:00.000Z",
-      "updatedBy": "Claude Sonnet 4.6"
+      "notes": "Phase 1 設定表單完成 + Phase 2 Telegram polling 完成：Rust telegram_start_poll/stop/status_all/send_message，long-poll getUpdates、allowed_chat_ids gate、TelegramRegistry per-channel state、telegram-message/telegram-status events。前端 ChannelsView 加 Start/Stop 控制 + Polling 狀態 pill + Recent Activity 面板 + 自動 routeTelegramCommand 路由 /help（實作）和 /status /report /run（Phase 3 stub）。Phase 3：把 /status 等接通 ProjectsRepository 真實資料。",
+      "updatedAt": "2026-05-17T00:00:00.000Z",
+      "updatedBy": "Claude Opus 4.7"
     },
     {
       "id": "F14",
