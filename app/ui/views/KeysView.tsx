@@ -1,93 +1,57 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Eye, EyeOff, Github, KeyRound, Sparkles } from 'lucide-react';
-import { getSecret, setSecret } from '../../../lib/bridge';
+import {
+  ChevronDown,
+  Eye,
+  EyeOff,
+  Github,
+  KeyRound,
+  LogIn,
+  Sparkles,
+  Upload,
+} from 'lucide-react';
+import {
+  PROVIDERS,
+  providersByCategory,
+  type ProviderSpec,
+} from '../../../lib/keys/registry';
+import { loadProviderSecret, saveProviderSecret } from '../../../lib/keys/keychain';
+import { EnvImportModal } from './_components/EnvImportModal';
+import { OAuthDeviceModal } from './_components/OAuthDeviceModal';
 
-const KEYCHAIN_SERVICE = 'projectmanager';
-const LS_PREFIX = 'projectManager-key:';
-
-interface KeyEntry {
-  id: string;
-  label: string;
-  placeholder: string;
-  keychainKey: string;
-  lsKey: string;
-  docUrl: string;
-}
-
-const AI_KEYS: KeyEntry[] = [
-  {
-    id: 'anthropic',
-    label: 'Anthropic (Claude API)',
-    placeholder: 'sk-ant-...',
-    keychainKey: 'anthropic-api-key',
-    lsKey: `${LS_PREFIX}anthropic`,
-    docUrl: 'https://console.anthropic.com/settings/keys',
-  },
-  {
-    id: 'openai',
-    label: 'OpenAI',
-    placeholder: 'sk-...',
-    keychainKey: 'openai-api-key',
-    lsKey: `${LS_PREFIX}openai`,
-    docUrl: 'https://platform.openai.com/api-keys',
-  },
-  {
-    id: 'gemini',
-    label: 'Gemini (Google AI)',
-    placeholder: 'AIza...',
-    keychainKey: 'gemini-api-key',
-    lsKey: `${LS_PREFIX}gemini`,
-    docUrl: 'https://aistudio.google.com/app/apikey',
-  },
-];
-
-const INTEGRATION_KEYS: KeyEntry[] = [
-  {
-    id: 'github',
-    label: 'GitHub Personal Access Token',
-    placeholder: 'ghp_...',
-    keychainKey: 'github-token',
-    lsKey: `${LS_PREFIX}github`,
-    docUrl: 'https://github.com/settings/tokens',
-  },
-];
-
-function KeyRow({
-  entry,
+function ProviderRow({
+  provider,
   isTauri,
+  onOpenOAuth,
+  reloadToken,
 }: {
-  entry: KeyEntry;
+  provider: ProviderSpec;
   isTauri: boolean;
+  onOpenOAuth: (p: ProviderSpec) => void;
+  /** Bumped by the parent after an import / OAuth flow so this row re-reads. */
+  reloadToken: number;
 }) {
   const [value, setValue] = useState('');
   const [show, setShow] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [loaded, setLoaded] = useState(false);
+  const [showMethods, setShowMethods] = useState(false);
 
   useEffect(() => {
-    if (isTauri) {
-      getSecret(KEYCHAIN_SERVICE, entry.keychainKey)
-        .then((v) => { if (v) setValue(v); setLoaded(true); })
-        .catch(() => setLoaded(true));
-    } else {
-      const stored = localStorage.getItem(entry.lsKey) ?? '';
-      if (stored) setValue(stored);
-      setLoaded(true);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isTauri]);
+    loadProviderSecret(provider)
+      .then((v) => {
+        setValue(v);
+        setLoaded(true);
+      })
+      .catch(() => setLoaded(true));
+  }, [provider, reloadToken]);
 
   const handleSave = async () => {
     setError('');
     try {
-      if (isTauri) {
-        await setSecret(KEYCHAIN_SERVICE, entry.keychainKey, value);
-      } else {
-        localStorage.setItem(entry.lsKey, value);
-      }
+      await saveProviderSecret(provider, value);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e: unknown) {
@@ -97,14 +61,10 @@ function KeyRow({
 
   const handleClear = async () => {
     if (!value) return;
-    if (typeof window !== 'undefined' && !window.confirm(`Clear the ${entry.label} key?`)) return;
+    if (typeof window !== 'undefined' && !window.confirm(`Clear the ${provider.label} key?`)) return;
     setError('');
     try {
-      if (isTauri) {
-        await setSecret(KEYCHAIN_SERVICE, entry.keychainKey, '');
-      } else {
-        localStorage.removeItem(entry.lsKey);
-      }
+      await saveProviderSecret(provider, '');
       setValue('');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
@@ -112,11 +72,12 @@ function KeyRow({
   };
 
   const isConfigured = loaded && value.length > 0;
+  const hasOAuth = provider.supportedMethods.includes('oauth') && !!provider.oauthConfig;
 
   return (
     <div className="border-b border-stone-200/10 px-4 py-4 last:border-b-0">
       <div className="mb-2.5 flex items-center gap-2.5">
-        <span className="text-sm text-stone-100">{entry.label}</span>
+        <span className="text-sm text-stone-100">{provider.label}</span>
         {isConfigured ? (
           <span className="border border-emerald-200/30 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.14em] text-emerald-300/90">
             Configured
@@ -127,26 +88,38 @@ function KeyRow({
           </span>
         )}
         <a
-          href={entry.docUrl}
+          href={provider.docUrl}
           target="_blank"
           rel="noreferrer"
           className="ml-auto text-[11px] text-stone-500 hover:text-stone-300 transition-colors"
         >
           Get key ↗
         </a>
+        {provider.supportedMethods.length > 1 && (
+          <button
+            onClick={() => setShowMethods((s) => !s)}
+            className="text-[11px] text-stone-500 hover:text-stone-200 inline-flex items-center gap-1"
+            aria-expanded={showMethods}
+            aria-label="More sign-in methods"
+          >
+            More <ChevronDown size={11} className={showMethods ? 'rotate-180 transition-transform' : 'transition-transform'} />
+          </button>
+        )}
       </div>
+
       <div className="flex gap-2">
         <div className="relative flex-1">
           <input
             type={show ? 'text' : 'password'}
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder={entry.placeholder}
+            placeholder={provider.placeholder}
             className="w-full border border-stone-200/18 bg-[#03100f] px-3 py-2 pr-10 font-mono text-sm text-stone-100 outline-none focus:ring-1 focus:ring-emerald-300/35"
           />
           <button
             onClick={() => setShow((s) => !s)}
             className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-200 transition-colors"
+            aria-label={show ? 'Hide key' : 'Show key'}
           >
             {show ? <EyeOff size={14} /> : <Eye size={14} />}
           </button>
@@ -171,6 +144,27 @@ function KeyRow({
           </button>
         )}
       </div>
+
+      {showMethods && (
+        <div className="mt-3 space-y-1.5 border-l border-stone-200/15 pl-3 text-[11px]">
+          {hasOAuth && (
+            <button
+              onClick={() => onOpenOAuth(provider)}
+              disabled={!isTauri}
+              className="inline-flex items-center gap-1.5 text-stone-300 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"
+              title={isTauri ? undefined : 'OAuth requires the desktop app'}
+            >
+              <LogIn size={11} /> Sign in with browser (OAuth Device Flow)
+            </button>
+          )}
+          {provider.supportedMethods.includes('envImport') && (
+            <p className="text-stone-500">
+              Or use the <span className="text-stone-300">Import from .env</span> button above to bulk-import.
+            </p>
+          )}
+        </div>
+      )}
+
       {error && <p className="mt-1.5 text-[11px] text-red-400">{error}</p>}
     </div>
   );
@@ -181,13 +175,17 @@ function SectionCard({
   icon,
   subtitle,
   isTauri,
-  entries,
+  providers,
+  onOpenOAuth,
+  reloadToken,
 }: {
   title: string;
   icon: React.ReactNode;
   subtitle: string;
   isTauri: boolean;
-  entries: KeyEntry[];
+  providers: ProviderSpec[];
+  onOpenOAuth: (p: ProviderSpec) => void;
+  reloadToken: number;
 }) {
   return (
     <section className="border border-stone-200/18 bg-[#071d1a]/72">
@@ -208,8 +206,14 @@ function SectionCard({
         )}
       </div>
       <div>
-        {entries.map((entry) => (
-          <KeyRow key={entry.id} entry={entry} isTauri={isTauri} />
+        {providers.map((p) => (
+          <ProviderRow
+            key={p.id}
+            provider={p}
+            isTauri={isTauri}
+            onOpenOAuth={onOpenOAuth}
+            reloadToken={reloadToken}
+          />
         ))}
       </div>
     </section>
@@ -218,21 +222,53 @@ function SectionCard({
 
 export function KeysView() {
   const [isTauri, setIsTauri] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [oauthProvider, setOauthProvider] = useState<ProviderSpec | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+  const [importedFlash, setImportedFlash] = useState('');
 
   useEffect(() => {
     setIsTauri(typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window);
   }, []);
 
+  const aiProviders = providersByCategory('ai');
+  const integrationProviders = providersByCategory('integration');
+
+  const handleImported = (count: number) => {
+    setShowImport(false);
+    setReloadToken((n) => n + 1);
+    setImportedFlash(`Imported ${count} key${count === 1 ? '' : 's'} into ${isTauri ? 'Keychain' : 'localStorage'}.`);
+    setTimeout(() => setImportedFlash(''), 4000);
+  };
+
+  const handleOAuthAuthorized = () => {
+    setOauthProvider(null);
+    setReloadToken((n) => n + 1);
+  };
+
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">Keys</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">Keys</h1>
+          <button
+            onClick={() => setShowImport(true)}
+            className="ml-auto inline-flex items-center gap-1.5 border border-stone-200/22 px-3 py-1.5 text-[11px] uppercase tracking-[0.14em] text-stone-200 hover:bg-stone-200/8"
+          >
+            <Upload size={12} /> Import from .env
+          </button>
+        </div>
         <p className="mt-1 text-xs text-stone-400">
           API keys and tokens.{' '}
           {isTauri
             ? 'All secrets are stored in the macOS Keychain — never written to disk in plaintext.'
             : 'In dev mode, stored in localStorage. In production (Tauri), stored in OS Keychain.'}
         </p>
+        {importedFlash && (
+          <p className="mt-2 inline-block border border-emerald-300/35 bg-emerald-300/8 px-2 py-1 text-[11px] text-emerald-200">
+            {importedFlash}
+          </p>
+        )}
       </div>
 
       <SectionCard
@@ -240,7 +276,9 @@ export function KeysView() {
         icon={<Sparkles size={15} className="text-amber-100" />}
         subtitle="Keys used by AI adapters and the Rust call_anthropic bridge."
         isTauri={isTauri}
-        entries={AI_KEYS}
+        providers={aiProviders}
+        onOpenOAuth={setOauthProvider}
+        reloadToken={reloadToken}
       />
 
       <SectionCard
@@ -248,7 +286,9 @@ export function KeysView() {
         icon={<Github size={15} className="text-stone-300" />}
         subtitle="Tokens for external services such as GitHub polling."
         isTauri={isTauri}
-        entries={INTEGRATION_KEYS}
+        providers={integrationProviders}
+        onOpenOAuth={setOauthProvider}
+        reloadToken={reloadToken}
       />
 
       <section className="border border-stone-200/18 bg-[#071d1a]/72">
@@ -264,6 +304,7 @@ export function KeysView() {
             { label: 'Backend', value: isTauri ? 'OS Keychain (keyring crate)' : 'localStorage', ok: isTauri },
             { label: 'Renderer access', value: 'None — proxied via Rust bridge', ok: true },
             { label: 'Disk plaintext', value: 'Never', ok: true },
+            { label: 'Providers tracked', value: `${PROVIDERS.length}`, ok: true },
           ].map(({ label, value, ok }) => (
             <div key={label} className="flex items-center justify-between text-sm">
               <span className="text-stone-400">{label}</span>
@@ -272,6 +313,17 @@ export function KeysView() {
           ))}
         </div>
       </section>
+
+      {showImport && (
+        <EnvImportModal onClose={() => setShowImport(false)} onImported={handleImported} />
+      )}
+      {oauthProvider && (
+        <OAuthDeviceModal
+          provider={oauthProvider}
+          onClose={() => setOauthProvider(null)}
+          onAuthorized={handleOAuthAuthorized}
+        />
+      )}
     </div>
   );
 }
