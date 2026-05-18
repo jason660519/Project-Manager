@@ -47,6 +47,7 @@ function renderModal(overrides: Partial<Parameters<typeof ProjectsView>[0]> = {}
       onAddProject={onAddProject}
       onRemoveProject={() => {}}
       onSyncProject={async () => {}}
+      onInitializeProject={async () => {}}
       runHistory={[]}
       {...overrides}
     />,

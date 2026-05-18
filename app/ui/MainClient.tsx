@@ -6,6 +6,7 @@ import sampleConfig1 from '../../config/samples/project-manager.sample.json';
 import sampleConfig2 from '../../config/samples/project-manager-self.sample.json';
 import { listAdapters } from '../../lib/adapters/registry';
 import {
+  ensureEngineerRoles,
   getProjectsRepository,
   mergeFeaturesById,
   migrateConfig,
@@ -37,6 +38,9 @@ import { CronJobsView } from './views/CronJobsView';
 import { LogsView } from './views/LogsView';
 import { SessionsView } from './views/SessionsView';
 import { KeysView } from './views/KeysView';
+import { EnvImportModal } from './views/_components/EnvImportModal';
+import { parseEnvText } from '../../lib/keys/envParser';
+import { detectProviders } from '../../lib/keys/detectProviders';
 import { KeyboardShortcutsView } from './views/KeyboardShortcutsView';
 import { SettingsView } from './views/SettingsView';
 import { DocumentationView } from './views/DocumentationView';
@@ -44,13 +48,13 @@ import { DocumentationView } from './views/DocumentationView';
 const INITIAL_PROJECTS: ProjectEntry[] = [
   {
     id: 'owner-property',
-    config: sampleConfig1 as ProjectManagerConfig,
+    config: ensureEngineerRoles(sampleConfig1 as ProjectManagerConfig),
     configPath:
       '/Volumes/KLEVV-4T-1/Real Estate Management Projects/Owner-Property-Management-AI-SPA/.project-manager.json',
   },
   {
     id: 'project-manager',
-    config: sampleConfig2 as ProjectManagerConfig,
+    config: ensureEngineerRoles(sampleConfig2 as ProjectManagerConfig),
     configPath: '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager.json',
   },
 ];
@@ -93,7 +97,9 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
       // Always keep the canonical (bundled) sample projects with their latest
       // config; append any user-added projects from storage as extras.
       const fallbackIds = new Set(INITIAL_PROJECTS.map((p) => p.id));
-      const extras = stored.filter((p) => !fallbackIds.has(p.id));
+      const extras = stored
+        .filter((p) => !fallbackIds.has(p.id))
+        .map((p) => ({ ...p, config: ensureEngineerRoles(p.config) }));
       const safeProjects =
         stored.length > 0 ? [...INITIAL_PROJECTS, ...extras] : INITIAL_PROJECTS;
       setProjects(safeProjects);
@@ -225,11 +231,51 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
     (async () => {
       const { onConfigChanged } = await import('../../lib/bridge');
       unlisten = await onConfigChanged(({ path, config }) => {
-        setProjects((prev) => prev.map((p) => (p.configPath === path ? { ...p, config } : p)));
+        const migrated = ensureEngineerRoles(migrateConfig(config));
+        setProjects((prev) =>
+          prev.map((p) => (p.configPath === path ? { ...p, config: migrated } : p)),
+        );
       });
     })();
     return () => unlisten?.();
   }, [isTauri]);
+
+  // Tauri boot: hydrate local projects from disk immediately (don't wait for the
+  // 2 s poll) and back-fill any missing default engineer roles.
+  useEffect(() => {
+    if (!isTauri || !storageInitialized) return;
+    let cancelled = false;
+    (async () => {
+      const { readConfig } = await import('../../lib/bridge');
+      const reads = await Promise.all(
+        INITIAL_PROJECTS.filter(
+          (p) => p.configPath && !p.configPath.startsWith('https://'),
+        ).map(async (p) => {
+          try {
+            const disk = ensureEngineerRoles(await readConfig(p.configPath));
+            return { path: p.configPath, config: disk };
+          } catch {
+            return null;
+          }
+        }),
+      );
+      if (cancelled) return;
+      const byPath = new Map(
+        reads.filter((r): r is { path: string; config: ProjectManagerConfig } => r !== null)
+          .map((r) => [r.path, r.config]),
+      );
+      if (byPath.size === 0) return;
+      setProjects((prev) =>
+        prev.map((p) => {
+          const disk = byPath.get(p.configPath);
+          return disk ? { ...p, config: disk } : p;
+        }),
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isTauri, storageInitialized]);
 
   // Persist projects and selected project across route changes/reloads.
   useEffect(() => {
@@ -402,11 +448,15 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
     [isTauri, selectedProjectId],
   );
 
-  // Cross-project lookup: progress dashboard features may come from any project
-  // (their id is namespaced as "projectId::featureId"). Splits the namespaced
-  // id and routes the patch back to the originating project.
-  const handleFeaturePromptSave = useCallback(
-    (namespacedId: string, config: FeaturePromptConfig) => {
+  // Cross-project feature patcher used by the progress dashboard. The
+  // dashboard's row id is namespaced as `<projectId>::<featureId>` because
+  // features from multiple projects can be aggregated into one view; this
+  // splits the prefix off and routes the partial patch back to the
+  // originating project's config.  Accepts any subset of Feature fields so
+  // the dashboard can edit testCoverage / deployStatus / etc. without each
+  // new field needing its own handler.
+  const handleFeaturePatch = useCallback(
+    (namespacedId: string, patch: Partial<Feature>) => {
       const sep = namespacedId.indexOf('::');
       const projectId = sep > 0 ? namespacedId.slice(0, sep) : selectedProjectId;
       const featureId = sep > 0 ? namespacedId.slice(sep + 2) : namespacedId;
@@ -417,7 +467,7 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
             ...p.config,
             features: p.config.features.map((f) =>
               f.id === featureId
-                ? { ...f, promptConfig: config, updatedAt: new Date().toISOString() }
+                ? { ...f, ...patch, updatedAt: new Date().toISOString() }
                 : f,
             ),
           };
@@ -431,6 +481,15 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
       );
     },
     [isTauri, selectedProjectId],
+  );
+
+  // Thin wrapper around the generic patcher kept for call-site readability —
+  // the prompt-config flow is the loudest consumer and "save my prompt" is
+  // clearer than a `{ promptConfig: ... }` patch object at the call site.
+  const handleFeaturePromptSave = useCallback(
+    (namespacedId: string, config: FeaturePromptConfig) =>
+      handleFeaturePatch(namespacedId, { promptConfig: config }),
+    [handleFeaturePatch],
   );
 
   // Manual cron job run: same code path as the heartbeat would take, but
@@ -452,11 +511,41 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
     [handleRunStart],
   );
 
-  const handleAddProject = useCallback((entry: ProjectEntry) => {
-    setProjects((prev) => [...prev, entry]);
-    setSelectedProjectId(entry.id);
-    setSelectedDashboardProjectIds((prev) => (prev.includes(entry.id) ? prev : [...prev, entry.id]));
-  }, []);
+  // Surfaces the .env import modal after a project is added when its root
+  // contains real credentials we recognise. Skipped for GitHub-sourced
+  // projects (no FS) and dev mode (no Tauri scan command).
+  const [pendingEnvImportRoot, setPendingEnvImportRoot] = useState<string>('');
+
+  const handleAddProject = useCallback(
+    (entry: ProjectEntry) => {
+      setProjects((prev) => [...prev, entry]);
+      setSelectedProjectId(entry.id);
+      setSelectedDashboardProjectIds((prev) => (prev.includes(entry.id) ? prev : [...prev, entry.id]));
+
+      if (!isTauri) return;
+      const root = entry.config.project.root;
+      if (!root || root.startsWith('https://')) return;
+      // Pre-flight scan so we only open the modal when there's actually
+      // something worth importing. Anything that fails (no .env, parse error,
+      // no provider match) silently drops the prompt.
+      void (async () => {
+        try {
+          const { scanEnvFiles } = await import('../../lib/bridge');
+          const files = await scanEnvFiles(root);
+          for (const f of files) {
+            const detected = detectProviders(parseEnvText(f.content));
+            if (detected.some((d) => d.status !== 'empty')) {
+              setPendingEnvImportRoot(root);
+              return;
+            }
+          }
+        } catch {
+          /* silent — pre-flight is best-effort */
+        }
+      })();
+    },
+    [isTauri],
+  );
 
   /**
    * Remove a project from PM's tracked list. Always removes the in-memory entry
@@ -493,6 +582,63 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
    * remote feature list onto local PM-side edits (status / progress / notes).
    * Stamps `lastSyncedAt` so the card can show "Synced X ago".
    */
+  const handleInitializeProject = useCallback(
+    async (id: string, mode: 'create' | 'merge' | 'overwrite') => {
+      const target = projects.find((p) => p.id === id);
+      if (!target) throw new Error('Project not found');
+      if (target.configPath.startsWith('https://')) {
+        throw new Error('Initialize is only available for local projects');
+      }
+      if (!isTauri) throw new Error('Initialize requires the Project Manager desktop app');
+
+      const {
+        buildOverwriteScaffold,
+        buildProjectScaffold,
+        ensureFeaturePaths,
+        mergeProjectConfig,
+      } = await import('../../lib/storage');
+      const { initializeProject, readConfig, writeConfig } = await import('../../lib/bridge');
+
+      const root =
+        target.config.project.root ||
+        target.configPath.replace(/\/\.project-manager\.json$/, '');
+      let config = buildProjectScaffold(root, { projectName: target.config.project.name });
+      let invokeMode: 'create' | 'merge' | 'overwrite' = mode;
+
+      if (mode === 'merge' || mode === 'overwrite') {
+        try {
+          const existing = await readConfig(target.configPath);
+          config =
+            mode === 'merge'
+              ? mergeProjectConfig(existing, config)
+              : buildOverwriteScaffold(root, existing.project.name);
+        } catch {
+          invokeMode = 'create';
+        }
+      }
+
+      config = { ...config, features: ensureFeaturePaths(config.features) };
+      const result = await initializeProject(root, config, invokeMode);
+      let mergedConfig = await readConfig(result.configPath);
+      mergedConfig = { ...mergedConfig, features: ensureFeaturePaths(mergedConfig.features) };
+      await writeConfig(result.configPath, mergedConfig);
+
+      setProjects((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                config: mergedConfig,
+                configPath: result.configPath,
+                lastSyncedAt: new Date().toISOString(),
+              }
+            : p,
+        ),
+      );
+    },
+    [isTauri, projects],
+  );
+
   const handleSyncProject = useCallback(
     async (id: string) => {
       const target = projects.find((p) => p.id === id);
@@ -525,7 +671,10 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
       }
 
       const mergedFeatures = mergeFeaturesById(remoteConfig.features, target.config.features);
-      const mergedConfig: ProjectManagerConfig = { ...remoteConfig, features: mergedFeatures };
+      const mergedConfig = ensureEngineerRoles({
+        ...remoteConfig,
+        features: mergedFeatures,
+      });
 
       setProjects((prev) =>
         prev.map((p) =>
@@ -715,22 +864,26 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
   return (
     <AppShell
       currentView={currentView}
-      projectName={selectedProject.config.project.name}
-      projectRoot={selectedProject.config.project.root}
       bridgeStatus={bridgeStatus}
       activeRunCount={activeRuns.length}
     >
       {currentView === 'dashboard' && (
         <ProjectProgressClient
           project={selectedProject.config.project}
+          projectRoot={selectedProject.config.project.root}
           features={dashboardFeatures}
           adapters={adapters}
           cronJobs={selectedProject.config.cronJobs ?? []}
           activeRuns={activeRuns}
+          runHistory={runHistory}
           dashboardProjectNames={effectiveDashboardProjects.map((p) => p.config.project.name)}
           onCronJobsChange={handleCronJobsUpdate}
+          onFeaturePatch={handleFeaturePatch}
           onFeaturePromptSave={handleFeaturePromptSave}
           onRunCronJob={handleRunCronJob}
+          onRunStart={handleRunStart}
+          onRunLog={handleRunLog}
+          onRunEnd={handleRunEnd}
         />
       )}
       {currentView === 'features' && (
@@ -757,6 +910,7 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
           onAddProject={handleAddProject}
           onRemoveProject={handleRemoveProject}
           onSyncProject={handleSyncProject}
+          onInitializeProject={handleInitializeProject}
           runHistory={runHistory}
         />
       )}
@@ -797,6 +951,13 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
         <ProjectFilesView
           projects={projects}
           selectedDashboardProjectIds={selectedDashboardProjectIds}
+        />
+      )}
+      {pendingEnvImportRoot && (
+        <EnvImportModal
+          projectRoot={pendingEnvImportRoot}
+          onClose={() => setPendingEnvImportRoot('')}
+          onImported={() => setPendingEnvImportRoot('')}
         />
       )}
     </AppShell>

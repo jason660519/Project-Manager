@@ -8,8 +8,8 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  FolderGit2,
   FolderOpen,
+  FolderPlus,
   Github,
   Loader2,
   Plus,
@@ -19,6 +19,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import type { InitializeMode } from '../../../lib/storage';
 import { migrateConfig, resolveConfigPath } from '../../../lib/storage';
 import { CompletedRun, ProjectManagerConfig, Feature, ProjectEntry } from '../../../lib/types';
 
@@ -31,7 +32,14 @@ interface ProjectsViewProps {
   onAddProject: (entry: ProjectEntry) => void;
   onRemoveProject: (id: string, deleteConfigFile: boolean) => Promise<void> | void;
   onSyncProject: (id: string) => Promise<void>;
+  onInitializeProject: (id: string, mode: InitializeMode) => Promise<void>;
   runHistory: CompletedRun[];
+}
+
+function isMissingConfigError(message: string): boolean {
+  return /No such file or directory|Is a directory|os error 2\b|os error 21\b|CONFIG_EXISTS/i.test(
+    message,
+  );
 }
 
 function formatRelativeTime(iso: string): string {
@@ -67,6 +75,7 @@ export function ProjectsView({
   onAddProject,
   onRemoveProject,
   onSyncProject,
+  onInitializeProject,
   runHistory,
 }: ProjectsViewProps) {
   const [showAddModal, setShowAddModal] = useState(false);
@@ -97,6 +106,8 @@ export function ProjectsView({
   // Sync state — track which project ids are currently syncing + any error.
   const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set());
   const [syncErrors, setSyncErrors] = useState<Record<string, string>>({});
+  const [initializingIds, setInitializingIds] = useState<Set<string>>(new Set());
+  const [initConfirmTarget, setInitConfirmTarget] = useState<ProjectEntry | null>(null);
 
   // Delete confirmation modal state.
   const [deleteTarget, setDeleteTarget] = useState<ProjectEntry | null>(null);
@@ -348,6 +359,50 @@ export function ProjectsView({
     await Promise.all(projects.map((p) => handleSyncOne(p.id)));
   };
 
+  const runInitialize = async (project: ProjectEntry, mode: InitializeMode) => {
+    setInitializingIds((prev) => new Set(prev).add(project.id));
+    setSyncErrors((prev) => {
+      if (!(project.id in prev)) return prev;
+      const next = { ...prev };
+      delete next[project.id];
+      return next;
+    });
+    try {
+      await onInitializeProject(project.id, mode);
+      setInitConfirmTarget(null);
+    } catch (e) {
+      const raw = e instanceof Error ? e.message : String(e);
+      if (/CONFIG_EXISTS/i.test(raw)) {
+        setInitConfirmTarget(project);
+      } else {
+        setSyncErrors((prev) => ({ ...prev, [project.id]: raw }));
+      }
+    } finally {
+      setInitializingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(project.id);
+        return next;
+      });
+    }
+  };
+
+  const handleInitializeClick = async (project: ProjectEntry) => {
+    if (!isTauri) {
+      setSyncErrors((prev) => ({
+        ...prev,
+        [project.id]: 'Initialize requires the Project Manager desktop app (Tauri).',
+      }));
+      return;
+    }
+    if (project.configPath.startsWith('https://')) return;
+    await runInitialize(project, 'create');
+  };
+
+  const confirmInitializeMode = async (mode: InitializeMode) => {
+    if (!initConfirmTarget) return;
+    await runInitialize(initConfirmTarget, mode);
+  };
+
   const openDeleteConfirm = (project: ProjectEntry) => {
     setDeleteTarget(project);
     setDeleteAlsoFile(false);
@@ -493,8 +548,11 @@ export function ProjectsView({
           const isSelected = project.id === selectedProjectId;
           const isDashboardSelected = selectedDashboardProjectIds.includes(project.id);
           const isSyncing = syncingIds.has(project.id);
+          const isInitializing = initializingIds.has(project.id);
           const syncError = syncErrors[project.id];
           const isGithub = project.configPath.startsWith('https://github.com/');
+          const showInitialize =
+            !isGithub && (isMissingConfigError(syncError ?? '') || !project.lastSyncedAt);
 
           return (
             <div
@@ -517,10 +575,6 @@ export function ProjectsView({
                     onClick={(e) => e.stopPropagation()}
                     className="h-4 w-4 cursor-pointer accent-emerald-400"
                     title="Include this project in Dashboard"
-                  />
-                  <FolderGit2
-                    size={16}
-                    className={isSelected ? 'text-emerald-300' : 'text-stone-400'}
                   />
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -548,15 +602,29 @@ export function ProjectsView({
                   {/* Hover-revealed action group. Sync stays visible while spinning so users get feedback. */}
                   <div
                     className={`flex items-center gap-1 transition-opacity ${
-                      isSyncing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                      isSyncing || isInitializing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                     }`}
                   >
+                    {showInitialize && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleInitializeClick(project);
+                        }}
+                        disabled={isInitializing || isSyncing}
+                        title="Create .project-manager.json, docs/features/, and docs/dev-logs/"
+                        className="flex h-7 items-center gap-1 border border-emerald-200/30 bg-emerald-500/15 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-emerald-100 hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <FolderPlus size={12} className={isInitializing ? 'animate-pulse' : ''} />
+                        Init
+                      </button>
+                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         void handleSyncOne(project.id);
                       }}
-                      disabled={isSyncing}
+                      disabled={isSyncing || isInitializing}
                       title={isGithub ? 'Re-fetch from GitHub' : 'Re-read .project-manager.json from disk'}
                       className="flex h-7 w-7 items-center justify-center text-stone-400 hover:bg-white/5 hover:text-stone-100 disabled:cursor-not-allowed disabled:opacity-40"
                     >
@@ -576,9 +644,22 @@ export function ProjectsView({
                 </div>
               </div>
               {syncError && (
-                <div className="flex items-start gap-2 border-t border-red-500/25 bg-red-900/15 px-4 py-2 text-[11px] text-red-300">
+                <div className="flex flex-wrap items-start gap-2 border-t border-red-500/25 bg-red-900/15 px-4 py-2 text-[11px] text-red-300">
                   <AlertTriangle size={12} className="mt-0.5 shrink-0" />
-                  <span className="min-w-0 break-words">Sync failed: {syncError}</span>
+                  <span className="min-w-0 flex-1 break-words">Sync failed: {syncError}</span>
+                  {showInitialize && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleInitializeClick(project);
+                      }}
+                      disabled={isInitializing}
+                      className="shrink-0 border border-emerald-200/35 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-emerald-100 hover:bg-emerald-500/30 disabled:opacity-50"
+                    >
+                      Initialize
+                    </button>
+                  )}
                   <button
                     onClick={() =>
                       setSyncErrors((prev) => {
@@ -587,7 +668,7 @@ export function ProjectsView({
                         return next;
                       })
                     }
-                    className="ml-auto shrink-0 text-red-400 hover:text-red-200"
+                    className="shrink-0 text-red-400 hover:text-red-200"
                   >
                     <X size={11} />
                   </button>
@@ -625,6 +706,52 @@ export function ProjectsView({
           <pre className="max-h-96 overflow-auto whitespace-pre-wrap p-4 font-mono text-xs leading-5 text-stone-300">
             {reportText}
           </pre>
+        </div>
+      )}
+
+      {/* Initialize — config already exists */}
+      {initConfirmTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md border border-amber-200/25 bg-[#071d1a] shadow-2xl">
+            <div className="flex items-center gap-2 border-b border-stone-200/12 bg-amber-500/10 px-6 py-4">
+              <AlertTriangle size={18} className="text-amber-200" />
+              <h3 className="text-base font-semibold text-stone-50">Config already exists</h3>
+            </div>
+            <div className="space-y-3 px-6 py-5 text-sm text-stone-200">
+              <p>
+                <span className="font-medium text-stone-50">{initConfirmTarget.config.project.name}</span>{' '}
+                already has a <code className="font-mono text-stone-300">.project-manager.json</code> on disk.
+              </p>
+              <p className="text-xs text-stone-400">
+                Merge keeps your features and fills missing engineer roles. Overwrite replaces the file with a
+                fresh empty scaffold (features cleared). Both ensure <code className="font-mono">docs/features/</code>{' '}
+                and <code className="font-mono">docs/dev-logs/</code> exist.
+              </p>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2 border-t border-stone-200/12 bg-white/[0.035] px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setInitConfirmTarget(null)}
+                className="px-4 py-2 text-sm text-stone-300 hover:bg-white/5"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmInitializeMode('merge')}
+                className="border border-cyan-200/30 bg-cyan-500/15 px-4 py-2 text-sm font-medium text-cyan-100 hover:bg-cyan-500/25"
+              >
+                Merge
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmInitializeMode('overwrite')}
+                className="bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500"
+              >
+                Overwrite
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

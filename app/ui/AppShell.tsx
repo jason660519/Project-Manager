@@ -3,13 +3,10 @@
 import type { ReactNode } from 'react';
 import { ViewId } from '../../lib/types';
 import { Sidebar } from './Sidebar';
-import { Topbar } from './Topbar';
 
 interface AppShellProps {
   children: ReactNode;
   currentView: ViewId;
-  projectName: string;
-  projectRoot: string;
   bridgeStatus: 'dry-run' | 'connected' | 'offline' | 'live';
   activeRunCount: number;
 }
@@ -17,8 +14,6 @@ interface AppShellProps {
 export function AppShell({
   children,
   currentView,
-  projectName,
-  projectRoot,
   bridgeStatus,
   activeRunCount,
 }: AppShellProps) {
@@ -33,11 +28,6 @@ export function AppShell({
           activeRunCount={activeRunCount}
         />
         <div className="min-w-0 border-l border-stone-200/15">
-          <Topbar
-            currentView={currentView}
-            projectName={projectName}
-            projectRoot={projectRoot}
-          />
           <div className="px-4 py-4 sm:px-6 lg:px-7 lg:py-6">{children}</div>
         </div>
       </div>

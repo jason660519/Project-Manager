@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Trash2, Users2 } from 'lucide-react';
+import { Plus, Trash2, Users2, Workflow } from 'lucide-react';
+import { DEFAULT_AGENT_WORKFLOWS, getRecommendedWorkflowsForRole } from '../../../lib/agent-workflows';
+import { DEFAULT_ENGINEER_ROLES } from '../../../lib/defaults/engineerRoles';
 import type { AnyAdapterConfig, EngineerRole } from '../../../lib/types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -29,74 +31,17 @@ function slugColor(slug: string): string {
   return SLUG_COLORS[slug] ?? 'border-stone-300/35 text-stone-300/80';
 }
 
-const DEFAULT_ROLES: EngineerRole[] = [
-  {
-    id: 'role-frontend',
-    name: 'Frontend Engineer',
-    slug: 'frontend',
-    skills: ['React', 'TypeScript', 'Tailwind CSS', 'Next.js'],
-    commands: ['npm run dev', 'npm run typecheck', 'npm run build'],
-    systemPrompt:
-      'You are a senior frontend engineer specializing in React and TypeScript. Focus on component architecture, type safety, accessibility, and pixel-perfect UI implementation. Follow the project\'s existing patterns and conventions. Prefer composition over inheritance, keep components small and focused.',
-    referenceFiles: ['CLAUDE.md'],
-    notes: '',
-  },
-  {
-    id: 'role-backend',
-    name: 'Backend Engineer',
-    slug: 'backend',
-    skills: ['Node.js', 'TypeScript', 'REST API', 'PostgreSQL'],
-    commands: ['npm run dev', 'npm run test'],
-    systemPrompt:
-      'You are a senior backend engineer. Focus on API design, data modeling, security, and performance. Write well-tested, maintainable server-side code. Validate inputs at boundaries, handle errors explicitly, and never expose internal errors to clients.',
-    referenceFiles: ['CLAUDE.md'],
-    notes: '',
-  },
-  {
-    id: 'role-fullstack',
-    name: 'Full-stack Engineer',
-    slug: 'fullstack',
-    skills: ['React', 'Node.js', 'TypeScript', 'PostgreSQL', 'REST API'],
-    commands: ['npm run dev', 'npm run typecheck'],
-    systemPrompt:
-      'You are a senior full-stack engineer comfortable with both frontend and backend. Balance UI quality with solid API design and data integrity. Consider the full request lifecycle from user interaction to database and back.',
-    referenceFiles: ['CLAUDE.md'],
-    notes: '',
-  },
-  {
-    id: 'role-qa',
-    name: 'QA Engineer',
-    slug: 'qa',
-    skills: ['Testing', 'Playwright', 'Vitest', 'Test Planning', 'E2E'],
-    commands: ['npm run test', 'npx playwright test'],
-    systemPrompt:
-      'You are a senior QA engineer. Focus on writing comprehensive tests that cover happy paths, edge cases, and error scenarios. Prefer integration tests over pure mocks. Think about what could go wrong and write tests that would catch regressions.',
-    referenceFiles: ['CLAUDE.md'],
-    notes: '',
-  },
-  {
-    id: 'role-devops',
-    name: 'DevOps Engineer',
-    slug: 'devops',
-    skills: ['Docker', 'CI/CD', 'GitHub Actions', 'Infrastructure', 'Shell'],
-    commands: ['docker build .', 'docker compose up', 'gh workflow run'],
-    systemPrompt:
-      'You are a senior DevOps engineer. Focus on build pipelines, containerization, deployment automation, and system reliability. Prefer declarative configuration. Make deployments repeatable and rollbacks easy.',
-    referenceFiles: ['CLAUDE.md'],
-    notes: '',
-  },
-  {
-    id: 'role-devex',
-    name: '開發者體驗專員',
-    slug: 'devex',
-    skills: ['Developer Experience', 'CLI Design', 'Documentation', 'Onboarding', 'Error Messages', 'Tooling'],
-    commands: ['npm run docs:check', 'npm run typecheck'],
-    systemPrompt:
-      'You are a senior Developer Experience (DX) specialist. Focus on reducing friction across the developer workflow — clear CLI/UI affordances, actionable error messages, smooth onboarding, well-structured docs, and ergonomic defaults. Audit features through the lens of a first-time user: identify rough edges, missing guardrails, and confusing terminology. Prefer small, polish-oriented improvements that compound over time.',
-    referenceFiles: ['CLAUDE.md'],
-    notes: '',
-  },
-];
+const MODE_COLORS: Record<string, string> = {
+  'plan-only': 'border-sky-300/30 text-sky-200/80',
+  'review-only': 'border-amber-300/30 text-amber-200/80',
+  'guarded-execution': 'border-emerald-300/30 text-emerald-200/80',
+  'ship-readiness': 'border-blue-300/30 text-blue-200/80',
+  learning: 'border-stone-300/30 text-stone-200/75',
+};
+
+function modeColor(mode: string): string {
+  return MODE_COLORS[mode] ?? 'border-stone-300/30 text-stone-200/75';
+}
 
 // ── Form state ────────────────────────────────────────────────────────────────
 
@@ -167,6 +112,7 @@ interface DetailPanelProps {
 function DetailPanel({ role, agents, onSave, onDelete }: DetailPanelProps) {
   const [form, setForm] = useState<FormState>(() => roleToForm(role));
   const [dirty, setDirty] = useState(false);
+  const recommendedWorkflows = getRecommendedWorkflowsForRole(form.slug);
 
   const set = (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const val = e.target.value;
@@ -243,6 +189,41 @@ function DetailPanel({ role, agents, onSave, onDelete }: DetailPanelProps) {
           className={`${inputCls} font-mono text-xs`}
         />
       </FormField>
+
+      {/* Workflow playbooks */}
+      <div className="border border-stone-200/12 bg-[#061512]/45 p-3">
+        <div className="mb-2 flex items-center gap-2">
+          <Workflow size={13} className="text-stone-400" />
+          <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">
+            Recommended Workflows
+          </span>
+          <span className="font-mono text-[10px] text-stone-600">
+            {recommendedWorkflows.length}
+          </span>
+        </div>
+        {recommendedWorkflows.length === 0 ? (
+          <p className="text-xs text-stone-500">
+            No workflow recommendations for this slug yet. This role can still use any workflow
+            during dispatch.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+            {recommendedWorkflows.map((workflow) => (
+              <div key={workflow.id} className="border border-stone-200/10 bg-[#03100f]/60 p-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-stone-200">{workflow.name}</span>
+                  <span className={`ml-auto border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] ${modeColor(workflow.mode)}`}>
+                    {workflow.mode}
+                  </span>
+                </div>
+                <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-stone-500">
+                  {workflow.summary}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Commands */}
       <FormField label="Common Commands" hint="(one per line)">
@@ -347,8 +328,8 @@ export function EngineersView({ roles, agents, onRolesChange }: EngineersViewPro
   };
 
   const handleInitDefaults = () => {
-    onRolesChange(DEFAULT_ROLES);
-    setSelectedId(DEFAULT_ROLES[0].id);
+    onRolesChange(DEFAULT_ENGINEER_ROLES);
+    setSelectedId(DEFAULT_ENGINEER_ROLES[0].id);
   };
 
   const handleSave = (updated: EngineerRole) => {
@@ -371,13 +352,42 @@ export function EngineersView({ roles, agents, onRolesChange }: EngineersViewPro
           AI Engineers
         </h1>
         <p className="mt-1 text-xs text-stone-400">
-          Configure engineer role presets for this project. Roles are injected into AI dispatches
-          as system context.
+          Configure engineer role presets and workflow playbooks for this project. Roles and
+          selected workflows are injected into AI dispatches as explicit operating context.
         </p>
       </div>
 
+      <div className="mb-4 border border-stone-200/12 bg-[#071d1a]/72 p-3">
+        <div className="mb-2 flex items-center gap-2">
+          <Workflow size={13} className="text-stone-400" />
+          <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">
+            Workflow Catalog
+          </span>
+          <span className="font-mono text-[10px] text-stone-600">
+            {DEFAULT_AGENT_WORKFLOWS.length}
+          </span>
+        </div>
+        <div className="grid gap-2 md:grid-cols-3">
+          {DEFAULT_AGENT_WORKFLOWS.map((workflow) => (
+            <div key={workflow.id} className="border border-stone-200/10 bg-[#03100f]/50 p-2">
+              <div className="flex items-center gap-2">
+                <span className="truncate text-xs font-medium text-stone-200">
+                  {workflow.name}
+                </span>
+                <span className={`ml-auto shrink-0 border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] ${modeColor(workflow.mode)}`}>
+                  {workflow.mode}
+                </span>
+              </div>
+              <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-stone-500">
+                {workflow.summary}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Master-detail layout — fixed viewport height so both panels scroll independently */}
-      <div className="flex h-[calc(100vh-11rem)] gap-0 border border-stone-200/18 bg-[#071d1a]/72">
+      <div className="flex h-[calc(100vh-22rem)] min-h-[34rem] gap-0 border border-stone-200/18 bg-[#071d1a]/72">
         {/* Left — role list */}
         <div className="flex w-60 shrink-0 flex-col border-r border-stone-200/15">
           <div className="flex items-center gap-2 border-b border-stone-200/12 px-3 py-2.5">
@@ -453,7 +463,7 @@ export function EngineersView({ roles, agents, onRolesChange }: EngineersViewPro
             <div className="flex h-full items-center justify-center">
               <p className="text-sm text-stone-500">
                 {roles.length === 0
-                  ? 'Click "Add Role" or "Initialize 5 Defaults" to get started.'
+                  ? 'Click "Add Role" or "Initialize 6 Defaults" to get started.'
                   : 'Select a role to edit.'}
               </p>
             </div>

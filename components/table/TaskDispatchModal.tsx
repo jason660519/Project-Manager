@@ -11,6 +11,11 @@ import {
   spawnAgent,
   spawnTerminal,
 } from '../../lib/bridge';
+import {
+  DEFAULT_AGENT_WORKFLOWS,
+  buildAgentWorkflowPrompt,
+  getAgentWorkflowById,
+} from '../../lib/agent-workflows';
 import { collectEnabledMcpServers } from '../../lib/storage/plugins';
 import { AgentAdapterConfig, AnyAdapterConfig, EngineerRole, ExecutionResult, Feature } from '../../lib/types';
 
@@ -113,6 +118,7 @@ export function TaskDispatchModal({
   onFeatureUpdate,
 }: TaskDispatchModalProps) {
   const [selectedRoleId, setSelectedRoleId] = useState<string>('');
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>('');
   const [selectedAdapterId, setSelectedAdapterId] = useState(adapters[0]?.id ?? '');
   const [prompt, setPrompt] = useState('');
   const [phase, setPhase] = useState<Phase>('idle');
@@ -128,6 +134,7 @@ export function TaskDispatchModal({
   const selectedAdapter = adapters.find((a) => a.id === selectedAdapterId);
   const isIDE = selectedAdapter?.type === 'ide';
   const selectedRole = engineerRoles.find((r) => r.id === selectedRoleId) ?? null;
+  const selectedWorkflow = selectedWorkflowId ? getAgentWorkflowById(selectedWorkflowId) ?? null : null;
 
   const handleRoleChange = (roleId: string) => {
     setSelectedRoleId(roleId);
@@ -222,6 +229,9 @@ export function TaskDispatchModal({
       if (parts.length > 0) {
         effectivePrompt = `${parts.join('\n\n')}\n\n---\n\n${prompt}`;
       }
+    }
+    if (selectedWorkflow) {
+      effectivePrompt = buildAgentWorkflowPrompt(selectedWorkflow, feature, effectivePrompt);
     }
 
     const args = agent.argsTemplate.map((arg) =>
@@ -375,6 +385,42 @@ export function TaskDispatchModal({
                           · 參考：{selectedRole.referenceFiles.join(', ')}
                         </span>
                       )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Workflow selector */}
+              {!isIDE && (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-stone-200">
+                    Agent Workflow
+                  </label>
+                  <select
+                    value={selectedWorkflowId}
+                    onChange={(e) => setSelectedWorkflowId(e.target.value)}
+                    className="w-full border border-stone-200/20 bg-[#03100f] px-3 py-2 text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
+                  >
+                    <option value="">— 一般派遣，不套用 workflow —</option>
+                    {DEFAULT_AGENT_WORKFLOWS.map((workflow) => (
+                      <option key={workflow.id} value={workflow.id}>
+                        {workflow.name} · {workflow.mode}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedWorkflow && (
+                    <div className="mt-1.5 border border-stone-200/12 bg-[#061512]/60 px-3 py-2 text-[11px] text-stone-400">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="border border-amber-200/25 px-1.5 py-0.5 font-mono uppercase tracking-[0.12em] text-amber-200/80">
+                          {selectedWorkflow.mode}
+                        </span>
+                        <span className="text-stone-300">{selectedWorkflow.role}</span>
+                        <span>{selectedWorkflow.summary}</span>
+                      </div>
+                      <p className="mt-1 text-stone-500">
+                        Required evidence: {selectedWorkflow.requiredChecks.slice(0, 2).join(' · ')}
+                        {selectedWorkflow.requiredChecks.length > 2 ? ' · …' : ''}
+                      </p>
                     </div>
                   )}
                 </div>

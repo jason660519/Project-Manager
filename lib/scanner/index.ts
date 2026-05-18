@@ -103,6 +103,10 @@ import { readdir, readFile, stat } from 'fs/promises';
 import type { Dirent } from 'fs';
 import { join, basename } from 'path';
 
+function joinExternalRoot(root: string, ...segments: string[]): string {
+  return join(/*turbopackIgnore: true*/ root, ...segments);
+}
+
 /**
  * Build a text-based directory tree for the given root, up to `maxDepth` levels.
  * Skips common build/cache folders.
@@ -179,17 +183,17 @@ export async function buildProjectContext(root: string): Promise<ProjectContext>
   // Read key files
   const keyFiles: Record<string, string> = {};
   for (const file of KEY_FILES) {
-    const content = await safeReadFile(join(root, file));
+    const content = await safeReadFile(joinExternalRoot(root, file));
     if (content) {
       keyFiles[file] = content;
     }
   }
 
   // Also check for docs/ directory listing
-  const docsContent = await safeReadFile(join(root, 'docs'));
+  const docsContent = await safeReadFile(joinExternalRoot(root, 'docs'));
   if (docsContent === null) {
     try {
-      const docsEntries = await readdir(join(root, 'docs'));
+      const docsEntries = await readdir(joinExternalRoot(root, 'docs'));
       if (docsEntries.length > 0) {
         keyFiles['docs/'] = docsEntries.join('\n');
       }
@@ -202,7 +206,7 @@ export async function buildProjectContext(root: string): Promise<ProjectContext>
   const detectedIDEs: string[] = [];
   for (const [marker, ide] of Object.entries(IDE_MARKERS)) {
     try {
-      const s = await stat(join(root, marker));
+      const s = await stat(joinExternalRoot(root, marker));
       if (s.isDirectory()) detectedIDEs.push(ide);
     } catch {
       // marker not found
@@ -213,7 +217,7 @@ export async function buildProjectContext(root: string): Promise<ProjectContext>
   const detectedAgents: string[] = [];
   for (const marker of Object.keys(AGENT_MARKERS)) {
     try {
-      await stat(join(root, marker));
+      await stat(joinExternalRoot(root, marker));
       detectedAgents.push(AGENT_MARKERS[marker].id);
     } catch {
       // marker not found

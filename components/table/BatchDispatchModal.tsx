@@ -9,6 +9,11 @@ import {
   onAgentStdout,
   spawnAgent,
 } from '../../lib/bridge';
+import {
+  DEFAULT_AGENT_WORKFLOWS,
+  buildAgentWorkflowPrompt,
+  getAgentWorkflowById,
+} from '../../lib/agent-workflows';
 import { collectEnabledMcpServers } from '../../lib/storage/plugins';
 import { AgentAdapterConfig, AnyAdapterConfig, Feature } from '../../lib/types';
 
@@ -97,6 +102,7 @@ export function BatchDispatchModal({
 
   const [selectedAdapterId, setSelectedAdapterId] = useState(agentAdapters[0]?.id ?? '');
   const [selectedTemplate, setSelectedTemplate] = useState(0);
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState('');
   const [batchPhase, setBatchPhase] = useState<BatchPhase>('idle');
   const [items, setItems] = useState<BatchItem[]>(
     features.map((f) => ({ feature: f, phase: 'pending', logs: [] })),
@@ -112,6 +118,7 @@ export function BatchDispatchModal({
   }, []);
 
   const adapter = agentAdapters.find((a) => a.id === selectedAdapterId);
+  const selectedWorkflow = selectedWorkflowId ? getAgentWorkflowById(selectedWorkflowId) ?? null : null;
 
   const mcpServerCount = adapter
     ? Object.keys(collectEnabledMcpServers(projectRoot)).length
@@ -122,7 +129,10 @@ export function BatchDispatchModal({
   const buildArgs = (feature: Feature): string[] => {
     if (!adapter) return [];
     const agent = adapter as AgentAdapterConfig;
-    const prompt = BATCH_TEMPLATES[selectedTemplate].build(feature);
+    const basePrompt = BATCH_TEMPLATES[selectedTemplate].build(feature);
+    const prompt = selectedWorkflow
+      ? buildAgentWorkflowPrompt(selectedWorkflow, feature, basePrompt)
+      : basePrompt;
     return agent.argsTemplate.map((arg) =>
       arg
         .replaceAll('{prompt}', prompt)
@@ -254,6 +264,34 @@ export function BatchDispatchModal({
                   </select>
                 </div>
               )}
+
+              {/* Workflow selector */}
+              <div>
+                <label className="mb-1 block text-sm font-medium text-stone-200">
+                  Agent Workflow
+                </label>
+                <select
+                  value={selectedWorkflowId}
+                  onChange={(e) => setSelectedWorkflowId(e.target.value)}
+                  className="w-full border border-stone-200/20 bg-[#03100f] px-3 py-2 text-sm text-stone-100 outline-none"
+                >
+                  <option value="">— 一般批次派遣，不套用 workflow —</option>
+                  {DEFAULT_AGENT_WORKFLOWS.map((workflow) => (
+                    <option key={workflow.id} value={workflow.id}>
+                      {workflow.name} · {workflow.mode}
+                    </option>
+                  ))}
+                </select>
+                {selectedWorkflow && (
+                  <div className="mt-1.5 border border-stone-200/12 bg-[#061512]/60 px-3 py-2 text-[11px] text-stone-400">
+                    <span className="border border-amber-200/25 px-1.5 py-0.5 font-mono uppercase tracking-[0.12em] text-amber-200/80">
+                      {selectedWorkflow.mode}
+                    </span>
+                    <span className="ml-2 text-stone-300">{selectedWorkflow.role}</span>
+                    <span className="ml-2">{selectedWorkflow.summary}</span>
+                  </div>
+                )}
+              </div>
 
               {mcpInjection && (
                 <p className="text-[11px] text-emerald-300/80">
