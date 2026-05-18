@@ -55,7 +55,7 @@ Using the gathered state + this conversation's history, draft the following sect
 
 1. **Goal** — the high-level objective of this work (1–2 sentences).
 2. **Decisions made** — architectural choices, trade-offs taken, approaches ruled out and why.
-3. **Remaining work** — concrete next steps, in priority order, each with file paths.
+3. **Remaining work** — concrete next steps, in priority order, each with file paths. If a feature is in progress, write any notes to `.project-manager/features/<ID>/dev-log.md` rather than inline in `config.json`.
 4. **Gotchas / open questions** — things tried that didn't work, blocked items, items waiting on external info, ADR collisions noted.
 5. **Verification baseline at checkpoint time** — last known state of `typecheck` / `cargo check` / `jest` / `cargo test`. Mark `UNKNOWN` if not run this session.
 

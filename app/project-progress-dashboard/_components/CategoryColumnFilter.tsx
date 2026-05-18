@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Filter } from 'lucide-react';
 import { clsx } from 'clsx';
+import { useI18n } from '../../../lib/i18n';
 
 type SelectMode = 'single' | 'multi';
 
@@ -21,6 +22,7 @@ export function CategoryColumnFilter({
   onChange,
   formatLabel,
 }: CategoryColumnFilterProps) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<SelectMode>('multi');
   const rootRef = useRef<HTMLDivElement>(null);
@@ -93,7 +95,7 @@ export function CategoryColumnFilter({
                     : 'border-stone-200/15 text-stone-400 hover:text-stone-200',
                 )}
               >
-                {m === 'multi' ? '複選' : '單選'}
+                {m === 'multi' ? t.common.multiSelect : t.common.singleSelect}
               </button>
             ))}
           </div>
@@ -104,7 +106,7 @@ export function CategoryColumnFilter({
               onClick={applyAll}
               className="flex-1 rounded border border-stone-200/15 px-1.5 py-0.5 text-[10px] normal-case tracking-normal text-stone-300 hover:bg-white/5 hover:text-stone-100"
             >
-              {selected.size === categories.length ? '取消全選' : '全選'}
+              {selected.size === categories.length ? t.common.deselectAll : t.common.selectAll}
             </button>
             {active && (
               <button
@@ -112,7 +114,7 @@ export function CategoryColumnFilter({
                 onClick={clear}
                 className="rounded border border-stone-200/15 px-1.5 py-0.5 text-[10px] normal-case tracking-normal text-stone-300 hover:bg-white/5 hover:text-stone-100"
               >
-                清除
+                {t.common.clear}
               </button>
             )}
           </div>

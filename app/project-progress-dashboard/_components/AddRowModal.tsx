@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
+import { useI18n } from '../../../lib/i18n';
 import type { DeployStatus, FeaturePhase, FeatureStatus, TestStatus } from '../../../lib/types';
 import type { CustomProjectProgressRow } from '../types';
 import { DEFAULT_E2E_CATEGORY } from '../_lib/e2eCategories';
@@ -19,16 +20,18 @@ interface AddRowModalProps {
   onAdd: (row: CustomProjectProgressRow) => void;
 }
 
-const PHASE_LABEL: Record<FeaturePhase, string> = {
-  development: '開發 Development',
-  e2e_testing: 'E2E 測試 E2E Testing',
-  deployment: '部署 Deployment',
-  operations: '運維 Operations',
+const PHASE_KEY: Record<FeaturePhase, 'development' | 'e2eTesting' | 'deployment' | 'operations'> = {
+  development: 'development',
+  e2e_testing: 'e2eTesting',
+  deployment:  'deployment',
+  operations:  'operations',
 };
 
 export function AddRowModal({
   open, onClose, phase, defaultProjectName, projectNames = [], existingIds, onAdd,
 }: AddRowModalProps) {
+  const { t } = useI18n();
+  const phaseLabel = t.phases[PHASE_KEY[phase]];
   const projectOptions = projectNames.length > 0 ? projectNames : [defaultProjectName];
   const [projectName, setProjectName] = useState(defaultProjectName);
   const [rowId, setRowId] = useState('');
@@ -119,15 +122,15 @@ export function AddRowModal({
       <div className="w-full max-w-md rounded border border-stone-200/20 bg-[#061512] p-4 shadow-2xl">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-stone-100">
-            Add row · {PHASE_LABEL[phase]}
+            Add row · {phaseLabel}
           </h2>
           <button onClick={onClose} className="text-stone-400 hover:text-stone-100"><X size={16} /></button>
         </div>
         <div className="space-y-2 text-xs text-stone-200">
-          <Field label="專案名稱 *">
+          <Field label={`${t.dashboard.projectName} *`}>
             {projectOptions.length > 1 ? (
               <select
-                aria-label="專案名稱"
+                aria-label={t.dashboard.projectName}
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
                 className="input"

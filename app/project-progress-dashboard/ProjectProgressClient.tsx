@@ -138,7 +138,7 @@ export function ProjectProgressClient({
         <div className="min-w-0">
           <h1 className="flex items-center gap-2 text-xl font-semibold text-stone-50">
             <Activity className="h-5 w-5 text-emerald-300" />
-            Project Progress Dashboard <span className="text-stone-400 text-sm font-normal">(專案進度儀表板)</span>
+            Project Progress Dashboard
           </h1>
           {dashboardProjectNames.length > 0 && (
             <p className="mt-1 text-xs text-cyan-200/85">

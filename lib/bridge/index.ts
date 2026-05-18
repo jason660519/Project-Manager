@@ -905,3 +905,29 @@ export function onTelegramMessage(cb: (p: TelegramMessagePayload) => void): Prom
 export function onTelegramStatus(cb: (p: TelegramPollStatus) => void): Promise<UnlistenFn> {
   return listen<TelegramPollStatus>('telegram-status', cb);
 }
+
+// ── App update check ──────────────────────────────────────────────────────────
+
+export interface UpdateCheckResult {
+  current: string;
+  hasUpdate: boolean;
+  latest?: string;
+}
+
+/**
+ * Query the current app version and optionally the latest GitHub release.
+ * Only available inside the Tauri runtime — throws in browser / next dev.
+ * The Rust side never throws on network errors; it returns `hasUpdate: false`
+ * so the UI always gets a usable result.
+ */
+export async function checkUpdate(): Promise<UpdateCheckResult> {
+  if (!isTauri()) throw new Error('checkUpdate requires Tauri runtime');
+  const raw = await invoke<{ current: string; has_update: boolean; latest?: string }>(
+    'check_update',
+  );
+  return {
+    current: raw.current,
+    hasUpdate: raw.has_update,
+    latest: raw.latest,
+  };
+}

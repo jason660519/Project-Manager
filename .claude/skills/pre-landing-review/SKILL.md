@@ -84,6 +84,7 @@ Apply these categories first. Each finding must cite `file:line` and propose a c
 - Read path that doesn't handle missing/older `schemaVersion` → silent data loss on old projects.
 - Write path that overwrites `.project-manager.json` without an atomic rename (write-temp + rename) → corruption on crash.
 - New file under `app/api/` referenced from a component (won't exist in built Tauri app) → **static-export miss**.
+- New feature added to `config.json`? → Verify `.project-manager/features/<ID>/README.md` exists.
 
 ### 3D. LLM Output Trust Boundary (applies to AI flows)
 - LLM-generated string written to `.project-manager.json` / file path / shell arg WITHOUT shape + content validation → **stored prompt injection / path traversal**.

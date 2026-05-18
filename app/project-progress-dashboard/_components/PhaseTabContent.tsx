@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import type { AgentAdapterConfig, EngineerRole, Feature, FeaturePhase, FeaturePromptConfig } from '../../../lib/types';
+import { useI18n } from '../../../lib/i18n';
 import type { CustomProjectProgressRow, PhaseTablePrefs } from '../types';
 import { buildPhaseRows, type PhaseRow } from '../_lib/phaseRows';
 import { columnsForPhase } from '../_lib/columns';
@@ -16,6 +17,7 @@ import { PhaseTable } from './PhaseTable';
 import { PhaseTableToolbar } from './PhaseTableToolbar';
 import { AddRowModal } from './AddRowModal';
 import { PromptEngineerModal } from './PromptEngineerModal';
+import { FeatureDocPanel } from './FeatureDocPanel';
 
 interface PhaseTabContentProps {
   phase: FeaturePhase;
@@ -39,13 +41,15 @@ export function PhaseTabContent({
   phase, projectName, projectNames, projectRoot, features, engineerRoles, prefs, patch, reset, agents,
   onFeaturePromptSave, onFeaturePatch, onDispatchRow,
 }: PhaseTabContentProps) {
-  const columns = useMemo(() => columnsForPhase(phase), [phase]);
+  const { t } = useI18n();
+  const columns = useMemo(() => columnsForPhase(phase, t.dashboard.projectName), [phase, t]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [showHiddenRows, setShowHiddenRows] = useState(false);
   const [addRowOpen, setAddRowOpen] = useState(false);
   const [promptRow, setPromptRow] = useState<PhaseRow | null>(null);
+  const [notesPanelPath, setNotesPanelPath] = useState<string | null>(null);
 
   // All rows for this phase (features + custom rows).
   const allRows = useMemo(
@@ -175,6 +179,7 @@ export function PhaseTabContent({
     onPatchCustomRow,
     onChangePhase,
     onDispatch: onDispatchRow,
+    onOpenNotePanel: (absPath: string) => setNotesPanelPath(absPath),
   }), [projectRoot, engineerRoles, hiddenSet, onToggleHideRow, onDeleteCustomRow, onPatchFeature, onPatchCustomRow, onChangePhase, onDispatchRow]);
 
   return (
@@ -230,6 +235,10 @@ export function PhaseTabContent({
         row={promptRow}
         agents={agents}
         onSave={onPromptSave}
+      />
+      <FeatureDocPanel
+        absPath={notesPanelPath}
+        onClose={() => setNotesPanelPath(null)}
       />
     </div>
   );

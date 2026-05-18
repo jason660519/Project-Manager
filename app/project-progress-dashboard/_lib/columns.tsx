@@ -1,14 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Bot, Eye, EyeOff, Pencil, Settings2, Trash2 } from 'lucide-react';
+import { Bot, Eye, EyeOff, FileText, Pencil, Settings2, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import type {
   DeployStatus, EngineerRole, Feature, FeaturePhase, FeatureStatus, IDEId, TestStatus,
 } from '../../../lib/types';
 import type { CustomProjectProgressRow } from '../types';
 import type { PhaseRow } from './phaseRows';
-import { PathLink } from './pathLinks';
+import { PathLink, resolveProjectPath } from './pathLinks';
 import { E2E_CATEGORY_PALETTE, e2eCategorySelectOptions } from './e2eCategories';
 
 export interface ColumnDef {
@@ -31,6 +31,8 @@ export interface ColumnHandlers {
   onChangePhase: (row: PhaseRow, phase: FeaturePhase) => void;
   /** Quick dispatch — only meaningful for feature rows. Undefined disables it. */
   onDispatch?: (row: PhaseRow) => void;
+  /** Opens the FeatureDocPanel for the given absolute file path. */
+  onOpenNotePanel?: (absPath: string) => void;
 }
 
 const IDE_OPTIONS: ReadonlyArray<{ value: IDEId; label: string }> = [
@@ -381,11 +383,11 @@ function pointsColumn(): ColumnDef {
   };
 }
 
-function commonIdNameCols(phase: FeaturePhase): ColumnDef[] {
+function commonIdNameCols(phase: FeaturePhase, projectNameLabel = 'Project Name'): ColumnDef[] {
   const cols: ColumnDef[] = [
     {
       id: 'project',
-      header: '專案名稱',
+      header: projectNameLabel,
       accessor: (r) => r.projectName ?? '',
       cell: (r) => (
         <span className="block max-w-full truncate text-[11px] text-cyan-100/90" title={r.projectName}>
@@ -510,11 +512,79 @@ const STATUS_OPTIONS = [
   { value: 'on_hold',     label: 'On Hold' },
 ] as const;
 
+// ── Notes cell — shows a view-button that opens FeatureDocPanel ─────────────
+
+function NotesCell({
+  projectRoot, value, onOpenPanel, onCommit,
+}: {
+  projectRoot: string;
+  value?: string;
+  onOpenPanel: (absPath: string) => void;
+  onCommit: (next: string | undefined) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value ?? '');
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => { if (!editing) setDraft(value ?? ''); }, [value, editing]);
+  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type="text"
+        value={draft}
+        placeholder=".project-manager/features/F01/README.md"
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          setEditing(false);
+          const next = draft.trim();
+          if (next !== (value ?? '')) onCommit(next || undefined);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+          if (e.key === 'Escape') { setDraft(value ?? ''); setEditing(false); }
+          e.stopPropagation();
+        }}
+        onClick={(e) => e.stopPropagation()}
+        className="h-6 w-full min-w-[8rem] rounded border border-emerald-300/40 bg-[#020a09]/95 px-1 font-mono text-[11px] text-stone-100 focus:outline-none"
+      />
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      {value ? (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onOpenPanel(resolveProjectPath(projectRoot, value)); }}
+          title={resolveProjectPath(projectRoot, value)}
+          className="inline-flex items-center gap-1 truncate rounded px-1.5 py-0.5 text-[11px] text-cyan-200/90 hover:bg-white/5 hover:text-cyan-100 transition-colors"
+        >
+          <FileText size={11} className="shrink-0 opacity-80" />
+          <span className="truncate max-w-[120px]">{value.split('/').pop()}</span>
+        </button>
+      ) : (
+        <span className="text-xs text-stone-500">—</span>
+      )}
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+        className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-stone-400 hover:bg-white/10 hover:text-stone-100"
+        title={value ? 'Edit path' : 'Set notes path'}
+      >
+        <Pencil size={10} />
+      </button>
+    </div>
+  );
+}
+
 // ── Column factories ────────────────────────────────────────────────────────
 
-export function createDevelopmentColumns(): ColumnDef[] {
+export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[] {
   return [
-    ...commonIdNameCols('development'),
+    ...commonIdNameCols('development', projectNameLabel),
     { id: 'progress', header: 'Progress', accessor: (r) => r.progress, cell: (r, h) => (
       <EditableProgressBar
         percent={r.progress}
@@ -635,9 +705,10 @@ export function createDevelopmentColumns(): ColumnDef[] {
       />
     )},
     { id: 'notes', header: 'Notes', accessor: (r) => r.notes ?? '', cell: (r, h) => (
-      <EditableText
+      <NotesCell
+        projectRoot={h.projectRoot}
         value={r.notes}
-        placeholder="add note…"
+        onOpenPanel={(absPath) => h.onOpenNotePanel?.(absPath)}
         onCommit={(v) => patchRow(r, { notes: v || undefined }, h)}
       />
     )},
@@ -645,9 +716,9 @@ export function createDevelopmentColumns(): ColumnDef[] {
   ];
 }
 
-export function createTestingColumns(): ColumnDef[] {
+export function createTestingColumns(projectNameLabel?: string): ColumnDef[] {
   return [
-    ...commonIdNameCols('e2e_testing'),
+    ...commonIdNameCols('e2e_testing', projectNameLabel),
     { id: 'coverage', header: 'Coverage', accessor: (r) => r.testCoverage ?? -1, cell: (r, h) => (
       <EditableProgressBar
         percent={r.testCoverage}
@@ -674,9 +745,9 @@ export function createTestingColumns(): ColumnDef[] {
   ];
 }
 
-export function createDeploymentColumns(): ColumnDef[] {
+export function createDeploymentColumns(projectNameLabel?: string): ColumnDef[] {
   return [
-    ...commonIdNameCols('deployment'),
+    ...commonIdNameCols('deployment', projectNameLabel),
     { id: 'deployStatus', header: 'Status', accessor: (r) => r.deployStatus ?? '', cell: (r, h) => (
       <EditableSelect
         value={r.deployStatus}
@@ -722,9 +793,9 @@ function opsNumericCell(
   );
 }
 
-export function createOperationsColumns(): ColumnDef[] {
+export function createOperationsColumns(projectNameLabel?: string): ColumnDef[] {
   return [
-    ...commonIdNameCols('operations'),
+    ...commonIdNameCols('operations', projectNameLabel),
     { id: 'uptime',   header: 'Uptime %',      accessor: (r) => r.uptimePercent   ?? -1, cell: opsNumericCell('uptimePercent') },
     { id: 'error',    header: 'Error %',       accessor: (r) => r.errorRate       ?? -1, cell: opsNumericCell('errorRate') },
     { id: 'rt',       header: 'Response (ms)', accessor: (r) => r.avgResponseTime ?? -1, cell: opsNumericCell('avgResponseTime') },
@@ -738,11 +809,11 @@ export function createOperationsColumns(): ColumnDef[] {
   ];
 }
 
-export function columnsForPhase(phase: FeaturePhase): ColumnDef[] {
+export function columnsForPhase(phase: FeaturePhase, projectNameLabel?: string): ColumnDef[] {
   switch (phase) {
-    case 'e2e_testing': return createTestingColumns();
-    case 'deployment': return createDeploymentColumns();
-    case 'operations': return createOperationsColumns();
-    default: return createDevelopmentColumns();
+    case 'e2e_testing': return createTestingColumns(projectNameLabel);
+    case 'deployment': return createDeploymentColumns(projectNameLabel);
+    case 'operations': return createOperationsColumns(projectNameLabel);
+    default: return createDevelopmentColumns(projectNameLabel);
   }
 }

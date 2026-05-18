@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Bot, Search } from 'lucide-react';
+import { useI18n } from '../../../lib/i18n';
 import { ActiveRun, AnyAdapterConfig, CompletedRun, EngineerRole, Feature, FeatureStatus } from '../../../lib/types';
 import { TableCore } from '../../../components/table/TableCore';
 import { TaskDispatchModal } from '../../../components/table/TaskDispatchModal';
@@ -41,6 +42,7 @@ export function FeaturesView({
   onRunEnd,
   onFeatureUpdate,
 }: FeaturesViewProps) {
+  const { t } = useI18n();
   const [statusFilter, setStatusFilter] = useState<FeatureStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
@@ -141,13 +143,13 @@ export function FeaturesView({
               className="inline-flex items-center gap-1.5 border border-emerald-200/40 bg-emerald-100/15 px-3 py-2 text-xs font-medium text-emerald-100 hover:bg-emerald-100/25"
             >
               <Bot size={13} />
-              批次派遣 ({selectedIds.size})
+              {t.features.batchDispatch} ({selectedIds.size})
             </button>
             <button
               onClick={handleClearSelection}
               className="text-xs text-stone-500 hover:text-stone-300"
             >
-              取消選取
+              {t.common.deselectSelection}
             </button>
           </div>
         )}

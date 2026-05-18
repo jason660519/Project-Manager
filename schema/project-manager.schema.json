@@ -159,6 +159,7 @@
           "type": "object",
           "description": "Source .md files are editable inputs; *Html variants are generated HTML report artifacts.",
           "properties": {
+            "featureFolder": { "type": "string", "description": "Canonical feature folder: .project-manager/features/<ID>/" },
             "spec": { "type": "string", "description": "Feature dev spec (.md)" },
             "tdd": { "type": "string", "description": "TDD spec (.md)" },
             "tddProgressReport": { "type": "string", "description": "TDD progress raw data (.md)" },
@@ -171,7 +172,7 @@
             "implementation": { "type": "string", "description": "Implementation code path" }
           }
         },
-        "notes": { "type": "string" },
+        "notes": { "type": "string", "description": "Relative path to the feature notes document (e.g. .project-manager/features/F01/README.md)." },
         "createdAt": {
           "type": "string",
           "format": "date-time",

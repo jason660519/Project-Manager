@@ -11,6 +11,7 @@ import {
   computeOperationsStats,
 } from '../_lib/aggregations';
 import { StatCard } from './StatCard';
+import { useI18n } from '../../../lib/i18n';
 
 interface SharedStatsCardsProps {
   phase: FeaturePhase;
@@ -28,16 +29,18 @@ function Container({ compact, children }: { compact: boolean; children: React.Re
 }
 
 export function SharedStatsCards({ phase, features, compact = false }: SharedStatsCardsProps) {
+  const { t } = useI18n();
+
   if (phase === 'development') {
     const s = computeDevelopmentStats(features);
     return (
       <Container compact={compact}>
         <CircularProgressCard percent={s.overallProgress} totalFeatures={s.totalFeatures} compact={compact} />
-        <StatCard label="完成 Completed" value={s.completedCount} icon={CheckCircle2}
+        <StatCard label={t.stats.completed} value={s.completedCount} icon={CheckCircle2}
           bgClass="bg-emerald-500/15" colorClass="text-emerald-300" compact={compact} />
-        <StatCard label="進行中 In Progress" value={s.inProgressCount} icon={Clock}
+        <StatCard label={t.stats.inProgress} value={s.inProgressCount} icon={Clock}
           bgClass="bg-cyan-500/15" colorClass="text-cyan-300" compact={compact} />
-        <StatCard label="未開始 Pending" value={s.pendingCount} subValue={`/ ${s.totalPoints} SP`}
+        <StatCard label={t.stats.pending} value={s.pendingCount} subValue={`/ ${s.totalPoints} SP`}
           icon={Layers} bgClass="bg-stone-200/10" colorClass="text-stone-200" compact={compact} />
       </Container>
     );
@@ -46,13 +49,13 @@ export function SharedStatsCards({ phase, features, compact = false }: SharedSta
     const s = computeTestingStats(features);
     return (
       <Container compact={compact}>
-        <StatCard label="平均覆蓋率" value={`${s.avgCoverage}%`} icon={TestTube2}
+        <StatCard label={t.stats.avgCoverage} value={`${s.avgCoverage}%`} icon={TestTube2}
           bgClass="bg-purple-500/15" colorClass="text-purple-300" compact={compact} />
-        <StatCard label="Passed" value={s.passedCount} icon={CheckCircle2}
+        <StatCard label={t.stats.completed} value={s.passedCount} icon={CheckCircle2}
           bgClass="bg-emerald-500/15" colorClass="text-emerald-300" compact={compact} />
-        <StatCard label="Failed" value={s.failedCount} icon={AlertTriangle}
+        <StatCard label={t.features.filterBlocked} value={s.failedCount} icon={AlertTriangle}
           bgClass="bg-red-500/15" colorClass="text-red-300" compact={compact} />
-        <StatCard label="Pending" value={s.pendingCount} icon={Clock}
+        <StatCard label={t.stats.pending} value={s.pendingCount} icon={Clock}
           bgClass="bg-stone-200/10" colorClass="text-stone-200" compact={compact} />
       </Container>
     );
@@ -65,9 +68,9 @@ export function SharedStatsCards({ phase, features, compact = false }: SharedSta
           bgClass="bg-emerald-500/15" colorClass="text-emerald-300" compact={compact} />
         <StatCard label="Staging" value={s.stagingCount} icon={Server}
           bgClass="bg-amber-500/15" colorClass="text-amber-300" compact={compact} />
-        <StatCard label="未部署" value={s.notDeployedCount} icon={Layers}
+        <StatCard label={t.stats.notDeployed} value={s.notDeployedCount} icon={Layers}
           bgClass="bg-stone-200/10" colorClass="text-stone-200" compact={compact} />
-        <StatCard label="最近部署日" value={s.latestDeploy} icon={Activity}
+        <StatCard label={t.stats.latestDeployDate} value={s.latestDeploy} icon={Activity}
           bgClass="bg-cyan-500/15" colorClass="text-cyan-300" compact={compact} />
       </Container>
     );
@@ -75,13 +78,13 @@ export function SharedStatsCards({ phase, features, compact = false }: SharedSta
   const s = computeOperationsStats(features);
   return (
     <Container compact={compact}>
-      <StatCard label="平均 Uptime" value={s.avgUptime === '—' ? '—' : `${s.avgUptime}%`} icon={Shield}
+      <StatCard label={t.stats.avgUptime} value={s.avgUptime === '—' ? '—' : `${s.avgUptime}%`} icon={Shield}
         bgClass="bg-emerald-500/15" colorClass="text-emerald-300" compact={compact} />
-      <StatCard label="平均錯誤率" value={s.avgErrorRate === '—' ? '—' : `${s.avgErrorRate}%`} icon={AlertTriangle}
+      <StatCard label={t.stats.avgErrorRate} value={s.avgErrorRate === '—' ? '—' : `${s.avgErrorRate}%`} icon={AlertTriangle}
         bgClass="bg-red-500/15" colorClass="text-red-300" compact={compact} />
-      <StatCard label="平均回應 (ms)" value={s.avgResponseTime} icon={Zap}
+      <StatCard label={t.stats.avgResponseMs} value={s.avgResponseTime} icon={Zap}
         bgClass="bg-cyan-500/15" colorClass="text-cyan-300" compact={compact} />
-      <StatCard label="近期事件" value={s.incidentCount} icon={Activity}
+      <StatCard label={t.stats.recentIncidents} value={s.incidentCount} icon={Activity}
         bgClass="bg-amber-500/15" colorClass="text-amber-300" compact={compact} />
     </Container>
   );
@@ -90,6 +93,7 @@ export function SharedStatsCards({ phase, features, compact = false }: SharedSta
 function CircularProgressCard({
   percent, totalFeatures, compact,
 }: { percent: number; totalFeatures: number; compact: boolean }) {
+  const { t } = useI18n();
   const size = compact ? 36 : 60;
   return (
     <div className={
@@ -118,7 +122,7 @@ function CircularProgressCard({
       </div>
       <div>
         <p className={compact ? 'text-[10px] uppercase tracking-[0.1em] text-stone-400 leading-tight whitespace-nowrap' : 'text-xs uppercase tracking-[0.12em] text-stone-400'}>
-          總體開發進度
+          {t.stats.overallProgress}
         </p>
         <p className={compact ? 'text-[10px] text-stone-400' : 'mt-1 text-xs text-stone-400'}>
           {totalFeatures} Features · Weighted by SP

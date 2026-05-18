@@ -3,30 +3,28 @@
 import { Code2, FlaskConical, Rocket, Activity } from 'lucide-react';
 import { clsx } from 'clsx';
 import type { FeaturePhase } from '../../../lib/types';
+import { useI18n } from '../../../lib/i18n';
 
 interface SheetTab {
   id: FeaturePhase;
-  label: string;
-  zhLabel: string;
   icon: React.ElementType;
   color: string;
   activeColor: string;
 }
 
 const SHEETS: SheetTab[] = [
-  { id: 'development', label: 'Development', zhLabel: '開發',
-    icon: Code2,         color: 'text-emerald-300',
-    activeColor: 'bg-emerald-600/85 text-white' },
-  { id: 'e2e_testing', label: 'E2E Testing', zhLabel: 'E2E 測試',
-    icon: FlaskConical,  color: 'text-cyan-200',
-    activeColor: 'bg-cyan-600/85 text-white' },
-  { id: 'deployment',  label: 'Deployment',  zhLabel: '部署',
-    icon: Rocket,        color: 'text-fuchsia-200',
-    activeColor: 'bg-fuchsia-600/80 text-white' },
-  { id: 'operations',  label: 'Operations',  zhLabel: '運維',
-    icon: Activity,      color: 'text-amber-200',
-    activeColor: 'bg-amber-600/85 text-white' },
+  { id: 'development', icon: Code2,         color: 'text-emerald-300',  activeColor: 'bg-emerald-600/85 text-white' },
+  { id: 'e2e_testing', icon: FlaskConical,  color: 'text-cyan-200',     activeColor: 'bg-cyan-600/85 text-white' },
+  { id: 'deployment',  icon: Rocket,        color: 'text-fuchsia-200',  activeColor: 'bg-fuchsia-600/80 text-white' },
+  { id: 'operations',  icon: Activity,      color: 'text-amber-200',    activeColor: 'bg-amber-600/85 text-white' },
 ];
+
+const PHASE_LABEL_KEY: Record<FeaturePhase, keyof import('../../../lib/i18n').Translations['phases']> = {
+  development: 'development',
+  e2e_testing: 'e2eTesting',
+  deployment:  'deployment',
+  operations:  'operations',
+};
 
 interface SheetTabsProps {
   activePhase: FeaturePhase;
@@ -35,6 +33,7 @@ interface SheetTabsProps {
 }
 
 export function SheetTabs({ activePhase, onPhaseChange, phaseCounts }: SheetTabsProps) {
+  const { t } = useI18n();
   return (
     <div className="flex items-end gap-0 border-t border-stone-200/15 bg-[#061512]/70 overflow-x-auto flex-none">
       {SHEETS.map((sheet) => {
@@ -57,7 +56,7 @@ export function SheetTabs({ activePhase, onPhaseChange, phaseCounts }: SheetTabs
             )}
           >
             <Icon className={clsx('h-4 w-4', isActive ? 'text-current' : sheet.color)} />
-            <span>{sheet.zhLabel} {sheet.label}</span>
+            <span>{t.phases[PHASE_LABEL_KEY[sheet.id]]}</span>
             {count > 0 && (
               <span
                 className={clsx(

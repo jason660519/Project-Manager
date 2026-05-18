@@ -1,0 +1,80 @@
+import type { Translations } from './types';
+
+export const zh: Translations = {
+  navGroups: {
+    workspace: '工作区',
+    execution: '执行',
+    observe: '观测',
+    system: '系统',
+  },
+  navItems: {
+    projects: '项目',
+    dashboard: '仪表盘',
+    files: '文件',
+    engineers: '工程师',
+    plugins: '插件',
+    channels: '频道',
+    cronJobs: '定时任务',
+    sessions: '会话',
+    logs: '日志',
+    keys: '密钥',
+    shortcuts: '快捷键',
+    settings: '设置',
+    docs: '文档',
+  },
+  system: {
+    checkForUpdates: '检查更新',
+    upToDate: '已是最新版本',
+    checkFailed: '检查失败',
+    updateAvailable: '有更新：v{version}',
+    // GLOSSARY: guarded-execution
+    guarded: '受保护',
+    runsActive: '{count} 个任务运行中',
+  },
+  common: {
+    search: '搜索',
+    selectAll: '全选',
+    deselectAll: '取消全选',
+    deselectSelection: '取消选择',
+    multiSelect: '多选',
+    singleSelect: '单选',
+    clear: '清除',
+    loading: '加载中…',
+    noProjectsConfigured: '暂无项目，请先在「项目」页面添加。',
+  },
+  phases: {
+    development: '开发',
+    e2eTesting: 'E2E 测试',
+    deployment: '部署',
+    operations: '运维',
+  },
+  stats: {
+    overallProgress: '整体开发进度',
+    completed: '已完成',
+    inProgress: '进行中',
+    pending: '未开始',
+    avgCoverage: '平均覆盖率',
+    notDeployed: '未部署',
+    latestDeployDate: '最近部署日',
+    avgUptime: '平均 Uptime',
+    avgErrorRate: '平均错误率',
+    avgResponseMs: '平均响应 (ms)',
+    recentIncidents: '近期事件',
+  },
+  dashboard: {
+    title: '项目进度仪表盘',
+    // GLOSSARY: project-name
+    projectName: '项目名称',
+  },
+  features: {
+    filterAll: '全部',
+    filterBlocked: '待解除',
+    filterInProgress: '进行中',
+    filterTodo: '待办',
+    filterDone: '完成',
+    batchDispatch: '批量派发',
+  },
+  language: {
+    label: '语言',
+  },
+};

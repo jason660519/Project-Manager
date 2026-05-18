@@ -1,0 +1,80 @@
+import type { Translations } from './types';
+
+export const zhHant: Translations = {
+  navGroups: {
+    workspace: '工作區',
+    execution: '執行',
+    observe: '觀測',
+    system: '系統',
+  },
+  navItems: {
+    projects: '專案',
+    dashboard: '儀表板',
+    files: '檔案',
+    engineers: '工程師',
+    plugins: '插件',
+    channels: '頻道',
+    cronJobs: '排程任務',
+    sessions: '工作階段',
+    logs: '日誌',
+    keys: '金鑰',
+    shortcuts: '快捷鍵',
+    settings: '設定',
+    docs: '文件',
+  },
+  system: {
+    checkForUpdates: '檢查更新',
+    upToDate: '已是最新版本',
+    checkFailed: '檢查失敗',
+    updateAvailable: '有更新：v{version}',
+    // GLOSSARY: guarded-execution
+    guarded: '受保護',
+    runsActive: '{count} 個任務執行中',
+  },
+  common: {
+    search: '搜尋',
+    selectAll: '全選',
+    deselectAll: '取消全選',
+    deselectSelection: '取消選取',
+    multiSelect: '複選',
+    singleSelect: '單選',
+    clear: '清除',
+    loading: '載入中…',
+    noProjectsConfigured: '尚未設定專案，請先在「專案」頁面新增。',
+  },
+  phases: {
+    development: '開發',
+    e2eTesting: 'E2E 測試',
+    deployment: '部署',
+    operations: '運維',
+  },
+  stats: {
+    overallProgress: '總體開發進度',
+    completed: '完成',
+    inProgress: '進行中',
+    pending: '未開始',
+    avgCoverage: '平均覆蓋率',
+    notDeployed: '未部署',
+    latestDeployDate: '最近部署日',
+    avgUptime: '平均 Uptime',
+    avgErrorRate: '平均錯誤率',
+    avgResponseMs: '平均回應 (ms)',
+    recentIncidents: '近期事件',
+  },
+  dashboard: {
+    title: '專案進度儀表板',
+    // GLOSSARY: project-name
+    projectName: '專案名稱',
+  },
+  features: {
+    filterAll: '全部',
+    filterBlocked: '待解除',
+    filterInProgress: '進行中',
+    filterTodo: '待辦',
+    filterDone: '完成',
+    batchDispatch: '批次派遣',
+  },
+  language: {
+    label: '語言',
+  },
+};

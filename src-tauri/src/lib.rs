@@ -2712,6 +2712,61 @@ async fn telegram_send_message(
     Ok(())
 }
 
+// ── App update check ─────────────────────────────────────────────────────────
+
+#[derive(Serialize)]
+struct UpdateCheckResult {
+    current: String,
+    has_update: bool,
+    latest: Option<String>,
+}
+
+/// Check for a newer GitHub release. Reads the current version from the
+/// embedded `tauri.conf.json` version string, then queries the GitHub releases
+/// API for the latest published release. Returns `has_update: true` when the
+/// latest tag (stripped of a leading `v`) differs from the current version.
+///
+/// On any network/parse error the command still succeeds — it returns the
+/// current version with `has_update: false` so the UI always gets a result.
+#[tauri::command]
+async fn check_update(app: AppHandle) -> Result<UpdateCheckResult, String> {
+    let current = app.config().version.clone().unwrap_or_else(|| "0.0.0".to_string());
+
+    // Try to fetch the latest release from GitHub.
+    let latest_opt: Option<String> = async {
+        #[derive(Deserialize)]
+        struct Release {
+            tag_name: String,
+        }
+
+        let url = "https://api.github.com/repos/anthropics/project-manager/releases/latest";
+        let client = reqwest::Client::builder()
+            .user_agent("ProjectManager-UpdateCheck/1.0")
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .ok()?;
+
+        let res = client.get(url).send().await.ok()?;
+        if !res.status().is_success() {
+            return None;
+        }
+        let release: Release = res.json().await.ok()?;
+        Some(release.tag_name.trim_start_matches('v').to_string())
+    }
+    .await;
+
+    let has_update = latest_opt
+        .as_deref()
+        .map(|latest| latest != current.as_str())
+        .unwrap_or(false);
+
+    Ok(UpdateCheckResult {
+        current,
+        has_update,
+        latest: latest_opt,
+    })
+}
+
 // ── App entry ─────────────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -2777,6 +2832,7 @@ pub fn run() {
             telegram_stop_poll,
             telegram_status_all,
             telegram_send_message,
+            check_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

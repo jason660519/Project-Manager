@@ -24,6 +24,8 @@ export interface FeaturePromptConfig {
 }
 
 export interface FeaturePaths {
+  /** Canonical feature folder: `.project-manager/features/<ID>/` */
+  featureFolder?: string;
   spec?: string;                      // Feature dev spec (.md — source, editable)
   tdd?: string;                       // TDD spec (.md — source, editable)
   tddProgressReport?: string;         // TDD progress data (.md — raw data source)
@@ -43,6 +45,7 @@ export interface Feature {
   status: FeatureStatus;
   progress: number;
   paths: FeaturePaths;
+  /** Relative path to the feature's notes document (e.g. `.project-manager/features/F01/README.md`). */
   notes?: string;
   // ── Sync audit fields (schema v2, ADR-006) ─────────────────────────────
   /** ISO 8601 timestamp set when the feature was first created. */

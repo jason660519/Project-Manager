@@ -94,6 +94,7 @@ For each true item, surface to the user **before** committing. Use a single batc
 | **ADR collision** | Diff touches Anthropic key path / Rust prompt / `app/api/` for renderer use | Confirm an ADR amendment OR back out the change |
 | **DESIGN.md sync** | Diff touches `app/ui/**` substantially | Confirm DESIGN.md / `docs/design/shared-ai-desktop-style.md` still describes reality |
 | **Unreviewed non-trivial diff** | >3 files AND no `plan-review` / `pre-landing-review` in conversation context | Recommend running `pre-landing-review` first |
+| **Feature folder missing** | Diff adds a new feature entry to `config.json` | Verify `.project-manager/features/<ID>/` exists with at minimum a `README.md` |
 
 If the user overrides any check, **record the override** in the commit message footer (`Override: capabilities-not-updated — reason: ...`).
 

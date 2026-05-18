@@ -1,0 +1,80 @@
+import type { Translations } from './types';
+
+export const ja: Translations = {
+  navGroups: {
+    workspace: 'ワークスペース',
+    execution: '実行',
+    observe: '観測',
+    system: 'システム',
+  },
+  navItems: {
+    projects: 'プロジェクト',
+    dashboard: 'ダッシュボード',
+    files: 'ファイル',
+    engineers: 'エンジニア',
+    plugins: 'プラグイン',
+    channels: 'チャンネル',
+    cronJobs: 'Cronジョブ',
+    sessions: 'セッション',
+    logs: 'ログ',
+    keys: 'キー',
+    shortcuts: 'ショートカット',
+    settings: '設定',
+    docs: 'ドキュメント',
+  },
+  system: {
+    checkForUpdates: 'アップデートを確認',
+    upToDate: '最新バージョンです',
+    checkFailed: '確認に失敗しました',
+    updateAvailable: 'アップデート: v{version}',
+    // GLOSSARY: guarded-execution
+    guarded: 'ガード中',
+    runsActive: '{count} 件実行中',
+  },
+  common: {
+    search: '検索',
+    selectAll: 'すべて選択',
+    deselectAll: 'すべて解除',
+    deselectSelection: '選択解除',
+    multiSelect: '複数選択',
+    singleSelect: '単一選択',
+    clear: 'クリア',
+    loading: '読み込み中…',
+    noProjectsConfigured: 'プロジェクトが設定されていません。プロジェクト一覧で追加してください。',
+  },
+  phases: {
+    development: '開発',
+    e2eTesting: 'E2Eテスト',
+    deployment: 'デプロイ',
+    operations: '運用',
+  },
+  stats: {
+    overallProgress: '総合開発進捗',
+    completed: '完了',
+    inProgress: '進行中',
+    pending: '未着手',
+    avgCoverage: '平均カバレッジ',
+    notDeployed: '未デプロイ',
+    latestDeployDate: '最終デプロイ',
+    avgUptime: '平均稼働率',
+    avgErrorRate: '平均エラー率',
+    avgResponseMs: '平均応答 (ms)',
+    recentIncidents: '最近のインシデント',
+  },
+  dashboard: {
+    title: 'プロジェクト進捗ダッシュボード',
+    // GLOSSARY: project-name
+    projectName: 'プロジェクト名',
+  },
+  features: {
+    filterAll: 'すべて',
+    filterBlocked: 'ブロック中',
+    filterInProgress: '進行中',
+    filterTodo: '未着手',
+    filterDone: '完了',
+    batchDispatch: '一括ディスパッチ',
+  },
+  language: {
+    label: '言語',
+  },
+};

@@ -2,13 +2,70 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Theme CSS variables ─────────────────────────────────────────────────── */
+/* Shell-level color tokens only. Content-area colors inherit from Tailwind.  */
+
 :root {
   color-scheme: dark;
+
+  /* default = Hermes Teal adapted to PM's emerald palette */
+  --pm-bg:           #071b18;
+  --pm-sidebar:      rgba(6, 21, 18, 0.95);
+  --pm-glow:         rgba(214, 185, 118, 0.12);
+  --pm-glow-from:    rgba(14, 63, 56, 0.9);
+  --pm-glow-to:      rgba(4, 18, 17, 0.98);
+  --pm-active-bg:    rgba(6, 35, 28, 0.6);
+  --pm-accent:       #6ee7b7;
 }
 
+[data-theme="midnight"] {
+  --pm-bg:           #0a0a1f;
+  --pm-sidebar:      rgba(8, 8, 32, 0.95);
+  --pm-glow:         rgba(167, 139, 250, 0.18);
+  --pm-glow-from:    rgba(15, 10, 50, 0.9);
+  --pm-glow-to:      rgba(4, 4, 20, 0.98);
+  --pm-active-bg:    rgba(20, 15, 50, 0.6);
+  --pm-accent:       #a78bfa;
+}
+
+[data-theme="ember"] {
+  --pm-bg:           #1a0a06;
+  --pm-sidebar:      rgba(21, 8, 4, 0.95);
+  --pm-glow:         rgba(249, 115, 22, 0.28);
+  --pm-glow-from:    rgba(50, 20, 8, 0.9);
+  --pm-glow-to:      rgba(20, 6, 2, 0.98);
+  --pm-active-bg:    rgba(50, 20, 8, 0.6);
+  --pm-accent:       #fb923c;
+}
+
+[data-theme="mono"] {
+  --pm-bg:           #0e0e0e;
+  --pm-sidebar:      rgba(10, 10, 10, 0.95);
+  --pm-glow:         rgba(255, 255, 255, 0.06);
+  --pm-glow-from:    rgba(20, 20, 20, 0.9);
+  --pm-glow-to:      rgba(8, 8, 8, 0.98);
+  --pm-active-bg:    rgba(30, 30, 30, 0.6);
+  --pm-accent:       #e5e5e5;
+}
+
+/* ── Shell background gradients (theme-aware) ────────────────────────────── */
+.pm-bg-noise {
+  background-image:
+    linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 72px 72px;
+}
+
+.pm-bg-glow {
+  background-image:
+    radial-gradient(circle at 50% 0%, var(--pm-glow), transparent 38%),
+    linear-gradient(135deg, var(--pm-glow-from), var(--pm-glow-to) 62%);
+}
+
+/* ── Base reset ──────────────────────────────────────────────────────────── */
 body {
   margin: 0;
-  background: #071b18;
+  background: var(--pm-bg);
   color: #f5f5f4;
 }
 
@@ -21,3 +78,24 @@ textarea {
 ::selection {
   background: rgba(253, 230, 138, 0.35);
 }
+
+/* ── FeatureDocPanel markdown prose ─────────────────────────────────────── */
+.pm-prose { color: #d6d3d1; font-size: 13px; line-height: 1.7; }
+.pm-prose h1 { font-size: 17px; font-weight: 700; color: #f5f5f4; margin: 0 0 12px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 6px; }
+.pm-prose h2 { font-size: 14px; font-weight: 600; color: #e7e5e4; margin: 20px 0 8px; letter-spacing: 0.03em; }
+.pm-prose h3 { font-size: 13px; font-weight: 600; color: #d6d3d1; margin: 16px 0 6px; }
+.pm-prose p  { margin: 0 0 10px; }
+.pm-prose ul, .pm-prose ol { margin: 0 0 10px 18px; padding: 0; }
+.pm-prose li { margin-bottom: 4px; }
+.pm-prose strong { color: #f5f5f4; font-weight: 600; }
+.pm-prose code { font-family: ui-monospace, monospace; font-size: 11px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1); border-radius: 3px; padding: 1px 5px; color: #6ee7b7; }
+.pm-prose pre  { background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 12px 14px; overflow-x: auto; margin: 0 0 12px; }
+.pm-prose pre code { background: none; border: none; padding: 0; color: #a3e635; font-size: 11.5px; }
+.pm-prose blockquote { border-left: 2px solid rgba(110,231,183,0.4); margin: 0 0 10px 0; padding: 4px 12px; color: #a8a29e; font-style: italic; }
+.pm-prose hr { border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 18px 0; }
+.pm-prose a  { color: #67e8f9; text-decoration: underline; text-underline-offset: 2px; }
+.pm-prose a:hover { color: #a5f3fc; }
+.pm-prose table { width: 100%; border-collapse: collapse; margin: 0 0 12px; font-size: 12px; }
+.pm-prose th { background: rgba(255,255,255,0.06); color: #e7e5e4; font-weight: 600; text-align: left; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.08); }
+.pm-prose td { padding: 5px 10px; border: 1px solid rgba(255,255,255,0.07); color: #d6d3d1; }
+.pm-prose tr:nth-child(even) td { background: rgba(255,255,255,0.025); }

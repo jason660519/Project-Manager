@@ -25,6 +25,7 @@ Project Manager is a cross-project engineering dashboard that ingests heterogene
 | `config/samples/` | Sample `.project-manager.json` |
 | `docs/architecture/ADR-*.md` | Closed architecture decisions |
 | `docs/engineering/` | Operational engineering docs for bridge, storage, ingestion, security, and verification |
+| `.project-manager/features/<ID>/` | Per-feature documentation home (README.md, tdd-spec.md, tdd-report.md, dev-log.md, dispatch.json) |
 
 ## Architecture (short)
 
@@ -41,6 +42,7 @@ Full diagram: [`docs/architecture/architecture-overview.md`](docs/architecture/a
 ## Key Conventions
 
 - **Design system**: read [`DESIGN.md`](DESIGN.md) and [`docs/design/shared-ai-desktop-style.md`](docs/design/shared-ai-desktop-style.md) before UI changes. Keep the PM rail, dense dashboard layout, semantic status badges, and guarded-execution UX intact.
+- **Feature folders**: every feature has a canonical folder at `.project-manager/features/<ID>/`. Notes in `config.json` are relative paths to `README.md` inside that folder. Create the folder and README when adding a new feature.
 - **Static export**: Next.js produces a static bundle for Tauri. `app/api/` only runs under `next dev`. Anything that must exist in the shipped app belongs in Rust.
 - **Bridge discipline**: never call `invoke()` directly from a component. Add a typed wrapper in `lib/bridge/index.ts`.
 - **Anthropic API key never reaches the renderer** (ADR-004). Always proxy through `call_anthropic` in Rust; storage uses `keyring`.
