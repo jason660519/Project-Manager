@@ -22,9 +22,16 @@ git log origin/main..HEAD --oneline
 ```
 
 **Abort conditions:**
-- On `main` → `"On main. Ship from a feature branch."`
-- No diff against `origin/main` → `"Nothing to ship — branch matches origin/main."`
 - Detached HEAD → abort, instruct the user to create / check out a branch.
+- No diff against `origin/main` AND no uncommitted → `"Nothing to ship — branch matches origin/main."`
+
+**On `main` with unpushed commits or uncommitted changes** — do NOT hard-abort. This is a real, common solo / personal-repo state. Use AskUserQuestion to confirm the path:
+
+- A) **Cut a feature branch** (team-repo path): `git branch feat/<topic>` from the current HEAD, leave commits on the branch, then continue from Step 2 on the branch. Ship will open a PR at the end.
+- B) **Direct-push to `main`** (solo / personal-repo path): continue from Step 2 ON `main`. Ship will push to `origin/main` AND skip the PR-creation step (no PR for direct-to-main). **Only offer B if the remote looks like a personal repo** (e.g. owner matches the local git user). If unsure, default to A.
+- C) **Cancel** — exit; user will sort the branching themselves.
+
+If the user picks B, log it in the final SHIP REPORT footer: `Mode: direct-to-main (no PR)`.
 
 **Diff-size sanity (informational, do not block):**
 - Diff > 200 LOC and `plan-review` hasn't run in this session → mention: *"Large diff — consider `/plan-review` first."*
@@ -199,7 +206,7 @@ Follow-ups:      <list — TODO items spotted, deferred work, suggested next pla
 ## Guardrails
 
 - **Never** force-push.
-- **Never** push to `main` directly (PR-only).
+- **Never** push to `main` directly UNLESS the user explicitly picked path (B) "direct-to-main" in Step 1 for a solo / personal repo. Team repos: PR-only, no exceptions.
 - **Never** skip Step 3 verifications silently. Skips are explicit and reasoned.
 - **Never** auto-bump `schemaVersion` — always confirm with the user.
 - **Never** commit a file matching `.env`, `*.key`, `keychain*`, `credentials*` even if staged. Warn instead.

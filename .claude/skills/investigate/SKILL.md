@@ -34,9 +34,26 @@ Output the hypothesis as one sentence: **"Root cause hypothesis: …"** — a sp
 
 ---
 
-## Phase 2: Pattern Analysis (Project Manager-specific)
+## Phase 2: Pattern Analysis
 
-Check if the bug matches a known shape in this codebase **before** brute-force debugging.
+**Two-pass.** Always run Pass 1 (generic patterns) BEFORE Pass 2 (PM-specific). Most bugs are generic — nil propagation and recent-refactor regressions hit far more often than ADR-specific issues. Don't skip Pass 1 just because the PM table is shinier.
+
+### Pass 1: Generic patterns (apply to any codebase)
+
+| Pattern | Signature | Likely site |
+|---|---|---|
+| **Nil / undefined propagation** | `TypeError: Cannot read properties of undefined (reading 'X')` / `cannot access property of null` / blank UI on a specific data shape | `?? fallback` chains where the fallback can ITSELF be undefined (e.g. `arr.find(...) ?? arr[0]` on an empty array); destructured props without defaults; conditionally-rendered children reading from a derived selector |
+| **Regression from recent refactor** | "It was working yesterday" / "Broke after I merged X" — same files touched in last N commits | `git log --oneline -20 -- <symptom-file>`; diff the offending function vs its previous form; look for removed guards, renamed fields, signature changes |
+| **Race condition** | Intermittent, timing-dependent, "works on retry", different behaviour under dev tools vs prod | concurrent state writes, shared mutable cache, `useEffect` without ignore-flag, file watcher + manual write hitting the same target, two `await invoke(...)` to the same Rust command without dedupe |
+| **Stale cache / closure** | Shows old data, fixes on hard reload / re-mount / "Cmd-Shift-R" / restart | `useMemo` / `useCallback` with wrong deps, Next.js fetch cache, App Router revalidation, localStorage read once on mount, closures capturing stale state |
+| **State corruption / partial update** | Inconsistent UI, partial-update visible mid-render, "saved" but didn't | Callback chain with intermediate `set` + immediate `read`, transaction-like flow without atomic write, no rollback on mid-flight failure |
+| **Configuration drift** | Works in `npm run dev` / locally / on your machine, fails in `tauri:dev` / packaged build / CI / another machine | `process.env.*` in renderer, `app/api/` referenced post-build, Tauri capability mismatch, missing platform-specific dep, OS keychain not initialised |
+| **Contract drift** | Unexpected `null` / wrong shape on a function or API boundary | Tauri command signature mismatch (Rust ↔ TS), `JSON.parse` on un-validated input, plugin SDK version skew, optional fields that become required |
+| **Silent error swallowed** | Nothing in the UI, nothing in `console.error`, but the action didn't take effect | Empty `catch (e) {}`, `.catch(() => null)`, Rust `.ok()` chain dropping `Err`, hook that returns the wrong fallback on error |
+
+### Pass 2: PM-specific patterns (apply on top of Pass 1)
+
+Only walk this table after Pass 1 didn't match — Pass 2 patterns are narrower and rarer.
 
 | Pattern | Signature | First place to look |
 |---|---|---|
