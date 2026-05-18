@@ -8,7 +8,7 @@ import type { Feature } from '../types';
 const PRESERVED_KEYS = ['status', 'progress', 'notes'] as const;
 
 /**
- * Merge remote features (from `.project-manager.json` on disk or from GitHub)
+ * Merge remote features (from `.project-manager/config.json` on disk or from GitHub)
  * with local features (currently held in PM memory + LocalStorage).
  *
  * Rules:
@@ -19,6 +19,9 @@ const PRESERVED_KEYS = ['status', 'progress', 'notes'] as const;
  *   - Local features not present in remote are dropped (they were removed upstream).
  */
 export function mergeFeaturesById(remote: Feature[], local: Feature[]): Feature[] {
+  // Empty on-disk scaffold — keep PM-side / bundled-sample features intact.
+  if (remote.length === 0 && local.length > 0) return local;
+
   const localById = new Map(local.map((f) => [f.id, f]));
   return remote.map((remoteFeature) => {
     const localFeature = localById.get(remoteFeature.id);

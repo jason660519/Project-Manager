@@ -1,8 +1,12 @@
 /**
  * Provider registry — single source of truth for every external credential PM
- * knows how to handle. Adding a new provider is one entry here; the KeysView,
- * .env import flow, and OAuth flow all read from this list.
+ * knows how to handle. AI providers (Anthropic, OpenAI, Gemini, DeepSeek, …)
+ * are defined in `llmProviders.ts`; this file extends the list with non-LLM
+ * integrations (currently just GitHub OAuth) so the Keys view and `.env`
+ * import can iterate one combined list.
  */
+
+import { listLlmProviders } from './llmProviders';
 
 export type AuthMethod = 'apiKey' | 'oauth' | 'envImport';
 export type ProviderCategory = 'ai' | 'integration';
@@ -38,43 +42,25 @@ const LS_PREFIX = 'projectManager-key:';
 
 export const KEYCHAIN_SERVICE = 'projectmanager';
 
-export const PROVIDERS: ProviderSpec[] = [
-  {
-    id: 'anthropic',
-    label: 'Anthropic (Claude API)',
-    category: 'ai',
-    placeholder: 'sk-ant-...',
-    keychainKey: 'anthropic-api-key',
-    lsKey: `${LS_PREFIX}anthropic`,
-    docUrl: 'https://console.anthropic.com/settings/keys',
-    envVarNames: ['ANTHROPIC_API_KEY', 'CLAUDE_API_KEY'],
-    validatePattern: /^sk-ant-[A-Za-z0-9_-]{20,}$/,
-    supportedMethods: ['apiKey', 'envImport'],
-  },
-  {
-    id: 'openai',
-    label: 'OpenAI',
-    category: 'ai',
-    placeholder: 'sk-...',
-    keychainKey: 'openai-api-key',
-    lsKey: `${LS_PREFIX}openai`,
-    docUrl: 'https://platform.openai.com/api-keys',
-    envVarNames: ['OPENAI_API_KEY'],
-    validatePattern: /^sk-[A-Za-z0-9_-]{20,}$/,
-    supportedMethods: ['apiKey', 'envImport'],
-  },
-  {
-    id: 'gemini',
-    label: 'Gemini (Google AI)',
-    category: 'ai',
-    placeholder: 'AIza...',
-    keychainKey: 'gemini-api-key',
-    lsKey: `${LS_PREFIX}gemini`,
-    docUrl: 'https://aistudio.google.com/app/apikey',
-    envVarNames: ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY'],
-    validatePattern: /^AIza[A-Za-z0-9_-]{20,}$/,
-    supportedMethods: ['apiKey', 'envImport'],
-  },
+/**
+ * Project off the LLM registry so the Keys page automatically shows every
+ * provider PM can call. AI providers all support `apiKey + envImport`; the
+ * Keys view doesn't expose OAuth for them.
+ */
+const AI_PROVIDERS: ProviderSpec[] = listLlmProviders().map((spec) => ({
+  id: spec.id,
+  label: spec.label,
+  category: 'ai' as const,
+  placeholder: spec.placeholder,
+  keychainKey: spec.keychainKey,
+  lsKey: spec.lsKey,
+  docUrl: spec.docUrl,
+  envVarNames: spec.envVarNames,
+  validatePattern: spec.validatePattern,
+  supportedMethods: ['apiKey', 'envImport'] as AuthMethod[],
+}));
+
+const INTEGRATION_PROVIDERS: ProviderSpec[] = [
   {
     id: 'github',
     label: 'GitHub Personal Access Token',
@@ -95,6 +81,8 @@ export const PROVIDERS: ProviderSpec[] = [
     },
   },
 ];
+
+export const PROVIDERS: ProviderSpec[] = [...AI_PROVIDERS, ...INTEGRATION_PROVIDERS];
 
 export function getProvider(id: string): ProviderSpec | undefined {
   return PROVIDERS.find((p) => p.id === id);

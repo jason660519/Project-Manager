@@ -29,6 +29,28 @@ export async function readConfig(path: string): Promise<ProjectManagerConfig> {
   return migrateConfig(raw);
 }
 
+export interface MigrateProjectLayoutResult {
+  migrated: boolean;
+  configPath: string;
+}
+
+/**
+ * Move a project from the legacy `<root>/.project-manager.json` layout to
+ * the consolidated `<root>/.project-manager/config.json` layout (ADR-008).
+ * Idempotent: returns `{ migrated: false }` if the project is already on the
+ * new layout or has no config at all.
+ */
+export async function migrateProjectLayout(
+  projectRoot: string,
+): Promise<MigrateProjectLayoutResult> {
+  if (!isTauri()) throw new Error('migrateProjectLayout requires Tauri runtime');
+  const raw = await invoke<{ migrated: boolean; config_path: string }>(
+    'migrate_project_layout',
+    { projectRoot },
+  );
+  return { migrated: raw.migrated, configPath: raw.config_path };
+}
+
 export async function writeConfig(path: string, config: ProjectManagerConfig): Promise<void> {
   if (!isTauri()) throw new Error('writeConfig requires Tauri runtime');
   return invoke<void>('write_config', { path, config });
@@ -42,8 +64,9 @@ export interface InitializeProjectResult {
 export type InitializeProjectMode = 'create' | 'merge' | 'overwrite';
 
 /**
- * Create `docs/features/`, `docs/dev-logs/`, and write `.project-manager.json`.
- * See `lib/storage/createProjectScaffold.ts` for config assembly before calling this.
+ * Create the `.project-manager/` dashboard folder with `config.json`,
+ * `features/`, and `dev-logs/` (ADR-008). See
+ * `lib/storage/createProjectScaffold.ts` for config assembly before calling this.
  */
 export async function initializeProject(
   projectRoot: string,
@@ -60,9 +83,10 @@ export async function initializeProject(
 }
 
 /**
- * Delete a `.project-manager.json` config file from disk.
- * Rust refuses paths whose basename is not `.project-manager.json` so this
- * cannot wipe an unrelated file due to a typo in `configPath`.
+ * Delete the dashboard config file from disk. Accepts both the new layout
+ * (`.project-manager/config.json`) and the legacy single-file form
+ * (`.project-manager.json`); Rust refuses anything else so a typo in
+ * `configPath` cannot wipe an unrelated file.
  */
 export async function deleteConfig(path: string): Promise<void> {
   if (!isTauri()) throw new Error('deleteConfig requires Tauri runtime');
@@ -601,6 +625,68 @@ export async function callAnthropic(opts: {
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json() as Promise<AnthropicResponse>;
+}
+
+/**
+ * Call the OpenAI chat-completions API via the Rust bridge. Same return
+ * shape as `callAnthropic` so the scanner fallback chain can swap providers
+ * without per-provider response handling. Tauri-only — there is no dev
+ * fallback because we don't ship an `/api/openai` route.
+ */
+export async function callOpenAI(opts: {
+  apiKey: string;
+  model?: string;
+  maxTokens?: number;
+  messages: AnthropicMessage[];
+}): Promise<AnthropicResponse> {
+  if (!isTauri()) throw new Error('callOpenAI requires Tauri runtime');
+  return invoke<AnthropicResponse>('call_openai', {
+    apiKey: opts.apiKey,
+    model: opts.model ?? 'gpt-4o',
+    maxTokens: opts.maxTokens ?? 4096,
+    messages: opts.messages,
+  });
+}
+
+/**
+ * Generic OpenAI-compatible chat-completions call (DeepSeek, Grok, Kimi,
+ * OpenRouter, Perplexity, Together, Zhipu, Qwen…). The `baseUrl` is
+ * whatever the provider published — the Rust side appends `/chat/completions`.
+ */
+export async function callOpenAICompatible(opts: {
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+  maxTokens?: number;
+  messages: AnthropicMessage[];
+}): Promise<AnthropicResponse> {
+  if (!isTauri()) throw new Error('callOpenAICompatible requires Tauri runtime');
+  return invoke<AnthropicResponse>('call_openai_compatible', {
+    apiKey: opts.apiKey,
+    baseUrl: opts.baseUrl,
+    model: opts.model,
+    maxTokens: opts.maxTokens ?? 4096,
+    messages: opts.messages,
+  });
+}
+
+/**
+ * Call Google's Gemini generateContent API via the Rust bridge. Tauri-only.
+ * Same response shape as the other two providers.
+ */
+export async function callGemini(opts: {
+  apiKey: string;
+  model?: string;
+  maxTokens?: number;
+  messages: AnthropicMessage[];
+}): Promise<AnthropicResponse> {
+  if (!isTauri()) throw new Error('callGemini requires Tauri runtime');
+  return invoke<AnthropicResponse>('call_gemini', {
+    apiKey: opts.apiKey,
+    model: opts.model ?? 'gemini-1.5-pro-latest',
+    maxTokens: opts.maxTokens ?? 4096,
+    messages: opts.messages,
+  });
 }
 
 // ── Sessions ──────────────────────────────────────────────────────────────────

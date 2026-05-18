@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import {
+  Check,
   ChevronDown,
   Eye,
   EyeOff,
   Github,
   KeyRound,
+  Loader2,
   LogIn,
   Sparkles,
   Upload,
@@ -33,8 +35,12 @@ function ProviderRow({
   reloadToken: number;
 }) {
   const [value, setValue] = useState('');
+  // The last value we know is persisted to Keychain / localStorage. The
+  // button label is derived from `value !== savedValue` (dirty) instead of a
+  // 2-second flash so users never have to wonder whether the save succeeded.
+  const [savedValue, setSavedValue] = useState('');
   const [show, setShow] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [showMethods, setShowMethods] = useState(false);
@@ -43,6 +49,7 @@ function ProviderRow({
     loadProviderSecret(provider)
       .then((v) => {
         setValue(v);
+        setSavedValue(v);
         setLoaded(true);
       })
       .catch(() => setLoaded(true));
@@ -50,28 +57,35 @@ function ProviderRow({
 
   const handleSave = async () => {
     setError('');
+    setSaving(true);
     try {
       await saveProviderSecret(provider, value);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      setSavedValue(value);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleClear = async () => {
-    if (!value) return;
+    if (!savedValue) return;
     if (typeof window !== 'undefined' && !window.confirm(`Clear the ${provider.label} key?`)) return;
     setError('');
+    setSaving(true);
     try {
       await saveProviderSecret(provider, '');
       setValue('');
+      setSavedValue('');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
     }
   };
 
-  const isConfigured = loaded && value.length > 0;
+  const isConfigured = loaded && savedValue.length > 0;
+  const isDirty = value !== savedValue;
   const hasOAuth = provider.supportedMethods.includes('oauth') && !!provider.oauthConfig;
 
   return (
@@ -126,19 +140,40 @@ function ProviderRow({
         </div>
         <button
           onClick={() => void handleSave()}
-          className={`px-4 py-2 text-sm font-medium transition-colors ${
-            saved
-              ? 'bg-emerald-700 text-emerald-100'
-              : 'bg-stone-100 text-[#071d1a] hover:bg-amber-100'
+          disabled={saving || !isDirty}
+          title={
+            !isDirty && isConfigured
+              ? 'Already saved — start typing to change the value'
+              : !isDirty
+                ? 'Enter a key to save'
+                : undefined
+          }
+          className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed ${
+            !isDirty && isConfigured
+              ? 'bg-emerald-700/70 text-emerald-100 disabled:opacity-100'
+              : 'bg-stone-100 text-[#071d1a] hover:bg-amber-100 disabled:opacity-40'
           }`}
         >
-          {saved ? 'Saved ✓' : 'Save'}
+          {saving ? (
+            <>
+              <Loader2 size={13} className="animate-spin" />
+              Saving…
+            </>
+          ) : !isDirty && isConfigured ? (
+            <>
+              <Check size={13} />
+              Saved
+            </>
+          ) : (
+            'Save'
+          )}
         </button>
         {isConfigured && (
           <button
             onClick={() => void handleClear()}
+            disabled={saving}
             title="Clear this key"
-            className="px-3 py-2 text-sm text-stone-500 hover:text-red-400"
+            className="px-3 py-2 text-sm text-stone-500 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Clear
           </button>

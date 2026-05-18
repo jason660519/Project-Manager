@@ -2,7 +2,8 @@
  * POST /api/scan-project
  *
  * Accepts a local project path, scans its structure, calls OpenAI to
- * generate a `.project-manager.json` config, and returns the result.
+ * generate a `.project-manager/config.json` dashboard config (ADR-008),
+ * and returns the result.
  *
  * Request body:
  *   { "path": "/absolute/path/to/project" }
@@ -14,8 +15,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { buildProjectContext, buildScanPrompt, parseScanResponse } from '../../../lib/scanner';
-import type { ScanResult } from '../../../lib/scanner';
+import { buildScanPrompt, parseScanResponse } from '../../../lib/scanner/shared';
+import { buildProjectContext } from '../../../lib/scanner/server';
+import type { ScanResult } from '../../../lib/scanner/shared';
 
 export async function POST(request: NextRequest) {
   try {

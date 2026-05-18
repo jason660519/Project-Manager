@@ -20,6 +20,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Capture every readConfig call so we can assert on the path it received.
 const readConfigMock = vi.fn();
 const pickProjectFoldersMock = vi.fn();
+const migrateProjectLayoutMock = vi.fn(async (projectRoot: string) => ({
+  migrated: false,
+  configPath: `${projectRoot}/.project-manager/config.json`,
+}));
 
 vi.mock('../lib/bridge', () => ({
   getGithubToken: async () => '',
@@ -27,6 +31,7 @@ vi.mock('../lib/bridge', () => ({
   readConfig: (path: string) => readConfigMock(path),
   fetchGithubRepo: async () => [],
   pickProjectFolders: (opts?: { multiple?: boolean }) => pickProjectFoldersMock(opts),
+  migrateProjectLayout: (root: string) => migrateProjectLayoutMock(root),
 }));
 
 import { ProjectsView } from '../app/ui/views/ProjectsView';
@@ -35,6 +40,7 @@ import { ProjectsView } from '../app/ui/views/ProjectsView';
 beforeEach(() => {
   readConfigMock.mockReset();
   pickProjectFoldersMock.mockReset();
+  migrateProjectLayoutMock.mockClear();
   (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {};
 });
 
@@ -48,9 +54,8 @@ function renderModal(overrides: Partial<Parameters<typeof ProjectsView>[0]> = {}
       onSelectProject={() => {}}
       onToggleDashboardProject={() => {}}
       onAddProject={onAddProject}
+      onUpdateProject={overrides.onUpdateProject ?? vi.fn()}
       onRemoveProject={() => {}}
-      onSyncProject={async () => {}}
-      onInitializeProject={async () => {}}
       runHistory={[]}
       {...overrides}
     />,
@@ -72,33 +77,8 @@ function getModalSubmit(): HTMLElement {
   return matches[matches.length - 1];
 }
 
-describe('Add Project modal — independent inputs', () => {
-  it('AI Scan and Manual Add inputs do not share state', async () => {
-    const user = userEvent.setup();
-    renderModal();
-    await openAddModal(user);
-
-    // First input = AI Scan ("Project folder path").
-    const scanInput = screen.getByPlaceholderText('/path/to/your/project') as HTMLInputElement;
-    // Second input = Manual Add ("Path to existing .project-manager.json").
-    const manualInput = screen.getByPlaceholderText(
-      '/path/to/project/.project-manager.json',
-    ) as HTMLInputElement;
-
-    await user.type(scanInput, '/scan/folder');
-
-    // Typing in the AI Scan input must NOT propagate to the manual input.
-    expect(scanInput.value).toBe('/scan/folder');
-    expect(manualInput.value).toBe('');
-
-    await user.type(manualInput, '/manual/.project-manager.json');
-    expect(scanInput.value).toBe('/scan/folder');
-    expect(manualInput.value).toBe('/manual/.project-manager.json');
-  });
-});
-
 describe('Add Project modal — manual add path normalization', () => {
-  it('appends .project-manager.json when a folder path is given', async () => {
+  it('appends .project-manager/config.json when a folder path is given', async () => {
     readConfigMock.mockResolvedValueOnce({
       schemaVersion: 2,
       id: 'fixture-id',
@@ -112,7 +92,7 @@ describe('Add Project modal — manual add path normalization', () => {
     await openAddModal(user);
 
     const manualInput = screen.getByPlaceholderText(
-      '/path/to/project/.project-manager.json',
+      '/path/to/project (auto-detects .project-manager/)',
     ) as HTMLInputElement;
 
     // The user pastes the FIXTURE folder path (mirrors the bug screenshot).
@@ -122,7 +102,7 @@ describe('Add Project modal — manual add path normalization', () => {
 
     await waitFor(() => {
       expect(readConfigMock).toHaveBeenCalledWith(
-        '/Volumes/KLEVV-4T-1/Realestate_Management_Apps/.project-manager.json',
+        '/Volumes/KLEVV-4T-1/Realestate_Management_Apps/.project-manager/config.json',
       );
     });
 
@@ -130,14 +110,14 @@ describe('Add Project modal — manual add path normalization', () => {
       expect(onAddProject).toHaveBeenCalled();
     });
 
-    // The stored configPath should be the normalized file path, not the folder.
+    // The stored configPath should be the normalized file path inside the dashboard folder.
     const entry = onAddProject.mock.calls[0][0];
     expect(entry.configPath).toBe(
-      '/Volumes/KLEVV-4T-1/Realestate_Management_Apps/.project-manager.json',
+      '/Volumes/KLEVV-4T-1/Realestate_Management_Apps/.project-manager/config.json',
     );
   });
 
-  it('passes through a path that already ends with .project-manager.json', async () => {
+  it('passes through a path that already ends with .project-manager/config.json', async () => {
     readConfigMock.mockResolvedValueOnce({
       schemaVersion: 2,
       id: 'x',
@@ -151,39 +131,65 @@ describe('Add Project modal — manual add path normalization', () => {
     await openAddModal(user);
 
     const manualInput = screen.getByPlaceholderText(
-      '/path/to/project/.project-manager.json',
+      '/path/to/project (auto-detects .project-manager/)',
     ) as HTMLInputElement;
 
-    await user.type(manualInput, '/foo/.project-manager.json');
+    await user.type(manualInput, '/foo/.project-manager/config.json');
     await user.click(getModalSubmit());
 
     await waitFor(() => {
-      expect(readConfigMock).toHaveBeenCalledWith('/foo/.project-manager.json');
+      expect(readConfigMock).toHaveBeenCalledWith('/foo/.project-manager/config.json');
     });
   });
 
-  it('shows a friendly error suggesting AI Scan when the config file is missing', async () => {
-    // Simulate what Rust's read_config returns when there is no file at the path.
-    readConfigMock.mockRejectedValueOnce(
-      new Error('Cannot read /Volumes/KLEVV-4T-1/Realestate_Management_Apps/.project-manager.json: No such file or directory (os error 2)'),
-    );
+  it('normalises a legacy .project-manager.json path to the new layout', async () => {
+    readConfigMock.mockResolvedValueOnce({
+      schemaVersion: 2,
+      id: 'x',
+      project: { name: 'X', root: '/foo', defaultIDE: 'Cursor' },
+      features: [],
+      adapters: { ides: [], agents: [] },
+    });
 
     const user = userEvent.setup();
     renderModal();
     await openAddModal(user);
 
     const manualInput = screen.getByPlaceholderText(
-      '/path/to/project/.project-manager.json',
+      '/path/to/project (auto-detects .project-manager/)',
+    ) as HTMLInputElement;
+
+    await user.type(manualInput, '/foo/.project-manager.json');
+    await user.click(getModalSubmit());
+
+    await waitFor(() => {
+      expect(readConfigMock).toHaveBeenCalledWith('/foo/.project-manager/config.json');
+    });
+  });
+
+  it('registers the folder when dashboard config is missing (setup deferred)', async () => {
+    readConfigMock.mockRejectedValueOnce(
+      new Error('Cannot read /Volumes/KLEVV-4T-1/Realestate_Management_Apps/.project-manager/config.json: No such file or directory (os error 2)'),
+    );
+
+    const user = userEvent.setup();
+    const { onAddProject } = renderModal();
+    await openAddModal(user);
+
+    const manualInput = screen.getByPlaceholderText(
+      '/path/to/project (auto-detects .project-manager/)',
     ) as HTMLInputElement;
 
     await user.type(manualInput, '/Volumes/KLEVV-4T-1/Realestate_Management_Apps');
     await user.click(getModalSubmit());
 
-    // Error should explain that no .project-manager.json was found at that
-    // location and suggest the AI Scan path forward.  Look for the marker
-    // phrase in the error region (not the AI Scan button label itself).
     await waitFor(() => {
-      expect(screen.getByText(/No \.project-manager\.json found/i)).toBeInTheDocument();
+      expect(onAddProject).toHaveBeenCalledWith(
+        expect.objectContaining({
+          configMissing: true,
+          configPath: '/Volumes/KLEVV-4T-1/Realestate_Management_Apps/.project-manager/config.json',
+        }),
+      );
     });
     expect(screen.queryByText(/Is a directory/i)).not.toBeInTheDocument();
   });
@@ -202,7 +208,7 @@ describe('Add Project modal — Finder folder picker', () => {
       schemaVersion: 2,
       project: {
         name: path.includes('alpha') ? 'Alpha' : 'Beta',
-        root: path.replace(/\/\.project-manager\.json$/, ''),
+        root: path.replace(/\/\.project-manager\/config\.json$/, ''),
         defaultIDE: 'Cursor',
       },
       features: [],
@@ -222,7 +228,7 @@ describe('Add Project modal — Finder folder picker', () => {
     });
   });
 
-  it('fills the AI Scan path when Browse is used for a single folder', async () => {
+  it('fills the manual input when Browse is used for a single folder', async () => {
     const user = userEvent.setup();
     renderModal();
 
@@ -232,16 +238,18 @@ describe('Add Project modal — Finder folder picker', () => {
     });
 
     await openAddModal(user);
-    const browseButtons = screen.getAllByRole('button', { name: /^browse$/i });
-    await user.click(browseButtons[0]);
+    const browseBtn = screen.getByRole('button', { name: /^browse$/i });
+    await user.click(browseBtn);
 
     await waitFor(() => {
       expect(pickProjectFoldersMock).toHaveBeenCalledWith(
         expect.objectContaining({ multiple: false }),
       );
     });
-    const scanInput = screen.getByPlaceholderText('/path/to/your/project') as HTMLInputElement;
-    expect(scanInput.value).toBe('/Volumes/Projects/my-app');
+    const manualInput = screen.getByPlaceholderText(
+      '/path/to/project (auto-detects .project-manager/)',
+    ) as HTMLInputElement;
+    expect(manualInput.value).toBe('/Volumes/Projects/my-app');
   });
 
   it('quietly closes when the user cancels the picker (no error, no import)', async () => {
@@ -263,7 +271,7 @@ describe('Add Project modal — Finder folder picker', () => {
     expect(screen.queryByText(/Skipped/i)).not.toBeInTheDocument();
   });
 
-  it('reports "No projects were imported" when every chosen folder lacks a config', async () => {
+  it('imports folders even when every chosen path lacks a config file', async () => {
     const user = userEvent.setup();
     const { onAddProject } = renderModal();
 
@@ -271,7 +279,6 @@ describe('Add Project modal — Finder folder picker', () => {
       status: 'ok',
       paths: ['/Volumes/Projects/empty-1', '/Volumes/Projects/empty-2'],
     });
-    // Both readConfig calls reject with Rust's missing-file error.
     readConfigMock.mockRejectedValue(
       new Error('Cannot read config: No such file or directory (os error 2)'),
     );
@@ -280,18 +287,15 @@ describe('Add Project modal — Finder folder picker', () => {
     await user.click(screen.getByRole('button', { name: /choose from finder/i }));
 
     await waitFor(() => {
-      expect(readConfigMock).toHaveBeenCalledTimes(2);
+      expect(onAddProject).toHaveBeenCalledTimes(2);
     });
-
-    expect(onAddProject).not.toHaveBeenCalled();
-    // Both labels appear in the per-folder error list.
+    expect(onAddProject).toHaveBeenCalledWith(expect.objectContaining({ configMissing: true }));
     await waitFor(() => {
-      expect(screen.getByText(/empty-1: no \.project-manager\.json/)).toBeInTheDocument();
+      expect(screen.getByText(/Generate project data/i)).toBeInTheDocument();
     });
-    expect(screen.getByText(/empty-2: no \.project-manager\.json/)).toBeInTheDocument();
   });
 
-  it('shows "Imported N / Skipped M" when batch import partially succeeds', async () => {
+  it('opens batch scan prompt when some imported folders need setup', async () => {
     const user = userEvent.setup();
     const { onAddProject } = renderModal();
 
@@ -299,7 +303,6 @@ describe('Add Project modal — Finder folder picker', () => {
       status: 'ok',
       paths: ['/Volumes/Projects/alpha', '/Volumes/Projects/beta'],
     });
-    // alpha resolves, beta rejects.
     readConfigMock.mockImplementation(async (path: string) => {
       if (path.includes('alpha')) {
         return {
@@ -309,20 +312,15 @@ describe('Add Project modal — Finder folder picker', () => {
           adapters: { ides: [], agents: [] },
         };
       }
-      throw new Error('Cannot read config: No such file or directory (os error 2)');
+      throw new Error(`Cannot read ${path}: No such file or directory (os error 2)`);
     });
 
     await openAddModal(user);
     await user.click(screen.getByRole('button', { name: /choose from finder/i }));
 
     await waitFor(() => {
-      expect(onAddProject).toHaveBeenCalledTimes(1);
+      expect(onAddProject).toHaveBeenCalledTimes(2);
     });
-
-    // Modal stays open so the user can see what failed.
-    await waitFor(() => {
-      expect(screen.getByText(/Imported 1 project\. Skipped 1/i)).toBeInTheDocument();
-    });
-    expect(screen.getByText(/beta: no \.project-manager\.json/)).toBeInTheDocument();
+    expect(screen.getByText(/Generate project data/i)).toBeInTheDocument();
   });
 });

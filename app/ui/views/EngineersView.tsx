@@ -1,9 +1,13 @@
 'use client';
 
-import { useState } from 'react';
-import { Plus, Trash2, Users2, Workflow } from 'lucide-react';
-import { DEFAULT_AGENT_WORKFLOWS, getRecommendedWorkflowsForRole } from '../../../lib/agent-workflows';
+import { useEffect, useState } from 'react';
+import { Loader2, Play, Plus, RefreshCw, Sparkles, Trash2, Users2, Workflow, X } from 'lucide-react';
+import { DEFAULT_AGENT_WORKFLOWS } from '../../../lib/agent-workflows';
 import { DEFAULT_ENGINEER_ROLES } from '../../../lib/defaults/engineerRoles';
+import { listLlmProviders, type LlmProviderId } from '../../../lib/keys/llmProviders';
+import { hasProviderKey, loadProviderKey } from '../../../lib/keys/loadProviderKey';
+import { loadProviderOrder, type ProviderOrderEntry } from '../../../lib/keys/providerOrder';
+import { callSingleProvider } from '../../../lib/scanner/runProjectScan';
 import type { AnyAdapterConfig, EngineerRole } from '../../../lib/types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -49,11 +53,12 @@ interface FormState {
   name: string;
   slug: string;
   skills: string;
-  commands: string;
   systemPrompt: string;
-  referenceFiles: string;
   defaultAgentId: string;
   notes: string;
+  testProviderId: string;
+  testModel: string;
+  testPrompt: string;
 }
 
 function roleToForm(role: EngineerRole): FormState {
@@ -61,26 +66,60 @@ function roleToForm(role: EngineerRole): FormState {
     name: role.name,
     slug: role.slug,
     skills: role.skills.join('\n'),
-    commands: role.commands.join('\n'),
     systemPrompt: role.systemPrompt,
-    referenceFiles: role.referenceFiles.join('\n'),
     defaultAgentId: role.defaultAgentId ?? '',
     notes: role.notes ?? '',
+    testProviderId: role.testProviderId ?? '',
+    testModel: role.testModel ?? '',
+    testPrompt: role.testPrompt ?? '',
   };
 }
 
-function formToRole(id: string, form: FormState): EngineerRole {
+function formToRole(id: string, form: FormState, existing: EngineerRole): EngineerRole {
   return {
     id,
     name: form.name || 'Unnamed Role',
     slug: form.slug || slugify(form.name) || 'role',
     skills: form.skills.split('\n').map((s) => s.trim()).filter(Boolean),
-    commands: form.commands.split('\n').map((s) => s.trim()).filter(Boolean),
+    commands: existing.commands,
     systemPrompt: form.systemPrompt,
-    referenceFiles: form.referenceFiles.split('\n').map((s) => s.trim()).filter(Boolean),
+    referenceFiles: existing.referenceFiles,
     defaultAgentId: form.defaultAgentId || undefined,
     notes: form.notes || undefined,
+    testProviderId: form.testProviderId || undefined,
+    testModel: form.testModel || undefined,
+    testPrompt: form.testPrompt || undefined,
   };
+}
+
+// Build a sensible default test prompt from the current form values. The user
+// can override by typing into the textarea; empty falls back to this output.
+function buildDefaultTestPrompt(form: FormState): string {
+  const skills = form.skills.split('\n').map((s) => s.trim()).filter(Boolean);
+  const systemPrompt = form.systemPrompt.trim();
+  const lines: (string | null)[] = [
+    `You are a ${form.name || 'engineer'}.`,
+    skills.length > 0 ? `Your skills: ${skills.join(', ')}.` : null,
+    systemPrompt ? `Operating context: ${systemPrompt}` : null,
+    '',
+    'Reply briefly to confirm:',
+    '1. Your role in one sentence.',
+    '2. Three things you would check first when given a new task.',
+    '3. One question you would ask the human before starting.',
+  ];
+  return lines.filter((l): l is string => l !== null).join('\n');
+}
+
+// UI-only state for the test playground inside DetailPanel.
+interface PlaygroundResult {
+  content?: string;
+  error?: string;
+  latencyMs: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  model: string;
+  provider: LlmProviderId;
+  at: number;
 }
 
 // ── Shared UI ─────────────────────────────────────────────────────────────────
@@ -112,7 +151,59 @@ interface DetailPanelProps {
 function DetailPanel({ role, agents, onSave, onDelete }: DetailPanelProps) {
   const [form, setForm] = useState<FormState>(() => roleToForm(role));
   const [dirty, setDirty] = useState(false);
-  const recommendedWorkflows = getRecommendedWorkflowsForRole(form.slug);
+
+  // ── Test playground state ───────────────────────────────────────────────────
+  const [isTauri, setIsTauri] = useState(false);
+  const [testRunning, setTestRunning] = useState(false);
+  const [testResult, setTestResult] = useState<PlaygroundResult | null>(null);
+  const [orderEntries, setOrderEntries] = useState<ProviderOrderEntry[]>([]);
+  const [keyAvail, setKeyAvail] = useState<Record<string, boolean>>({});
+
+  const providers = listLlmProviders();
+
+  useEffect(() => {
+    setIsTauri(typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window);
+  }, []);
+
+  // Reload provider order + key availability whenever the selected role
+  // changes; key edits in another view should also be reflected on focus.
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = async () => {
+      const order = await loadProviderOrder();
+      if (cancelled) return;
+      setOrderEntries(order);
+      const avail: Record<string, boolean> = {};
+      await Promise.all(
+        order.map(async (e) => {
+          avail[e.provider] = await hasProviderKey(e.provider);
+        }),
+      );
+      if (cancelled) return;
+      setKeyAvail(avail);
+    };
+    void refresh();
+    const onFocus = () => void refresh();
+    if (typeof window !== 'undefined') window.addEventListener('focus', onFocus);
+    return () => {
+      cancelled = true;
+      if (typeof window !== 'undefined') window.removeEventListener('focus', onFocus);
+    };
+  }, [role.id]);
+
+  // Resolve provider: explicit pick on the role wins; otherwise fall back to
+  // the first enabled provider in Settings order that has a saved key.
+  const resolvedProviderId: LlmProviderId | null = (() => {
+    if (form.testProviderId) {
+      return providers.find((p) => p.id === form.testProviderId)?.id ?? null;
+    }
+    const first = orderEntries.find((e) => e.enabled && keyAvail[e.provider]);
+    return first?.provider ?? null;
+  })();
+  const resolvedSpec = resolvedProviderId
+    ? providers.find((p) => p.id === resolvedProviderId)
+    : null;
+  const resolvedModel = form.testModel || resolvedSpec?.defaultModel || '';
 
   const set = (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const val = e.target.value;
@@ -120,6 +211,12 @@ function DetailPanel({ role, agents, onSave, onDelete }: DetailPanelProps) {
       const next = { ...prev, [field]: val };
       if (field === 'name' && !dirty) {
         next.slug = slugify(val);
+      }
+      // Switching provider invalidates a model id that belongs to the
+      // previous provider — clear it so the user re-picks (or falls back to
+      // the new provider's default).
+      if (field === 'testProviderId') {
+        next.testModel = '';
       }
       return next;
     });
@@ -132,13 +229,56 @@ function DetailPanel({ role, agents, onSave, onDelete }: DetailPanelProps) {
   };
 
   const handleSave = () => {
-    onSave(formToRole(role.id, form));
+    onSave(formToRole(role.id, form, role));
     setDirty(false);
   };
 
   const handleReset = () => {
     setForm(roleToForm(role));
     setDirty(false);
+  };
+
+  const handleResetTestPrompt = () => {
+    setForm((prev) => ({ ...prev, testPrompt: '' }));
+    setDirty(true);
+  };
+
+  const handleRunTest = async () => {
+    if (!resolvedProviderId || !resolvedSpec) return;
+    setTestRunning(true);
+    const start = performance.now();
+    try {
+      const apiKey = await loadProviderKey(resolvedProviderId);
+      if (!apiKey.trim()) {
+        throw new Error(`No API key saved for ${resolvedSpec.label}. Add one in the Keys page.`);
+      }
+      const promptToUse = form.testPrompt.trim() || buildDefaultTestPrompt(form);
+      const r = await callSingleProvider(
+        resolvedProviderId,
+        apiKey,
+        promptToUse,
+        resolvedModel || undefined,
+      );
+      setTestResult({
+        content: r.content,
+        latencyMs: Math.round(performance.now() - start),
+        inputTokens: r.inputTokens,
+        outputTokens: r.outputTokens,
+        model: r.model,
+        provider: resolvedProviderId,
+        at: Date.now(),
+      });
+    } catch (e) {
+      setTestResult({
+        error: e instanceof Error ? e.message : String(e),
+        latencyMs: Math.round(performance.now() - start),
+        model: resolvedModel || '?',
+        provider: resolvedProviderId,
+        at: Date.now(),
+      });
+    } finally {
+      setTestRunning(false);
+    }
   };
 
   const agentAdapters = agents.filter((a) => a.type === 'agent');
@@ -190,51 +330,6 @@ function DetailPanel({ role, agents, onSave, onDelete }: DetailPanelProps) {
         />
       </FormField>
 
-      {/* Workflow playbooks */}
-      <div className="border border-stone-200/12 bg-[#061512]/45 p-3">
-        <div className="mb-2 flex items-center gap-2">
-          <Workflow size={13} className="text-stone-400" />
-          <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">
-            Recommended Workflows
-          </span>
-          <span className="font-mono text-[10px] text-stone-600">
-            {recommendedWorkflows.length}
-          </span>
-        </div>
-        {recommendedWorkflows.length === 0 ? (
-          <p className="text-xs text-stone-500">
-            No workflow recommendations for this slug yet. This role can still use any workflow
-            during dispatch.
-          </p>
-        ) : (
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-            {recommendedWorkflows.map((workflow) => (
-              <div key={workflow.id} className="border border-stone-200/10 bg-[#03100f]/60 p-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-stone-200">{workflow.name}</span>
-                  <span className={`ml-auto border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] ${modeColor(workflow.mode)}`}>
-                    {workflow.mode}
-                  </span>
-                </div>
-                <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-stone-500">
-                  {workflow.summary}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Commands */}
-      <FormField label="Common Commands" hint="(one per line)">
-        <textarea
-          rows={3}
-          value={form.commands}
-          onChange={set('commands')}
-          placeholder={'npm run dev\nnpm run typecheck'}
-          className={`${inputCls} font-mono text-xs`}
-        />
-      </FormField>
 
       {/* System Prompt */}
       <FormField label="System Prompt" hint="(prepended to every AI dispatch)">
@@ -247,16 +342,152 @@ function DetailPanel({ role, agents, onSave, onDelete }: DetailPanelProps) {
         />
       </FormField>
 
-      {/* Reference Files */}
-      <FormField label="Reference Files" hint="(paths relative to project root, one per line)">
-        <textarea
-          rows={3}
-          value={form.referenceFiles}
-          onChange={set('referenceFiles')}
-          placeholder={'CLAUDE.md\ndocs/Architecture.md'}
-          className={`${inputCls} font-mono text-xs`}
-        />
-      </FormField>
+      {/* ── AI Provider Test ──────────────────────────────────────────────── */}
+      <div className="space-y-3 border border-cyan-300/15 bg-[#04201d]/55 p-3">
+        <div className="flex items-center gap-2">
+          <Sparkles size={13} className="text-cyan-300/80" />
+          <span className="text-[11px] uppercase tracking-[0.14em] text-cyan-200/85">
+            AI Provider Test
+          </span>
+          <span className="ml-auto text-[10px] text-stone-500">
+            Sanity-check this role with a chosen provider/model before dispatch
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <FormField label="Provider (Company)">
+            <select value={form.testProviderId} onChange={set('testProviderId')} className={inputCls}>
+              <option value="">
+                Auto — use Settings fallback order
+                {resolvedSpec && !form.testProviderId ? ` (→ ${resolvedSpec.label})` : ''}
+              </option>
+              {providers.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                  {keyAvail[p.id] === false ? ' — no key' : ''}
+                </option>
+              ))}
+            </select>
+          </FormField>
+          <FormField label="Model">
+            <select
+              value={form.testModel}
+              onChange={set('testModel')}
+              disabled={!resolvedSpec}
+              className={`${inputCls} font-mono text-xs`}
+            >
+              <option value="">
+                {resolvedSpec ? `Default (${resolvedSpec.defaultModel})` : 'Pick a provider first'}
+              </option>
+              {resolvedSpec?.availableModels.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </FormField>
+        </div>
+
+        <FormField
+          label="Test Prompt"
+          hint={
+            form.testPrompt.trim()
+              ? '(custom — saved with the role)'
+              : '(empty — placeholder shows the auto-generated default that will be sent)'
+          }
+        >
+          <textarea
+            rows={6}
+            value={form.testPrompt}
+            onChange={set('testPrompt')}
+            placeholder={buildDefaultTestPrompt(form)}
+            className={`${inputCls} text-xs leading-5`}
+          />
+          {form.testPrompt.trim() && (
+            <button
+              type="button"
+              onClick={handleResetTestPrompt}
+              className="mt-1 inline-flex items-center gap-1 text-[10px] text-stone-500 hover:text-cyan-200"
+            >
+              <RefreshCw size={10} /> Reset to auto-generated default
+            </button>
+          )}
+        </FormField>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleRunTest()}
+            disabled={
+              !isTauri ||
+              !resolvedProviderId ||
+              !keyAvail[resolvedProviderId] ||
+              testRunning
+            }
+            title={
+              !isTauri
+                ? 'Testing requires the desktop app (Rust bridge calls the provider directly).'
+                : !resolvedProviderId
+                  ? 'No provider available — pick one above or enable one in Settings.'
+                  : !keyAvail[resolvedProviderId]
+                    ? `Save an API key for ${resolvedSpec?.label ?? 'this provider'} in the Keys page first.`
+                    : 'Send the prompt to the resolved provider/model.'
+            }
+            className="inline-flex items-center gap-1.5 border border-cyan-200/30 bg-cyan-500/15 px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-cyan-100 hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {testRunning ? (
+              <Loader2 size={11} className="animate-spin" />
+            ) : (
+              <Play size={11} />
+            )}
+            Run Test
+          </button>
+          <span className="text-[10px] text-stone-500">
+            {resolvedProviderId && resolvedSpec
+              ? `→ ${resolvedSpec.label} · ${resolvedModel || resolvedSpec.defaultModel}`
+              : 'No provider resolved'}
+          </span>
+          {testResult && (
+            <button
+              type="button"
+              onClick={() => setTestResult(null)}
+              className="ml-auto text-stone-500 hover:text-stone-200"
+              title="Clear result"
+              aria-label="Clear test result"
+            >
+              <X size={11} />
+            </button>
+          )}
+        </div>
+
+        {testResult && (
+          <div className="border border-stone-200/12 bg-[#020908] px-3 py-2 text-[11px]">
+            <div className="mb-1 flex flex-wrap items-center gap-3 text-stone-500">
+              <span>
+                {testResult.error ? (
+                  <span className="text-red-300">failed</span>
+                ) : (
+                  <span className="text-emerald-300">ok</span>
+                )}{' '}
+                · {testResult.latencyMs} ms
+                {testResult.inputTokens != null && testResult.outputTokens != null && (
+                  <>
+                    {' '}
+                    · in {testResult.inputTokens} / out {testResult.outputTokens} tokens
+                  </>
+                )}
+                {' · '}
+                <code className="font-mono">{testResult.model}</code>
+                {' · '}
+                <span>{testResult.provider}</span>
+              </span>
+            </div>
+            <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-stone-200">
+              {testResult.error ?? testResult.content ?? ''}
+            </pre>
+          </div>
+        )}
+      </div>
 
       {/* Notes */}
       <FormField label="Notes">
@@ -321,7 +552,7 @@ export function EngineersView({ roles, agents, onRolesChange }: EngineersViewPro
       skills: [],
       commands: [],
       systemPrompt: '',
-      referenceFiles: ['CLAUDE.md'],
+      referenceFiles: [],
     };
     onRolesChange([...roles, newRole]);
     setSelectedId(newRole.id);

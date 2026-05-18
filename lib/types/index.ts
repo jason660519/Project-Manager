@@ -163,6 +163,12 @@ export interface EngineerRole {
   referenceFiles: string[];
   defaultAgentId?: string;
   notes?: string;
+  /** LLM provider used by the in-page Test panel. Empty = fall back to Settings provider order. */
+  testProviderId?: string;
+  /** Model id for the chosen test provider. Empty = use that provider's defaultModel. */
+  testModel?: string;
+  /** User-edited test prompt. Empty = auto-generate from name + skills + systemPrompt. */
+  testPrompt?: string;
 }
 
 export type ViewId = 'dashboard' | 'features' | 'projects' | 'project-files' | 'plugins' | 'settings' | 'keyboard-shortcuts' | 'engineers' | 'channels' | 'sessions' | 'cron-jobs' | 'logs' | 'keys' | 'documentation';
@@ -273,6 +279,11 @@ export interface ProjectEntry {
   configPath: string;
   /** ISO timestamp of the last successful sync from disk or GitHub. */
   lastSyncedAt?: string;
+  /**
+   * Folder was imported before `.project-manager/config.json` exists on disk.
+   * Scan or Initialize clears this flag after writing the config file.
+   */
+  configMissing?: boolean;
 }
 
 // ── AI API types ──────────────────────────────────────────────────────────────

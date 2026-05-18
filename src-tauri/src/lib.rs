@@ -23,7 +23,12 @@ struct ExitEvent {
 
 // ── Commands ──────────────────────────────────────────────────────────────────
 
-/// Read and parse a `.project-manager.json` config file.
+// Filenames for the consolidated dashboard layout (ADR-008).
+const DASHBOARD_DIR_NAME: &str = ".project-manager";
+const CONFIG_FILENAME: &str = "config.json";
+const LEGACY_CONFIG_FILENAME: &str = ".project-manager.json";
+
+/// Read and parse the dashboard config JSON file.
 #[tauri::command]
 async fn read_config(path: String) -> Result<serde_json::Value, String> {
     let content = tokio::fs::read_to_string(&path)
@@ -32,12 +37,20 @@ async fn read_config(path: String) -> Result<serde_json::Value, String> {
     serde_json::from_str(&content).map_err(|e| format!("Invalid JSON in {path}: {e}"))
 }
 
-/// Write a JSON value back to a `.project-manager.json` config file.
+/// Write a JSON value back to the dashboard config file. Ensures the parent
+/// `.project-manager/` directory exists so writes succeed even when the
+/// caller passes a fresh path that hasn't been materialised yet.
 #[tauri::command]
 async fn write_config(path: String, config: serde_json::Value) -> Result<(), String> {
+    let target = std::path::Path::new(&path);
+    if let Some(parent) = target.parent() {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| format!("Cannot create directory {}: {e}", parent.display()))?;
+    }
     let content =
         serde_json::to_string_pretty(&config).map_err(|e| format!("Serialize error: {e}"))?;
-    tokio::fs::write(&path, content)
+    tokio::fs::write(target, content)
         .await
         .map_err(|e| format!("Cannot write {path}: {e}"))
 }
@@ -48,9 +61,11 @@ struct InitializeProjectResult {
     created_dirs: Vec<String>,
 }
 
-/// Create scaffold directories and write `.project-manager.json` for a local project.
-/// `mode` is one of `create` | `merge` | `overwrite`. Caller supplies the final JSON for
-/// merge/overwrite; this command only enforces existence rules for `create`.
+/// Create the consolidated `.project-manager/` folder (ADR-008) and write
+/// `config.json` for a local project.
+/// `mode` is one of `create` | `merge` | `overwrite`. Caller supplies the
+/// final JSON for merge/overwrite; this command only enforces existence
+/// rules for `create`.
 #[tauri::command]
 async fn initialize_project(
     project_root: String,
@@ -62,7 +77,8 @@ async fn initialize_project(
         return Err(format!("Project root does not exist: {project_root}"));
     }
 
-    let config_path = root.join(".project-manager.json");
+    let dashboard_dir = root.join(DASHBOARD_DIR_NAME);
+    let config_path = dashboard_dir.join(CONFIG_FILENAME);
     let config_path_str = config_path
         .to_str()
         .ok_or_else(|| format!("Invalid config path under {project_root}"))?
@@ -79,18 +95,26 @@ async fn initialize_project(
         other => return Err(format!("Invalid initialize mode: {other}")),
     }
 
-    let scaffold_dirs = ["docs/features", "docs/dev-logs"];
+    // Create the dashboard root and its canonical subdirectories so they're
+    // immediately visible to the engineer in their file tree.
+    let scaffold_dirs = [
+        dashboard_dir.clone(),
+        dashboard_dir.join("features"),
+        dashboard_dir.join("dev-logs"),
+    ];
     let mut created_dirs: Vec<String> = Vec::new();
-    for rel in scaffold_dirs {
-        let dir = root.join(rel);
-        tokio::fs::create_dir_all(&dir)
+    for dir in &scaffold_dirs {
+        tokio::fs::create_dir_all(dir)
             .await
             .map_err(|e| format!("Cannot create directory {}: {e}", dir.display()))?;
-        let gitkeep = dir.join(".gitkeep");
-        if !gitkeep.is_file() {
-            tokio::fs::write(&gitkeep, b"")
-                .await
-                .map_err(|e| format!("Cannot write {}: {e}", gitkeep.display()))?;
+        // Skip .gitkeep at the dashboard root itself — config.json keeps it tracked.
+        if dir != &dashboard_dir {
+            let gitkeep = dir.join(".gitkeep");
+            if !gitkeep.is_file() {
+                tokio::fs::write(&gitkeep, b"")
+                    .await
+                    .map_err(|e| format!("Cannot write {}: {e}", gitkeep.display()))?;
+            }
         }
         if let Some(s) = dir.to_str() {
             created_dirs.push(s.to_string());
@@ -109,18 +133,114 @@ async fn initialize_project(
     })
 }
 
-/// Delete a `.project-manager.json` config file from disk.
-/// Refuses any path whose basename is not `.project-manager.json` so a typo in
-/// the configPath can never wipe an unrelated file.
+#[derive(serde::Serialize)]
+struct MigrateProjectLayoutResult {
+    /// Whether anything actually moved on disk. `false` means the project was
+    /// already on the new layout (or had no config at all).
+    migrated: bool,
+    /// Path to the canonical config after migration (or where it already lived).
+    config_path: String,
+}
+
+/// Migrate a project from the legacy single-file layout (ADR-008):
+///   <root>/.project-manager.json
+/// to the consolidated dashboard layout:
+///   <root>/.project-manager/config.json
+///   <root>/.project-manager/features/.gitkeep
+///   <root>/.project-manager/dev-logs/.gitkeep
+///
+/// Idempotent: if `<root>/.project-manager/config.json` already exists the
+/// command is a no-op and returns `migrated: false`. The legacy file is
+/// removed only after the new file is successfully written, so a crashed
+/// migration leaves a recoverable state on disk.
+#[tauri::command]
+async fn migrate_project_layout(
+    project_root: String,
+) -> Result<MigrateProjectLayoutResult, String> {
+    let root = std::path::Path::new(&project_root);
+    if !root.is_dir() {
+        return Err(format!("Project root does not exist: {project_root}"));
+    }
+
+    let dashboard_dir = root.join(DASHBOARD_DIR_NAME);
+    let new_config = dashboard_dir.join(CONFIG_FILENAME);
+    let legacy_config = root.join(LEGACY_CONFIG_FILENAME);
+
+    let new_config_str = new_config
+        .to_str()
+        .ok_or_else(|| format!("Invalid new config path under {project_root}"))?
+        .to_string();
+
+    if new_config.is_file() {
+        return Ok(MigrateProjectLayoutResult {
+            migrated: false,
+            config_path: new_config_str,
+        });
+    }
+
+    if !legacy_config.is_file() {
+        return Ok(MigrateProjectLayoutResult {
+            migrated: false,
+            config_path: new_config_str,
+        });
+    }
+
+    // Materialise the destination tree first so the rename below is the very
+    // last filesystem mutation — if it fails the legacy file is still there.
+    for subdir in ["features", "dev-logs"] {
+        let dir = dashboard_dir.join(subdir);
+        tokio::fs::create_dir_all(&dir)
+            .await
+            .map_err(|e| format!("Cannot create directory {}: {e}", dir.display()))?;
+        let gitkeep = dir.join(".gitkeep");
+        if !gitkeep.is_file() {
+            tokio::fs::write(&gitkeep, b"")
+                .await
+                .map_err(|e| format!("Cannot write {}: {e}", gitkeep.display()))?;
+        }
+    }
+
+    // Use rename so the file's contents (the user's actual data) are never
+    // copy-then-deleted, which would briefly duplicate sensitive data on disk.
+    tokio::fs::rename(&legacy_config, &new_config)
+        .await
+        .map_err(|e| {
+            format!(
+                "Cannot move {} to {}: {e}",
+                legacy_config.display(),
+                new_config.display(),
+            )
+        })?;
+
+    Ok(MigrateProjectLayoutResult {
+        migrated: true,
+        config_path: new_config_str,
+    })
+}
+
+/// Delete the dashboard config file from disk. Accepts both the new path
+/// (`.project-manager/config.json`) and the legacy single-file path
+/// (`.project-manager.json`) so projects mid-migration can still be removed.
+/// Refuses any other path so a typo in the configPath can never wipe an
+/// unrelated file.
 #[tauri::command]
 async fn delete_config(path: String) -> Result<(), String> {
-    let basename = std::path::Path::new(&path)
+    let p = std::path::Path::new(&path);
+    let basename = p
         .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or("");
-    if basename != ".project-manager.json" {
+    let parent_name = p
+        .parent()
+        .and_then(|parent| parent.file_name())
+        .and_then(|s| s.to_str())
+        .unwrap_or("");
+
+    let is_new_layout = basename == CONFIG_FILENAME && parent_name == DASHBOARD_DIR_NAME;
+    let is_legacy_layout = basename == LEGACY_CONFIG_FILENAME;
+    if !is_new_layout && !is_legacy_layout {
         return Err(format!(
-            "Refusing to delete {path}: basename must be .project-manager.json"
+            "Refusing to delete {path}: must be `{DASHBOARD_DIR_NAME}/{CONFIG_FILENAME}` or `{LEGACY_CONFIG_FILENAME}`"
         ));
     }
     match tokio::fs::remove_file(&path).await {
@@ -326,7 +446,10 @@ async fn github_oauth_device_poll(device_code: String) -> Result<GithubDevicePol
     }
 }
 
-/// Scan a directory for projects that contain a `.project-manager.json`.
+/// Scan a directory for projects that contain a dashboard config file —
+/// either the new layout (`.project-manager/config.json`) or the legacy
+/// single-file form (`.project-manager.json`). Returns the canonical config
+/// path so the caller can hand it straight back to `read_config`.
 #[tauri::command]
 async fn scan_projects(root: String) -> Result<Vec<String>, String> {
     let mut found: Vec<String> = Vec::new();
@@ -335,9 +458,15 @@ async fn scan_projects(root: String) -> Result<Vec<String>, String> {
         .map_err(|e| format!("Cannot read dir {root}: {e}"))?;
 
     while let Ok(Some(entry)) = dir.next_entry().await {
-        let config_path = entry.path().join(".project-manager.json");
-        if config_path.exists() {
-            if let Some(p) = config_path.to_str() {
+        let folder = entry.path();
+        let new_config = folder.join(DASHBOARD_DIR_NAME).join(CONFIG_FILENAME);
+        let legacy_config = folder.join(LEGACY_CONFIG_FILENAME);
+        if new_config.exists() {
+            if let Some(p) = new_config.to_str() {
+                found.push(p.to_string());
+            }
+        } else if legacy_config.exists() {
+            if let Some(p) = legacy_config.to_str() {
                 found.push(p.to_string());
             }
         }
@@ -519,6 +648,148 @@ struct AnthropicResponse {
     input_tokens: u32,
     #[serde(rename = "outputTokens")]
     output_tokens: u32,
+}
+
+/// Call any OpenAI-compatible chat-completions endpoint (OpenAI itself,
+/// DeepSeek, Grok, Kimi, OpenRouter, Perplexity, Together, Zhipu, Qwen…).
+/// Bearer-auth + the standard `{messages, model, max_tokens}` body covers
+/// every provider in this family — the only thing that changes between
+/// them is `base_url`.
+///
+/// Response shape matches `call_anthropic` so the scanner fallback chain
+/// can swap providers without per-provider handling. Session persistence
+/// is intentionally omitted; only the long-running `call_anthropic` agent
+/// flow needs it.
+#[tauri::command]
+async fn call_openai_compatible(
+    api_key: String,
+    base_url: String,
+    model: String,
+    max_tokens: u32,
+    messages: Vec<AnthropicMessage>,
+) -> Result<AnthropicResponse, String> {
+    let client = reqwest::Client::new();
+
+    let body = serde_json::json!({
+        "model": model,
+        "max_tokens": max_tokens,
+        "messages": messages,
+    });
+
+    let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
+
+    let res = client
+        .post(&url)
+        .bearer_auth(&api_key)
+        .header("content-type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {e}"))?;
+
+    if !res.status().is_success() {
+        let status = res.status();
+        let text = res.text().await.unwrap_or_default();
+        return Err(format!("OpenAI-compatible API {status}: {text}"));
+    }
+
+    let raw: serde_json::Value = res.json().await.map_err(|e| format!("Parse error: {e}"))?;
+    let content = raw["choices"][0]["message"]["content"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
+    let input_tokens = raw["usage"]["prompt_tokens"].as_u64().unwrap_or(0) as u32;
+    let output_tokens = raw["usage"]["completion_tokens"].as_u64().unwrap_or(0) as u32;
+
+    Ok(AnthropicResponse { content, input_tokens, output_tokens })
+}
+
+/// Thin wrapper that calls OpenAI specifically — kept for backward
+/// compatibility with the renderer's existing `callOpenAI(opts)` shape.
+#[tauri::command]
+async fn call_openai(
+    api_key: String,
+    model: String,
+    max_tokens: u32,
+    messages: Vec<AnthropicMessage>,
+) -> Result<AnthropicResponse, String> {
+    call_openai_compatible(
+        api_key,
+        "https://api.openai.com/v1".to_string(),
+        model,
+        max_tokens,
+        messages,
+    )
+    .await
+}
+
+/// Call Google's Gemini generateContent endpoint. Differences from the other
+/// two providers: the API key is a query-string param (not a header), the
+/// payload uses `contents[].parts[].text` instead of `messages[].content`,
+/// and roles use `user` / `model` instead of `user` / `assistant`. Tokens
+/// come back under `usageMetadata`.
+#[tauri::command]
+async fn call_gemini(
+    api_key: String,
+    model: String,
+    max_tokens: u32,
+    messages: Vec<AnthropicMessage>,
+) -> Result<AnthropicResponse, String> {
+    let client = reqwest::Client::new();
+
+    // Translate the shared OpenAI/Anthropic-style messages into Gemini's
+    // {role, parts:[{text}]} format. Map assistant → model since Gemini
+    // doesn't recognise the OpenAI role name.
+    let contents: Vec<serde_json::Value> = messages
+        .iter()
+        .map(|m| {
+            let role = if m.role == "assistant" { "model" } else { &m.role };
+            serde_json::json!({
+                "role": role,
+                "parts": [{ "text": m.content }],
+            })
+        })
+        .collect();
+
+    let body = serde_json::json!({
+        "contents": contents,
+        "generationConfig": {
+            "maxOutputTokens": max_tokens,
+            "temperature": 0.2,
+        },
+    });
+
+    let url = format!(
+        "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}",
+    );
+
+    let res = client
+        .post(&url)
+        .header("content-type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {e}"))?;
+
+    if !res.status().is_success() {
+        let status = res.status();
+        let text = res.text().await.unwrap_or_default();
+        return Err(format!("Gemini API {status}: {text}"));
+    }
+
+    let raw: serde_json::Value = res.json().await.map_err(|e| format!("Parse error: {e}"))?;
+    let content = raw["candidates"][0]["content"]["parts"][0]["text"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
+    let input_tokens = raw["usageMetadata"]["promptTokenCount"]
+        .as_u64()
+        .unwrap_or(0) as u32;
+    let output_tokens = raw["usageMetadata"]["candidatesTokenCount"]
+        .as_u64()
+        .unwrap_or(0) as u32;
+
+    Ok(AnthropicResponse { content, input_tokens, output_tokens })
 }
 
 // ── Terminal spawn (interactive) ──────────────────────────────────────────────
@@ -1099,8 +1370,13 @@ fn list_dir_recursive(path: &std::path::Path, depth: u32, max_depth: u32) -> Vec
     for entry in read_dir.flatten() {
         let file_name = entry.file_name();
         let name = file_name.to_string_lossy().to_string();
-        // Skip hidden files/dirs (except root level and .project-manager.json)
-        if name.starts_with('.') && name != ".project-manager.json" && depth > 0 {
+        // Skip hidden files/dirs except the dashboard folder + its legacy
+        // single-file ancestor; both are required for AI Scan context.
+        if name.starts_with('.')
+            && name != ".project-manager"
+            && name != ".project-manager.json"
+            && depth > 0
+        {
             continue;
         }
         let entry_path = entry.path();
@@ -2461,12 +2737,16 @@ pub fn run() {
             read_config,
             write_config,
             initialize_project,
+            migrate_project_layout,
             delete_config,
             scan_projects,
             spawn_agent,
             spawn_terminal,
             kill_process,
             call_anthropic,
+            call_openai,
+            call_openai_compatible,
+            call_gemini,
             watch_config,
             fetch_github_repo,
             fetch_github_issues,

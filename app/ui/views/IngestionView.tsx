@@ -372,7 +372,7 @@ export function IngestionView({ project, onImportFeatures }: IngestionViewProps)
         {!isTauri && (
           <p className="mt-3 text-[11px] text-amber-100/60">
             Dev mode: features added to in-memory state only. In production they write to
-            .project-manager.json via Tauri bridge.
+            .project-manager/config.json via Tauri bridge.
           </p>
         )}
       </div>

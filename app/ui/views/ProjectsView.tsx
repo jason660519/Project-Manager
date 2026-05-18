@@ -1,27 +1,39 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   AlertTriangle,
   BarChart3,
   Bot,
   Check,
-  ChevronDown,
-  ChevronUp,
   FolderOpen,
-  FolderPlus,
   Github,
+  KeyRound,
   Loader2,
   Plus,
-  RefreshCw,
-  Save,
-  Sparkles,
   Trash2,
   X,
 } from 'lucide-react';
-import type { InitializeMode } from '../../../lib/storage';
-import { CURRENT_SCHEMA_VERSION, migrateConfig, resolveConfigPath } from '../../../lib/storage';
+import { hasProviderKey } from '../../../lib/keys/loadProviderKey';
+import {
+  ALL_LLM_PROVIDERS,
+  type LlmProviderId,
+} from '../../../lib/keys/providerOrder';
+import {
+  getProjectSetupStatus,
+  projectNeedsScan,
+  setupStatusLabel,
+} from '../../../lib/projectSetup';
+import { runProjectScan } from '../../../lib/scanner/runProjectScan';
+import {
+  applyScanConfigToProject,
+  buildProjectEntryFromPath,
+  migrateConfig,
+  resolveConfigPath,
+} from '../../../lib/storage';
 import { CompletedRun, ProjectManagerConfig, Feature, ProjectEntry } from '../../../lib/types';
+import { PostImportScanDialog } from './_components/PostImportScanDialog';
 
 interface ProjectsViewProps {
   projects: ProjectEntry[];
@@ -30,9 +42,8 @@ interface ProjectsViewProps {
   onSelectProject: (id: string) => void;
   onToggleDashboardProject: (id: string, selected: boolean) => void;
   onAddProject: (entry: ProjectEntry) => void;
+  onUpdateProject: (entry: ProjectEntry) => void;
   onRemoveProject: (id: string, deleteConfigFile: boolean) => Promise<void> | void;
-  onSyncProject: (id: string) => Promise<void>;
-  onInitializeProject: (id: string, mode: InitializeMode) => Promise<void>;
   runHistory: CompletedRun[];
 }
 
@@ -56,16 +67,6 @@ function formatRelativeTime(iso: string): string {
   return `${days} day${days === 1 ? '' : 's'} ago`;
 }
 
-type ScanPhase = 'idle' | 'scanning' | 'preview' | 'error';
-
-interface ScanPreview {
-  config: ProjectManagerConfig;
-  rawJson: string;
-  projectName: string;
-  featureCount: number;
-  detectedIDEs: string[];
-}
-
 export function ProjectsView({
   projects,
   selectedProjectId,
@@ -73,20 +74,14 @@ export function ProjectsView({
   onSelectProject,
   onToggleDashboardProject,
   onAddProject,
+  onUpdateProject,
   onRemoveProject,
-  onSyncProject,
-  onInitializeProject,
   runHistory,
 }: ProjectsViewProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [addMode, setAddMode] = useState<'local' | 'github'>('local');
   /** Folder path used by the AI Scan flow. */
-  const [localPath, setLocalPath] = useState('');
-  /**
-   * Path used by the Manual Add flow. Kept separate from `localPath` so the
-   * two inputs don't mirror each other (they serve different intents — AI Scan
-   * wants a folder, Manual Add wants an existing config file).
-   */
+  /** Path the user pastes into the manual-add field (or auto-filled by Browse). */
   const [manualConfigPath, setManualConfigPath] = useState('');
   const [githubUrl, setGithubUrl] = useState('');
   const [githubToken, setGithubToken] = useState('');
@@ -96,24 +91,33 @@ export function ProjectsView({
   const [reportCopied, setReportCopied] = useState(false);
   const [isTauri, setIsTauri] = useState(false);
 
-  // AI Scan state
-  const [scanPhase, setScanPhase] = useState<ScanPhase>('idle');
-  const [scanPreview, setScanPreview] = useState<ScanPreview | null>(null);
-  const [scanError, setScanError] = useState('');
-  const [editableJson, setEditableJson] = useState('');
-  const [showRawJson, setShowRawJson] = useState(false);
-
-  // Sync state — track which project ids are currently syncing + any error.
-  const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set());
-  const [syncErrors, setSyncErrors] = useState<Record<string, string>>({});
-  const [initializingIds, setInitializingIds] = useState<Set<string>>(new Set());
-  const [initConfirmTarget, setInitConfirmTarget] = useState<ProjectEntry | null>(null);
-
   // Delete confirmation modal state.
   const [deleteTarget, setDeleteTarget] = useState<ProjectEntry | null>(null);
   const [deleteAlsoFile, setDeleteAlsoFile] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [pickingFolders, setPickingFolders] = useState(false);
+  const [postImportScanQueue, setPostImportScanQueue] = useState<ProjectEntry[] | null>(null);
+  const [batchScanning, setBatchScanning] = useState(false);
+  // Per-row Initialize state. One project at a time can be busy initializing;
+  // any failures land in initErrors keyed by project id and surface below the row.
+  const [initializingIds, setInitializingIds] = useState<Set<string>>(new Set());
+  const [initErrors, setInitErrors] = useState<Record<string, string>>({});
+  /**
+   * Three-colour notice (success / warning / error) replacing the old single
+   * emerald string. Same slot in the UI, but the kind decides the colour so
+   * "Imported 4" and "1 scan failed" don't both look like success.
+   */
+  const [notice, setNotice] = useState<
+    { kind: 'success' | 'warning' | 'error'; text: string } | null
+  >(null);
+  /**
+   * Tri-state preflight: null = still checking, false = no usable provider,
+   * true = at least one fallback-order provider has a key. We gate the
+   * Initialize UI on this so a batch-scan never fires identical "no key"
+   * errors. (Provider order itself is honoured by the scanner.)
+   */
+  const [anyProviderKeyPresent, setAnyProviderKeyPresent] = useState<boolean | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     setIsTauri(typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window);
@@ -123,19 +127,35 @@ export function ProjectsView({
       const token = await getGithubToken();
       if (!cancelled) setGithubToken(token);
     })();
+    // Multi-provider preflight — runs on mount and after the Keys view
+    // focus event so saving a key (or reordering providers) clears the
+    // banner without a full reload. We only need to know whether *any*
+    // configured provider has a key; the scanner decides the exact order.
+    const refreshKey = async () => {
+      try {
+        const flags = await Promise.all(ALL_LLM_PROVIDERS.map((p) => hasProviderKey(p)));
+        if (!cancelled) setAnyProviderKeyPresent(flags.some(Boolean));
+      } catch {
+        if (!cancelled) setAnyProviderKeyPresent(false);
+      }
+    };
+    void refreshKey();
+    const onFocus = () => void refreshKey();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', onFocus);
+    }
     return () => {
       cancelled = true;
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', onFocus);
+      }
     };
   }, []);
 
-  // Reset scan + manual-add state when modal closes so the next open starts clean.
+  // Reset transient modal state when the dialog closes so the next open
+  // starts clean (no stale error / stale path).
   useEffect(() => {
     if (!showAddModal) {
-      setScanPhase('idle');
-      setScanPreview(null);
-      setScanError('');
-      setEditableJson('');
-      setShowRawJson(false);
       setAddError('');
       setManualConfigPath('');
     }
@@ -178,33 +198,19 @@ export function ProjectsView({
     }
   };
 
-  const importProjectFromPath = async (folderOrConfigPath: string): Promise<void> => {
+  const upsertProjectFromPath = async (folderOrConfigPath: string): Promise<ProjectEntry> => {
     const resolvedPath = resolveConfigPath(folderOrConfigPath.trim());
-    let config: ProjectManagerConfig;
-    if (isTauri) {
-      const { readConfig } = await import('../../../lib/bridge');
-      config = await readConfig(resolvedPath);
-    } else {
-      const folder = resolvedPath.replace(/\/\.project-manager\.json$/, '');
-      // Non-Tauri (web preview / jest) placeholder. Stamp the latest schema so
-      // we never silently rely on the v1→vN migration chain just to read our
-      // own freshly-minted stub.
-      config = migrateConfig({
-        schemaVersion: CURRENT_SCHEMA_VERSION,
-        project: {
-          name: folder.split('/').pop() || 'Project',
-          root: folder,
-          defaultIDE: 'Cursor',
-        },
-        features: [],
-        adapters: { ides: [], agents: [] },
-      });
-    }
-    onAddProject({
-      id: `proj-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      config,
-      configPath: resolvedPath,
+    const existing = projects.find((p) => p.configPath === resolvedPath);
+    const entry = await buildProjectEntryFromPath(folderOrConfigPath, {
+      isTauri,
+      existing,
     });
+    if (existing) {
+      onUpdateProject(entry);
+    } else {
+      onAddProject(entry);
+    }
+    return entry;
   };
 
   const handleAddLocal = async () => {
@@ -213,15 +219,14 @@ export function ProjectsView({
     setAdding(true);
     setAddError('');
     try {
-      await importProjectFromPath(manualConfigPath);
+      await upsertProjectFromPath(manualConfigPath);
       setShowAddModal(false);
       setManualConfigPath('');
-      setLocalPath('');
     } catch (e) {
       const raw = e instanceof Error ? e.message : String(e);
       if (isMissingConfigError(raw)) {
         setAddError(
-          `No .project-manager.json found at ${resolvedPath}. Try the AI Scan option above to generate one automatically.`,
+          `No dashboard config found at ${resolvedPath}. Click Initialize on this project's row to generate one.`,
         );
       } else {
         setAddError(`Failed to read config: ${raw}`);
@@ -232,9 +237,11 @@ export function ProjectsView({
   };
 
   /** Native Finder / Explorer folder picker — fill a field or import immediately. */
-  const handlePickFolders = async (mode: 'import' | 'scan' | 'manual') => {
+  const handlePickFolders = async (mode: 'import' | 'manual') => {
     if (!isTauri) {
-      setAddError('Folder picker requires the Project Manager desktop app.');
+      setAddError(
+        'Native Finder picker is desktop-only — paste a project folder path below to import from the dev server.',
+      );
       return;
     }
     setPickingFolders(true);
@@ -250,7 +257,9 @@ export function ProjectsView({
       });
 
       if (result.status === 'unsupported') {
-        setAddError('Folder picker requires the Project Manager desktop app.');
+        setAddError(
+        'Native Finder picker is desktop-only — paste a project folder path below to import from the dev server.',
+      );
         return;
       }
       if (result.status === 'cancelled') return;
@@ -259,41 +268,56 @@ export function ProjectsView({
       if (paths.length === 0) return;
 
       switch (mode) {
-        case 'scan':
-          setLocalPath(paths[0]);
-          return;
         case 'manual':
           setManualConfigPath(paths[0]);
           return;
         case 'import': {
           setAdding(true);
           const failures: string[] = [];
-          let imported = 0;
+          const importedEntries: ProjectEntry[] = [];
+          const needsSetup: ProjectEntry[] = [];
           for (const folderPath of paths) {
             try {
-              await importProjectFromPath(folderPath);
-              imported += 1;
+              const entry = await upsertProjectFromPath(folderPath);
+              importedEntries.push(entry);
+              if (projectNeedsScan(entry)) needsSetup.push(entry);
             } catch (e) {
               const raw = e instanceof Error ? e.message : String(e);
               const label = folderPath.split('/').filter(Boolean).pop() ?? folderPath;
-              failures.push(
-                isMissingConfigError(raw)
-                  ? `${label}: no .project-manager.json — use AI Scan or Initialize`
-                  : `${label}: ${raw}`,
-              );
+              failures.push(`${label}: ${raw}`);
             }
           }
 
-          if (imported > 0 && failures.length === 0) {
+          const imported = importedEntries.length;
+          if (imported > 0) {
+            setNotice(
+              failures.length > 0
+                ? {
+                    kind: 'warning',
+                    text: `Imported ${imported} folder${imported === 1 ? '' : 's'}, ${failures.length} failed.`,
+                  }
+                : {
+                    kind: 'success',
+                    text: `Imported ${imported} folder${imported === 1 ? '' : 's'}.`,
+                  },
+            );
             setShowAddModal(false);
             setManualConfigPath('');
-            setLocalPath('');
-          } else if (imported > 0) {
-            setAddError(
-              `Imported ${imported} project${imported === 1 ? '' : 's'}. Skipped ${failures.length}:\n${failures.join('\n')}`,
-            );
+            if (needsSetup.length > 0 && isTauri) {
+              setPostImportScanQueue(needsSetup);
+            }
+          }
+          if (failures.length > 0) {
+            setAddError(failures.join('\n'));
           } else {
+            setAddError('');
+          }
+          if (imported === 0) {
             setAddError(failures.join('\n') || 'No projects were imported.');
+            setNotice({
+              kind: 'error',
+              text: `Import failed for ${failures.length || 1} folder${(failures.length || 1) === 1 ? '' : 's'}.`,
+            });
           }
           return;
         }
@@ -313,64 +337,136 @@ export function ProjectsView({
 
   // ── AI Scan handlers ──────────────────────────────────────────────────────
 
-  const handleAIScan = async () => {
-    const path = addMode === 'local' ? localPath.trim() : githubUrl.trim();
-    if (!path) return;
+  const formatScanError = (raw: string): string =>
+    raw === 'NO_PROVIDER_CONFIGURED'
+      ? 'No AI provider is configured. Open Keys to save at least one API key, then enable it in Settings.'
+      : raw;
 
-    setScanPhase('scanning');
-    setScanError('');
-    setScanPreview(null);
+  /**
+   * Result of one full Initialize run — used by the row to display the
+   * fallback notice ("Initialized via OpenAI — Anthropic failed: …").
+   */
+  interface InitializeOutcome {
+    entry: ProjectEntry;
+    providerUsed?: LlmProviderId;
+    fallbacks: { provider: LlmProviderId; error: string }[];
+  }
 
-    try {
-      const res = await fetch('/api/scan-project', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path }),
-      });
-
-      const data = await res.json();
-
-      if (!data.success) {
-        throw new Error(data.error || 'Scan failed');
+  const runScanForProject = async (project: ProjectEntry): Promise<InitializeOutcome> => {
+    const root = project.config.project.root;
+    if (!root?.trim()) throw new Error('Project root is missing');
+    const result = await runProjectScan(root);
+    if (!result.success || !result.config) {
+      const err = result.error || 'AI Scan failed';
+      if (err === 'NO_PROVIDER_CONFIGURED') {
+        // Surface the key state to the rest of the view so the banner appears
+        // even when the user never explicitly visited Keys.
+        setAnyProviderKeyPresent(false);
       }
-
-      const config = data.config as ProjectManagerConfig;
-      const rawJson = JSON.stringify(config, null, 2);
-
-      setScanPreview({
-        config,
-        rawJson,
-        projectName: config.project.name,
-        featureCount: config.features.length,
-        detectedIDEs: data.context?.detectedIDEs ?? [],
-      });
-      setEditableJson(rawJson);
-      setScanPhase('preview');
-    } catch (e) {
-      setScanError(e instanceof Error ? e.message : String(e));
-      setScanPhase('error');
+      throw new Error(err);
     }
+    const entry = await applyScanConfigToProject(project, result.config);
+    const fallbacks =
+      result.attempts
+        ?.filter((a) => a.outcome !== 'success' && a.error)
+        .map((a) => ({ provider: a.provider, error: a.error! })) ?? [];
+    return { entry, providerUsed: result.providerUsed, fallbacks };
   };
 
-  const handleSaveScanResult = () => {
+  /**
+   * Initialize a single project — runs the AI scan, then writes
+   * `.project-manager/config.json` to disk. This is the only per-row action
+   * besides Delete after the row simplification.
+   */
+  const handleInitializeOne = async (project: ProjectEntry) => {
+    if (anyProviderKeyPresent === false) {
+      setInitErrors((prev) => ({ ...prev, [project.id]: 'NO_PROVIDER_CONFIGURED' }));
+      return;
+    }
+    setInitializingIds((prev) => new Set(prev).add(project.id));
+    setInitErrors((prev) => {
+      if (!(project.id in prev)) return prev;
+      const next = { ...prev };
+      delete next[project.id];
+      return next;
+    });
     try {
-      // Pipe through migrateConfig so AI-generated JSON missing v2 fields
-      // (id / createdAt / …) gets back-filled before we persist it.
-      const config = migrateConfig(JSON.parse(editableJson));
-      const configPath = config.project.root.endsWith('.project-manager.json')
-        ? config.project.root
-        : `${config.project.root}/.project-manager.json`;
-
-      onAddProject({
-        id: `scan-${Date.now()}`,
-        config,
-        configPath,
-      });
-      setShowAddModal(false);
+      const outcome = await runScanForProject(project);
+      onUpdateProject(outcome.entry);
+      if (outcome.fallbacks.length > 0 && outcome.providerUsed) {
+        // Tell the user the chain actually saved them — e.g. Anthropic
+        // rate-limited but OpenAI succeeded.
+        setNotice({
+          kind: 'warning',
+          text: `${project.config.project.name}: initialized via ${outcome.providerUsed} after ${outcome.fallbacks
+            .map((f) => f.provider)
+            .join(', ')} failed.`,
+        });
+      }
     } catch (e) {
-      setScanError(`Invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
+      setInitErrors((prev) => ({
+        ...prev,
+        [project.id]: e instanceof Error ? e.message : String(e),
+      }));
+    } finally {
+      setInitializingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(project.id);
+        return next;
+      });
     }
   };
+
+  const handleBatchScan = async (targets: ProjectEntry[]) => {
+    if (targets.length === 0) return;
+    // Preflight: short-circuit the whole batch instead of firing N identical
+    // "no provider" errors. Banner + dialog already point users at Keys.
+    if (anyProviderKeyPresent === false) {
+      setBatchScanning(false);
+      setPostImportScanQueue(null);
+      setNotice({
+        kind: 'warning',
+        text: 'AI Scan blocked — no AI provider is configured. Open Keys to save a key, then retry.',
+      });
+      return;
+    }
+    setBatchScanning(true);
+    const errors: { name: string; message: string }[] = [];
+    let succeeded = 0;
+    for (const project of targets) {
+      try {
+        const outcome = await runScanForProject(project);
+        onUpdateProject(outcome.entry);
+        succeeded++;
+      } catch (e) {
+        const raw = e instanceof Error ? e.message : String(e);
+        errors.push({ name: project.config.project.name, message: formatScanError(raw) });
+        if (raw === 'NO_PROVIDER_CONFIGURED') break; // No point hammering the same failure.
+      }
+    }
+    setBatchScanning(false);
+    setPostImportScanQueue(null);
+    if (errors.length === 0) {
+      setNotice({
+        kind: 'success',
+        text: `AI Scan complete (${succeeded} project${succeeded === 1 ? '' : 's'}).`,
+      });
+    } else if (succeeded === 0) {
+      setNotice({
+        kind: 'error',
+        text: `AI Scan failed for all ${errors.length} project${errors.length === 1 ? '' : 's'}.`,
+      });
+    } else {
+      setNotice({
+        kind: 'warning',
+        text: `AI Scan: ${succeeded} succeeded, ${errors.length} failed (${errors
+          .map((e) => e.name)
+          .join(', ')}).`,
+      });
+    }
+  };
+
+  const openKeysView = () => router.push('/keys');
 
   const handleGenerateReport = () => {
     const today = new Date().toLocaleDateString('zh-TW', {
@@ -414,80 +510,7 @@ export function ProjectsView({
     setTimeout(() => setReportCopied(false), 2000);
   };
 
-  // ── Sync / Delete handlers ────────────────────────────────────────────────
-
-  const handleSyncOne = async (id: string) => {
-    setSyncingIds((prev) => new Set(prev).add(id));
-    setSyncErrors((prev) => {
-      if (!(id in prev)) return prev;
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-    try {
-      await onSyncProject(id);
-    } catch (e) {
-      setSyncErrors((prev) => ({
-        ...prev,
-        [id]: e instanceof Error ? e.message : String(e),
-      }));
-    } finally {
-      setSyncingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-    }
-  };
-
-  const handleSyncAll = async () => {
-    // Fire in parallel — projects sync independently.
-    await Promise.all(projects.map((p) => handleSyncOne(p.id)));
-  };
-
-  const runInitialize = async (project: ProjectEntry, mode: InitializeMode) => {
-    setInitializingIds((prev) => new Set(prev).add(project.id));
-    setSyncErrors((prev) => {
-      if (!(project.id in prev)) return prev;
-      const next = { ...prev };
-      delete next[project.id];
-      return next;
-    });
-    try {
-      await onInitializeProject(project.id, mode);
-      setInitConfirmTarget(null);
-    } catch (e) {
-      const raw = e instanceof Error ? e.message : String(e);
-      if (/CONFIG_EXISTS/i.test(raw)) {
-        setInitConfirmTarget(project);
-      } else {
-        setSyncErrors((prev) => ({ ...prev, [project.id]: raw }));
-      }
-    } finally {
-      setInitializingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(project.id);
-        return next;
-      });
-    }
-  };
-
-  const handleInitializeClick = async (project: ProjectEntry) => {
-    if (!isTauri) {
-      setSyncErrors((prev) => ({
-        ...prev,
-        [project.id]: 'Initialize requires the Project Manager desktop app (Tauri).',
-      }));
-      return;
-    }
-    if (project.configPath.startsWith('https://')) return;
-    await runInitialize(project, 'create');
-  };
-
-  const confirmInitializeMode = async (mode: InitializeMode) => {
-    if (!initConfirmTarget) return;
-    await runInitialize(initConfirmTarget, mode);
-  };
+  // ── Delete handlers ───────────────────────────────────────────────────────
 
   const openDeleteConfirm = (project: ProjectEntry) => {
     setDeleteTarget(project);
@@ -506,87 +529,69 @@ export function ProjectsView({
     }
   };
 
-  // ── Render: Scan Preview Modal Content ────────────────────────────────────
 
-  const renderScanPreview = () => {
-    if (!scanPreview) return null;
-    const { config } = scanPreview;
-
-    return (
-      <div className="space-y-4">
-        {/* Summary header */}
-        <div className="flex items-start gap-3 rounded border border-emerald-400/20 bg-emerald-900/20 p-3">
-          <Sparkles size={18} className="mt-0.5 shrink-0 text-emerald-300" />
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-emerald-100">
-              Scan complete — {config.features.length} features detected
-            </p>
-            <p className="mt-0.5 text-xs text-emerald-200/70">
-              Project: {config.project.name} · IDE: {config.project.defaultIDE}
-              {scanPreview.detectedIDEs.length > 0 && (
-                <> · Detected: {scanPreview.detectedIDEs.join(', ')}</>
-              )}
-            </p>
-          </div>
-        </div>
-
-        {/* Feature list */}
-        <div className="max-h-48 space-y-1 overflow-auto">
-          {config.features.map((f, i) => (
-            <div
-              key={f.id || i}
-              className="flex items-center gap-2 border-b border-stone-200/8 px-1 py-1.5 text-xs"
-            >
-              <span className="shrink-0 font-mono text-stone-500">{f.id}</span>
-              <span className="min-w-0 truncate text-stone-200">{f.name}</span>
-              <span className="ml-auto shrink-0 border border-stone-200/15 px-1.5 py-0.5 text-[10px] text-stone-400">
-                {f.category}
-              </span>
-              <span
-                className={`shrink-0 text-[10px] font-medium ${
-                  f.status === 'done'
-                    ? 'text-emerald-400'
-                    : f.status === 'in_progress'
-                      ? 'text-amber-300'
-                      : f.status === 'on_hold'
-                        ? 'text-red-400'
-                        : 'text-stone-500'
-                }`}
-              >
-                {f.status}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        {/* Editable JSON toggle */}
-        <div>
-          <button
-            onClick={() => setShowRawJson((s) => !s)}
-            className="flex items-center gap-1.5 text-xs text-stone-400 hover:text-stone-200"
-          >
-            {showRawJson ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-            {showRawJson ? 'Hide' : 'Show'} raw JSON (editable)
-          </button>
-          {showRawJson && (
-            <textarea
-              value={editableJson}
-              onChange={(e) => setEditableJson(e.target.value)}
-              className="mt-2 h-64 w-full border border-stone-200/15 bg-[#03100f] p-3 font-mono text-xs text-stone-300 outline-none focus:ring-2 focus:ring-emerald-300/30"
-              spellCheck={false}
-            />
-          )}
-        </div>
-
-        <p className="text-[11px] text-amber-100/60">
-          ⚠ Review the generated config before saving. You can edit the JSON directly above.
-        </p>
-      </div>
-    );
+  const noticeClasses: Record<NonNullable<typeof notice>['kind'], string> = {
+    success: 'border-emerald-200/25 bg-emerald-500/10 text-emerald-100',
+    warning: 'border-amber-200/30 bg-amber-500/10 text-amber-100',
+    error: 'border-red-400/30 bg-red-500/10 text-red-200',
   };
+
+  // Show the preflight banner once we've confirmed the key is missing AND the
+  // user has at least one project that would actually need a scan. Avoids
+  // nagging users who only track ready / GitHub projects.
+  const projectsThatNeedKey = projects.filter(
+    (p) => !p.configPath.startsWith('https://') && projectNeedsScan(p),
+  );
+  const showKeyPreflight =
+    anyProviderKeyPresent === false && projectsThatNeedKey.length > 0;
 
   return (
     <div className="space-y-6">
+      {showKeyPreflight && (
+        <div className="flex flex-wrap items-start gap-3 border border-amber-200/35 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          <KeyRound size={16} className="mt-0.5 shrink-0 text-amber-200" />
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-amber-50">AI Scan blocked — no AI provider configured</p>
+            <p className="mt-0.5 text-xs text-amber-100/80">
+              {projectsThatNeedKey.length} project
+              {projectsThatNeedKey.length === 1 ? ' needs' : 's need'} setup. Save at least one
+              API key (Anthropic / OpenAI / Gemini) in Keys, then return here.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={openKeysView}
+            className="shrink-0 border border-amber-200/40 bg-amber-500/20 px-3 py-1 text-xs font-medium uppercase tracking-[0.12em] text-amber-50 hover:bg-amber-500/30"
+          >
+            Open Keys
+          </button>
+        </div>
+      )}
+      {notice && (
+        <div
+          className={`flex items-start justify-between gap-3 border px-4 py-2 text-sm ${noticeClasses[notice.kind]}`}
+        >
+          <span className="min-w-0 flex-1 break-words">{notice.text}</span>
+          <button
+            type="button"
+            onClick={() => setNotice(null)}
+            className="shrink-0 opacity-70 hover:opacity-100"
+            aria-label="Dismiss notice"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+      {postImportScanQueue && postImportScanQueue.length > 0 && (
+        <PostImportScanDialog
+          projects={postImportScanQueue}
+          scanning={batchScanning}
+          keyMissing={anyProviderKeyPresent === false}
+          onClose={() => setPostImportScanQueue(null)}
+          onOpenKeys={openKeysView}
+          onScanProjects={handleBatchScan}
+        />
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -601,15 +606,6 @@ export function ProjectsView({
           </p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={handleSyncAll}
-            disabled={projects.length === 0 || syncingIds.size > 0}
-            className="inline-flex h-9 items-center gap-2 border border-stone-200/20 px-3 text-xs uppercase tracking-[0.14em] text-stone-200 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
-            title="Re-read every project from its source"
-          >
-            <RefreshCw size={14} className={syncingIds.size > 0 ? 'animate-spin' : ''} />
-            Sync All
-          </button>
           <button
             onClick={handleGenerateReport}
             className="inline-flex h-9 items-center gap-2 border border-stone-200/20 px-3 text-xs uppercase tracking-[0.14em] text-stone-200 hover:bg-white/5"
@@ -641,12 +637,16 @@ export function ProjectsView({
           const { features } = project.config;
           const isSelected = project.id === selectedProjectId;
           const isDashboardSelected = selectedDashboardProjectIds.includes(project.id);
-          const isSyncing = syncingIds.has(project.id);
           const isInitializing = initializingIds.has(project.id);
-          const syncError = syncErrors[project.id];
+          const initError = initErrors[project.id];
           const isGithub = project.configPath.startsWith('https://github.com/');
-          const showInitialize =
-            !isGithub && (isMissingConfigError(syncError ?? '') || !project.lastSyncedAt);
+          const setupStatus = getProjectSetupStatus(project);
+          const isReady = setupStatus === 'ready';
+          // GitHub repos have their own feature-sync path — the Initialize
+          // button doesn't apply to them. Local projects always show the
+          // button, but it's disabled in the browser dev shell because
+          // writing the config to disk requires the Tauri bridge.
+          const showInitialize = !isGithub;
 
           return (
             <div
@@ -680,6 +680,17 @@ export function ProjectsView({
                           Dashboard
                         </span>
                       )}
+                      {setupStatus !== 'ready' && (
+                        <span
+                          className={`border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.16em] ${
+                            setupStatus === 'needs_scan'
+                              ? 'border-amber-200/35 text-amber-200'
+                              : 'border-stone-200/25 text-stone-400'
+                          }`}
+                        >
+                          {setupStatusLabel(setupStatus)}
+                        </span>
+                      )}
                     </div>
                     <p className="mt-0.5 max-w-sm truncate text-xs text-stone-500">
                       {project.configPath}
@@ -693,42 +704,60 @@ export function ProjectsView({
                 </div>
                 <div className="flex items-center gap-3 text-xs text-stone-400">
                   <span>{features.length} features</span>
-                  {/* Hover-revealed action group. Sync stays visible while spinning so users get feedback. */}
-                  <div
-                    className={`flex items-center gap-1 transition-opacity ${
-                      isSyncing || isInitializing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                    }`}
-                  >
-                    {showInitialize && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (!isTauri) return;
-                          void handleInitializeClick(project);
-                        }}
-                        disabled={isInitializing || isSyncing || !isTauri}
-                        title={
-                          !isTauri
-                            ? 'Initialize requires the desktop app — run ./start_project_manager.sh (without "web") to enable filesystem access.'
-                            : 'Create .project-manager.json, docs/features/, and docs/dev-logs/'
-                        }
-                        className="flex h-7 items-center gap-1 border border-emerald-200/30 bg-emerald-500/15 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-emerald-100 hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <FolderPlus size={12} className={isInitializing ? 'animate-pulse' : ''} />
-                        Init
-                      </button>
-                    )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void handleSyncOne(project.id);
-                      }}
-                      disabled={isSyncing || isInitializing}
-                      title={isGithub ? 'Re-fetch from GitHub' : 'Re-read .project-manager.json from disk'}
-                      className="flex h-7 w-7 items-center justify-center text-stone-400 hover:bg-white/5 hover:text-stone-100 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <RefreshCw size={13} className={isSyncing ? 'animate-spin' : ''} />
-                    </button>
+                  {/* Two actions only: Initialize/Initialized toggle + Delete. */}
+                  <div className="flex items-center gap-1">
+                    {showInitialize &&
+                      (isReady ? (
+                        // Initialized = passive success state, solid emerald
+                        // (matches the project-state semantics: "done, healthy").
+                        <span
+                          title="Project is initialized — dashboard reads .project-manager/config.json from disk"
+                          className="flex h-7 items-center gap-1 border border-emerald-400/50 bg-emerald-600/30 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-emerald-100"
+                        >
+                          <Check size={12} />
+                          Initialized
+                        </span>
+                      ) : (
+                        // Initialize = call-to-action, amber to match the
+                        // "NEEDS SETUP" chip so the visual link is obvious.
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!isTauri) return;
+                            if (anyProviderKeyPresent === false) {
+                              openKeysView();
+                              return;
+                            }
+                            void handleInitializeOne(project);
+                          }}
+                          disabled={
+                            !isTauri ||
+                            isInitializing ||
+                            batchScanning ||
+                            anyProviderKeyPresent === null
+                          }
+                          title={
+                            !isTauri
+                              ? 'Initialize requires the Project Manager desktop app — run ./start_project_manager.sh (without "web") to enable filesystem access.'
+                              : anyProviderKeyPresent === false
+                                ? 'No AI provider configured — click to open Keys'
+                                : 'AI-scan the project structure and write .project-manager/config.json'
+                          }
+                          className="flex h-7 items-center gap-1 border border-amber-300/40 bg-amber-500/20 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-amber-100 hover:bg-amber-500/35 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {isInitializing ? (
+                            <>
+                              <Loader2 size={12} className="animate-spin" />
+                              Initializing…
+                            </>
+                          ) : (
+                            <>
+                              <Bot size={12} />
+                              Initialize
+                            </>
+                          )}
+                        </button>
+                      ))}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -742,38 +771,48 @@ export function ProjectsView({
                   </div>
                 </div>
               </div>
-              {syncError && (
-                <div className="flex flex-wrap items-start gap-2 border-t border-red-500/25 bg-red-900/15 px-4 py-2 text-[11px] text-red-300">
+              {initError && (
+                <div className="flex flex-wrap items-start gap-2 border-t border-violet-500/25 bg-violet-900/15 px-4 py-2 text-[11px] text-violet-200">
                   <AlertTriangle size={12} className="mt-0.5 shrink-0" />
-                  <span className="min-w-0 flex-1 break-words">Sync failed: {syncError}</span>
-                  {showInitialize && (
+                  <span className="min-w-0 flex-1 break-words">
+                    Initialize failed: {formatScanError(initError)}
+                  </span>
+                  {initError === 'NO_PROVIDER_CONFIGURED' ? (
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (!isTauri) return;
-                        void handleInitializeClick(project);
+                        openKeysView();
                       }}
-                      disabled={isInitializing || !isTauri}
-                      title={
-                        !isTauri
-                          ? 'Initialize requires the desktop app — run ./start_project_manager.sh (without "web").'
-                          : undefined
-                      }
-                      className="shrink-0 border border-emerald-200/35 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-emerald-100 hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="shrink-0 border border-amber-200/40 bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-amber-50 hover:bg-amber-500/30"
                     >
-                      Initialize
+                      Open Keys
                     </button>
+                  ) : (
+                    showInitialize &&
+                    isTauri && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleInitializeOne(project);
+                        }}
+                        disabled={isInitializing || anyProviderKeyPresent === false}
+                        className="shrink-0 border border-violet-200/35 bg-violet-500/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-violet-100 hover:bg-violet-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Retry
+                      </button>
+                    )
                   )}
                   <button
                     onClick={() =>
-                      setSyncErrors((prev) => {
+                      setInitErrors((prev) => {
                         const next = { ...prev };
                         delete next[project.id];
                         return next;
                       })
                     }
-                    className="shrink-0 text-red-400 hover:text-red-200"
+                    className="shrink-0 text-violet-300 hover:text-violet-100"
                   >
                     <X size={11} />
                   </button>
@@ -814,52 +853,6 @@ export function ProjectsView({
         </div>
       )}
 
-      {/* Initialize — config already exists */}
-      {initConfirmTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md border border-amber-200/25 bg-[#071d1a] shadow-2xl">
-            <div className="flex items-center gap-2 border-b border-stone-200/12 bg-amber-500/10 px-6 py-4">
-              <AlertTriangle size={18} className="text-amber-200" />
-              <h3 className="text-base font-semibold text-stone-50">Config already exists</h3>
-            </div>
-            <div className="space-y-3 px-6 py-5 text-sm text-stone-200">
-              <p>
-                <span className="font-medium text-stone-50">{initConfirmTarget.config.project.name}</span>{' '}
-                already has a <code className="font-mono text-stone-300">.project-manager.json</code> on disk.
-              </p>
-              <p className="text-xs text-stone-400">
-                Merge keeps your features and fills missing engineer roles. Overwrite replaces the file with a
-                fresh empty scaffold (features cleared). Both ensure <code className="font-mono">docs/features/</code>{' '}
-                and <code className="font-mono">docs/dev-logs/</code> exist.
-              </p>
-            </div>
-            <div className="flex flex-wrap justify-end gap-2 border-t border-stone-200/12 bg-white/[0.035] px-6 py-4">
-              <button
-                type="button"
-                onClick={() => setInitConfirmTarget(null)}
-                className="px-4 py-2 text-sm text-stone-300 hover:bg-white/5"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void confirmInitializeMode('merge')}
-                className="border border-cyan-200/30 bg-cyan-500/15 px-4 py-2 text-sm font-medium text-cyan-100 hover:bg-cyan-500/25"
-              >
-                Merge
-              </button>
-              <button
-                type="button"
-                onClick={() => void confirmInitializeMode('overwrite')}
-                className="bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500"
-              >
-                Overwrite
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
@@ -879,7 +872,7 @@ export function ProjectsView({
               </div>
               <p className="text-xs text-stone-400">
                 By default, this only removes the project from PM&apos;s tracked list. The{' '}
-                <code className="font-mono text-stone-300">.project-manager.json</code> on disk is left untouched.
+                <code className="font-mono text-stone-300">.project-manager/config.json</code> on disk is left untouched.
               </p>
 
               {/* Disk-delete opt-in (disabled for GitHub-sourced projects) */}
@@ -899,7 +892,7 @@ export function ProjectsView({
                       className="mt-0.5 h-3.5 w-3.5 cursor-pointer accent-red-400 disabled:cursor-not-allowed"
                     />
                     <span className="text-stone-200">
-                      Also delete the <code className="font-mono">.project-manager.json</code> file on disk
+                      Also delete the <code className="font-mono">.project-manager/config.json</code> file on disk
                       {isGithubTarget && (
                         <span className="ml-1 text-stone-500">(N/A for GitHub-sourced projects)</span>
                       )}
@@ -944,7 +937,7 @@ export function ProjectsView({
           <div className="w-full max-w-lg border border-stone-200/18 bg-[#071d1a] shadow-2xl">
             <div className="flex items-center justify-between border-b border-stone-200/12 bg-white/[0.035] px-6 py-4">
               <h3 className="text-lg font-bold text-stone-50">
-                {scanPhase === 'preview' ? 'AI Scan Results' : 'Add Project'}
+                Add Project
               </h3>
               <button
                 onClick={() => setShowAddModal(false)}
@@ -955,44 +948,39 @@ export function ProjectsView({
             </div>
 
             <div className="space-y-4 p-6">
-              {/* Phase: Preview */}
-              {scanPhase === 'preview' ? (
-                renderScanPreview()
-              ) : (
-                <>
-                  {/* Mode tabs */}
-                  <div className="flex border border-stone-200/18">
-                    {(
-                      [
-                        { id: 'local', label: 'Local Path', icon: FolderOpen },
-                        { id: 'github', label: 'GitHub URL', icon: Github },
-                      ] as const
-                    ).map(({ id, label, icon: Icon }) => (
-                      <button
-                        key={id}
-                        onClick={() => setAddMode(id)}
-                        className={`flex flex-1 items-center justify-center gap-2 py-2 text-xs uppercase tracking-[0.14em] transition-colors ${
-                          addMode === id
-                            ? 'bg-stone-100 text-[#071d1a]'
-                            : 'text-stone-300 hover:bg-white/5'
-                        }`}
-                      >
-                        <Icon size={13} />
-                        {label}
-                      </button>
-                    ))}
-                  </div>
+              {/* Mode tabs */}
+              <div className="flex border border-stone-200/18">
+                {(
+                  [
+                    { id: 'local', label: 'Local Path', icon: FolderOpen },
+                    { id: 'github', label: 'GitHub URL', icon: Github },
+                  ] as const
+                ).map(({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    onClick={() => setAddMode(id)}
+                    className={`flex flex-1 items-center justify-center gap-2 py-2 text-xs uppercase tracking-[0.14em] transition-colors ${
+                      addMode === id
+                        ? 'bg-stone-100 text-[#071d1a]'
+                        : 'text-stone-300 hover:bg-white/5'
+                    }`}
+                  >
+                    <Icon size={13} />
+                    {label}
+                  </button>
+                ))}
+              </div>
 
-                  {addMode === 'local' ? (
+              {addMode === 'local' ? (
                     <div className="space-y-3">
                       <button
                         type="button"
                         onClick={() => void handlePickFolders('import')}
-                        disabled={pickingFolders || adding || scanPhase === 'scanning'}
+                        disabled={pickingFolders || adding}
                         title={
                           isTauri
                             ? 'Open Finder — select one or more folders (⌘-click for multiple)'
-                            : 'Requires the Project Manager desktop app'
+                            : 'Native Finder picker is desktop-only (browsers cannot expose absolute paths). Paste the folder path below instead.'
                         }
                         className="flex w-full items-center justify-center gap-2 border border-cyan-200/30 bg-cyan-500/15 px-4 py-2.5 text-sm font-medium text-cyan-100 transition-colors hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-40"
                       >
@@ -1009,77 +997,29 @@ export function ProjectsView({
                         )}
                       </button>
                       <p className="text-[10px] leading-relaxed text-stone-500">
-                        Import one or more projects at once. Folders must already contain a{' '}
-                        <code className="font-mono text-stone-400">.project-manager.json</code>
-                        {' '}
-                        (use AI Scan below if missing).
+                        Import one or more project folders at once. Folders without{' '}
+                        <code className="font-mono text-stone-400">.project-manager/</code> are
+                        still added — click <span className="text-stone-300">Initialize</span> on
+                        the row afterwards to AI-scan and generate the dashboard config.
                       </p>
 
-                      <div>
-                        <label className="mb-1 block text-sm font-medium text-stone-200">
-                          Project folder path
-                        </label>
-                        <div className="flex gap-2">
-                          <input
-                            value={localPath}
-                            onChange={(e) => setLocalPath(e.target.value)}
-                            placeholder="/path/to/your/project"
-                            className="min-w-0 flex-1 border border-stone-200/20 bg-[#03100f] px-3 py-2 font-mono text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => void handlePickFolders('scan')}
-                            disabled={pickingFolders || !isTauri}
-                            title={
-                              isTauri
-                                ? 'Choose a folder in Finder'
-                                : 'Requires the Project Manager desktop app'
-                            }
-                            className="inline-flex shrink-0 items-center gap-1.5 border border-stone-200/20 px-3 py-2 text-xs uppercase tracking-[0.12em] text-stone-200 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            <FolderOpen size={13} />
-                            Browse
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* AI Scan button */}
-                      <button
-                        onClick={handleAIScan}
-                        disabled={!localPath.trim() || scanPhase === 'scanning'}
-                        className="flex w-full items-center justify-center gap-2 border border-emerald-400/30 bg-emerald-900/25 px-4 py-2.5 text-sm font-medium text-emerald-200 transition-colors hover:bg-emerald-900/40 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        {scanPhase === 'scanning' ? (
-                          <>
-                            <Loader2 size={15} className="animate-spin" />
-                            Scanning project…
-                          </>
-                        ) : (
-                          <>
-                            <Bot size={15} />
-                            <Sparkles size={12} />
-                            AI Scan — Auto-generate .project-manager.json
-                          </>
-                        )}
-                      </button>
-
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 pt-1">
                         <div className="h-px flex-1 bg-stone-200/12" />
                         <span className="text-[10px] uppercase tracking-[0.18em] text-stone-500">
-                          or add manually
+                          or paste a path
                         </span>
                         <div className="h-px flex-1 bg-stone-200/12" />
                       </div>
 
                       <div>
                         <label className="mb-1 block text-xs text-stone-400">
-                          Path to existing .project-manager.json
+                          Project folder path
                         </label>
                         <div className="flex gap-2">
                           <input
                             value={manualConfigPath}
                             onChange={(e) => setManualConfigPath(e.target.value)}
-                            placeholder="/path/to/project/.project-manager.json"
+                            placeholder="/path/to/project (auto-detects .project-manager/)"
                             className="min-w-0 flex-1 border border-stone-200/20 bg-[#03100f] px-3 py-2 font-mono text-xs text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
                           />
                           <button
@@ -1089,7 +1029,7 @@ export function ProjectsView({
                             title={
                               isTauri
                                 ? 'Choose a folder in Finder'
-                                : 'Requires the Project Manager desktop app'
+                                : 'Native Finder picker is desktop-only — paste the path into the field instead.'
                             }
                             className="inline-flex shrink-0 items-center gap-1.5 border border-stone-200/20 px-3 py-2 text-xs uppercase tracking-[0.12em] text-stone-200 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
                           >
@@ -1098,15 +1038,17 @@ export function ProjectsView({
                           </button>
                         </div>
                         <p className="mt-1 text-[10px] text-stone-500">
-                          Folder paths are accepted — .project-manager.json will be appended automatically.
+                          Folder paths are accepted — .project-manager/config.json is resolved automatically.
                         </p>
                       </div>
 
                       {!isTauri && (
                         <p className="text-[11px] text-amber-100/60">
-                          Dev mode: AI Scan works via Next.js API route. Manual add creates a placeholder
-                          project. The Finder folder picker requires the desktop app (
-                          <code className="font-mono">./start_project_manager.sh</code>).
+                          Dev mode: paste an absolute folder path above to import — the Next.js
+                          server reads the disk for you. The native Finder picker is desktop-only
+                          (browsers can&apos;t expose absolute paths); launch{' '}
+                          <code className="font-mono">./start_project_manager.sh</code> for the
+                          one-click picker.
                         </p>
                       )}
                     </div>
@@ -1150,71 +1092,35 @@ export function ProjectsView({
                     </div>
                   )}
 
-                  {/* Scan error */}
-                  {scanPhase === 'error' && scanError && (
-                    <div className="rounded border border-red-500/30 bg-red-900/15 p-3">
-                      <p className="text-xs text-red-300">{scanError}</p>
-                      <button
-                        onClick={() => setScanPhase('idle')}
-                        className="mt-1 text-[11px] text-red-400 underline hover:text-red-200"
-                      >
-                        Dismiss
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-
               {addError && <p className="text-sm text-red-400">{addError}</p>}
             </div>
 
             {/* Footer */}
             <div className="flex justify-end gap-3 border-t border-stone-200/12 bg-white/[0.035] px-6 py-4">
-              {scanPhase === 'preview' ? (
-                <>
-                  <button
-                    onClick={() => setScanPhase('idle')}
-                    className="px-4 py-2 text-sm text-stone-300 hover:bg-white/5"
-                  >
-                    ← Back
-                  </button>
-                  <button
-                    onClick={handleSaveScanResult}
-                    className="inline-flex items-center gap-2 bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
-                  >
-                    <Save size={14} />
-                    Save & Add Project
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    onClick={() => setShowAddModal(false)}
-                    className="px-4 py-2 text-sm text-stone-300 hover:bg-white/5"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={addMode === 'local' ? handleAddLocal : handleAddGitHub}
-                    disabled={
-                      adding ||
-                      scanPhase === 'scanning' ||
-                      (addMode === 'local'
-                        ? !manualConfigPath.trim()
-                        : !githubUrl.trim() || !isTauri)
-                    }
-                    className="bg-stone-100 px-4 py-2 text-sm font-medium text-[#071d1a] hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {adding
-                      ? 'Importing…'
-                      : addMode === 'github'
-                        ? isTauri
-                          ? 'Import from GitHub'
-                          : 'Requires Tauri'
-                        : 'Add Project'}
-                  </button>
-                </>
-              )}
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="px-4 py-2 text-sm text-stone-300 hover:bg-white/5"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={addMode === 'local' ? handleAddLocal : handleAddGitHub}
+                disabled={
+                  adding ||
+                  (addMode === 'local'
+                    ? !manualConfigPath.trim()
+                    : !githubUrl.trim() || !isTauri)
+                }
+                className="bg-stone-100 px-4 py-2 text-sm font-medium text-[#071d1a] hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {adding
+                  ? 'Importing…'
+                  : addMode === 'github'
+                    ? isTauri
+                      ? 'Import from GitHub'
+                      : 'Requires Tauri'
+                    : 'Add Project'}
+              </button>
             </div>
           </div>
         </div>

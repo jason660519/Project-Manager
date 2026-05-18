@@ -1,148 +1,377 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { BookOpen, KeyRound, Keyboard, Monitor, Server } from 'lucide-react';
+import { ArrowDown, ArrowUp, Loader2, Monitor, Play, Server, Sparkles, X } from 'lucide-react';
 
-import { skillList, skillMoveFiles } from '../../../lib/bridge';
-import { getSkillsDir, setSkillsDir } from '../../../lib/storage/settings';
+import { listLlmProviders } from '../../../lib/keys/llmProviders';
+import { hasProviderKey, loadProviderKey } from '../../../lib/keys/loadProviderKey';
+import {
+  ALL_LLM_PROVIDERS,
+  bulkEnableConfiguredProviders,
+  loadProviderOrder,
+  saveProviderOrder,
+  type LlmProviderId,
+  type ProviderOrderEntry,
+} from '../../../lib/keys/providerOrder';
+import { callSingleProvider } from '../../../lib/scanner/runProjectScan';
+
+// Derive label map from the registry so adding a provider is a one-file change.
+const PROVIDER_LABEL = Object.fromEntries(
+  listLlmProviders().map((spec) => [spec.id, spec.label]),
+) as Record<LlmProviderId, string>;
+
+// Same shape, all `false` — used to seed the configured-key map.
+const EMPTY_KEY_STATUS = Object.fromEntries(
+  ALL_LLM_PROVIDERS.map((id) => [id, false]),
+) as Record<LlmProviderId, boolean>;
 
 export function SettingsView() {
-  const [hotkeyEnabled, setHotkeyEnabled] = useState(false);
   const [trayEnabled, setTrayEnabled] = useState(false);
-
   const [isTauri, setIsTauri] = useState(false);
 
-  // Skills directory — current value, edit-buffer, and pending-confirmation modal state.
-  const [skillsDirCurrent, setSkillsDirCurrent] = useState('');
-  const [skillsDirInput, setSkillsDirInput] = useState('');
-  const [skillsDirSaving, setSkillsDirSaving] = useState(false);
-  const [skillsDirError, setSkillsDirError] = useState<string | null>(null);
-  const [pendingDir, setPendingDir] = useState<string | null>(null);
+  const [providerOrder, setProviderOrderState] = useState<ProviderOrderEntry[]>([]);
+  const [keyStatus, setKeyStatus] = useState<Record<LlmProviderId, boolean>>(EMPTY_KEY_STATUS);
+
+  // Playground state. One shared prompt across providers (so the user can A/B
+  // the same input), per-provider Test state, and a per-provider result panel
+  // that expands inline below the row.
+  const [testPrompt, setTestPrompt] = useState(
+    [
+      'You are being evaluated for the Project Manager AI Scan pipeline (one-shot JSON extraction).',
+      'Reply with ONLY this JSON, no markdown fences:',
+      '{',
+      '  "model_self_id": "<your model name and version, as you understand it>",',
+      '  "strengths": ["<3-5 short phrases describing what you are best at>"],',
+      '  "weaknesses": ["<2-3 short phrases>"],',
+      '  "cost_tier": "low | medium | high",',
+      '  "json_reliability": "<your honest 0-10 self-rating for strict JSON output>"',
+      '}',
+    ].join('\n'),
+  );
+  const [testingId, setTestingId] = useState<LlmProviderId | null>(null);
+  interface PlaygroundResult {
+    content?: string;
+    error?: string;
+    latencyMs: number;
+    inputTokens?: number;
+    outputTokens?: number;
+    model: string;
+    at: number;
+  }
+  const [results, setResults] = useState<Partial<Record<LlmProviderId, PlaygroundResult>>>({});
 
   useEffect(() => {
     setIsTauri(typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window);
   }, []);
 
   useEffect(() => {
-    void (async () => {
-      const dir = await getSkillsDir();
-      setSkillsDirCurrent(dir);
-      setSkillsDirInput(dir);
-    })();
+    let cancelled = false;
+    const refresh = async () => {
+      const order = await loadProviderOrder();
+      if (cancelled) return;
+      setProviderOrderState(order);
+      const availability = await Promise.all(
+        ALL_LLM_PROVIDERS.map(async (p) => [p, await hasProviderKey(p)] as const),
+      );
+      if (cancelled) return;
+      const next: Record<LlmProviderId, boolean> = { ...EMPTY_KEY_STATUS };
+      for (const [p, ok] of availability) next[p] = ok;
+      setKeyStatus(next);
+    };
+    void refresh();
+    const onFocus = () => void refresh();
+    if (typeof window !== 'undefined') window.addEventListener('focus', onFocus);
+    return () => {
+      cancelled = true;
+      if (typeof window !== 'undefined') window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
-  const handleSaveSkillsDir = async () => {
-    const newDir = skillsDirInput.trim();
-    if (!newDir || newDir === skillsDirCurrent) return;
-    setSkillsDirSaving(true);
-    setSkillsDirError(null);
+  const commitOrder = (next: ProviderOrderEntry[]) => {
+    setProviderOrderState(next);
+    void saveProviderOrder(next);
+  };
+
+  const moveProvider = (index: number, delta: -1 | 1) => {
+    const target = index + delta;
+    if (target < 0 || target >= providerOrder.length) return;
+    const next = [...providerOrder];
+    [next[index], next[target]] = [next[target], next[index]];
+    commitOrder(next);
+  };
+
+  const toggleProvider = (index: number) => {
+    const next = providerOrder.map((entry, i) =>
+      i === index ? { ...entry, enabled: !entry.enabled } : entry,
+    );
+    commitOrder(next);
+  };
+
+  const setProviderModel = (provider: LlmProviderId, model: string) => {
+    const next = providerOrder.map((entry) =>
+      entry.provider === provider ? { ...entry, model } : entry,
+    );
+    commitOrder(next);
+  };
+
+  /** Fire the shared prompt against one provider and store the result. */
+  const handleTestProvider = async (provider: LlmProviderId) => {
+    const entry = providerOrder.find((e) => e.provider === provider);
+    if (!entry) return;
+    const model = entry.model;
+    setTestingId(provider);
+    const start = performance.now();
     try {
-      const existing = await skillList(skillsDirCurrent);
-      if (existing.length > 0) {
-        // Defer the actual save until the user picks a sync strategy in the modal.
-        setPendingDir(newDir);
-      } else {
-        setSkillsDir(newDir);
-        setSkillsDirCurrent(newDir);
-      }
+      const apiKey = await loadProviderKey(provider);
+      if (!apiKey.trim()) throw new Error('No API key saved for this provider');
+      const r = await callSingleProvider(provider, apiKey, testPrompt, model);
+      setResults((prev) => ({
+        ...prev,
+        [provider]: {
+          content: r.content,
+          latencyMs: Math.round(performance.now() - start),
+          inputTokens: r.inputTokens,
+          outputTokens: r.outputTokens,
+          model: r.model,
+          at: Date.now(),
+        },
+      }));
     } catch (e) {
-      setSkillsDirError(String(e));
+      setResults((prev) => ({
+        ...prev,
+        [provider]: {
+          error: e instanceof Error ? e.message : String(e),
+          latencyMs: Math.round(performance.now() - start),
+          model: model ?? '?',
+          at: Date.now(),
+        },
+      }));
     } finally {
-      setSkillsDirSaving(false);
+      setTestingId(null);
     }
   };
 
-  const handleJustChange = () => {
-    if (!pendingDir) return;
-    setSkillsDir(pendingDir);
-    setSkillsDirCurrent(pendingDir);
-    setPendingDir(null);
-  };
+  const clearResult = (provider: LlmProviderId) =>
+    setResults((prev) => {
+      if (!(provider in prev)) return prev;
+      const next = { ...prev };
+      delete next[provider];
+      return next;
+    });
 
-  const handleMoveAndChange = async () => {
-    if (!pendingDir) return;
-    setSkillsDirSaving(true);
-    try {
-      const existing = await skillList(skillsDirCurrent);
-      await skillMoveFiles(existing.map((s) => s.absPath), pendingDir);
-      setSkillsDir(pendingDir);
-      setSkillsDirCurrent(pendingDir);
-      setPendingDir(null);
-    } catch (e) {
-      setSkillsDirError(String(e));
-    } finally {
-      setSkillsDirSaving(false);
-    }
+  // One-click recovery: turn on every provider that has a stored key but is
+  // currently disabled in the chain. The pre-auto-enable era + "default
+  // disabled when a new provider lands" rule leaves a lot of these around.
+  const configuredButDisabled = providerOrder.filter(
+    (entry) => !entry.enabled && keyStatus[entry.provider],
+  );
+  const handleEnableAllConfigured = async () => {
+    const ids = configuredButDisabled.map((entry) => entry.provider);
+    await bulkEnableConfiguredProviders(ids);
+    // Pull the fresh order back so the UI reflects the change immediately.
+    const next = await loadProviderOrder();
+    setProviderOrderState(next);
   };
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-5xl space-y-6">
       <div>
         <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">Settings</h1>
         <p className="mt-1 text-xs text-stone-400">Adapters and system preferences.</p>
       </div>
 
-      {/* Keys shortcut */}
-      <Link
-        href="/keys"
-        className="flex items-center gap-3 border border-stone-200/18 bg-[#071d1a]/72 px-4 py-3 transition-colors hover:border-stone-200/30 hover:bg-white/5"
-      >
-        <KeyRound size={15} className="text-amber-100" />
-        <div>
-          <p className="text-sm font-medium uppercase tracking-[0.16em] text-stone-100">API Keys &amp; Tokens</p>
-          <p className="mt-0.5 text-[11px] text-stone-400">Manage Anthropic, OpenAI, GitHub tokens and more.</p>
-        </div>
-        <span className="ml-auto text-stone-500">→</span>
-      </Link>
-
-      {/* Global Hotkey */}
       <section className="border border-stone-200/18 bg-[#071d1a]/72">
         <div className="flex items-center gap-3 border-b border-stone-200/12 px-4 py-3">
-          <Keyboard size={15} className="text-stone-300" />
+          <Sparkles size={15} className="text-amber-100" />
           <h2 className="text-sm font-medium uppercase tracking-[0.16em] text-stone-100">
-            Global Hotkey
+            AI Provider Fallback Order
           </h2>
-          <span className="ml-auto border border-amber-200/25 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-amber-100/80">
-            P2
-          </span>
         </div>
-        <div className="space-y-3 p-4">
+        <div className="space-y-2 p-4">
           <p className="text-xs text-stone-400">
-            Press a global shortcut to open the Quick Dispatch overlay from any app. Requires Tauri
-            plugin registration.
+            When AI Scan / Initialize runs, providers are tried top-down. Failures fall through
+            automatically. Disable a provider to skip it entirely, or reorder with the arrows.
           </p>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="border border-stone-200/20 px-2 py-1 font-mono text-sm text-stone-200">
-                ⌘K
+          {configuredButDisabled.length > 0 && (
+            <div className="flex items-center justify-between border border-amber-200/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100">
+              <span>
+                {configuredButDisabled.length} provider
+                {configuredButDisabled.length === 1 ? ' has' : 's have'} a saved key but
+                {configuredButDisabled.length === 1 ? ' is' : ' are'} skipped by the fallback chain.
               </span>
-              <span className="text-xs text-stone-400">Quick Dispatch Overlay</span>
+              <button
+                type="button"
+                onClick={() => void handleEnableAllConfigured()}
+                className="ml-3 shrink-0 border border-amber-200/40 bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-amber-50 hover:bg-amber-500/30"
+              >
+                Enable all {configuredButDisabled.length}
+              </button>
             </div>
-            <button
-              onClick={() => setHotkeyEnabled((e) => !e)}
-              className={`relative h-6 w-11 rounded-full transition-colors ${
-                hotkeyEnabled ? 'bg-emerald-600' : 'bg-stone-600'
-              } ${!isTauri ? 'cursor-not-allowed opacity-50' : ''}`}
-              disabled={!isTauri}
-              title={!isTauri ? 'Requires Tauri runtime' : undefined}
-            >
-              <span
-                className={`absolute left-0 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                  hotkeyEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
-          </div>
-          {!isTauri && (
-            <p className="text-[11px] text-amber-100/60">
-              Hotkey registration not available in browser dev mode.
-            </p>
           )}
+
+          {/* Shared test prompt — placed ABOVE the provider list so the
+              read order matches the workflow: "type prompt → click Test on
+              each row → compare results inline below the row". */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-400">
+              Test prompt — applied to every row&apos;s Test button
+            </label>
+            <textarea
+              value={testPrompt}
+              onChange={(e) => setTestPrompt(e.target.value)}
+              rows={9}
+              spellCheck={false}
+              className="w-full resize-y border border-stone-200/15 bg-[#03100f] p-3 font-mono text-[11px] leading-relaxed text-stone-100 outline-none focus:ring-1 focus:ring-emerald-300/35"
+            />
+            <p className="text-[10px] text-stone-500">
+              Fire a row&apos;s Test button to send this prompt to that provider with the
+              selected model. The response, latency, and token usage appear inline below
+              the row so you can compare cost / quality side-by-side.
+            </p>
+          </div>
+
+          <ul className="space-y-1.5">
+            {providerOrder.map((entry, index) => {
+              const configured = keyStatus[entry.provider];
+              const spec = listLlmProviders().find((s) => s.id === entry.provider);
+              const selectedModel = entry.model ?? spec?.defaultModel ?? '';
+              const result = results[entry.provider];
+              const isTestingThisRow = testingId === entry.provider;
+              return (
+                <li
+                  key={entry.provider}
+                  className="border border-stone-200/12 bg-[#03100f]"
+                >
+                  <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+                    <span className="w-5 text-center font-mono text-[11px] text-stone-500">
+                      {index + 1}
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={entry.enabled}
+                      onChange={() => toggleProvider(index)}
+                      className="h-3.5 w-3.5 cursor-pointer accent-emerald-400"
+                      aria-label={`Enable ${PROVIDER_LABEL[entry.provider]}`}
+                    />
+                    <span
+                      className={`min-w-[10rem] text-sm ${entry.enabled ? 'text-stone-100' : 'text-stone-500 line-through'}`}
+                    >
+                      {PROVIDER_LABEL[entry.provider]}
+                    </span>
+                    {spec && (
+                      <select
+                        value={selectedModel}
+                        onChange={(e) => setProviderModel(entry.provider, e.target.value)}
+                        title={`Model for ${PROVIDER_LABEL[entry.provider]}`}
+                        aria-label={`Model for ${PROVIDER_LABEL[entry.provider]}`}
+                        className="w-[14rem] shrink-0 truncate border border-stone-200/20 bg-[#03100f] px-2 py-1 font-mono text-[11px] text-stone-200 outline-none focus:ring-1 focus:ring-emerald-300/35"
+                      >
+                        {spec.availableModels.map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <span
+                      className={`border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.14em] ${
+                        configured
+                          ? entry.enabled
+                            ? 'border-emerald-200/30 text-emerald-300/90'
+                            : 'border-stone-200/20 text-stone-500'
+                          : 'border-stone-200/18 text-stone-500'
+                      }`}
+                    >
+                      {configured ? 'Configured' : 'Not set'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void handleTestProvider(entry.provider)}
+                      disabled={
+                        !isTauri ||
+                        !configured ||
+                        isTestingThisRow ||
+                        testPrompt.trim().length === 0
+                      }
+                      title={
+                        !isTauri
+                          ? 'Testing requires the desktop app (Rust bridge calls the provider directly).'
+                          : !configured
+                            ? 'Save an API key in Keys first.'
+                            : 'Send the prompt below to this provider/model.'
+                      }
+                      className="inline-flex h-6 items-center gap-1 border border-cyan-200/30 bg-cyan-500/15 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-cyan-100 hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {isTestingThisRow ? (
+                        <Loader2 size={11} className="animate-spin" />
+                      ) : (
+                        <Play size={11} />
+                      )}
+                      Test
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveProvider(index, -1)}
+                      disabled={index === 0}
+                      title="Move up"
+                      aria-label={`Move ${PROVIDER_LABEL[entry.provider]} up`}
+                      className="flex h-6 w-6 items-center justify-center text-stone-400 hover:bg-white/5 hover:text-stone-100 disabled:cursor-not-allowed disabled:opacity-30"
+                    >
+                      <ArrowUp size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveProvider(index, 1)}
+                      disabled={index === providerOrder.length - 1}
+                      title="Move down"
+                      aria-label={`Move ${PROVIDER_LABEL[entry.provider]} down`}
+                      className="flex h-6 w-6 items-center justify-center text-stone-400 hover:bg-white/5 hover:text-stone-100 disabled:cursor-not-allowed disabled:opacity-30"
+                    >
+                      <ArrowDown size={12} />
+                    </button>
+                  </div>
+                  {result && (
+                    <div className="border-t border-stone-200/12 bg-[#020908] px-3 py-2 text-[11px]">
+                      <div className="mb-1 flex flex-wrap items-center gap-3 text-stone-500">
+                        <span>
+                          {result.error ? (
+                            <span className="text-red-300">failed</span>
+                          ) : (
+                            <span className="text-emerald-300">ok</span>
+                          )}{' '}
+                          · {result.latencyMs} ms
+                          {result.inputTokens != null && result.outputTokens != null && (
+                            <> · in {result.inputTokens} / out {result.outputTokens} tokens</>
+                          )}
+                          {' · '}
+                          <code className="font-mono">{result.model}</code>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => clearResult(entry.provider)}
+                          className="ml-auto text-stone-500 hover:text-stone-200"
+                          title="Clear this result"
+                          aria-label="Clear result"
+                        >
+                          <X size={11} />
+                        </button>
+                      </div>
+                      <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-stone-200">
+                        {result.error ?? result.content ?? ''}
+                      </pre>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          <p className="text-[10px] text-stone-500">
+            Tip: providers without a saved API key are skipped automatically — they aren&apos;t
+            disabled here, so adding the key later lights them up without revisiting Settings.
+          </p>
         </div>
       </section>
 
-      {/* System Tray */}
       <section className="border border-stone-200/18 bg-[#071d1a]/72">
         <div className="flex items-center gap-3 border-b border-stone-200/12 px-4 py-3">
           <Monitor size={15} className="text-stone-300" />
@@ -179,96 +408,6 @@ export function SettingsView() {
         </div>
       </section>
 
-      {/* Skills Directory */}
-      <section className="border border-stone-200/18 bg-[#071d1a]/72">
-        <div className="flex items-center gap-3 border-b border-stone-200/12 px-4 py-3">
-          <BookOpen size={15} className="text-stone-300" />
-          <h2 className="text-sm font-medium uppercase tracking-[0.16em] text-stone-100">
-            Skills Directory
-          </h2>
-        </div>
-        <div className="space-y-3 p-4">
-          <p className="text-xs text-stone-400">
-            Where PM scans for installed skills (markdown packages). Default is{' '}
-            <span className="font-mono">~/.claude/skills</span>. PM observes this directory — files
-            added or removed externally show up after a Rescan in Plugins → Skills.
-          </p>
-          <div>
-            <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-stone-500">
-              Path
-            </label>
-            <div className="flex gap-2">
-              <input
-                value={skillsDirInput}
-                onChange={(e) => setSkillsDirInput(e.target.value)}
-                placeholder="/Users/.../skills"
-                className="flex-1 border border-stone-200/20 bg-[#03100f] px-3 py-2 font-mono text-xs text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
-              />
-              <button
-                onClick={handleSaveSkillsDir}
-                disabled={
-                  skillsDirSaving ||
-                  !skillsDirInput.trim() ||
-                  skillsDirInput.trim() === skillsDirCurrent
-                }
-                className="bg-stone-100 px-3 py-2 text-xs font-medium text-[#071d1a] hover:bg-amber-100 disabled:opacity-50"
-              >
-                Save
-              </button>
-            </div>
-          </div>
-          {skillsDirError && <p className="text-xs text-red-400">{skillsDirError}</p>}
-        </div>
-      </section>
-
-      {/* Skills directory change-confirmation modal */}
-      {pendingDir && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md border border-stone-200/18 bg-[#071d1a] shadow-2xl">
-            <div className="border-b border-stone-200/12 px-6 py-4">
-              <h3 className="text-base font-bold text-stone-50">Change skills directory?</h3>
-            </div>
-            <div className="space-y-3 px-6 py-4 text-xs text-stone-300">
-              <p>Existing skills at:</p>
-              <p className="break-all bg-[#03100f] p-2 font-mono text-[11px] text-stone-400">
-                {skillsDirCurrent}
-              </p>
-              <p>will not be moved automatically. After changing:</p>
-              <ul className="list-disc space-y-1 pl-5 text-stone-400">
-                <li>Files at the old path remain on disk</li>
-                <li>PM will no longer track them</li>
-                <li>
-                  PM will scan the new path and pick up any{' '}
-                  <span className="font-mono">.md</span> files found there
-                </li>
-              </ul>
-            </div>
-            <div className="flex flex-wrap justify-end gap-2 border-t border-stone-200/12 px-6 py-4">
-              <button
-                onClick={() => setPendingDir(null)}
-                className="px-3 py-1.5 text-xs text-stone-400 hover:text-stone-100"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleJustChange}
-                className="border border-stone-200/25 px-3 py-1.5 text-xs text-stone-200 hover:bg-white/5"
-              >
-                Just change path
-              </button>
-              <button
-                onClick={handleMoveAndChange}
-                disabled={skillsDirSaving}
-                className="bg-stone-100 px-3 py-1.5 text-xs font-medium text-[#071d1a] hover:bg-amber-100 disabled:opacity-50"
-              >
-                Move existing skills
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Runtime Bridge Info */}
       <section className="border border-stone-200/18 bg-[#071d1a]/72">
         <div className="flex items-center gap-3 border-b border-stone-200/12 px-4 py-3">
           <Server size={15} className="text-stone-300" />

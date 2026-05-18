@@ -59,7 +59,7 @@ const NAV_ITEMS: Array<{
       id: 'engineers',
       label: 'AI Engineers',
       href: '/engineers',
-      hint: 'Configure engineer role presets — skills, system prompts, reference files.',
+      hint: 'Configure engineer role presets — skills and system prompts.',
       icon: Users2,
     },
     {

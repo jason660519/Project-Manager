@@ -1,7 +1,8 @@
 import type { ProjectManagerConfig, Feature } from '../types';
 
 /**
- * Pure migration pipeline for `.project-manager.json` documents.
+ * Pure migration pipeline for dashboard config JSON documents
+ * (`.project-manager/config.json` — ADR-008; previously `.project-manager.json`).
  *
  * v1 → v2 (ADR-006): adds a stable root `id` (UUID) plus `createdAt` /
  * `updatedAt` / `updatedBy` audit fields on the root and on every feature.

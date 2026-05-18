@@ -4,7 +4,10 @@ import type { ProjectsRepository } from './ProjectsRepository';
 
 export type { ProjectsRepository } from './ProjectsRepository';
 export { CURRENT_SCHEMA_VERSION, migrateConfig } from './migrate';
+export { enrichConfigFromBundledSample } from './bundledSamples';
 export { mergeFeaturesById } from './mergeFeatures';
+export { mergeProjectConfigFromDisk } from './mergeProjectFromDisk';
+export { applyScanConfigToProject, buildProjectEntryFromPath } from './importProjectEntry';
 export { ensureEngineerRoles, mergeEngineerRolesById } from './mergeEngineerRoles';
 export { resolveConfigPath } from './resolveConfigPath';
 export {

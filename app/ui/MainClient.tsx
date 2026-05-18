@@ -9,10 +9,12 @@ import {
   ensureEngineerRoles,
   getProjectsRepository,
   mergeFeaturesById,
+  mergeProjectConfigFromDisk,
   migrateConfig,
   resolveDashboardProjectIds,
   resolveInitialProjectId,
 } from '../../lib/storage';
+import { getProjectSetupStatus } from '../../lib/projectSetup';
 import {
   ActiveRun,
   CompletedRun,
@@ -58,12 +60,12 @@ const SEED_PROJECTS: ProjectEntry[] = [
     id: 'owner-property',
     config: ensureEngineerRoles(sampleConfig1 as ProjectManagerConfig),
     configPath:
-      '/Volumes/KLEVV-4T-1/Real Estate Management Projects/Owner-Property-Management-AI-SPA/.project-manager.json',
+      '/Volumes/KLEVV-4T-1/Real Estate Management Projects/Owner-Property-Management-AI-SPA/.project-manager/config.json',
   },
   {
     id: 'project-manager',
     config: ensureEngineerRoles(sampleConfig2 as ProjectManagerConfig),
-    configPath: '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager.json',
+    configPath: '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager/config.json',
   },
 ];
 
@@ -265,9 +267,12 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
     (async () => {
       const { onConfigChanged } = await import('../../lib/bridge');
       unlisten = await onConfigChanged(({ path, config }) => {
-        const migrated = ensureEngineerRoles(migrateConfig(config));
         setProjects((prev) =>
-          prev.map((p) => (p.configPath === path ? { ...p, config: migrated } : p)),
+          prev.map((p) =>
+            p.configPath === path
+              ? { ...p, config: mergeProjectConfigFromDisk(p.config, config, path) }
+              : p,
+          ),
         );
       });
     })();
@@ -292,7 +297,7 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
       const reads = await Promise.all(
         localProjects.map(async (p) => {
           try {
-            const disk = ensureEngineerRoles(await readConfig(p.configPath));
+            const disk = await readConfig(p.configPath);
             return { path: p.configPath, config: disk };
           } catch {
             return null;
@@ -308,7 +313,9 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
       setProjects((prev) =>
         prev.map((p) => {
           const disk = byPath.get(p.configPath);
-          return disk ? { ...p, config: disk } : p;
+          return disk
+            ? { ...p, config: mergeProjectConfigFromDisk(p.config, disk, p.configPath) }
+            : p;
         }),
       );
     })();
@@ -560,11 +567,22 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
   // projects (no FS) and dev mode (no Tauri scan command).
   const [pendingEnvImportRoot, setPendingEnvImportRoot] = useState<string>('');
 
+  const handleUpdateProject = useCallback((entry: ProjectEntry) => {
+    setProjects((prev) => prev.map((p) => (p.id === entry.id ? entry : p)));
+  }, []);
+
   const handleAddProject = useCallback(
     (entry: ProjectEntry) => {
       setProjects((prev) => [...prev, entry]);
       setSelectedProjectId(entry.id);
-      setSelectedDashboardProjectIds((prev) => (prev.includes(entry.id) ? prev : [...prev, entry.id]));
+      // Only auto-include 'ready' projects in dashboard scope. Empty scaffolds
+      // and needs-scan entries contribute zero rows, so prefilling the checkbox
+      // creates the "checked but empty" confusion the user reported.
+      if (getProjectSetupStatus(entry) === 'ready') {
+        setSelectedDashboardProjectIds((prev) =>
+          prev.includes(entry.id) ? prev : [...prev, entry.id],
+        );
+      }
 
       if (!isTauri) return;
       const root = entry.config.project.root;
@@ -594,7 +612,7 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
   /**
    * Remove a project from PM's tracked list. Always removes the in-memory entry
    * (which then persists via the saveProjects effect); when `deleteConfigFile`
-   * is true and we're on Tauri, also deletes the `.project-manager.json` on disk.
+   * is true and we're on Tauri, also deletes the `.project-manager/config.json` on disk.
    * GitHub-sourced projects (configPath starts with https://) never touch disk.
    */
   const handleRemoveProject = useCallback(
@@ -674,6 +692,7 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
                 ...p,
                 config: mergedConfig,
                 configPath: result.configPath,
+                configMissing: false,
                 lastSyncedAt: new Date().toISOString(),
               }
             : p,
@@ -723,7 +742,12 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
       setProjects((prev) =>
         prev.map((p) =>
           p.id === id
-            ? { ...p, config: mergedConfig, lastSyncedAt: new Date().toISOString() }
+            ? {
+                ...p,
+                config: mergedConfig,
+                configMissing: false,
+                lastSyncedAt: new Date().toISOString(),
+              }
             : p,
         ),
       );
@@ -953,9 +977,8 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
           onSelectProject={setSelectedProjectId}
           onToggleDashboardProject={handleToggleDashboardProject}
           onAddProject={handleAddProject}
+          onUpdateProject={handleUpdateProject}
           onRemoveProject={handleRemoveProject}
-          onSyncProject={handleSyncProject}
-          onInitializeProject={handleInitializeProject}
           runHistory={runHistory}
         />
       )}
