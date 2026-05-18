@@ -1,93 +1,343 @@
 'use client';
 
-import { Settings2, Trash2, EyeOff, Eye } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Bot, Eye, EyeOff, Settings2, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
-import type { FeaturePhase } from '../../../lib/types';
+import type {
+  DeployStatus, Feature, FeaturePhase, FeatureStatus, TestStatus,
+} from '../../../lib/types';
+import type { CustomProjectProgressRow } from '../types';
 import type { PhaseRow } from './phaseRows';
+import { PathLink } from './pathLinks';
+import { E2E_CATEGORY_PALETTE, e2eCategorySelectOptions } from './e2eCategories';
 
 export interface ColumnDef {
   id: string;
   header: string;
-  /** Cell renderer. Receives the row plus a handlers bag. */
   cell: (row: PhaseRow, handlers: ColumnHandlers) => React.ReactNode;
-  /** Accessor for search/sort. */
   accessor?: (row: PhaseRow) => string | number;
 }
 
 export interface ColumnHandlers {
+  projectRoot: string;
   hiddenRowKeysSet: Set<string>;
   onToggleHideRow: (rowKey: string) => void;
   onOpenPromptConfig: (row: PhaseRow) => void;
   onDeleteCustomRow: (rowId: string) => void;
+  onPatchFeature: (featureId: string, patch: Partial<Feature>) => void;
+  onPatchCustomRow: (rowId: string, patch: Partial<CustomProjectProgressRow>) => void;
+  onChangePhase: (row: PhaseRow, phase: FeaturePhase) => void;
+  /** Quick dispatch — only meaningful for feature rows. Undefined disables it. */
+  onDispatch?: (row: PhaseRow) => void;
 }
+
+const STATUS_STYLE: Record<FeatureStatus, string> = {
+  todo:        'border-stone-300/25 bg-stone-200/10 text-stone-200',
+  in_progress: 'border-cyan-200/25  bg-cyan-100/12  text-cyan-100',
+  done:        'border-emerald-200/25 bg-emerald-100/12 text-emerald-100',
+  on_hold:     'border-red-400/30   bg-red-500/18    text-red-200',
+};
+
+// ── Patching helper: routes Patch<Feature> on a feature row, Patch<CustomRow>
+//    on a custom row.  Centralises the source check so cells don't repeat it.
+function patchRow(row: PhaseRow, patch: Partial<Feature> & Partial<CustomProjectProgressRow>, h: ColumnHandlers) {
+  if (row.source === 'feature' && row.featureId) {
+    // Strip CustomRow-only keys (rowId, percentage, phase) so the feature
+    // record never grows orphan fields if a caller passes a shared shape.
+    const { rowId: _r, percentage: _p, phase: _ph, ...featurePatch } = patch as Record<string, unknown>;
+    void _r; void _p; void _ph;
+    h.onPatchFeature(row.featureId, featurePatch as Partial<Feature>);
+  } else if (row.source === 'custom' && row.customRowId) {
+    h.onPatchCustomRow(row.customRowId, patch);
+  }
+}
+
+// ── Editable cell primitives ────────────────────────────────────────────────
+
+function EditableText({
+  value, onCommit, placeholder, kind = 'text',
+}: {
+  value?: string | number;
+  onCommit: (next: string) => void;
+  placeholder?: string;
+  kind?: 'text' | 'date' | 'number';
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value == null ? '' : String(value));
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // Reset draft when the upstream value changes while not editing.
+  useEffect(() => {
+    if (!editing) setDraft(value == null ? '' : String(value));
+  }, [value, editing]);
+
+  // Auto-focus when we enter edit mode (clicking the display label).
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  if (!editing) {
+    const display = value == null || value === '' ? '—' : String(value);
+    return (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+        className={clsx(
+          'inline-flex min-w-[3rem] cursor-text rounded border border-transparent px-1 py-0.5 text-xs hover:border-stone-200/20',
+          value == null || value === '' ? 'text-stone-500' : 'text-stone-200',
+        )}
+      >{display}</button>
+    );
+  }
+  return (
+    <input
+      ref={inputRef}
+      type={kind === 'number' ? 'number' : kind === 'date' ? 'date' : 'text'}
+      value={draft}
+      placeholder={placeholder}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        setEditing(false);
+        if (draft !== String(value ?? '')) onCommit(draft);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+        if (e.key === 'Escape') { setDraft(String(value ?? '')); setEditing(false); }
+        e.stopPropagation();
+      }}
+      onClick={(e) => e.stopPropagation()}
+      className="h-6 w-20 rounded border border-emerald-300/40 bg-[#020a09]/95 px-1 text-xs text-stone-100 focus:outline-none"
+    />
+  );
+}
+
+function EditableSelect<T extends string>({
+  value, options, onCommit, palette,
+}: {
+  value: T | undefined;
+  options: Array<{ value: T; label: string }>;
+  onCommit: (next: T) => void;
+  palette?: Record<T, string>;
+}) {
+  const handleChange = (v: string) => onCommit(v as T);
+  const display = options.find((o) => o.value === value)?.label ?? '—';
+  const colour = value && palette?.[value];
+  return (
+    <select
+      value={value ?? ''}
+      onChange={(e) => { e.stopPropagation(); handleChange(e.target.value); }}
+      onClick={(e) => e.stopPropagation()}
+      className={clsx(
+        'h-6 cursor-pointer rounded border bg-[#061512]/90 px-1.5 text-[11px] focus:outline-none focus:border-emerald-300/50',
+        colour ?? 'border-stone-200/20 text-stone-200',
+      )}
+      title={display}
+    >
+      <option value="">—</option>
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>{o.label}</option>
+      ))}
+    </select>
+  );
+}
+
+// ── Display helpers ─────────────────────────────────────────────────────────
 
 function progressBar(percent: number) {
   const clamped = Math.max(0, Math.min(100, percent));
   return (
     <div className="flex items-center gap-2">
-      <div className="h-2 w-20 bg-stone-200/15 rounded">
-        <div
-          className={clsx(
-            'h-2 rounded transition-all',
-            clamped >= 100 ? 'bg-emerald-400' : clamped > 0 ? 'bg-cyan-400' : 'bg-stone-500',
-          )}
-          style={{ width: `${clamped}%` }}
-        />
-      </div>
+      {progressBarTrack(clamped)}
       <span className="w-10 text-right font-mono text-xs text-stone-300">{clamped}%</span>
     </div>
   );
 }
 
-function statusPill(value: string | undefined, type: 'test' | 'deploy') {
-  if (!value) return <span className="text-xs text-stone-500">—</span>;
-  const palette: Record<string, string> = {
-    passed: 'border-emerald-300/30 bg-emerald-500/15 text-emerald-200',
-    failed: 'border-red-400/30 bg-red-500/15 text-red-300',
-    pending: 'border-stone-300/30 bg-stone-200/10 text-stone-200',
-    production: 'border-emerald-300/30 bg-emerald-500/15 text-emerald-200',
-    staging: 'border-amber-300/30 bg-amber-500/15 text-amber-200',
-    not_deployed: 'border-stone-300/30 bg-stone-200/10 text-stone-200',
-  };
-  const cls = palette[value] ?? 'border-stone-300/30 bg-stone-200/10 text-stone-200';
-  const label = type === 'deploy' && value === 'not_deployed' ? 'Not Deployed' : value;
+function progressBarTrack(clamped: number) {
   return (
-    <span className={clsx('inline-block border px-2 py-0.5 text-[11px] font-medium capitalize rounded-sm', cls)}>
-      {label}
-    </span>
+    <div className="h-2 w-20 rounded bg-stone-200/15">
+      <div
+        className={clsx(
+          'h-2 rounded transition-all',
+          clamped >= 100 ? 'bg-emerald-400' : clamped > 0 ? 'bg-cyan-400' : 'bg-stone-500',
+        )}
+        style={{ width: `${clamped}%` }}
+      />
+    </div>
   );
 }
 
-const text = (v?: string | number) => (
-  v == null || v === '' ? <span className="text-xs text-stone-500">—</span> : <span className="text-xs text-stone-200">{String(v)}</span>
-);
+/** Bar + percent label; click the label to edit (no duplicate bare integer). */
+function EditableProgressBar({
+  percent,
+  onCommit,
+  allowEmpty = false,
+}: {
+  percent?: number;
+  onCommit: (next: number | undefined) => void;
+  allowEmpty?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(percent == null ? '' : String(percent));
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
-function commonActionsCol(): ColumnDef {
+  useEffect(() => {
+    if (!editing) setDraft(percent == null ? '' : String(percent));
+  }, [percent, editing]);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  const clamped = Math.max(0, Math.min(100, percent ?? 0));
+  const showTrack = percent != null;
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2">
+        {showTrack && progressBarTrack(clamped)}
+        <input
+          ref={inputRef}
+          type="number"
+          min={0}
+          max={100}
+          value={draft}
+          placeholder={allowEmpty ? '0-100' : undefined}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => {
+            setEditing(false);
+            const raw = draft.trim();
+            if (raw === '') {
+              if (allowEmpty && percent != null) onCommit(undefined);
+              return;
+            }
+            const n = Math.max(0, Math.min(100, Number(raw) || 0));
+            if (n !== (percent ?? 0)) onCommit(n);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+            if (e.key === 'Escape') {
+              setDraft(percent == null ? '' : String(percent));
+              setEditing(false);
+            }
+            e.stopPropagation();
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="h-6 w-14 rounded border border-emerald-300/40 bg-[#020a09]/95 px-1 text-right font-mono text-xs text-stone-100 focus:outline-none"
+        />
+      </div>
+    );
+  }
+
+  const label = percent == null ? '—' : `${clamped}%`;
+  return (
+    <div className="flex items-center gap-2">
+      {showTrack && progressBarTrack(clamped)}
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+        className={clsx(
+          'w-10 cursor-text rounded border border-transparent py-0.5 text-right font-mono text-xs hover:border-stone-200/20',
+          percent == null ? 'text-stone-500' : 'text-stone-300',
+        )}
+      >{label}</button>
+    </div>
+  );
+}
+
+// ── Shared columns ──────────────────────────────────────────────────────────
+
+function categoryColumn(phase: FeaturePhase): ColumnDef {
+  if (phase === 'e2e_testing') {
+    return {
+      id: 'category',
+      header: 'E2E Category',
+      accessor: (r) => r.category,
+      cell: (r, h) => (
+        <EditableSelect<string>
+          value={r.category}
+          options={e2eCategorySelectOptions(r.category)}
+          palette={E2E_CATEGORY_PALETTE as Record<string, string>}
+          onCommit={(v) => { if (v) patchRow(r, { category: v }, h); }}
+        />
+      ),
+    };
+  }
+  return {
+    id: 'category',
+    header: 'Category',
+    accessor: (r) => r.category,
+    cell: (r) => (
+      <span className="rounded-sm border border-amber-200/20 bg-amber-100/10 px-2 py-0.5 text-[11px] text-amber-100/90">
+        {r.category}
+      </span>
+    ),
+  };
+}
+
+function pointsColumn(): ColumnDef {
+  return {
+    id: 'points',
+    header: 'SP',
+    accessor: (r) => r.points,
+    cell: (r, h) => (
+      <EditableText
+        value={r.points}
+        kind="number"
+        onCommit={(v) => patchRow(r, { points: Math.max(0, Number(v) || 0) }, h)}
+      />
+    ),
+  };
+}
+
+function commonIdNameCols(phase: FeaturePhase): ColumnDef[] {
+  const cols: ColumnDef[] = [
+    { id: 'id', header: 'ID', accessor: (r) => r.id, cell: (r) => (
+      <span className="font-mono text-[11px] text-stone-300">{r.id}</span>
+    )},
+  ];
+  if (phase === 'development') cols.push(pointsColumn());
+  cols.push(
+    categoryColumn(phase),
+    { id: 'name', header: 'Function / Feature', accessor: (r) => r.name, cell: (r) => (
+      <span className="text-sm font-medium text-stone-100">{r.name}</span>
+    )},
+  );
+  return cols;
+}
+
+function actionsCol(): ColumnDef {
   return {
     id: 'actions',
     header: '',
     cell: (row, h) => {
       const hidden = h.hiddenRowKeysSet.has(row.rowKey);
+      const canDispatch = h.onDispatch && row.source === 'feature';
       return (
         <div className="flex items-center gap-1">
+          <PhaseSwitch row={row} onChange={(p) => h.onChangePhase(row, p)} />
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              h.onOpenPromptConfig(row);
-            }}
-            className="flex h-6 w-6 items-center justify-center rounded border border-stone-200/15 text-stone-300 hover:text-stone-100 hover:bg-white/10"
+            onClick={(e) => { e.stopPropagation(); h.onOpenPromptConfig(row); }}
+            className="flex h-6 w-6 items-center justify-center rounded border border-stone-200/15 text-stone-300 hover:bg-white/10 hover:text-stone-100"
             title="Configure prompt"
           >
             <Settings2 size={12} />
           </button>
+          {canDispatch && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); h.onDispatch?.(row); }}
+              className="flex h-6 items-center gap-1 rounded border border-emerald-200/30 bg-emerald-500/15 px-1.5 text-[11px] text-emerald-100 hover:bg-emerald-500/25"
+              title="Dispatch to agent"
+            >
+              <Bot size={11} /> Dispatch
+            </button>
+          )}
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              h.onToggleHideRow(row.rowKey);
-            }}
-            className="flex h-6 w-6 items-center justify-center rounded border border-stone-200/15 text-stone-300 hover:text-stone-100 hover:bg-white/10"
+            onClick={(e) => { e.stopPropagation(); h.onToggleHideRow(row.rowKey); }}
+            className="flex h-6 w-6 items-center justify-center rounded border border-stone-200/15 text-stone-300 hover:bg-white/10 hover:text-stone-100"
             title={hidden ? 'Unhide row' : 'Hide row'}
           >
             {hidden ? <Eye size={12} /> : <EyeOff size={12} />}
@@ -95,11 +345,8 @@ function commonActionsCol(): ColumnDef {
           {row.source === 'custom' && (
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (row.customRowId) h.onDeleteCustomRow(row.customRowId);
-              }}
-              className="flex h-6 w-6 items-center justify-center rounded border border-red-400/30 text-red-300 hover:text-red-200 hover:bg-red-500/15"
+              onClick={(e) => { e.stopPropagation(); if (row.customRowId) h.onDeleteCustomRow(row.customRowId); }}
+              className="flex h-6 w-6 items-center justify-center rounded border border-red-400/30 text-red-300 hover:bg-red-500/15 hover:text-red-200"
               title="Delete custom row"
             >
               <Trash2 size={12} />
@@ -111,75 +358,194 @@ function commonActionsCol(): ColumnDef {
   };
 }
 
-function commonIdNameCols(): ColumnDef[] {
-  return [
-    { id: 'id', header: 'ID', accessor: (r) => r.id, cell: (r) => (
-      <span className="font-mono text-[11px] text-stone-300">{r.id}</span>
-    )},
-    { id: 'category', header: 'Category', accessor: (r) => r.category, cell: (r) => (
-      <span className="border border-amber-200/20 bg-amber-100/10 px-2 py-0.5 text-[11px] text-amber-100/90 rounded-sm">
-        {r.category}
-      </span>
-    )},
-    { id: 'name', header: 'Function / Feature', accessor: (r) => r.name, cell: (r) => (
-      <span className="text-sm font-medium text-stone-100">{r.name}</span>
-    )},
-  ];
+function PhaseSwitch({ row, onChange }: { row: PhaseRow; onChange: (p: FeaturePhase) => void }) {
+  // Persist the *table's* current phase for the row by reading from the row's
+  // own data — features carry it as feature.phase, custom rows as custom.phase.
+  const current: FeaturePhase = row.feature?.phase ?? row.custom?.phase ?? 'development';
+  return (
+    <select
+      value={current}
+      onChange={(e) => { e.stopPropagation(); onChange(e.target.value as FeaturePhase); }}
+      onClick={(e) => e.stopPropagation()}
+      className="h-6 rounded border border-stone-200/20 bg-[#061512]/90 px-1.5 text-[10px] uppercase tracking-[0.08em] text-stone-200 hover:border-emerald-300/40"
+      title="Move feature to another phase"
+    >
+      <option value="development">DEV</option>
+      <option value="e2e_testing">E2E</option>
+      <option value="deployment">DEPLOY</option>
+      <option value="operations">OPS</option>
+    </select>
+  );
 }
+
+// ── Editable cells (one per phase-specific field) ───────────────────────────
+
+const TEST_STATUS_OPTIONS = [
+  { value: 'passed',  label: 'Passed' },
+  { value: 'failed',  label: 'Failed' },
+  { value: 'pending', label: 'Pending' },
+] as const;
+const TEST_STATUS_PALETTE: Record<TestStatus, string> = {
+  passed:  'border-emerald-300/40 text-emerald-200',
+  failed:  'border-red-400/40 text-red-200',
+  pending: 'border-stone-300/30 text-stone-200',
+};
+
+const DEPLOY_STATUS_OPTIONS = [
+  { value: 'production',  label: 'Production' },
+  { value: 'staging',     label: 'Staging' },
+  { value: 'not_deployed', label: 'Not Deployed' },
+] as const;
+const DEPLOY_STATUS_PALETTE: Record<DeployStatus, string> = {
+  production:   'border-emerald-300/40 text-emerald-200',
+  staging:      'border-amber-300/40 text-amber-200',
+  not_deployed: 'border-stone-300/30 text-stone-200',
+};
+
+const STATUS_OPTIONS = [
+  { value: 'todo',        label: 'To Do' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'done',        label: 'Done' },
+  { value: 'on_hold',     label: 'On Hold' },
+] as const;
+
+// ── Column factories ────────────────────────────────────────────────────────
 
 export function createDevelopmentColumns(): ColumnDef[] {
   return [
-    ...commonIdNameCols(),
-    { id: 'progress', header: 'Progress', accessor: (r) => r.progress, cell: (r) => progressBar(r.progress) },
-    { id: 'status', header: 'Status', accessor: (r) => r.status, cell: (r) => (
-      <span className="text-[11px] text-stone-200 capitalize">{r.status.replace('_', ' ')}</span>
+    ...commonIdNameCols('development'),
+    { id: 'progress', header: 'Progress', accessor: (r) => r.progress, cell: (r, h) => (
+      <EditableProgressBar
+        percent={r.progress}
+        onCommit={(n) => patchRow(r, { progress: n ?? 0, percentage: n ?? 0 }, h)}
+      />
     )},
-    { id: 'points', header: 'SP', accessor: (r) => r.points, cell: (r) => (
-      <span className="font-mono text-[11px] text-stone-300">{r.points}</span>
+    { id: 'status', header: 'Status', accessor: (r) => r.status, cell: (r, h) => (
+      <EditableSelect
+        value={r.status as FeatureStatus}
+        options={STATUS_OPTIONS as unknown as Array<{ value: FeatureStatus; label: string }>}
+        palette={STATUS_STYLE}
+        onCommit={(v) => patchRow(r, { status: v }, h)}
+      />
     )},
-    { id: 'page', header: 'Located Page', accessor: (r) => r.locatedPage ?? '', cell: (r) => text(r.locatedPage) },
-    commonActionsCol(),
+    { id: 'page', header: 'Located Page', accessor: (r) => r.locatedPage ?? '', cell: (r, h) => (
+      <EditableText
+        value={r.locatedPage}
+        onCommit={(v) => patchRow(r, { locatedPage: v || undefined }, h)}
+      />
+    )},
+    {
+      id: 'spec',
+      header: 'Feature Spec',
+      accessor: (r) => r.specPath ?? '',
+      cell: (r, h) => <PathLink projectRoot={h.projectRoot} relPath={r.specPath} />,
+    },
+    {
+      id: 'devLog',
+      header: 'Dev Logs',
+      accessor: (r) => r.devLogFolder ?? '',
+      cell: (r, h) => <PathLink projectRoot={h.projectRoot} relPath={r.devLogFolder} />,
+    },
+    actionsCol(),
   ];
 }
 
 export function createTestingColumns(): ColumnDef[] {
   return [
-    ...commonIdNameCols(),
-    { id: 'coverage', header: 'Coverage', accessor: (r) => r.testCoverage ?? -1, cell: (r) => (
-      r.testCoverage == null ? text() : progressBar(r.testCoverage)
+    ...commonIdNameCols('e2e_testing'),
+    { id: 'coverage', header: 'Coverage', accessor: (r) => r.testCoverage ?? -1, cell: (r, h) => (
+      <EditableProgressBar
+        percent={r.testCoverage}
+        allowEmpty
+        onCommit={(n) => patchRow(r, { testCoverage: n }, h)}
+      />
     )},
-    { id: 'testStatus', header: 'Test Status', accessor: (r) => r.testStatus ?? '', cell: (r) => statusPill(r.testStatus, 'test') },
+    { id: 'testStatus', header: 'Test Status', accessor: (r) => r.testStatus ?? '', cell: (r, h) => (
+      <EditableSelect
+        value={r.testStatus}
+        options={TEST_STATUS_OPTIONS as unknown as Array<{ value: TestStatus; label: string }>}
+        palette={TEST_STATUS_PALETTE}
+        onCommit={(v) => patchRow(r, { testStatus: v as TestStatus }, h)}
+      />
+    )},
     { id: 'progress', header: 'Progress', accessor: (r) => r.progress, cell: (r) => progressBar(r.progress) },
-    { id: 'page', header: 'Located Page', accessor: (r) => r.locatedPage ?? '', cell: (r) => text(r.locatedPage) },
-    commonActionsCol(),
+    { id: 'page', header: 'Located Page', accessor: (r) => r.locatedPage ?? '', cell: (r, h) => (
+      <EditableText
+        value={r.locatedPage}
+        onCommit={(v) => patchRow(r, { locatedPage: v || undefined }, h)}
+      />
+    )},
+    actionsCol(),
   ];
 }
 
 export function createDeploymentColumns(): ColumnDef[] {
   return [
-    ...commonIdNameCols(),
-    { id: 'deployStatus', header: 'Status', accessor: (r) => r.deployStatus ?? '', cell: (r) => statusPill(r.deployStatus, 'deploy') },
-    { id: 'env', header: 'Environment', accessor: (r) => r.deployEnv ?? '', cell: (r) => text(r.deployEnv) },
-    { id: 'date', header: 'Deploy Date', accessor: (r) => r.deployDate ?? '', cell: (r) => text(r.deployDate) },
+    ...commonIdNameCols('deployment'),
+    { id: 'deployStatus', header: 'Status', accessor: (r) => r.deployStatus ?? '', cell: (r, h) => (
+      <EditableSelect
+        value={r.deployStatus}
+        options={DEPLOY_STATUS_OPTIONS as unknown as Array<{ value: DeployStatus; label: string }>}
+        palette={DEPLOY_STATUS_PALETTE}
+        onCommit={(v) => patchRow(r, { deployStatus: v as DeployStatus }, h)}
+      />
+    )},
+    { id: 'env', header: 'Environment', accessor: (r) => r.deployEnv ?? '', cell: (r, h) => (
+      <EditableText
+        value={r.deployEnv}
+        onCommit={(v) => patchRow(r, { deployEnv: v || undefined }, h)}
+      />
+    )},
+    { id: 'date', header: 'Deploy Date', accessor: (r) => r.deployDate ?? '', cell: (r, h) => (
+      <EditableText
+        value={r.deployDate}
+        kind="date"
+        onCommit={(v) => patchRow(r, { deployDate: v || undefined }, h)}
+      />
+    )},
     { id: 'progress', header: 'Progress', accessor: (r) => r.progress, cell: (r) => progressBar(r.progress) },
-    commonActionsCol(),
+    actionsCol(),
   ];
+}
+
+// Numeric ops field with optional unit-suffix display.  Keep parsing simple:
+// the EditableText commit handler always receives raw numeric text (the
+// number-typed input strips the suffix in the editing path), and the display
+// value omits the suffix so users see "99.5" not "99.5%%" when re-editing.
+function opsNumericCell(
+  key: 'uptimePercent' | 'errorRate' | 'avgResponseTime',
+): (r: PhaseRow, h: ColumnHandlers) => React.ReactNode {
+  return (r, h) => (
+    <EditableText
+      value={(r as unknown as Record<string, number | undefined>)[key]}
+      kind="number"
+      onCommit={(v) => {
+        const n = Number(v);
+        patchRow(r, { [key]: v !== '' && Number.isFinite(n) ? n : undefined } as Partial<Feature>, h);
+      }}
+    />
+  );
 }
 
 export function createOperationsColumns(): ColumnDef[] {
   return [
-    ...commonIdNameCols(),
-    { id: 'uptime', header: 'Uptime %', accessor: (r) => r.uptimePercent ?? -1, cell: (r) => text(r.uptimePercent != null ? `${r.uptimePercent}%` : undefined) },
-    { id: 'error', header: 'Error %', accessor: (r) => r.errorRate ?? -1, cell: (r) => text(r.errorRate != null ? `${r.errorRate}%` : undefined) },
-    { id: 'rt', header: 'Response (ms)', accessor: (r) => r.avgResponseTime ?? -1, cell: (r) => text(r.avgResponseTime) },
-    { id: 'incident', header: 'Last Incident', accessor: (r) => r.lastIncident ?? '', cell: (r) => text(r.lastIncident) },
-    commonActionsCol(),
+    ...commonIdNameCols('operations'),
+    { id: 'uptime',   header: 'Uptime %',      accessor: (r) => r.uptimePercent   ?? -1, cell: opsNumericCell('uptimePercent') },
+    { id: 'error',    header: 'Error %',       accessor: (r) => r.errorRate       ?? -1, cell: opsNumericCell('errorRate') },
+    { id: 'rt',       header: 'Response (ms)', accessor: (r) => r.avgResponseTime ?? -1, cell: opsNumericCell('avgResponseTime') },
+    { id: 'incident', header: 'Last Incident', accessor: (r) => r.lastIncident    ?? '', cell: (r, h) => (
+      <EditableText
+        value={r.lastIncident}
+        onCommit={(v) => patchRow(r, { lastIncident: v || undefined }, h)}
+      />
+    )},
+    actionsCol(),
   ];
 }
 
 export function columnsForPhase(phase: FeaturePhase): ColumnDef[] {
   switch (phase) {
-    case 'testing': return createTestingColumns();
+    case 'e2e_testing': return createTestingColumns();
     case 'deployment': return createDeploymentColumns();
     case 'operations': return createOperationsColumns();
     default: return createDevelopmentColumns();

@@ -12,7 +12,7 @@ export interface ProgressSnapshot {
   exportedAt: string;
   project: { name: string; root: string };
   development: ReturnType<typeof computeDevelopmentStats> & { rows: ReturnType<typeof buildPhaseRows> };
-  testing:     ReturnType<typeof computeTestingStats>     & { rows: ReturnType<typeof buildPhaseRows> };
+  e2e_testing: ReturnType<typeof computeTestingStats>     & { rows: ReturnType<typeof buildPhaseRows> };
   deployment:  ReturnType<typeof computeDeploymentStats>  & { rows: ReturnType<typeof buildPhaseRows> };
   operations:  ReturnType<typeof computeOperationsStats>  & { rows: ReturnType<typeof buildPhaseRows> };
 }
@@ -23,7 +23,7 @@ export function buildProgressSnapshot(
   customRowsByPhase: Record<FeaturePhase, CustomProjectProgressRow[]>,
 ): ProgressSnapshot {
   const devRows = buildPhaseRows(features, 'development', customRowsByPhase.development);
-  const testRows = buildPhaseRows(features, 'testing', customRowsByPhase.testing);
+  const testRows = buildPhaseRows(features, 'e2e_testing', customRowsByPhase.e2e_testing);
   const deployRows = buildPhaseRows(features, 'deployment', customRowsByPhase.deployment);
   const opsRows = buildPhaseRows(features, 'operations', customRowsByPhase.operations);
 
@@ -31,7 +31,7 @@ export function buildProgressSnapshot(
     exportedAt: new Date().toISOString(),
     project: { name: project.name, root: project.root },
     development: { ...computeDevelopmentStats(devRows.map((r) => r.feature ?? toFeature(r))), rows: devRows },
-    testing:     { ...computeTestingStats(testRows.map((r) => r.feature ?? toFeature(r))),     rows: testRows },
+    e2e_testing: { ...computeTestingStats(testRows.map((r) => r.feature ?? toFeature(r))),     rows: testRows },
     deployment:  { ...computeDeploymentStats(deployRows.map((r) => r.feature ?? toFeature(r))), rows: deployRows },
     operations:  { ...computeOperationsStats(opsRows.map((r) => r.feature ?? toFeature(r))),    rows: opsRows },
   };

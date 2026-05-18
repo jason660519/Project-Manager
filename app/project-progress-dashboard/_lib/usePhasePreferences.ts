@@ -5,11 +5,13 @@ import type { FeaturePhase } from '../../../lib/types';
 import type { PhaseTablePrefs } from '../types';
 
 const STORAGE_PREFIX = 'projectManager.progressDashboard.phase.';
+/** localStorage key suffix before the testing tab was renamed to E2E. */
+const LEGACY_E2E_PHASE_KEY = 'testing';
 
 /** Phase-specific defaults. Column counts must match the column factories. */
 export const DEFAULT_WIDTHS_BY_PHASE: Record<FeaturePhase, number[]> = {
-  development: [60, 110, 220, 110, 140, 100, 100, 100],
-  testing:     [60, 110, 220, 110, 110, 110, 140, 100],
+  development: [60, 110, 220, 110, 140, 100, 100, 140, 120, 100],
+  e2e_testing: [60, 110, 220, 110, 110, 110, 140, 100],
   deployment:  [60, 110, 220, 110, 120, 120, 140, 140],
   operations:  [60, 110, 220, 110, 100, 100, 100, 200],
 };
@@ -34,10 +36,27 @@ function storageKey(phase: FeaturePhase): string {
   return `${STORAGE_PREFIX}${phase}`;
 }
 
+function migrateLegacyPrefsJson(raw: string): string {
+  const parsed = JSON.parse(raw) as Partial<PhaseTablePrefs>;
+  if (!Array.isArray(parsed.customRows)) return raw;
+  parsed.customRows = parsed.customRows.map((row) =>
+    (row.phase as string) === 'testing' ? { ...row, phase: 'e2e_testing' } : row,
+  );
+  return JSON.stringify(parsed);
+}
+
 function readPrefs(phase: FeaturePhase): PhaseTablePrefs {
   if (typeof window === 'undefined') return buildDefaults(phase);
   try {
-    const raw = window.localStorage.getItem(storageKey(phase));
+    let raw = window.localStorage.getItem(storageKey(phase));
+    if (!raw && phase === 'e2e_testing') {
+      const legacy = window.localStorage.getItem(`${STORAGE_PREFIX}${LEGACY_E2E_PHASE_KEY}`);
+      if (legacy) {
+        raw = migrateLegacyPrefsJson(legacy);
+        window.localStorage.setItem(storageKey(phase), raw);
+        window.localStorage.removeItem(`${STORAGE_PREFIX}${LEGACY_E2E_PHASE_KEY}`);
+      }
+    }
     if (!raw) return buildDefaults(phase);
     const parsed = JSON.parse(raw) as Partial<PhaseTablePrefs>;
     const defaults = buildDefaults(phase);

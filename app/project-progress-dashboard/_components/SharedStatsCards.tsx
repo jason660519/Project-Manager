@@ -42,7 +42,7 @@ export function SharedStatsCards({ phase, features, compact = false }: SharedSta
       </Container>
     );
   }
-  if (phase === 'testing') {
+  if (phase === 'e2e_testing') {
     const s = computeTestingStats(features);
     return (
       <Container compact={compact}>

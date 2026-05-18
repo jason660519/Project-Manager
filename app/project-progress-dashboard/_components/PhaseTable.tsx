@@ -5,6 +5,7 @@ import { clsx } from 'clsx';
 import type { PhaseTablePrefs } from '../types';
 import type { ColumnDef, ColumnHandlers } from '../_lib/columns';
 import type { PhaseRow } from '../_lib/phaseRows';
+import { CategoryColumnFilter, type CategoryColumnFilterProps } from './CategoryColumnFilter';
 
 interface PhaseTableProps {
   rows: PhaseRow[];
@@ -12,10 +13,11 @@ interface PhaseTableProps {
   prefs: PhaseTablePrefs;
   patch: (next: Partial<PhaseTablePrefs>) => void;
   handlers: ColumnHandlers;
+  categoryFilter?: Omit<CategoryColumnFilterProps, 'header'>;
   onRowClick?: (row: PhaseRow) => void;
 }
 
-export function PhaseTable({ rows, columns, prefs, patch, handlers, onRowClick }: PhaseTableProps) {
+export function PhaseTable({ rows, columns, prefs, patch, handlers, categoryFilter, onRowClick }: PhaseTableProps) {
   // Sum of frozen column widths — used to push the next column past the sticky edge.
   const leftOffsets = useMemo(() => {
     const arr: number[] = [];
@@ -87,7 +89,11 @@ export function PhaseTable({ rows, columns, prefs, patch, handlers, onRowClick }
                   }}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="truncate">{col.header || ' '}</span>
+                    {col.id === 'category' && categoryFilter ? (
+                      <CategoryColumnFilter header={col.header} {...categoryFilter} />
+                    ) : (
+                      <span className="truncate">{col.header || ' '}</span>
+                    )}
                     <span
                       onMouseDown={(e) => onMouseDown(idx, e)}
                       className="-mr-3 h-full w-2 cursor-col-resize border-r border-stone-200/0 hover:border-emerald-300/60"

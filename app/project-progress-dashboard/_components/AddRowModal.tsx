@@ -2,8 +2,10 @@
 
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import type { FeaturePhase, FeatureStatus } from '../../../lib/types';
+import type { DeployStatus, FeaturePhase, FeatureStatus, TestStatus } from '../../../lib/types';
 import type { CustomProjectProgressRow } from '../types';
+import { DEFAULT_E2E_CATEGORY } from '../_lib/e2eCategories';
+import { E2eCategoryField } from './E2eCategoryField';
 
 interface AddRowModalProps {
   open: boolean;
@@ -15,7 +17,7 @@ interface AddRowModalProps {
 
 const PHASE_LABEL: Record<FeaturePhase, string> = {
   development: '開發 Development',
-  testing: '測試 Testing',
+  e2e_testing: 'E2E 測試 E2E Testing',
   deployment: '部署 Deployment',
   operations: '運維 Operations',
 };
@@ -23,13 +25,34 @@ const PHASE_LABEL: Record<FeaturePhase, string> = {
 export function AddRowModal({ open, onClose, phase, existingIds, onAdd }: AddRowModalProps) {
   const [rowId, setRowId] = useState('');
   const [name, setName] = useState('');
-  const [category, setCategory] = useState('Custom');
+  const [category, setCategory] = useState(
+    () => (phase === 'e2e_testing' ? DEFAULT_E2E_CATEGORY : 'Custom'),
+  );
   const [percentage, setPercentage] = useState<number>(0);
   const [locatedPage, setLocatedPage] = useState('');
   const [status, setStatus] = useState<FeatureStatus>('todo');
+  // Phase-specific fields. Empty string = "leave undefined" — keeps the JSON
+  // tidy when the user doesn't have a value to enter yet.
+  const [testCoverage, setTestCoverage] = useState<string>('');
+  const [testStatus, setTestStatus] = useState<TestStatus | ''>('');
+  const [deployStatus, setDeployStatus] = useState<DeployStatus | ''>('');
+  const [deployEnv, setDeployEnv] = useState('');
+  const [deployDate, setDeployDate] = useState('');
+  const [uptimePercent, setUptimePercent] = useState<string>('');
+  const [errorRate, setErrorRate] = useState<string>('');
+  const [avgResponseTime, setAvgResponseTime] = useState<string>('');
+  const [lastIncident, setLastIncident] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   if (!open) return null;
+
+  // Promote a numeric string to a clamped number, or undefined if empty / NaN.
+  const num = (s: string, min = -Infinity, max = Infinity) => {
+    if (s.trim() === '') return undefined;
+    const n = Number(s);
+    if (!Number.isFinite(n)) return undefined;
+    return Math.max(min, Math.min(max, n));
+  };
 
   const submit = () => {
     setError(null);
@@ -40,19 +63,37 @@ export function AddRowModal({ open, onClose, phase, existingIds, onAdd }: AddRow
     const row: CustomProjectProgressRow = {
       rowId: id,
       name: name.trim(),
-      category: category.trim() || 'Custom',
+      category: phase === 'e2e_testing' ? category : (category.trim() || 'Custom'),
       percentage: Math.max(0, Math.min(100, percentage)),
       locatedPage: locatedPage.trim() || undefined,
       status,
       phase,
+      testCoverage: num(testCoverage, 0, 100),
+      testStatus: testStatus || undefined,
+      deployStatus: deployStatus || undefined,
+      deployEnv: deployEnv.trim() || undefined,
+      deployDate: deployDate.trim() || undefined,
+      uptimePercent: num(uptimePercent, 0, 100),
+      errorRate: num(errorRate, 0),
+      avgResponseTime: num(avgResponseTime, 0),
+      lastIncident: lastIncident.trim() || undefined,
     };
     onAdd(row);
     setRowId('');
     setName('');
-    setCategory('Custom');
+    setCategory(phase === 'e2e_testing' ? DEFAULT_E2E_CATEGORY : 'Custom');
     setPercentage(0);
     setLocatedPage('');
     setStatus('todo');
+    setTestCoverage('');
+    setTestStatus('');
+    setDeployStatus('');
+    setDeployEnv('');
+    setDeployDate('');
+    setUptimePercent('');
+    setErrorRate('');
+    setAvgResponseTime('');
+    setLastIncident('');
     onClose();
   };
 
@@ -74,8 +115,12 @@ export function AddRowModal({ open, onClose, phase, existingIds, onAdd }: AddRow
           <Field label="Name *">
             <input value={name} onChange={(e) => setName(e.target.value)} className="input" />
           </Field>
-          <Field label="Category">
-            <input value={category} onChange={(e) => setCategory(e.target.value)} className="input" />
+          <Field label={phase === 'e2e_testing' ? 'E2E Category' : 'Category'}>
+            {phase === 'e2e_testing' ? (
+              <E2eCategoryField value={category} onChange={setCategory} />
+            ) : (
+              <input value={category} onChange={(e) => setCategory(e.target.value)} className="input" />
+            )}
           </Field>
           <Field label="Located Page">
             <input value={locatedPage} onChange={(e) => setLocatedPage(e.target.value)} className="input" placeholder="optional" />
@@ -95,6 +140,67 @@ export function AddRowModal({ open, onClose, phase, existingIds, onAdd }: AddRow
                 className="input" />
             </Field>
           </div>
+
+          {phase === 'e2e_testing' && (
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Test Coverage %">
+                <input type="number" min={0} max={100} value={testCoverage}
+                  onChange={(e) => setTestCoverage(e.target.value)} className="input" placeholder="0-100" />
+              </Field>
+              <Field label="Test Status">
+                <select value={testStatus} onChange={(e) => setTestStatus(e.target.value as TestStatus | '')} className="input">
+                  <option value="">—</option>
+                  <option value="passed">Passed</option>
+                  <option value="failed">Failed</option>
+                  <option value="pending">Pending</option>
+                </select>
+              </Field>
+            </div>
+          )}
+
+          {phase === 'deployment' && (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Deploy Status">
+                  <select value={deployStatus} onChange={(e) => setDeployStatus(e.target.value as DeployStatus | '')} className="input">
+                    <option value="">—</option>
+                    <option value="production">Production</option>
+                    <option value="staging">Staging</option>
+                    <option value="not_deployed">Not Deployed</option>
+                  </select>
+                </Field>
+                <Field label="Environment">
+                  <input value={deployEnv} onChange={(e) => setDeployEnv(e.target.value)} className="input" placeholder="e.g. prod-asia" />
+                </Field>
+              </div>
+              <Field label="Deploy Date">
+                <input type="date" value={deployDate} onChange={(e) => setDeployDate(e.target.value)} className="input" />
+              </Field>
+            </>
+          )}
+
+          {phase === 'operations' && (
+            <>
+              <div className="grid grid-cols-3 gap-2">
+                <Field label="Uptime %">
+                  <input type="number" min={0} max={100} step="0.1" value={uptimePercent}
+                    onChange={(e) => setUptimePercent(e.target.value)} className="input" />
+                </Field>
+                <Field label="Error %">
+                  <input type="number" min={0} step="0.01" value={errorRate}
+                    onChange={(e) => setErrorRate(e.target.value)} className="input" />
+                </Field>
+                <Field label="Response (ms)">
+                  <input type="number" min={0} value={avgResponseTime}
+                    onChange={(e) => setAvgResponseTime(e.target.value)} className="input" />
+                </Field>
+              </div>
+              <Field label="Last Incident">
+                <input value={lastIncident} onChange={(e) => setLastIncident(e.target.value)} className="input" placeholder="optional note / id" />
+              </Field>
+            </>
+          )}
+
           {error && <p className="text-[11px] text-red-300">{error}</p>}
         </div>
         <div className="mt-4 flex justify-end gap-2">

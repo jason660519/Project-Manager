@@ -13,15 +13,15 @@ describe('usePhasePreferences', () => {
   });
 
   it('persists patches to localStorage under the phase-specific key', () => {
-    const { result } = renderHook(() => usePhasePreferences('testing'));
+    const { result } = renderHook(() => usePhasePreferences('e2e_testing'));
 
     act(() => {
       result.current.patch({
-        customRows: [{ rowId: 'C-1', name: 'demo', category: 'Custom', percentage: 25, phase: 'testing' }],
+        customRows: [{ rowId: 'C-1', name: 'demo', category: 'Custom', percentage: 25, phase: 'e2e_testing' }],
       });
     });
 
-    const raw = window.localStorage.getItem(`${STORAGE_PREFIX}testing`);
+    const raw = window.localStorage.getItem(`${STORAGE_PREFIX}e2e_testing`);
     expect(raw).not.toBeNull();
     expect(JSON.parse(raw!).customRows[0].rowId).toBe('C-1');
   });

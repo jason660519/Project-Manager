@@ -3,51 +3,86 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, Upload } from 'lucide-react';
 import type {
-  ActiveRun, AgentAdapterConfig, AnyAdapterConfig, CronJob, Feature, FeaturePhase,
+  ActiveRun, AgentAdapterConfig, AnyAdapterConfig, CompletedRun, CronJob, Feature, FeaturePhase,
   FeaturePromptConfig, ProjectConfig,
 } from '../../lib/types';
 import { PHASE_IDS } from './types';
 import type { CustomProjectProgressRow } from './types';
 import { usePhasePreferences } from './_lib/usePhasePreferences';
-import { computePhaseCounts } from './_lib/phaseRows';
+import { computePhaseCounts, type PhaseRow } from './_lib/phaseRows';
 import { SheetTabs } from './_components/SheetTabs';
 import { SharedStatsCards } from './_components/SharedStatsCards';
 import { AgentOpsPanel } from './_components/AgentOpsPanel';
 import { CronControlPanel } from './_components/CronControlPanel';
 import { ExportProgressDialog } from './_components/ExportProgressDialog';
 import { PhaseTabContent } from './_components/PhaseTabContent';
+import { TaskDispatchModal } from '../../components/table/TaskDispatchModal';
 
 interface ProjectProgressClientProps {
   project: ProjectConfig;
+  /** Project root path used when dispatching agents from a row. */
+  projectRoot: string;
   features: Feature[];
   adapters: AnyAdapterConfig[];
   cronJobs: CronJob[];
   activeRuns: ActiveRun[];
+  runHistory?: CompletedRun[];
   dashboardProjectNames: string[];
   onCronJobsChange: (jobs: CronJob[]) => void;
+  onFeaturePatch: (namespacedFeatureId: string, patch: Partial<Feature>) => void;
   onFeaturePromptSave: (featureId: string, config: FeaturePromptConfig) => void;
   onRunCronJob?: (job: CronJob) => Promise<void>;
+  onRunStart?: (
+    pid: number,
+    featureId: string,
+    featureName: string,
+    command: string,
+    args: string[],
+  ) => void;
+  onRunLog?: (pid: number, line: string) => void;
+  onRunEnd?: (pid: number, exitCode: number) => void;
+}
+
+/** Legacy URL hash from before the testing tab was renamed to E2E. */
+const LEGACY_PHASE_HASH: Record<string, FeaturePhase> = {
+  testing: 'e2e_testing',
+};
+
+function resolvePhaseHash(hash: string): FeaturePhase | null {
+  const lowered = hash.toLowerCase();
+  const resolved = LEGACY_PHASE_HASH[lowered] ?? lowered;
+  if ((PHASE_IDS as string[]).includes(resolved)) return resolved as FeaturePhase;
+  return null;
 }
 
 function readInitialPhase(): FeaturePhase {
   if (typeof window === 'undefined') return 'development';
-  const hash = window.location.hash.slice(1).toLowerCase();
-  if ((PHASE_IDS as string[]).includes(hash)) return hash as FeaturePhase;
-  return 'development';
+  const hash = window.location.hash.slice(1);
+  const phase = resolvePhaseHash(hash);
+  if (phase && typeof window !== 'undefined' && hash.toLowerCase() === 'testing') {
+    window.location.replace(`#${phase}`);
+  }
+  return phase ?? 'development';
 }
 
 export function ProjectProgressClient({
-  project, features, adapters, cronJobs, activeRuns, dashboardProjectNames,
-  onCronJobsChange, onFeaturePromptSave, onRunCronJob,
+  project, projectRoot, features, adapters, cronJobs, activeRuns, dashboardProjectNames,
+  onCronJobsChange, onFeaturePatch, onFeaturePromptSave, onRunCronJob,
+  onRunStart, onRunLog, onRunEnd,
 }: ProjectProgressClientProps) {
   const [activePhase, setActivePhase] = useState<FeaturePhase>(() => readInitialPhase());
   const [exportOpen, setExportOpen] = useState(false);
+  const [dispatchRow, setDispatchRow] = useState<PhaseRow | null>(null);
 
   // Sync URL hash both ways.
   useEffect(() => {
     const onHash = () => {
-      const hash = window.location.hash.slice(1).toLowerCase();
-      if ((PHASE_IDS as string[]).includes(hash)) setActivePhase(hash as FeaturePhase);
+      const hash = window.location.hash.slice(1);
+      const phase = resolvePhaseHash(hash);
+      if (phase) {
+        setActivePhase(phase);
+        if (hash.toLowerCase() === 'testing') window.location.replace(`#${phase}`);
+      }
     };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
@@ -55,17 +90,17 @@ export function ProjectProgressClient({
 
   // Per-phase preferences (custom rows, widths, etc).
   const dev = usePhasePreferences('development');
-  const test = usePhasePreferences('testing');
+  const test = usePhasePreferences('e2e_testing');
   const dep = usePhasePreferences('deployment');
   const ops = usePhasePreferences('operations');
 
   const prefsByPhase = useMemo(() => ({
-    development: dev, testing: test, deployment: dep, operations: ops,
+    development: dev, e2e_testing: test, deployment: dep, operations: ops,
   }), [dev, test, dep, ops]);
 
   const customRowsByPhase: Record<FeaturePhase, CustomProjectProgressRow[]> = useMemo(() => ({
     development: dev.prefs.customRows,
-    testing: test.prefs.customRows,
+    e2e_testing: test.prefs.customRows,
     deployment: dep.prefs.customRows,
     operations: ops.prefs.customRows,
   }), [dev.prefs.customRows, test.prefs.customRows, dep.prefs.customRows, ops.prefs.customRows]);
@@ -140,12 +175,15 @@ export function ProjectProgressClient({
         <div className="flex-1 min-h-0">
           <PhaseTabContent
             phase={activePhase}
+            projectRoot={projectRoot}
             features={phaseFeatures}
             prefs={activePhasePrefs.prefs}
             patch={activePhasePrefs.patch}
             reset={activePhasePrefs.reset}
             agents={agents}
             onFeaturePromptSave={onFeaturePromptSave}
+            onFeaturePatch={onFeaturePatch}
+            onDispatchRow={(row) => row.source === 'feature' && setDispatchRow(row)}
           />
         </div>
         <SheetTabs activePhase={activePhase} onPhaseChange={onChangePhase} phaseCounts={phaseCounts} />
@@ -158,6 +196,19 @@ export function ProjectProgressClient({
         features={features}
         customRowsByPhase={customRowsByPhase}
       />
+
+      {dispatchRow?.feature && (
+        <TaskDispatchModal
+          feature={dispatchRow.feature}
+          adapters={adapters}
+          projectRoot={(dispatchRow.feature.metadata?.sourceProjectRoot as string | undefined) ?? projectRoot}
+          onClose={() => setDispatchRow(null)}
+          onExecuted={() => {}}
+          onRunStart={onRunStart}
+          onRunLog={onRunLog}
+          onRunEnd={onRunEnd}
+        />
+      )}
     </div>
   );
 }

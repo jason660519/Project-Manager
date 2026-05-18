@@ -20,6 +20,8 @@ export interface PhaseRow extends PhaseRowMeta {
   errorRate?: number;
   avgResponseTime?: number;
   lastIncident?: string;
+  specPath?: string;
+  devLogFolder?: string;
   /** Underlying feature, when source==='feature'. */
   feature?: Feature;
   /** Underlying custom row, when source==='custom'. */
@@ -51,6 +53,8 @@ export function featureToPhaseRow(feature: Feature): PhaseRow {
     errorRate: feature.errorRate,
     avgResponseTime: feature.avgResponseTime,
     lastIncident: feature.lastIncident,
+    specPath: feature.paths?.spec,
+    devLogFolder: feature.paths?.developmentLogSummaryFolder,
     feature,
   };
 }
@@ -101,7 +105,7 @@ export function computePhaseCounts(
 ): Record<FeaturePhase, number> {
   const counts: Record<FeaturePhase, number> = {
     development: 0,
-    testing: 0,
+    e2e_testing: 0,
     deployment: 0,
     operations: 0,
   };

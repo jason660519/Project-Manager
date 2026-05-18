@@ -6,6 +6,12 @@ import type { CustomProjectProgressRow, PhaseTablePrefs } from '../types';
 import { buildPhaseRows, type PhaseRow } from '../_lib/phaseRows';
 import { columnsForPhase } from '../_lib/columns';
 import { summarizeStatuses } from '../_lib/aggregations';
+import {
+  E2E_TEST_CATEGORY_IDS,
+  e2eCategorySearchTokens,
+  formatE2eCategoryShort,
+  sortE2eCategoryIds,
+} from '../_lib/e2eCategories';
 import { PhaseTable } from './PhaseTable';
 import { PhaseTableToolbar } from './PhaseTableToolbar';
 import { AddRowModal } from './AddRowModal';
@@ -13,16 +19,22 @@ import { PromptEngineerModal } from './PromptEngineerModal';
 
 interface PhaseTabContentProps {
   phase: FeaturePhase;
+  projectRoot: string;
   features: Feature[];
   prefs: PhaseTablePrefs;
   patch: (next: Partial<PhaseTablePrefs>) => void;
   reset: () => void;
   agents: AgentAdapterConfig[];
   onFeaturePromptSave: (featureId: string, config: FeaturePromptConfig) => void;
+  /** Generic feature patcher — receives the namespaced feature id (`<projectId>::<featureId>`). */
+  onFeaturePatch: (namespacedFeatureId: string, patch: Partial<Feature>) => void;
+  /** Quick dispatch — opens a modal owned by the parent. Undefined disables the button. */
+  onDispatchRow?: (row: PhaseRow) => void;
 }
 
 export function PhaseTabContent({
-  phase, features, prefs, patch, reset, agents, onFeaturePromptSave,
+  phase, projectRoot, features, prefs, patch, reset, agents,
+  onFeaturePromptSave, onFeaturePatch, onDispatchRow,
 }: PhaseTabContentProps) {
   const columns = useMemo(() => columnsForPhase(phase), [phase]);
 
@@ -45,9 +57,12 @@ export function PhaseTabContent({
 
   const categoryList = useMemo(() => {
     const set = new Set<string>();
+    if (phase === 'e2e_testing') {
+      E2E_TEST_CATEGORY_IDS.forEach((id) => set.add(id));
+    }
     allRows.forEach((r) => set.add(r.category));
-    return Array.from(set).sort();
-  }, [allRows]);
+    return phase === 'e2e_testing' ? sortE2eCategoryIds(Array.from(set)) : Array.from(set).sort();
+  }, [allRows, phase]);
 
   const hiddenSet = useMemo(() => new Set(prefs.hiddenRowKeys), [prefs.hiddenRowKeys]);
 
@@ -58,23 +73,13 @@ export function PhaseTabContent({
       if (selectedCategories.size > 0 && !selectedCategories.has(r.category)) return false;
       if (!showHiddenRows && hiddenSet.has(r.rowKey)) return false;
       if (q) {
-        const hay = `${r.id} ${r.name} ${r.category} ${r.locatedPage ?? ''}`.toLowerCase();
+        const catHay = phase === 'e2e_testing' ? e2eCategorySearchTokens(r.category) : r.category;
+        const hay = `${r.id} ${r.name} ${catHay} ${r.locatedPage ?? ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [allRows, selectedCategories, hiddenSet, showHiddenRows, searchQuery]);
-
-  const onToggleCategory = useCallback((cat: string) => {
-    setSelectedCategories((prev) => {
-      const next = new Set(prev);
-      if (next.has(cat)) next.delete(cat);
-      else next.add(cat);
-      return next;
-    });
-  }, []);
-
-  const onClearCategories = useCallback(() => setSelectedCategories(new Set()), []);
+  }, [allRows, selectedCategories, hiddenSet, showHiddenRows, searchQuery, phase]);
 
   const onToggleHideRow = useCallback((rowKey: string) => {
     const current = prefs.hiddenRowKeys;
@@ -102,12 +107,71 @@ export function PhaseTabContent({
     }
   }, [onFeaturePromptSave]);
 
+  // Route a per-feature patch using the dashboard's namespaced id, since
+  // MainClient needs `<projectId>::<featureId>` to look up the right project.
+  const onPatchFeature = useCallback(
+    (featureId: string, p: Partial<Feature>) => onFeaturePatch(featureId, p),
+    [onFeaturePatch],
+  );
+
+  // Route a per-custom-row patch back into the phase prefs store.
+  const onPatchCustomRow = useCallback(
+    (rowId: string, p: Partial<CustomProjectProgressRow>) => {
+      patch({
+        customRows: prefs.customRows.map((r) =>
+          r.rowId === rowId ? { ...r, ...p } : r,
+        ),
+      });
+    },
+    [prefs.customRows, patch],
+  );
+
+  // Phase move: features go through MainClient (cross-project safe); custom
+  // rows stay in the local phase prefs but jump to a different phase's bucket.
+  const onChangePhase = useCallback(
+    (row: PhaseRow, nextPhase: FeaturePhase) => {
+      if (nextPhase === phase) return;
+      if (row.source === 'feature' && row.feature) {
+        onFeaturePatch(row.feature.id, { phase: nextPhase });
+      } else if (row.source === 'custom' && row.customRowId) {
+        // Drop from current phase prefs; the destination phase's localStorage
+        // bucket will be picked up by its own usePhasePreferences hook on next
+        // render. The custom row payload carries its target phase inside it.
+        patch({
+          customRows: prefs.customRows.filter((r) => r.rowId !== row.customRowId),
+        });
+        const moved = prefs.customRows.find((r) => r.rowId === row.customRowId);
+        if (moved && typeof window !== 'undefined') {
+          // Append to the destination phase's storage directly to avoid an
+          // extra hook subscription; the destination tab will read this on
+          // mount or refresh.
+          const key = `projectManager.progressDashboard.phase.${nextPhase}`;
+          try {
+            const raw = window.localStorage.getItem(key);
+            const parsed = raw ? JSON.parse(raw) : {};
+            const existing: CustomProjectProgressRow[] = Array.isArray(parsed.customRows) ? parsed.customRows : [];
+            const merged: CustomProjectProgressRow[] = [...existing, { ...moved, phase: nextPhase }];
+            window.localStorage.setItem(key, JSON.stringify({ ...parsed, customRows: merged }));
+          } catch {
+            /* quota / disabled — drop silently */
+          }
+        }
+      }
+    },
+    [phase, onFeaturePatch, prefs.customRows, patch],
+  );
+
   const handlers = useMemo(() => ({
+    projectRoot,
     hiddenRowKeysSet: hiddenSet,
     onToggleHideRow,
     onDeleteCustomRow,
     onOpenPromptConfig: (row: PhaseRow) => setPromptRow(row),
-  }), [hiddenSet, onToggleHideRow, onDeleteCustomRow]);
+    onPatchFeature,
+    onPatchCustomRow,
+    onChangePhase,
+    onDispatch: onDispatchRow,
+  }), [projectRoot, hiddenSet, onToggleHideRow, onDeleteCustomRow, onPatchFeature, onPatchCustomRow, onChangePhase, onDispatchRow]);
 
   return (
     <div className="flex flex-col gap-2">
@@ -125,10 +189,6 @@ export function PhaseTabContent({
         patch={patch}
         reset={reset}
         columns={columns}
-        categoryList={categoryList}
-        selectedCategories={selectedCategories}
-        onToggleCategory={onToggleCategory}
-        onClearCategories={onClearCategories}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         showHiddenRows={showHiddenRows}
@@ -137,7 +197,19 @@ export function PhaseTabContent({
         onAddRow={() => setAddRowOpen(true)}
       />
 
-      <PhaseTable rows={filteredRows} columns={columns} prefs={prefs} patch={patch} handlers={handlers} />
+      <PhaseTable
+        rows={filteredRows}
+        columns={columns}
+        prefs={prefs}
+        patch={patch}
+        handlers={handlers}
+        categoryFilter={{
+          categories: categoryList,
+          selected: selectedCategories,
+          onChange: setSelectedCategories,
+          formatLabel: phase === 'e2e_testing' ? formatE2eCategoryShort : undefined,
+        }}
+      />
 
       <AddRowModal
         open={addRowOpen}

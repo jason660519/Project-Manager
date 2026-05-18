@@ -60,12 +60,12 @@ describe('buildPhaseRows', () => {
   it('returns only features for the active phase, then appends matching custom rows', () => {
     const features = [
       f({ id: 'F01', phase: 'development' }),
-      f({ id: 'F02', phase: 'testing' }),
+      f({ id: 'F02', phase: 'e2e_testing' }),
       f({ id: 'F03', phase: 'development' }),
     ];
     const customs = [
       custom({ rowId: 'C-dev',  phase: 'development' }),
-      custom({ rowId: 'C-test', phase: 'testing' }),
+      custom({ rowId: 'C-test', phase: 'e2e_testing' }),
     ];
     const devRows = buildPhaseRows(features, 'development', customs);
 
@@ -88,18 +88,18 @@ describe('computePhaseCounts', () => {
   it('sums features and custom rows separately and merges into a per-phase tally', () => {
     const features = [
       f({ id: 'A', phase: 'development' }),
-      f({ id: 'B', phase: 'testing' }),
-      f({ id: 'C', phase: 'testing' }),
+      f({ id: 'B', phase: 'e2e_testing' }),
+      f({ id: 'C', phase: 'e2e_testing' }),
     ];
     const counts = computePhaseCounts(features, {
       development: [custom({ rowId: 'c1', phase: 'development' })],
-      testing: [],
+      e2e_testing: [],
       deployment: [custom({ rowId: 'c2', phase: 'deployment' /* phase mismatch on purpose */ })],
       operations: [custom({ rowId: 'c3', phase: 'operations' })],
     });
     expect(counts).toEqual({
       development: 2, // 1 feature + 1 custom
-      testing: 2,     // 2 features
+      e2e_testing: 2, // 2 features
       deployment: 1,  // 0 features + 1 custom (caller bucketed it under deployment)
       operations: 1,  // 0 features + 1 custom
     });

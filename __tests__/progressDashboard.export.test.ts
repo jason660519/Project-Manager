@@ -31,13 +31,13 @@ const custom = (overrides: Partial<CustomProjectProgressRow>): CustomProjectProg
   ...overrides,
 });
 
-const emptyCustomRows = { development: [], testing: [], deployment: [], operations: [] };
+const emptyCustomRows = { development: [], e2e_testing: [], deployment: [], operations: [] };
 
 describe('buildProgressSnapshot', () => {
   it('includes every phase even when there are no features for it', () => {
     const snap = buildProgressSnapshot(project, [], emptyCustomRows);
     expect(snap.development.rows).toEqual([]);
-    expect(snap.testing.rows).toEqual([]);
+    expect(snap.e2e_testing.rows).toEqual([]);
     expect(snap.deployment.rows).toEqual([]);
     expect(snap.operations.rows).toEqual([]);
     expect(snap.project).toEqual({ name: 'Demo', root: '/tmp/demo' });
@@ -46,7 +46,7 @@ describe('buildProgressSnapshot', () => {
   it('puts each feature into its declared phase and computes aggregates per phase', () => {
     const features: Feature[] = [
       feat({ id: 'F01', phase: 'development', progress: 100, points: 2 }),
-      feat({ id: 'F02', phase: 'testing', testCoverage: 75, testStatus: 'passed' }),
+      feat({ id: 'F02', phase: 'e2e_testing', testCoverage: 75, testStatus: 'passed' }),
       feat({ id: 'F03', phase: 'deployment', deployStatus: 'production', deployDate: '2026-05-10' }),
       feat({ id: 'F04', phase: 'operations', uptimePercent: 99.9, errorRate: 0.05, lastIncident: '2026-04-30' }),
     ];
@@ -54,7 +54,7 @@ describe('buildProgressSnapshot', () => {
 
     expect(snap.development.rows).toHaveLength(1);
     expect(snap.development.overallProgress).toBe(100);
-    expect(snap.testing.avgCoverage).toBe(75);
+    expect(snap.e2e_testing.avgCoverage).toBe(75);
     expect(snap.deployment.productionCount).toBe(1);
     expect(snap.deployment.latestDeploy).toBe('2026-05-10');
     expect(snap.operations.incidentCount).toBe(1);

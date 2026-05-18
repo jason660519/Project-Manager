@@ -11,10 +11,6 @@ interface PhaseTableToolbarProps {
   patch: (next: Partial<PhaseTablePrefs>) => void;
   reset: () => void;
   columns: ColumnDef[];
-  categoryList: string[];
-  selectedCategories: Set<string>;
-  onToggleCategory: (cat: string) => void;
-  onClearCategories: () => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
   showHiddenRows: boolean;
@@ -24,8 +20,7 @@ interface PhaseTableToolbarProps {
 }
 
 export function PhaseTableToolbar({
-  prefs, patch, reset, columns, categoryList, selectedCategories,
-  onToggleCategory, onClearCategories, searchQuery, onSearchChange,
+  prefs, patch, reset, columns, searchQuery, onSearchChange,
   showHiddenRows, onShowHiddenRowsChange, hiddenRowsCount, onAddRow,
 }: PhaseTableToolbarProps) {
   const [presetName, setPresetName] = useState('');
@@ -61,35 +56,6 @@ export function PhaseTableToolbar({
           placeholder="Search…"
           className="h-7 w-44 rounded border border-stone-200/15 bg-[#061512]/80 pl-7 pr-2 text-xs text-stone-100 placeholder:text-stone-500 focus:outline-none focus:border-emerald-400/40"
         />
-      </div>
-
-      {/* Category multi-filter */}
-      <div className="flex items-center gap-1">
-        {categoryList.slice(0, 8).map((cat) => {
-          const active = selectedCategories.has(cat);
-          return (
-            <button
-              key={cat}
-              onClick={() => onToggleCategory(cat)}
-              className={clsx(
-                'h-7 rounded border px-2 text-[11px]',
-                active
-                  ? 'border-amber-300/50 bg-amber-300/15 text-amber-100'
-                  : 'border-stone-200/15 text-stone-300 hover:text-stone-100 hover:bg-white/5',
-              )}
-            >
-              {cat}
-            </button>
-          );
-        })}
-        {selectedCategories.size > 0 && (
-          <button
-            onClick={onClearCategories}
-            className="h-7 rounded border border-stone-200/15 px-2 text-[11px] text-stone-300 hover:text-stone-100"
-          >
-            clear
-          </button>
-        )}
       </div>
 
       <div className="flex-1" />

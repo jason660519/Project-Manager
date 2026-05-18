@@ -17,7 +17,7 @@ const SHEETS: SheetTab[] = [
   { id: 'development', label: 'Development', zhLabel: '開發',
     icon: Code2,         color: 'text-emerald-300',
     activeColor: 'bg-emerald-600/85 text-white' },
-  { id: 'testing',     label: 'Testing',     zhLabel: '測試',
+  { id: 'e2e_testing', label: 'E2E Testing', zhLabel: 'E2E 測試',
     icon: FlaskConical,  color: 'text-cyan-200',
     activeColor: 'bg-cyan-600/85 text-white' },
   { id: 'deployment',  label: 'Deployment',  zhLabel: '部署',
