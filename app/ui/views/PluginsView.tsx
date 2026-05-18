@@ -117,6 +117,16 @@ const MARKETPLACE: MarketplacePlugin[] = [
     defaultCli: { command: 'codex', argsTemplate: ['exec', '--cwd', '{root}', '{prompt}'], providerId: 'openai' },
   },
   {
+    id: 'hermes-agent', name: 'Hermes Agent', description: 'Project-scoped Hermes CLI with isolated memory, sessions, skills, and dashboard state.',
+    category: 'dev', kind: 'cli', accentColor: 'bg-amber-700', initials: 'HA',
+    defaultCli: { command: '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager/bin/hermes', argsTemplate: ['chat', '-q', '{prompt}'] },
+  },
+  {
+    id: 'openclaw', name: 'OpenClaw', description: 'Project-scoped OpenClaw gateway and agent CLI with isolated state, workspace, updates, and rollback.',
+    category: 'dev', kind: 'cli', accentColor: 'bg-rose-700', initials: 'OC',
+    defaultCli: { command: '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager/bin/openclaw', argsTemplate: ['agent', '--message', '{prompt}'] },
+  },
+  {
     id: 'aider', name: 'Aider', description: 'AI pair programmer that edits code in your terminal.',
     category: 'dev', kind: 'cli', accentColor: 'bg-violet-700', initials: 'AD',
     defaultCli: { command: 'aider', argsTemplate: ['--yes', '--message', '{prompt}'] },

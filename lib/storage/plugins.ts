@@ -110,6 +110,24 @@ const DEFAULT_CLIS: CliPlugin[] = [
     argsTemplate: ['exec', '--cwd', '{root}', '{prompt}'],
     providerId: 'openai',
   },
+  {
+    id: 'hermes-agent',
+    kind: 'cli',
+    name: 'Hermes Agent',
+    enabled: false,
+    installedAt: BUILT_IN_INSTALL_DATE,
+    command: '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager/bin/hermes',
+    argsTemplate: ['chat', '-q', '{prompt}'],
+  },
+  {
+    id: 'openclaw',
+    kind: 'cli',
+    name: 'OpenClaw',
+    enabled: false,
+    installedAt: BUILT_IN_INSTALL_DATE,
+    command: '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager/bin/openclaw',
+    argsTemplate: ['agent', '--message', '{prompt}'],
+  },
 ];
 
 const DEFAULT_EDITORS: EditorPlugin[] = [
