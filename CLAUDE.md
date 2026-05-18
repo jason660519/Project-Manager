@@ -75,3 +75,24 @@ cargo build  --manifest-path src-tauri/Cargo.toml   # Rust build
 - PRD / scenarios / competitive analysis: [`docs/01-04-*.md`](docs/).
 - Doc governance: [`scripts/docs-governance-check.sh`](scripts/docs-governance-check.sh) and `/docs-governance` slash command.
 - TanStack Table patterns: use the `create-tanstack-table` skill before building or extending tables.
+
+## Project Manager skills (gstack-inspired)
+
+Custom skills live under [`.claude/skills/`](.claude/skills/) and are auto-loaded by description match. Use the right tool for the phase:
+
+| Phase | Skill | Trigger |
+|---|---|---|
+| Design a non-trivial change | [`plan-review`](.claude/skills/plan-review/SKILL.md) | Before `ExitPlanMode`; user says "review my plan / audit this approach" |
+| Debug a bug, regression, or unexpected behaviour | [`investigate`](.claude/skills/investigate/SKILL.md) | User reports a stack trace / "it was working yesterday" / IPC failure / unexpected UI state |
+| Build a TanStack table | [`create-tanstack-table`](.claude/skills/create-tanstack-table/SKILL.md) | New table or extending `TableCore` |
+| Final diff audit before push | [`pre-landing-review`](.claude/skills/pre-landing-review/SKILL.md) | After implementation, before `git push` / opening a PR |
+| End-to-end ship (verify → commit → push → PR) | [`ship`](.claude/skills/ship/SKILL.md) | User says "ship it / land this / open the PR" |
+| Pause work mid-session, save state | [`context-save`](.claude/skills/context-save/SKILL.md) | User says "save context / checkpoint this / pause here" |
+| Resume from a saved checkpoint | [`context-restore`](.claude/skills/context-restore/SKILL.md) | User says "resume / where was I / continue from last checkpoint" |
+| Normalize bilingual docs in `docs/` | [`docs-bilingual-governance`](.claude/skills/docs-bilingual-governance/SKILL.md) | Editing top-level `docs/*.md` |
+
+Iron rules carried across these skills:
+- **Zero silent failures.** Every error has a name; bare `catch (e) {}` / `.unwrap()` / `unimplemented!()` on user-facing paths is a defect.
+- **Bridge discipline.** `lib/bridge/index.ts` is the only call site for `invoke()`. Every Tauri command needs a typed wrapper there AND a capability entry in `src-tauri/capabilities/default.json`.
+- **ADR adherence.** Plan and code that contradict closed ADRs must surface the collision loudly (002 = schemaVersion, 003 = prompt assembly in TS, 004 = Anthropic key only in Rust `call_anthropic`).
+- **Verification baseline before ship.** `npm run typecheck`, `cargo check --manifest-path src-tauri/Cargo.toml`, the relevant test suites, `npm run docs:check`, `npm run build` — all green or explicit-with-reason.
