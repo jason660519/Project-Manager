@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AddRowModal } from '../app/project-progress-dashboard/_components/AddRowModal';
 import { DEFAULT_E2E_CATEGORY } from '../app/project-progress-dashboard/_lib/e2eCategories';
@@ -7,6 +7,7 @@ import { DEFAULT_E2E_CATEGORY } from '../app/project-progress-dashboard/_lib/e2e
 const renderOpen = (
   phase: 'development' | 'e2e_testing' | 'deployment' | 'operations',
   onAdd = vi.fn(),
+  opts: { defaultProjectName?: string; projectNames?: string[] } = {},
 ) => {
   const onClose = vi.fn();
   render(
@@ -14,6 +15,8 @@ const renderOpen = (
       open
       onClose={onClose}
       phase={phase}
+      defaultProjectName={opts.defaultProjectName ?? 'Demo Project'}
+      projectNames={opts.projectNames}
       existingIds={new Set()}
       onAdd={onAdd}
     />,
@@ -24,9 +27,20 @@ const renderOpen = (
 describe('AddRowModal phase-aware fields', () => {
   it('does not show testing/deployment/ops fields on the development phase', () => {
     renderOpen('development');
+    expect(screen.getByText('專案名稱 *')).toBeInTheDocument();
+    expect(screen.getByText('SP')).toBeInTheDocument();
     expect(screen.queryByText('Test Coverage %')).toBeNull();
     expect(screen.queryByText('Deploy Status')).toBeNull();
     expect(screen.queryByText('Uptime %')).toBeNull();
+  });
+
+  it('shows a project picker when multiple dashboard projects are visible', () => {
+    renderOpen('development', vi.fn(), {
+      defaultProjectName: 'Alpha',
+      projectNames: ['Alpha', 'Beta'],
+    });
+    expect(screen.getByLabelText('專案名稱')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Beta' })).toBeInTheDocument();
   });
 
   it('shows testCoverage + testStatus on the e2e_testing phase', () => {
@@ -63,7 +77,7 @@ describe('AddRowModal submission payloads', () => {
     const { onAdd } = renderOpen('e2e_testing');
 
     await user.type(screen.getByPlaceholderText('e.g. C-001'), 'C-T1');
-    await user.type(screen.getAllByRole('textbox').find((el) => el.previousElementSibling?.textContent === 'Name *') ?? screen.getAllByRole('textbox')[1], 'My test row');
+    await user.type(screen.getByLabelText('Name *'), 'My test row');
     await user.type(screen.getByPlaceholderText('0-100'), '85');
     await user.selectOptions(screen.getByLabelText('Test Status'), 'passed');
 
@@ -86,12 +100,29 @@ describe('AddRowModal submission payloads', () => {
     const { onAdd } = renderOpen('e2e_testing');
 
     await user.type(screen.getByPlaceholderText('e.g. C-001'), 'C-T2');
-    const nameInput = screen.getAllByRole('textbox')[1]; // Name field by index
-    await user.type(nameInput, 'Row');
+    await user.type(screen.getByLabelText('Name *'), 'Row');
     await user.type(screen.getByPlaceholderText('0-100'), '9999');
 
     await user.click(screen.getByRole('button', { name: /add/i }));
     expect(onAdd.mock.calls[0][0].testCoverage).toBe(100);
+  });
+
+  it('emits projectName and points on a development-phase row', async () => {
+    const user = userEvent.setup();
+    const { onAdd } = renderOpen('development', vi.fn(), { defaultProjectName: 'My App' });
+
+    await user.type(screen.getByPlaceholderText('e.g. C-001'), 'C-D1');
+    fireEvent.change(screen.getByLabelText('SP'), { target: { value: '3' } });
+    await user.type(screen.getByLabelText('Name *'), 'Custom task');
+
+    await user.click(screen.getByRole('button', { name: /add/i }));
+
+    expect(onAdd.mock.calls[0][0]).toMatchObject({
+      rowId: 'C-D1',
+      projectName: 'My App',
+      points: 3,
+      phase: 'development',
+    });
   });
 
   it('rejects empty rowId with an inline error', async () => {
@@ -110,12 +141,13 @@ describe('AddRowModal submission payloads', () => {
         open
         onClose={vi.fn()}
         phase="development"
+        defaultProjectName="Demo Project"
         existingIds={new Set(['DUP'])}
         onAdd={onAdd}
       />,
     );
     await user.type(screen.getByPlaceholderText('e.g. C-001'), 'DUP');
-    await user.type(screen.getAllByRole('textbox')[1], 'name');
+    await user.type(screen.getByLabelText('Name *'), 'name');
     await user.click(screen.getByRole('button', { name: /add/i }));
     expect(onAdd).not.toHaveBeenCalled();
     expect(screen.getByText(/already exists/)).toBeInTheDocument();

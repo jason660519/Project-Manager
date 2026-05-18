@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import type { DeployStatus, FeaturePhase, FeatureStatus, TestStatus } from '../../../lib/types';
 import type { CustomProjectProgressRow } from '../types';
@@ -11,6 +11,10 @@ interface AddRowModalProps {
   open: boolean;
   onClose: () => void;
   phase: FeaturePhase;
+  /** Default project name when adding a custom row. */
+  defaultProjectName: string;
+  /** All dashboard-visible project names (enables a picker when length > 1). */
+  projectNames?: string[];
   existingIds: Set<string>;
   onAdd: (row: CustomProjectProgressRow) => void;
 }
@@ -22,8 +26,13 @@ const PHASE_LABEL: Record<FeaturePhase, string> = {
   operations: '運維 Operations',
 };
 
-export function AddRowModal({ open, onClose, phase, existingIds, onAdd }: AddRowModalProps) {
+export function AddRowModal({
+  open, onClose, phase, defaultProjectName, projectNames = [], existingIds, onAdd,
+}: AddRowModalProps) {
+  const projectOptions = projectNames.length > 0 ? projectNames : [defaultProjectName];
+  const [projectName, setProjectName] = useState(defaultProjectName);
   const [rowId, setRowId] = useState('');
+  const [points, setPoints] = useState<number>(1);
   const [name, setName] = useState('');
   const [category, setCategory] = useState(
     () => (phase === 'e2e_testing' ? DEFAULT_E2E_CATEGORY : 'Custom'),
@@ -44,6 +53,10 @@ export function AddRowModal({ open, onClose, phase, existingIds, onAdd }: AddRow
   const [lastIncident, setLastIncident] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (open) setProjectName(defaultProjectName);
+  }, [open, defaultProjectName]);
+
   if (!open) return null;
 
   // Promote a numeric string to a clamped number, or undefined if empty / NaN.
@@ -62,9 +75,11 @@ export function AddRowModal({ open, onClose, phase, existingIds, onAdd }: AddRow
     if (!name.trim()) { setError('Name is required'); return; }
     const row: CustomProjectProgressRow = {
       rowId: id,
+      projectName: projectName.trim() || defaultProjectName,
       name: name.trim(),
       category: phase === 'e2e_testing' ? category : (category.trim() || 'Custom'),
       percentage: Math.max(0, Math.min(100, percentage)),
+      points: phase === 'development' ? Math.max(1, points || 1) : undefined,
       locatedPage: locatedPage.trim() || undefined,
       status,
       phase,
@@ -79,7 +94,9 @@ export function AddRowModal({ open, onClose, phase, existingIds, onAdd }: AddRow
       lastIncident: lastIncident.trim() || undefined,
     };
     onAdd(row);
+    setProjectName(defaultProjectName);
     setRowId('');
+    setPoints(1);
     setName('');
     setCategory(phase === 'e2e_testing' ? DEFAULT_E2E_CATEGORY : 'Custom');
     setPercentage(0);
@@ -107,11 +124,39 @@ export function AddRowModal({ open, onClose, phase, existingIds, onAdd }: AddRow
           <button onClick={onClose} className="text-stone-400 hover:text-stone-100"><X size={16} /></button>
         </div>
         <div className="space-y-2 text-xs text-stone-200">
+          <Field label="專案名稱 *">
+            {projectOptions.length > 1 ? (
+              <select
+                aria-label="專案名稱"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                className="input"
+              >
+                {projectOptions.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            ) : (
+              <input value={projectName} readOnly className="input text-stone-400" />
+            )}
+          </Field>
           <Field label="Row ID *">
             <input value={rowId} onChange={(e) => setRowId(e.target.value)}
               placeholder="e.g. C-001"
               className="input" />
           </Field>
+          {phase === 'development' && (
+            <Field label="SP">
+              <input
+                type="number"
+                min={1}
+                aria-label="SP"
+                value={points}
+                onChange={(e) => setPoints(Math.max(1, Number(e.target.value) || 1))}
+                className="input"
+              />
+            </Field>
+          )}
           <Field label="Name *">
             <input value={name} onChange={(e) => setName(e.target.value)} className="input" />
           </Field>

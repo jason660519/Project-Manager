@@ -22,10 +22,11 @@ export function buildProgressSnapshot(
   features: Feature[],
   customRowsByPhase: Record<FeaturePhase, CustomProjectProgressRow[]>,
 ): ProgressSnapshot {
-  const devRows = buildPhaseRows(features, 'development', customRowsByPhase.development);
-  const testRows = buildPhaseRows(features, 'e2e_testing', customRowsByPhase.e2e_testing);
-  const deployRows = buildPhaseRows(features, 'deployment', customRowsByPhase.deployment);
-  const opsRows = buildPhaseRows(features, 'operations', customRowsByPhase.operations);
+  const rowOpts = { defaultProjectName: project.name };
+  const devRows = buildPhaseRows(features, 'development', customRowsByPhase.development, rowOpts);
+  const testRows = buildPhaseRows(features, 'e2e_testing', customRowsByPhase.e2e_testing, rowOpts);
+  const deployRows = buildPhaseRows(features, 'deployment', customRowsByPhase.deployment, rowOpts);
+  const opsRows = buildPhaseRows(features, 'operations', customRowsByPhase.operations, rowOpts);
 
   return {
     exportedAt: new Date().toISOString(),

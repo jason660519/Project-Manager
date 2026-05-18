@@ -19,6 +19,8 @@ import { PromptEngineerModal } from './PromptEngineerModal';
 
 interface PhaseTabContentProps {
   phase: FeaturePhase;
+  projectName: string;
+  projectNames?: string[];
   projectRoot: string;
   features: Feature[];
   prefs: PhaseTablePrefs;
@@ -33,7 +35,7 @@ interface PhaseTabContentProps {
 }
 
 export function PhaseTabContent({
-  phase, projectRoot, features, prefs, patch, reset, agents,
+  phase, projectName, projectNames, projectRoot, features, prefs, patch, reset, agents,
   onFeaturePromptSave, onFeaturePatch, onDispatchRow,
 }: PhaseTabContentProps) {
   const columns = useMemo(() => columnsForPhase(phase), [phase]);
@@ -46,8 +48,8 @@ export function PhaseTabContent({
 
   // All rows for this phase (features + custom rows).
   const allRows = useMemo(
-    () => buildPhaseRows(features, phase, prefs.customRows),
-    [features, phase, prefs.customRows],
+    () => buildPhaseRows(features, phase, prefs.customRows, { defaultProjectName: projectName }),
+    [features, phase, prefs.customRows, projectName],
   );
 
   // Status summary for the top-of-tab strip (development tab uses it).
@@ -74,7 +76,7 @@ export function PhaseTabContent({
       if (!showHiddenRows && hiddenSet.has(r.rowKey)) return false;
       if (q) {
         const catHay = phase === 'e2e_testing' ? e2eCategorySearchTokens(r.category) : r.category;
-        const hay = `${r.id} ${r.name} ${catHay} ${r.locatedPage ?? ''}`.toLowerCase();
+        const hay = `${r.projectName ?? ''} ${r.id} ${r.name} ${catHay} ${r.locatedPage ?? ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -215,6 +217,8 @@ export function PhaseTabContent({
         open={addRowOpen}
         onClose={() => setAddRowOpen(false)}
         phase={phase}
+        defaultProjectName={projectName}
+        projectNames={projectNames}
         existingIds={existingIds}
         onAdd={onAdd}
       />

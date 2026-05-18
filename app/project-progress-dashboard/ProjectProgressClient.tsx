@@ -175,6 +175,8 @@ export function ProjectProgressClient({
         <div className="flex-1 min-h-0">
           <PhaseTabContent
             phase={activePhase}
+            projectName={project.name}
+            projectNames={dashboardProjectNames}
             projectRoot={projectRoot}
             features={phaseFeatures}
             prefs={activePhasePrefs.prefs}

@@ -292,6 +292,16 @@ function pointsColumn(): ColumnDef {
 
 function commonIdNameCols(phase: FeaturePhase): ColumnDef[] {
   const cols: ColumnDef[] = [
+    {
+      id: 'project',
+      header: '專案名稱',
+      accessor: (r) => r.projectName ?? '',
+      cell: (r) => (
+        <span className="block max-w-full truncate text-[11px] text-cyan-100/90" title={r.projectName}>
+          {r.projectName ?? '—'}
+        </span>
+      ),
+    },
     { id: 'id', header: 'ID', accessor: (r) => r.id, cell: (r) => (
       <span className="font-mono text-[11px] text-stone-300">{r.id}</span>
     )},

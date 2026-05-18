@@ -3,9 +3,13 @@ import type { FeaturePhase, FeatureStatus, TestStatus, DeployStatus } from '../.
 /** Phase-row payload persisted in localStorage on top of project features. */
 export interface CustomProjectProgressRow {
   rowId: string;
+  /** Owning project display name (multi-project dashboard). */
+  projectName?: string;
   name: string;
   category: string;
   percentage: number;
+  /** Story points (development tab). Defaults to 1 when missing. */
+  points?: number;
   locatedPage?: string;
   phase: FeaturePhase;
   status?: FeatureStatus;

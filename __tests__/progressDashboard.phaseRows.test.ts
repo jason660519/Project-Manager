@@ -44,6 +44,19 @@ describe('featureToPhaseRow', () => {
     expect(featureToPhaseRow(f({ progress: 9999 })).progress).toBe(100);
     expect(featureToPhaseRow(f({ progress: -10 })).progress).toBe(0);
   });
+
+  it('reads projectName from feature metadata with fallback', () => {
+    expect(
+      featureToPhaseRow(f({
+        metadata: { sourceProjectName: 'Alpha' },
+        locatedPage: 'app/page.tsx',
+      })).projectName,
+    ).toBe('Alpha');
+    expect(featureToPhaseRow(f({}), 'Fallback').projectName).toBe('Fallback');
+    expect(
+      featureToPhaseRow(f({ locatedPage: 'app/page.tsx' })).locatedPage,
+    ).toBe('app/page.tsx');
+  });
 });
 
 describe('customRowToPhaseRow', () => {

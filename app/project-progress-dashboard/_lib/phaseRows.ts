@@ -3,6 +3,7 @@ import type { CustomProjectProgressRow, PhaseRowMeta } from '../types';
 
 /** Display-side row used by every phase tab. Wraps a project Feature or a custom row. */
 export interface PhaseRow extends PhaseRowMeta {
+  projectName?: string;
   id: string;            // human-readable feature id ("F01" / row id)
   name: string;
   category: string;
@@ -31,18 +32,19 @@ export interface PhaseRow extends PhaseRowMeta {
 const safePoints = (f: Feature) => (typeof f.points === 'number' && f.points > 0 ? f.points : 1);
 
 /** Map a Feature → display row for a given phase view. */
-export function featureToPhaseRow(feature: Feature): PhaseRow {
+export function featureToPhaseRow(feature: Feature, defaultProjectName?: string): PhaseRow {
   return {
     rowKey: `feature::${feature.id}`,
     source: 'feature',
     featureId: feature.id,
+    projectName: (feature.metadata?.sourceProjectName as string | undefined) ?? defaultProjectName,
     id: feature.id,
     name: feature.name,
     category: feature.category,
     status: feature.status,
     progress: Math.max(0, Math.min(100, feature.progress ?? 0)),
     points: safePoints(feature),
-    locatedPage: feature.metadata?.sourceProjectName as string | undefined,
+    locatedPage: feature.locatedPage,
     notes: feature.notes,
     testCoverage: feature.testCoverage,
     testStatus: feature.testStatus,
@@ -60,17 +62,19 @@ export function featureToPhaseRow(feature: Feature): PhaseRow {
 }
 
 /** Map a custom row payload → display row for a phase view. */
-export function customRowToPhaseRow(row: CustomProjectProgressRow): PhaseRow {
+export function customRowToPhaseRow(row: CustomProjectProgressRow, defaultProjectName?: string): PhaseRow {
+  const points = typeof row.points === 'number' && row.points > 0 ? row.points : 1;
   return {
     rowKey: `custom::${row.rowId}`,
     source: 'custom',
     customRowId: row.rowId,
+    projectName: row.projectName ?? defaultProjectName,
     id: row.rowId,
     name: row.name,
     category: row.category,
     status: row.status ?? 'todo',
     progress: Math.max(0, Math.min(100, row.percentage ?? 0)),
-    points: 1,
+    points,
     locatedPage: row.locatedPage,
     testCoverage: row.testCoverage,
     testStatus: row.testStatus,
@@ -90,11 +94,15 @@ export function buildPhaseRows(
   features: Feature[],
   phase: FeaturePhase,
   customRows: CustomProjectProgressRow[],
+  options?: { defaultProjectName?: string },
 ): PhaseRow[] {
+  const defaultProjectName = options?.defaultProjectName;
   const featRows = features
     .filter((f) => (f.phase ?? 'development') === phase)
-    .map(featureToPhaseRow);
-  const customPhaseRows = customRows.filter((r) => r.phase === phase).map(customRowToPhaseRow);
+    .map((f) => featureToPhaseRow(f, defaultProjectName));
+  const customPhaseRows = customRows
+    .filter((r) => r.phase === phase)
+    .map((r) => customRowToPhaseRow(r, defaultProjectName));
   return [...featRows, ...customPhaseRows];
 }
 
