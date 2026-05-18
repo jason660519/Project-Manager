@@ -240,6 +240,40 @@ export async function openPath(path: string): Promise<void> {
   return invoke<void>('open_path', { path });
 }
 
+/**
+ * Discriminated result of {@link pickProjectFolders}. Callers MUST switch on
+ * `status` so "user cancelled" and "non-Tauri environment" never collapse
+ * into the same code path (the previous `string[] | null` API made them
+ * indistinguishable).
+ */
+export type PickProjectFoldersResult =
+  | { status: 'ok'; paths: string[] }
+  | { status: 'cancelled' }
+  | { status: 'unsupported' };
+
+/**
+ * Open the native folder picker (Finder on macOS). With `multiple: true`,
+ * Cmd-click several folders to batch-import projects.
+ *
+ * Returns a discriminated union so callers can react differently to a cancel
+ * vs. a non-Tauri environment.
+ */
+export async function pickProjectFolders(options?: {
+  multiple?: boolean;
+  title?: string;
+}): Promise<PickProjectFoldersResult> {
+  if (!isTauri()) return { status: 'unsupported' };
+  const { open } = await import('@tauri-apps/plugin-dialog');
+  const selected = await open({
+    directory: true,
+    multiple: options?.multiple ?? true,
+    title: options?.title ?? 'Select project folder(s)',
+  });
+  if (selected === null) return { status: 'cancelled' };
+  const paths = Array.isArray(selected) ? selected : [selected];
+  return { status: 'ok', paths };
+}
+
 // ── Skills (markdown packages on disk) ───────────────────────────────────────
 
 export interface SkillFileInfo {

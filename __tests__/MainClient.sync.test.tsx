@@ -14,6 +14,10 @@ import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DASHBOARD_SELECTED_PROJECTS_STORAGE_KEY } from '../lib/dashboardStorage';
+import {
+  KEY_PERSONAL_SEEDED,
+  KEY_SHARED_PROJECTS,
+} from '../lib/storage/keys';
 
 // ── Mock heavy / Tauri-specific dependencies ───────────────────────────────────
 
@@ -254,5 +258,17 @@ describe('init: localStorage state is restored on fresh mount', () => {
     const selection: string[] = JSON.parse(selectionEl.textContent ?? '[]');
 
     expect(selection).toEqual(['owner-property']);
+  });
+});
+
+describe('empty project list', () => {
+  it('renders projects view without crashing when storage has zero projects', async () => {
+    localStorage.setItem(KEY_SHARED_PROJECTS, JSON.stringify([]));
+    localStorage.setItem(KEY_PERSONAL_SEEDED, 'true');
+
+    render(<MainClient currentView="projects" />);
+    await flushEffects();
+
+    expect(screen.getByTestId('projects')).toBeInTheDocument();
   });
 });

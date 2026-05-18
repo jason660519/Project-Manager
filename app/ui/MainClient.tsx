@@ -172,10 +172,14 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
   }, []);
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId) ?? projects[0];
-  const adapters = listAdapters(selectedProject.config);
+  const adapters = selectedProject ? listAdapters(selectedProject.config) : [];
   const selectedDashboardProjects = projects.filter((p) => selectedDashboardProjectIds.includes(p.id));
   const effectiveDashboardProjects =
-    selectedDashboardProjects.length > 0 ? selectedDashboardProjects : [selectedProject];
+    selectedDashboardProjects.length > 0
+      ? selectedDashboardProjects
+      : selectedProject
+        ? [selectedProject]
+        : [];
   const dashboardFeatures: Feature[] = effectiveDashboardProjects.flatMap((project) =>
     project.config.features.map((feature) => ({
       ...feature,
@@ -335,7 +339,10 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
 
   // Keep selection valid when projects mutate.
   useEffect(() => {
-    if (projects.length === 0) return;
+    if (projects.length === 0) {
+      if (selectedProjectId) setSelectedProjectId('');
+      return;
+    }
     if (!projects.some((p) => p.id === selectedProjectId)) {
       setSelectedProjectId(projects[0].id);
     }
@@ -904,7 +911,7 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
       bridgeStatus={bridgeStatus}
       activeRunCount={activeRuns.length}
     >
-      {currentView === 'dashboard' && (
+      {currentView === 'dashboard' && selectedProject && (
         <ProjectProgressClient
           project={selectedProject.config.project}
           projectRoot={selectedProject.config.project.root}
@@ -924,7 +931,7 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
           onRunEnd={handleRunEnd}
         />
       )}
-      {currentView === 'features' && (
+      {currentView === 'features' && selectedProject && (
         <FeaturesView
           features={selectedProject.config.features}
           adapters={adapters}
@@ -954,10 +961,10 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
       )}
       {currentView === 'plugins' && <PluginsView />}
       {currentView === 'channels' && <ChannelsView />}
-      {currentView === 'sessions' && (
+      {currentView === 'sessions' && selectedProject && (
         <SessionsView projectRoot={selectedProject.config.project.root} />
       )}
-      {currentView === 'cron-jobs' && (
+      {currentView === 'cron-jobs' && selectedProject && (
         <CronJobsView
           cronJobs={selectedProject.config.cronJobs ?? []}
           cronHistory={cronHistory}
@@ -978,7 +985,7 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
       {currentView === 'keyboard-shortcuts' && <KeyboardShortcutsView />}
       {currentView === 'settings' && <SettingsView />}
       {currentView === 'documentation' && <DocumentationView />}
-      {currentView === 'engineers' && (
+      {currentView === 'engineers' && selectedProject && (
         <EngineersView
           roles={selectedProject.config.engineerRoles ?? []}
           agents={adapters}

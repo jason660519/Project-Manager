@@ -20,7 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import type { InitializeMode } from '../../../lib/storage';
-import { migrateConfig, resolveConfigPath } from '../../../lib/storage';
+import { CURRENT_SCHEMA_VERSION, migrateConfig, resolveConfigPath } from '../../../lib/storage';
 import { CompletedRun, ProjectManagerConfig, Feature, ProjectEntry } from '../../../lib/types';
 
 interface ProjectsViewProps {
@@ -113,6 +113,7 @@ export function ProjectsView({
   const [deleteTarget, setDeleteTarget] = useState<ProjectEntry | null>(null);
   const [deleteAlsoFile, setDeleteAlsoFile] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [pickingFolders, setPickingFolders] = useState(false);
 
   useEffect(() => {
     setIsTauri(typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window);
@@ -177,43 +178,48 @@ export function ProjectsView({
     }
   };
 
+  const importProjectFromPath = async (folderOrConfigPath: string): Promise<void> => {
+    const resolvedPath = resolveConfigPath(folderOrConfigPath.trim());
+    let config: ProjectManagerConfig;
+    if (isTauri) {
+      const { readConfig } = await import('../../../lib/bridge');
+      config = await readConfig(resolvedPath);
+    } else {
+      const folder = resolvedPath.replace(/\/\.project-manager\.json$/, '');
+      // Non-Tauri (web preview / jest) placeholder. Stamp the latest schema so
+      // we never silently rely on the v1→vN migration chain just to read our
+      // own freshly-minted stub.
+      config = migrateConfig({
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+        project: {
+          name: folder.split('/').pop() || 'Project',
+          root: folder,
+          defaultIDE: 'Cursor',
+        },
+        features: [],
+        adapters: { ides: [], agents: [] },
+      });
+    }
+    onAddProject({
+      id: `proj-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      config,
+      configPath: resolvedPath,
+    });
+  };
+
   const handleAddLocal = async () => {
     if (!manualConfigPath.trim()) return;
-    // Resolve `<folder>` → `<folder>/.project-manager.json` so Rust's read_config
-    // never sees a directory path (which would surface as `Is a directory (os error 21)`).
     const resolvedPath = resolveConfigPath(manualConfigPath);
     setAdding(true);
     setAddError('');
     try {
-      let config: ProjectManagerConfig;
-      if (isTauri) {
-        const { readConfig } = await import('../../../lib/bridge');
-        config = await readConfig(resolvedPath);
-      } else {
-        const folder = resolvedPath.replace(/\/\.project-manager\.json$/, '');
-        config = migrateConfig({
-          schemaVersion: 2,
-          project: {
-            name: folder.split('/').pop() || 'Project',
-            root: folder,
-            defaultIDE: 'Cursor',
-          },
-          features: [],
-          adapters: { ides: [], agents: [] },
-        });
-      }
-      onAddProject({ id: `proj-${Date.now()}`, config, configPath: resolvedPath });
+      await importProjectFromPath(manualConfigPath);
       setShowAddModal(false);
       setManualConfigPath('');
       setLocalPath('');
     } catch (e) {
       const raw = e instanceof Error ? e.message : String(e);
-      // Rust returns `No such file or directory (os error 2)` for missing
-      // files and `Is a directory (os error 21)` when handed a folder.
-      // Both mean the same thing from the user's perspective: there's no
-      // `.project-manager.json` at the location they pointed at. Translate
-      // it into actionable guidance instead of leaking the OS error.
-      if (/No such file or directory|Is a directory|os error 2\b|os error 21\b/i.test(raw)) {
+      if (isMissingConfigError(raw)) {
         setAddError(
           `No .project-manager.json found at ${resolvedPath}. Try the AI Scan option above to generate one automatically.`,
         );
@@ -221,6 +227,86 @@ export function ProjectsView({
         setAddError(`Failed to read config: ${raw}`);
       }
     } finally {
+      setAdding(false);
+    }
+  };
+
+  /** Native Finder / Explorer folder picker — fill a field or import immediately. */
+  const handlePickFolders = async (mode: 'import' | 'scan' | 'manual') => {
+    if (!isTauri) {
+      setAddError('Folder picker requires the Project Manager desktop app.');
+      return;
+    }
+    setPickingFolders(true);
+    setAddError('');
+    try {
+      const { pickProjectFolders } = await import('../../../lib/bridge');
+      const result = await pickProjectFolders({
+        multiple: mode === 'import',
+        title:
+          mode === 'import'
+            ? 'Select project folder(s) to import'
+            : 'Select a project folder',
+      });
+
+      if (result.status === 'unsupported') {
+        setAddError('Folder picker requires the Project Manager desktop app.');
+        return;
+      }
+      if (result.status === 'cancelled') return;
+
+      const { paths } = result;
+      if (paths.length === 0) return;
+
+      switch (mode) {
+        case 'scan':
+          setLocalPath(paths[0]);
+          return;
+        case 'manual':
+          setManualConfigPath(paths[0]);
+          return;
+        case 'import': {
+          setAdding(true);
+          const failures: string[] = [];
+          let imported = 0;
+          for (const folderPath of paths) {
+            try {
+              await importProjectFromPath(folderPath);
+              imported += 1;
+            } catch (e) {
+              const raw = e instanceof Error ? e.message : String(e);
+              const label = folderPath.split('/').filter(Boolean).pop() ?? folderPath;
+              failures.push(
+                isMissingConfigError(raw)
+                  ? `${label}: no .project-manager.json — use AI Scan or Initialize`
+                  : `${label}: ${raw}`,
+              );
+            }
+          }
+
+          if (imported > 0 && failures.length === 0) {
+            setShowAddModal(false);
+            setManualConfigPath('');
+            setLocalPath('');
+          } else if (imported > 0) {
+            setAddError(
+              `Imported ${imported} project${imported === 1 ? '' : 's'}. Skipped ${failures.length}:\n${failures.join('\n')}`,
+            );
+          } else {
+            setAddError(failures.join('\n') || 'No projects were imported.');
+          }
+          return;
+        }
+        default: {
+          const _exhaustive: never = mode;
+          throw new Error(`unhandled folder-picker mode: ${String(_exhaustive)}`);
+        }
+      }
+    } catch (e) {
+      console.error('[handlePickFolders]', e);
+      setAddError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPickingFolders(false);
       setAdding(false);
     }
   };
@@ -543,6 +629,14 @@ export function ProjectsView({
 
       {/* Project List */}
       <div className="space-y-3">
+        {projects.length === 0 && (
+          <div className="border border-dashed border-stone-200/20 bg-[#071d1a]/40 px-6 py-10 text-center">
+            <p className="text-sm text-stone-300">No projects yet</p>
+            <p className="mt-1 text-xs text-stone-500">
+              Add a local folder or GitHub repo to start tracking progress.
+            </p>
+          </div>
+        )}
         {projects.map((project) => {
           const { features } = project.config;
           const isSelected = project.id === selectedProjectId;
@@ -891,16 +985,62 @@ export function ProjectsView({
 
                   {addMode === 'local' ? (
                     <div className="space-y-3">
+                      <button
+                        type="button"
+                        onClick={() => void handlePickFolders('import')}
+                        disabled={pickingFolders || adding || scanPhase === 'scanning'}
+                        title={
+                          isTauri
+                            ? 'Open Finder — select one or more folders (⌘-click for multiple)'
+                            : 'Requires the Project Manager desktop app'
+                        }
+                        className="flex w-full items-center justify-center gap-2 border border-cyan-200/30 bg-cyan-500/15 px-4 py-2.5 text-sm font-medium text-cyan-100 transition-colors hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {pickingFolders ? (
+                          <>
+                            <Loader2 size={15} className="animate-spin" />
+                            Opening folder picker…
+                          </>
+                        ) : (
+                          <>
+                            <FolderOpen size={15} />
+                            Choose from Finder…
+                          </>
+                        )}
+                      </button>
+                      <p className="text-[10px] leading-relaxed text-stone-500">
+                        Import one or more projects at once. Folders must already contain a{' '}
+                        <code className="font-mono text-stone-400">.project-manager.json</code>
+                        {' '}
+                        (use AI Scan below if missing).
+                      </p>
+
                       <div>
                         <label className="mb-1 block text-sm font-medium text-stone-200">
                           Project folder path
                         </label>
-                        <input
-                          value={localPath}
-                          onChange={(e) => setLocalPath(e.target.value)}
-                          placeholder="/path/to/your/project"
-                          className="w-full border border-stone-200/20 bg-[#03100f] px-3 py-2 font-mono text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
-                        />
+                        <div className="flex gap-2">
+                          <input
+                            value={localPath}
+                            onChange={(e) => setLocalPath(e.target.value)}
+                            placeholder="/path/to/your/project"
+                            className="min-w-0 flex-1 border border-stone-200/20 bg-[#03100f] px-3 py-2 font-mono text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => void handlePickFolders('scan')}
+                            disabled={pickingFolders || !isTauri}
+                            title={
+                              isTauri
+                                ? 'Choose a folder in Finder'
+                                : 'Requires the Project Manager desktop app'
+                            }
+                            className="inline-flex shrink-0 items-center gap-1.5 border border-stone-200/20 px-3 py-2 text-xs uppercase tracking-[0.12em] text-stone-200 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            <FolderOpen size={13} />
+                            Browse
+                          </button>
+                        </div>
                       </div>
 
                       {/* AI Scan button */}
@@ -935,12 +1075,28 @@ export function ProjectsView({
                         <label className="mb-1 block text-xs text-stone-400">
                           Path to existing .project-manager.json
                         </label>
-                        <input
-                          value={manualConfigPath}
-                          onChange={(e) => setManualConfigPath(e.target.value)}
-                          placeholder="/path/to/project/.project-manager.json"
-                          className="w-full border border-stone-200/20 bg-[#03100f] px-3 py-2 font-mono text-xs text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
-                        />
+                        <div className="flex gap-2">
+                          <input
+                            value={manualConfigPath}
+                            onChange={(e) => setManualConfigPath(e.target.value)}
+                            placeholder="/path/to/project/.project-manager.json"
+                            className="min-w-0 flex-1 border border-stone-200/20 bg-[#03100f] px-3 py-2 font-mono text-xs text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => void handlePickFolders('manual')}
+                            disabled={pickingFolders || !isTauri}
+                            title={
+                              isTauri
+                                ? 'Choose a folder in Finder'
+                                : 'Requires the Project Manager desktop app'
+                            }
+                            className="inline-flex shrink-0 items-center gap-1.5 border border-stone-200/20 px-3 py-2 text-xs uppercase tracking-[0.12em] text-stone-200 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            <FolderOpen size={13} />
+                            Browse
+                          </button>
+                        </div>
                         <p className="mt-1 text-[10px] text-stone-500">
                           Folder paths are accepted — .project-manager.json will be appended automatically.
                         </p>
@@ -948,7 +1104,9 @@ export function ProjectsView({
 
                       {!isTauri && (
                         <p className="text-[11px] text-amber-100/60">
-                          Dev mode: AI Scan works via Next.js API route. Manual add creates a placeholder project.
+                          Dev mode: AI Scan works via Next.js API route. Manual add creates a placeholder
+                          project. The Finder folder picker requires the desktop app (
+                          <code className="font-mono">./start_project_manager.sh</code>).
                         </p>
                       )}
                     </div>

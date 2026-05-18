@@ -19,12 +19,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Capture every readConfig call so we can assert on the path it received.
 const readConfigMock = vi.fn();
+const pickProjectFoldersMock = vi.fn();
 
 vi.mock('../lib/bridge', () => ({
   getGithubToken: async () => '',
   setGithubToken: async () => {},
   readConfig: (path: string) => readConfigMock(path),
   fetchGithubRepo: async () => [],
+  pickProjectFolders: (opts?: { multiple?: boolean }) => pickProjectFoldersMock(opts),
 }));
 
 import { ProjectsView } from '../app/ui/views/ProjectsView';
@@ -32,6 +34,7 @@ import { ProjectsView } from '../app/ui/views/ProjectsView';
 // Flag the renderer as Tauri so handleAddLocal takes the readConfig branch.
 beforeEach(() => {
   readConfigMock.mockReset();
+  pickProjectFoldersMock.mockReset();
   (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {};
 });
 
@@ -183,5 +186,143 @@ describe('Add Project modal — manual add path normalization', () => {
       expect(screen.getByText(/No \.project-manager\.json found/i)).toBeInTheDocument();
     });
     expect(screen.queryByText(/Is a directory/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('Add Project modal — Finder folder picker', () => {
+  it('batch-imports multiple folders chosen from the native picker', async () => {
+    const user = userEvent.setup();
+    const { onAddProject } = renderModal();
+
+    pickProjectFoldersMock.mockResolvedValue({
+      status: 'ok',
+      paths: ['/Volumes/Projects/alpha', '/Volumes/Projects/beta'],
+    });
+    readConfigMock.mockImplementation(async (path: string) => ({
+      schemaVersion: 2,
+      project: {
+        name: path.includes('alpha') ? 'Alpha' : 'Beta',
+        root: path.replace(/\/\.project-manager\.json$/, ''),
+        defaultIDE: 'Cursor',
+      },
+      features: [],
+      adapters: { ides: [], agents: [] },
+    }));
+
+    await openAddModal(user);
+    await user.click(screen.getByRole('button', { name: /choose from finder/i }));
+
+    await waitFor(() => {
+      expect(pickProjectFoldersMock).toHaveBeenCalledWith(
+        expect.objectContaining({ multiple: true }),
+      );
+    });
+    await waitFor(() => {
+      expect(onAddProject).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('fills the AI Scan path when Browse is used for a single folder', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    pickProjectFoldersMock.mockResolvedValue({
+      status: 'ok',
+      paths: ['/Volumes/Projects/my-app'],
+    });
+
+    await openAddModal(user);
+    const browseButtons = screen.getAllByRole('button', { name: /^browse$/i });
+    await user.click(browseButtons[0]);
+
+    await waitFor(() => {
+      expect(pickProjectFoldersMock).toHaveBeenCalledWith(
+        expect.objectContaining({ multiple: false }),
+      );
+    });
+    const scanInput = screen.getByPlaceholderText('/path/to/your/project') as HTMLInputElement;
+    expect(scanInput.value).toBe('/Volumes/Projects/my-app');
+  });
+
+  it('quietly closes when the user cancels the picker (no error, no import)', async () => {
+    const user = userEvent.setup();
+    const { onAddProject } = renderModal();
+
+    pickProjectFoldersMock.mockResolvedValue({ status: 'cancelled' });
+
+    await openAddModal(user);
+    await user.click(screen.getByRole('button', { name: /choose from finder/i }));
+
+    await waitFor(() => {
+      expect(pickProjectFoldersMock).toHaveBeenCalled();
+    });
+
+    // Modal stays open (no submit), no project imported, no error shown.
+    expect(onAddProject).not.toHaveBeenCalled();
+    expect(screen.queryByText(/No projects were imported/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Skipped/i)).not.toBeInTheDocument();
+  });
+
+  it('reports "No projects were imported" when every chosen folder lacks a config', async () => {
+    const user = userEvent.setup();
+    const { onAddProject } = renderModal();
+
+    pickProjectFoldersMock.mockResolvedValue({
+      status: 'ok',
+      paths: ['/Volumes/Projects/empty-1', '/Volumes/Projects/empty-2'],
+    });
+    // Both readConfig calls reject with Rust's missing-file error.
+    readConfigMock.mockRejectedValue(
+      new Error('Cannot read config: No such file or directory (os error 2)'),
+    );
+
+    await openAddModal(user);
+    await user.click(screen.getByRole('button', { name: /choose from finder/i }));
+
+    await waitFor(() => {
+      expect(readConfigMock).toHaveBeenCalledTimes(2);
+    });
+
+    expect(onAddProject).not.toHaveBeenCalled();
+    // Both labels appear in the per-folder error list.
+    await waitFor(() => {
+      expect(screen.getByText(/empty-1: no \.project-manager\.json/)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/empty-2: no \.project-manager\.json/)).toBeInTheDocument();
+  });
+
+  it('shows "Imported N / Skipped M" when batch import partially succeeds', async () => {
+    const user = userEvent.setup();
+    const { onAddProject } = renderModal();
+
+    pickProjectFoldersMock.mockResolvedValue({
+      status: 'ok',
+      paths: ['/Volumes/Projects/alpha', '/Volumes/Projects/beta'],
+    });
+    // alpha resolves, beta rejects.
+    readConfigMock.mockImplementation(async (path: string) => {
+      if (path.includes('alpha')) {
+        return {
+          schemaVersion: 2,
+          project: { name: 'Alpha', root: '/Volumes/Projects/alpha', defaultIDE: 'Cursor' },
+          features: [],
+          adapters: { ides: [], agents: [] },
+        };
+      }
+      throw new Error('Cannot read config: No such file or directory (os error 2)');
+    });
+
+    await openAddModal(user);
+    await user.click(screen.getByRole('button', { name: /choose from finder/i }));
+
+    await waitFor(() => {
+      expect(onAddProject).toHaveBeenCalledTimes(1);
+    });
+
+    // Modal stays open so the user can see what failed.
+    await waitFor(() => {
+      expect(screen.getByText(/Imported 1 project\. Skipped 1/i)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/beta: no \.project-manager\.json/)).toBeInTheDocument();
   });
 });
