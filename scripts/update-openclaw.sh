@@ -14,6 +14,11 @@ fi
 
 mkdir -p "$OPENCLAW_RUNTIME"
 previous_ref="$(git -C "$OPENCLAW_SRC" rev-parse HEAD)"
+restore_previous_ref() {
+  echo "OpenClaw update failed; restoring previous ref $previous_ref" >&2
+  git -C "$OPENCLAW_SRC" checkout "$previous_ref" >/dev/null 2>&1 || true
+}
+trap restore_previous_ref ERR
 
 git -C "$OPENCLAW_SRC" fetch --tags origin
 git -C "$OPENCLAW_SRC" checkout "$TARGET_REF"
@@ -27,6 +32,7 @@ git -C "$OPENCLAW_SRC" checkout "$TARGET_REF"
 
 current_ref="$(git -C "$OPENCLAW_SRC" rev-parse HEAD)"
 current_desc="$(git -C "$OPENCLAW_SRC" describe --tags --always --dirty 2>/dev/null || printf unknown)"
+trap - ERR
 node -e '
 const fs = require("fs");
 const path = process.argv[1];

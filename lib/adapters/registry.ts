@@ -40,19 +40,15 @@ export function listAdapters(config: ProjectManagerConfig): AnyAdapterConfig[] {
   return [...config.adapters.ides, ...config.adapters.agents, ...listEnabledPluginAgents(config)];
 }
 
+export function createRuntimeAdapterFromConfig(adapter: AnyAdapterConfig): RuntimeAdapter {
+  if (adapter.type === 'ide') return new LocalIDEAdapter(adapter);
+  return new AgentAdapter(adapter);
+}
+
 export function createRuntimeAdapter(
   config: ProjectManagerConfig,
   adapterId: string,
 ): RuntimeAdapter | null {
-  const ide = config.adapters.ides.find((adapter) => adapter.id === adapterId);
-  if (ide) {
-    return new LocalIDEAdapter(ide);
-  }
-
-  const agent = config.adapters.agents.find((adapter) => adapter.id === adapterId);
-  if (agent) {
-    return new AgentAdapter(agent);
-  }
-
-  return null;
+  const adapter = listAdapters(config).find((candidate) => candidate.id === adapterId);
+  return adapter ? createRuntimeAdapterFromConfig(adapter) : null;
 }

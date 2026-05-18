@@ -20,11 +20,7 @@ export class LocalIDEAdapter implements RuntimeAdapter {
 
   async execute(context: ExecutionContext): Promise<ExecutionResult> {
     const { feature, projectRoot } = context;
-    const filePath = feature.paths.implementation || feature.paths.tdd || feature.paths.spec;
-
-    if (!filePath) {
-      return { success: false, message: '未找到相關檔案路徑' };
-    }
+    const filePath = feature.paths.implementation || feature.paths.tdd || feature.paths.spec || '.';
 
     const normalizedRoot = path.resolve(projectRoot);
     const fullPath = path.resolve(normalizedRoot, filePath);

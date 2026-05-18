@@ -3,6 +3,9 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OPENCLAW_SRC="${PM_OPENCLAW_SRC:-$ROOT_DIR/.project-manager/vendor/openclaw}"
+OPENCLAW_REPO_URL="${PM_OPENCLAW_REPO_URL:-https://github.com/openclaw/openclaw.git}"
+OPENCLAW_REF="${PM_OPENCLAW_REF:-}"
+OPENCLAW_AUTO_UPDATE="${PM_OPENCLAW_AUTO_UPDATE:-0}"
 OPENCLAW_RUNTIME="${PM_OPENCLAW_RUNTIME:-$ROOT_DIR/.project-manager/openclaw}"
 OPENCLAW_STATE_DIR="${PM_OPENCLAW_STATE_DIR:-$OPENCLAW_RUNTIME/state}"
 OPENCLAW_WORKSPACE_DIR="${PM_OPENCLAW_WORKSPACE_DIR:-$OPENCLAW_RUNTIME/workspace}"
@@ -11,6 +14,27 @@ OPENCLAW_ENV_FILE="$OPENCLAW_STATE_DIR/.env"
 BIN_DIR="$ROOT_DIR/.project-manager/bin"
 WRAPPER="$BIN_DIR/openclaw"
 MANIFEST="$OPENCLAW_RUNTIME/manifest.json"
+
+ensure_openclaw_source() {
+  if [ -f "$OPENCLAW_SRC/package.json" ]; then
+    return
+  fi
+
+  if [ -e "$OPENCLAW_SRC" ] && [ "$(find "$OPENCLAW_SRC" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l | tr -d ' ')" != "0" ]; then
+    echo "OpenClaw source path exists but is not a valid checkout: $OPENCLAW_SRC" >&2
+    exit 1
+  fi
+
+  if ! command -v git >/dev/null 2>&1; then
+    echo "git is required to clone OpenClaw source." >&2
+    exit 1
+  fi
+
+  mkdir -p "$(dirname "$OPENCLAW_SRC")"
+  git clone "$OPENCLAW_REPO_URL" "$OPENCLAW_SRC"
+}
+
+ensure_openclaw_source
 
 if [ ! -f "$OPENCLAW_SRC/package.json" ]; then
   echo "OpenClaw source not found at: $OPENCLAW_SRC" >&2
@@ -23,9 +47,10 @@ if ! command -v pnpm >/dev/null 2>&1; then
 fi
 
 mkdir -p "$OPENCLAW_STATE_DIR" "$OPENCLAW_WORKSPACE_DIR" "$OPENCLAW_RUNTIME/home" "$BIN_DIR"
+chmod 700 "$OPENCLAW_STATE_DIR"
 
 if [ ! -f "$OPENCLAW_ENV_FILE" ]; then
-  token="$(openssl rand -hex 32 2>/dev/null || node -e 'console.log(crypto.randomUUID().replaceAll("-", ""))')"
+  token="$(openssl rand -hex 32 2>/dev/null || node -e 'console.log(require("crypto").randomUUID().replaceAll("-", ""))')"
   cat > "$OPENCLAW_ENV_FILE" <<EOF
 OPENCLAW_GATEWAY_PORT=18790
 OPENCLAW_GATEWAY_BIND=loopback
@@ -33,6 +58,7 @@ OPENCLAW_GATEWAY_TOKEN=$token
 OPENCLAW_NO_AUTO_UPDATE=1
 EOF
 fi
+chmod 600 "$OPENCLAW_ENV_FILE"
 
 if [ ! -f "$OPENCLAW_CONFIG_PATH" ]; then
   cat > "$OPENCLAW_CONFIG_PATH" <<'EOF'
@@ -64,6 +90,15 @@ if [ ! -f "$OPENCLAW_CONFIG_PATH" ]; then
   }
 }
 EOF
+fi
+chmod 600 "$OPENCLAW_CONFIG_PATH"
+
+if [ -n "$OPENCLAW_REF" ]; then
+  git -C "$OPENCLAW_SRC" fetch --tags origin
+  git -C "$OPENCLAW_SRC" checkout "$OPENCLAW_REF"
+elif [ "$OPENCLAW_AUTO_UPDATE" = "1" ]; then
+  git -C "$OPENCLAW_SRC" fetch --tags origin
+  git -C "$OPENCLAW_SRC" checkout origin/main
 fi
 
 cat > "$WRAPPER" <<EOF

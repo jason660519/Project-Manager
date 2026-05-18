@@ -30,6 +30,7 @@ npm run hermes:install
 ```
 
 The installer creates the virtual environment, installs Hermes from the local checkout, creates a project-local `HERMES_HOME`, and writes a wrapper at `.project-manager/bin/hermes`.
+If the checkout is missing, the installer clones `https://github.com/NousResearch/hermes-agent.git` into `.project-manager/vendor/hermes-agent`.
 
 Useful commands:
 
@@ -37,7 +38,17 @@ Useful commands:
 npm run hermes -- --version
 npm run hermes:doctor
 npm run hermes:dashboard
+npm run hermes:update
+npm run hermes:rollback
 ```
+
+Optional install inputs:
+
+| Environment variable | Default | Purpose |
+| :-- | :-- | :-- |
+| `PM_HERMES_REPO_URL` | `https://github.com/NousResearch/hermes-agent.git` | Source repository to clone when missing. |
+| `PM_HERMES_REF` | unset | Specific branch, tag, or commit to checkout during install. |
+| `PM_HERMES_AUTO_UPDATE` | `0` | When set to `1`, fetch and checkout `origin/main` during install before installing. |
 
 `npm run hermes:dashboard` starts the Hermes dashboard on `127.0.0.1:9119` without opening a browser. Project Manager's Documentation view reads the OpenAPI spec from this same local port.
 
@@ -71,9 +82,21 @@ Project Manager 已把 Hermes Agent source 放在 `.project-manager/vendor/herme
 npm run hermes:install
 npm run hermes:doctor
 npm run hermes:dashboard
+npm run hermes:update
+npm run hermes:rollback
 ```
 
+若 checkout 不存在，installer 會自動 clone `https://github.com/NousResearch/hermes-agent.git` 到 `.project-manager/vendor/hermes-agent`。
+
 安裝後，Hermes CLI wrapper 會在 `.project-manager/bin/hermes`，runtime home 會在 `.project-manager/hermes/`。這個資料夾是本機狀態，已由 `.gitignore` 排除。
+
+可選 install 參數：
+
+| Environment variable | Default | 用途 |
+| :-- | :-- | :-- |
+| `PM_HERMES_REPO_URL` | `https://github.com/NousResearch/hermes-agent.git` | checkout 不存在時要 clone 的 source repository。 |
+| `PM_HERMES_REF` | unset | install 時指定 checkout 的 branch、tag 或 commit。 |
+| `PM_HERMES_AUTO_UPDATE` | `0` | 設為 `1` 時，install 前會 fetch 並 checkout `origin/main`。 |
 
 ## 3. Plugin 開關
 

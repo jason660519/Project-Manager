@@ -17,11 +17,11 @@ The main architecture decision was to keep third-party app source, virtual envir
 
 | Work item | Completion | Notes |
 | :-- | :-- | :-- |
-| Hermes Agent project-scoped install | 100% | Installed and re-pointed wrapper to `.project-manager/vendor/hermes-agent`. |
-| OpenClaw project-scoped install | 95% | CLI, dist artifacts, project state, wrapper, plugin toggle, and docs are in place. Full reinstall after final relocation was interrupted after a long pnpm/native-package retry, but existing artifacts and CLI version verify correctly. |
+| Hermes Agent project-scoped install | 100% | Installer now auto-clones missing source into `.project-manager/vendor/hermes-agent`, builds a local venv, writes a wrapper, and records a manifest. |
+| OpenClaw project-scoped install | 100% | Installer now auto-clones missing source into `.project-manager/vendor/openclaw`, builds OpenClaw, writes local state/config, and records a manifest. |
 | Plugin catalog integration | 100% | OpenClaw is registered as a disabled-by-default CLI plugin; user can enable it from Plugins. |
-| Adapter bridge integration | 100% | Enabled OpenClaw/Hermes CLI plugins can be promoted into Project Manager agent adapters. |
-| Update/rollback workflow | 100% | Added OpenClaw update and rollback scripts plus runbook instructions. |
+| Adapter bridge integration | 100% | Enabled OpenClaw/Hermes CLI plugins are promoted into Project Manager RuntimeAdapters, so dispatch no longer expands plugin commands directly in UI. |
+| Update/rollback workflow | 100% | Added OpenClaw and Hermes update/rollback scripts plus runbook instructions. |
 | Next/Turbopack build isolation | 100% | Moved external runtimes out of `app/` and top-level source directories; build now passes. |
 | OpenAI/Codex daily-report command | 100% | Added a repo-local workflow command and AGENTS routing rule for daily work logs. |
 
@@ -31,6 +31,8 @@ The main architecture decision was to keep third-party app source, virtual envir
 | :-- | :-- |
 | Hermes wrapper | `scripts/hermes-agent.sh` |
 | Hermes installer | `scripts/install-hermes-agent.sh` |
+| Hermes updater | `scripts/update-hermes-agent.sh` |
+| Hermes rollback script | `scripts/rollback-hermes-agent.sh` |
 | OpenClaw wrapper | `scripts/openclaw.sh` |
 | OpenClaw installer | `scripts/install-openclaw.sh` |
 | OpenClaw updater | `scripts/update-openclaw.sh` |
@@ -38,6 +40,8 @@ The main architecture decision was to keep third-party app source, virtual envir
 | OpenClaw plugin catalog entry | `lib/storage/plugins.ts` |
 | Plugin marketplace entry | `app/ui/views/PluginsView.tsx` |
 | Plugin agent adapter bridge | `lib/adapters/registry.ts` |
+| RuntimeAdapter dispatch path | `components/table/TaskDispatchModal.tsx`, `lib/adapters/local-ide-adapter.ts` |
+| Plugin adapter regression tests | `__tests__/adapterRegistry.plugin.test.ts` |
 | OpenClaw operations runbook | `docs/engineering/openclaw-plugin.md` |
 | Hermes operations runbook update | `docs/engineering/hermes-agent-plugin.md` |
 | Engineering index update | `docs/engineering/README.md` |
@@ -93,6 +97,7 @@ The main architecture decision was to keep third-party app source, virtual envir
 | Third-party runtime source belongs under `.project-manager/vendor/` | It is project-scoped but not Project Manager source code. It must not be scanned by Next App Router or Turbopack as app code. |
 | `.project-manager/` remains git-ignored | Prevents committed secrets, runtime state, virtualenvs, node_modules, generated binaries, and third-party checkout churn. |
 | Project Manager commits wrappers and runbooks, not third-party app source | Keeps update/rollback behavior reproducible without vendoring external runtime trees into this repo. |
+| Plugin dispatch goes through RuntimeAdapter | Matches the usual integration boundary: UI chooses an adapter and runtime intent; adapter code owns command/prompt expansion and safety checks. |
 | OpenClaw is disabled by default in Plugins | Installation means available; user enablement is a separate product choice. |
 | Plugin is product/governance layer; MCP is future capability layer | Plugin manages install/update/rollback/settings. MCP should be added only as a connector/capability surface, not as the lifecycle owner. |
 | Codex daily-report workflow lives in repo docs, not as a fake slash command | Codex does not automatically expose Claude `.claude/commands/*.md`; durable behavior needs an explicit repo-local command contract and AGENTS routing rule. |
@@ -106,6 +111,8 @@ The main architecture decision was to keep third-party app source, virtual envir
 | `npm run openclaw:install` | Passed before final relocation; interrupted after relocation | Initial install built OpenClaw and control UI. Post-relocation rerun stalled on pnpm/native retry and was stopped. |
 | `npm run openclaw -- --version` | Passed | Reported `OpenClaw 2026.5.17 (bef3356)`. |
 | `npm run openclaw:doctor` | Passed with warnings | Expected warnings include missing command owner, plugin registry initialization, global service mismatch, and gateway not running. |
+| `bash -n scripts/install-openclaw.sh scripts/openclaw.sh scripts/update-openclaw.sh scripts/rollback-openclaw.sh scripts/install-hermes-agent.sh scripts/hermes-agent.sh scripts/update-hermes-agent.sh scripts/rollback-hermes-agent.sh` | Passed | Shell syntax checks passed. |
+| `npm run test -- __tests__/adapterRegistry.plugin.test.ts` | Passed | Verifies enabled plugin agents enter the RuntimeAdapter registry, disabled plugin agents stay out, and IDE root fallback is preserved. |
 | `npm run docs:check` | Passed | Docs governance checks passed. |
 | `npm run typecheck` | Passed | Next route types and TypeScript passed. |
 | `npm run build` | Passed | Next/Turbopack production build completed successfully. |
@@ -115,8 +122,7 @@ The main architecture decision was to keep third-party app source, virtual envir
 
 | Priority | Follow-up | Reason |
 | :-- | :-- | :-- |
-| P1 | Rerun `npm run openclaw:install` when network/native package fetches are stable | Confirms a clean rebuild after final `.project-manager/vendor/openclaw` relocation. |
-| P1 | Decide whether Project Manager should offer UI buttons for OpenClaw update/rollback | Scripts exist; UI workflow is not yet implemented. |
+| P1 | Add UI buttons for OpenClaw/Hermes install/update/rollback/status | Scripts exist; UI workflow is not yet implemented. |
 | P2 | Add a plugin capability manifest model | Needed to distinguish CLI, gateway, MCP, dashboard, updateable, and rollbackable plugins. |
 | P2 | Decide whether Hermes/OpenClaw should expose MCP connectors | Plugin lifecycle is in place; MCP can be added later as an AI capability surface. |
 | P2 | Resolve standards P2 hard-coded color warning | Current command exits 0 but reports token usage drift. |

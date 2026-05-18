@@ -11,6 +11,7 @@ OPENCLAW_ENV_FILE="$OPENCLAW_STATE_DIR/.env"
 
 if [ ! -f "$OPENCLAW_SRC/package.json" ]; then
   echo "OpenClaw source not found at: $OPENCLAW_SRC" >&2
+  echo "Run: npm run openclaw:install" >&2
   exit 1
 fi
 

@@ -37,6 +37,7 @@ npm run openclaw:install
 
 The installer:
 
+- clones OpenClaw into `.project-manager/vendor/openclaw` if the checkout is missing;
 - installs OpenClaw dependencies in `.project-manager/vendor/openclaw`;
 - builds OpenClaw and its control UI;
 - creates `.project-manager/openclaw/state/openclaw.json`;
@@ -44,6 +45,14 @@ The installer:
 - creates `.project-manager/bin/openclaw`.
 
 The generated `.env`, config, workspace, and manifest are intentionally ignored by git through `.project-manager/`.
+
+Optional install inputs:
+
+| Environment variable | Default | Purpose |
+| :-- | :-- | :-- |
+| `PM_OPENCLAW_REPO_URL` | `https://github.com/openclaw/openclaw.git` | Source repository to clone when missing. |
+| `PM_OPENCLAW_REF` | unset | Specific branch, tag, or commit to checkout during install. |
+| `PM_OPENCLAW_AUTO_UPDATE` | `0` | When set to `1`, fetch and checkout `origin/main` during install before building. |
 
 ## 4. Runtime Commands
 
@@ -91,6 +100,8 @@ npm run openclaw:update -- bef3356375
 ```
 
 The update script records the previous and current refs in `.project-manager/openclaw/manifest.json`.
+
+If install or build fails during update, the script attempts to restore the previous source ref before exiting.
 
 ## 7. Rollback
 
@@ -155,12 +166,21 @@ npm run openclaw:install
 installer 會：
 
 - 在 `.project-manager/vendor/openclaw` 安裝 OpenClaw dependencies；
+- 若 checkout 不存在，自動 clone 到 `.project-manager/vendor/openclaw`；
 - build OpenClaw 與 control UI；
 - 建立 `.project-manager/openclaw/state/openclaw.json`；
 - 建立 `.project-manager/openclaw/state/.env`，內含專案 scope 的 gateway token；
 - 建立 `.project-manager/bin/openclaw`。
 
 產生的 `.env`、config、workspace、manifest 都透過 `.project-manager/` 忽略，不進 git。
+
+可選 install 參數：
+
+| Environment variable | Default | 用途 |
+| :-- | :-- | :-- |
+| `PM_OPENCLAW_REPO_URL` | `https://github.com/openclaw/openclaw.git` | checkout 不存在時要 clone 的 source repository。 |
+| `PM_OPENCLAW_REF` | unset | install 時指定 checkout 的 branch、tag 或 commit。 |
+| `PM_OPENCLAW_AUTO_UPDATE` | `0` | 設為 `1` 時，install/build 前會 fetch 並 checkout `origin/main`。 |
 
 ## 4. Runtime Commands
 
@@ -208,6 +228,8 @@ npm run openclaw:update -- bef3356375
 ```
 
 update script 會在 `.project-manager/openclaw/manifest.json` 記錄 previous 與 current refs。
+
+如果 update 的 install/build 階段失敗，script 會嘗試 checkout 回 previous source ref 再退出。
 
 ## 7. 回滾
 

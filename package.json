@@ -18,6 +18,8 @@
     "hermes:install": "bash scripts/install-hermes-agent.sh",
     "hermes:doctor": "bash scripts/hermes-agent.sh doctor",
     "hermes:dashboard": "bash scripts/hermes-agent.sh dashboard --host 127.0.0.1 --port 9119 --no-open",
+    "hermes:update": "bash scripts/update-hermes-agent.sh",
+    "hermes:rollback": "bash scripts/rollback-hermes-agent.sh",
     "openclaw": "bash scripts/openclaw.sh",
     "openclaw:install": "bash scripts/install-openclaw.sh",
     "openclaw:doctor": "bash scripts/openclaw.sh doctor",

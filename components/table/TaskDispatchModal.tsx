@@ -16,8 +16,9 @@ import {
   buildAgentWorkflowPrompt,
   getAgentWorkflowById,
 } from '../../lib/agent-workflows';
+import { createRuntimeAdapterFromConfig } from '../../lib/adapters/registry';
 import { collectEnabledMcpServers } from '../../lib/storage/plugins';
-import { AgentAdapterConfig, AnyAdapterConfig, EngineerRole, ExecutionResult, Feature } from '../../lib/types';
+import { AnyAdapterConfig, EngineerRole, ExecutionResult, Feature } from '../../lib/types';
 
 // ── Prompt templates ──────────────────────────────────────────────────────────
 
@@ -209,14 +210,7 @@ export function TaskDispatchModal({
     }
   };
 
-  const buildCommand = (adapter: AnyAdapterConfig): { command: string; args: string[] } => {
-    if (adapter.type === 'ide') {
-      const filePath =
-        feature.paths.implementation ?? feature.paths.tdd ?? feature.paths.spec ?? '.';
-      return { command: adapter.command, args: [resolvePath(filePath, projectRoot)] };
-    }
-    const agent = adapter as AgentAdapterConfig;
-
+  const buildExecutionPrompt = () => {
     let effectivePrompt = prompt;
     if (selectedRole) {
       const parts: string[] = [];
@@ -233,14 +227,20 @@ export function TaskDispatchModal({
     if (selectedWorkflow) {
       effectivePrompt = buildAgentWorkflowPrompt(selectedWorkflow, feature, effectivePrompt);
     }
+    return effectivePrompt;
+  };
 
-    const args = agent.argsTemplate.map((arg) =>
-      arg
-        .replaceAll('{prompt}', effectivePrompt)
-        .replaceAll('{featureId}', feature.id)
-        .replaceAll('{root}', projectRoot),
-    );
-    return { command: agent.command, args };
+  const buildCommand = async (adapter: AnyAdapterConfig): Promise<{ command: string; args: string[] }> => {
+    const runtimeAdapter = createRuntimeAdapterFromConfig(adapter);
+    const result = await runtimeAdapter.execute({
+      feature,
+      prompt: buildExecutionPrompt(),
+      projectRoot,
+    });
+    if (!result.success || !result.command || !result.args) {
+      throw new Error(result.message ?? `Unable to build command for ${adapter.name}`);
+    }
+    return { command: result.command, args: result.args };
   };
 
   const handleExecute = async () => {
@@ -252,10 +252,9 @@ export function TaskDispatchModal({
 
     onFeatureUpdate?.(feature.id, { status: 'in_progress' });
 
-    const { command, args: baseArgs } = buildCommand(adapter);
-    const args = await augmentArgsWithMcp(command, baseArgs, collectEnabledMcpServers(projectRoot));
-
     try {
+      const { command, args: baseArgs } = await buildCommand(adapter);
+      const args = await augmentArgsWithMcp(command, baseArgs, collectEnabledMcpServers(projectRoot));
       const unStdout = await onAgentStdout(({ pid: eventPid, line }) => {
         if (activePidRef.current !== null && eventPid !== activePidRef.current) return;
         setLogs((prev) => [...prev, line]);
@@ -299,13 +298,12 @@ export function TaskDispatchModal({
     const adapter = adapters.find((a) => a.id === selectedAdapterId);
     if (!adapter) return;
 
-    const { command, args: baseArgs } = buildCommand(adapter);
-    const args = await augmentArgsWithMcp(command, baseArgs, collectEnabledMcpServers(projectRoot));
-    // AppleScript `do script` injects newlines as Enter mid-typing on macOS,
-    // so collapse literal newlines in args into spaces before spawning.
-    const flatArgs = args.map((a) => a.replace(/\r?\n/g, ' '));
-
     try {
+      const { command, args: baseArgs } = await buildCommand(adapter);
+      const args = await augmentArgsWithMcp(command, baseArgs, collectEnabledMcpServers(projectRoot));
+      // AppleScript `do script` injects newlines as Enter mid-typing on macOS,
+      // so collapse literal newlines in args into spaces before spawning.
+      const flatArgs = args.map((a) => a.replace(/\r?\n/g, ' '));
       await spawnTerminal({ command, args: flatArgs, cwd: projectRoot });
       onFeatureUpdate?.(feature.id, { status: 'in_progress' });
       onExecuted({
