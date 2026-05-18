@@ -5,7 +5,20 @@ import type { ProjectsRepository } from './ProjectsRepository';
 export type { ProjectsRepository } from './ProjectsRepository';
 export { CURRENT_SCHEMA_VERSION, migrateConfig } from './migrate';
 export { mergeFeaturesById } from './mergeFeatures';
+export { ensureEngineerRoles, mergeEngineerRolesById } from './mergeEngineerRoles';
 export { resolveConfigPath } from './resolveConfigPath';
+export {
+  buildOverwriteScaffold,
+  buildProjectScaffold,
+  defaultFeaturePaths,
+  defaultFeatureSpecPath,
+  ensureFeaturePaths,
+  mergeProjectConfig,
+  SCAFFOLD_DOC_DIRS,
+  DEFAULT_DEV_LOG_FOLDER,
+  type InitializeMode,
+  type InitializeProjectOptions,
+} from './createProjectScaffold';
 
 let repoInstance: ProjectsRepository | null = null;
 

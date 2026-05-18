@@ -42,6 +42,73 @@ async fn write_config(path: String, config: serde_json::Value) -> Result<(), Str
         .map_err(|e| format!("Cannot write {path}: {e}"))
 }
 
+#[derive(serde::Serialize)]
+struct InitializeProjectResult {
+    config_path: String,
+    created_dirs: Vec<String>,
+}
+
+/// Create scaffold directories and write `.project-manager.json` for a local project.
+/// `mode` is one of `create` | `merge` | `overwrite`. Caller supplies the final JSON for
+/// merge/overwrite; this command only enforces existence rules for `create`.
+#[tauri::command]
+async fn initialize_project(
+    project_root: String,
+    config: serde_json::Value,
+    mode: String,
+) -> Result<InitializeProjectResult, String> {
+    let root = std::path::Path::new(&project_root);
+    if !root.is_dir() {
+        return Err(format!("Project root does not exist: {project_root}"));
+    }
+
+    let config_path = root.join(".project-manager.json");
+    let config_path_str = config_path
+        .to_str()
+        .ok_or_else(|| format!("Invalid config path under {project_root}"))?
+        .to_string();
+
+    let exists = config_path.is_file();
+    match mode.as_str() {
+        "create" if exists => {
+            return Err(format!(
+                "CONFIG_EXISTS: {config_path_str} already exists. Use merge or overwrite."
+            ));
+        }
+        "create" | "merge" | "overwrite" => {}
+        other => return Err(format!("Invalid initialize mode: {other}")),
+    }
+
+    let scaffold_dirs = ["docs/features", "docs/dev-logs"];
+    let mut created_dirs: Vec<String> = Vec::new();
+    for rel in scaffold_dirs {
+        let dir = root.join(rel);
+        tokio::fs::create_dir_all(&dir)
+            .await
+            .map_err(|e| format!("Cannot create directory {}: {e}", dir.display()))?;
+        let gitkeep = dir.join(".gitkeep");
+        if !gitkeep.is_file() {
+            tokio::fs::write(&gitkeep, b"")
+                .await
+                .map_err(|e| format!("Cannot write {}: {e}", gitkeep.display()))?;
+        }
+        if let Some(s) = dir.to_str() {
+            created_dirs.push(s.to_string());
+        }
+    }
+
+    let content =
+        serde_json::to_string_pretty(&config).map_err(|e| format!("Serialize error: {e}"))?;
+    tokio::fs::write(&config_path, content)
+        .await
+        .map_err(|e| format!("Cannot write {config_path_str}: {e}"))?;
+
+    Ok(InitializeProjectResult {
+        config_path: config_path_str,
+        created_dirs,
+    })
+}
+
 /// Delete a `.project-manager.json` config file from disk.
 /// Refuses any path whose basename is not `.project-manager.json` so a typo in
 /// the configPath can never wipe an unrelated file.
@@ -70,6 +137,193 @@ async fn read_file(path: String) -> Result<String, String> {
     tokio::fs::read_to_string(&path)
         .await
         .map_err(|e| format!("Cannot read {path}: {e}"))
+}
+
+#[derive(Serialize, Clone)]
+struct EnvFileInfo {
+    path: String,
+    name: String,
+    content: String,
+}
+
+/// Scan a project root for dotenv-style files and return each one with its
+/// content already loaded. We only look at the top level — searching nested
+/// directories would pick up dependency fixtures (`node_modules/**/.env`) and
+/// is rarely what the user wants. Files larger than 256 KB are skipped so a
+/// stray binary named `.env` cannot freeze the renderer.
+#[tauri::command]
+async fn scan_env_files(root: String) -> Result<Vec<EnvFileInfo>, String> {
+    const MAX_SIZE: u64 = 256 * 1024;
+    let root_path = std::path::Path::new(&root);
+    if !root_path.is_dir() {
+        return Err(format!("Project root does not exist: {root}"));
+    }
+    let mut found: Vec<EnvFileInfo> = Vec::new();
+    let mut dir = tokio::fs::read_dir(root_path)
+        .await
+        .map_err(|e| format!("Cannot read dir {root}: {e}"))?;
+    while let Ok(Some(entry)) = dir.next_entry().await {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let name = match path.file_name().and_then(|s| s.to_str()) {
+            Some(n) => n.to_string(),
+            None => continue,
+        };
+        // Match `.env`, `.env.local`, `.env.development`, `.envrc`, etc.
+        let is_env = name == ".env"
+            || name == ".envrc"
+            || name.starts_with(".env.")
+            || name == "env"
+            || name == "env.local";
+        if !is_env {
+            continue;
+        }
+        if let Ok(meta) = entry.metadata().await {
+            if meta.len() > MAX_SIZE {
+                continue;
+            }
+        }
+        let content = match tokio::fs::read_to_string(&path).await {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        let path_str = match path.to_str() {
+            Some(s) => s.to_string(),
+            None => continue,
+        };
+        found.push(EnvFileInfo { path: path_str, name, content });
+    }
+    Ok(found)
+}
+
+// ── GitHub OAuth (Device Flow) ────────────────────────────────────────────────
+//
+// We use the device flow because it doesn't need a redirect URI / local HTTP
+// callback — the user pastes a short code into a browser tab, we poll the
+// token endpoint. Compatible with Tauri's static-export world.
+//
+// The `client_id` is read from the `PM_GITHUB_OAUTH_CLIENT_ID` env var at
+// runtime so each PM build/deployment can register its own OAuth App. Set up:
+//   1. https://github.com/settings/developers → New OAuth App
+//   2. Enable "Device Flow" in the app's settings
+//   3. Launch PM with PM_GITHUB_OAUTH_CLIENT_ID=<your-client-id>
+// When unset, the commands return a structured error the UI can surface.
+
+fn github_oauth_client_id() -> Result<String, String> {
+    match std::env::var("PM_GITHUB_OAUTH_CLIENT_ID") {
+        Ok(v) if !v.is_empty() => Ok(v),
+        _ => Err("OAUTH_NOT_CONFIGURED: set PM_GITHUB_OAUTH_CLIENT_ID to a GitHub OAuth App client ID with Device Flow enabled.".to_string()),
+    }
+}
+
+#[derive(Serialize, Clone)]
+struct GithubDeviceCode {
+    device_code: String,
+    user_code: String,
+    verification_uri: String,
+    expires_in: u64,
+    interval: u64,
+}
+
+#[derive(Deserialize)]
+struct DeviceCodeResponse {
+    device_code: String,
+    user_code: String,
+    verification_uri: String,
+    expires_in: u64,
+    interval: u64,
+}
+
+#[tauri::command]
+async fn github_oauth_device_start(scopes: String) -> Result<GithubDeviceCode, String> {
+    let client_id = github_oauth_client_id()?;
+    let client = reqwest::Client::new();
+    let res = client
+        .post("https://github.com/login/device/code")
+        .header("Accept", "application/json")
+        .form(&[("client_id", client_id.as_str()), ("scope", scopes.as_str())])
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {e}"))?;
+    if !res.status().is_success() {
+        let status = res.status();
+        let body = res.text().await.unwrap_or_default();
+        return Err(format!("GitHub device endpoint returned {status}: {body}"));
+    }
+    let parsed: DeviceCodeResponse = res
+        .json()
+        .await
+        .map_err(|e| format!("Cannot parse device-code response: {e}"))?;
+    Ok(GithubDeviceCode {
+        device_code: parsed.device_code,
+        user_code: parsed.user_code,
+        verification_uri: parsed.verification_uri,
+        expires_in: parsed.expires_in,
+        interval: parsed.interval,
+    })
+}
+
+#[derive(Serialize, Clone)]
+#[serde(tag = "status", rename_all = "snake_case")]
+enum GithubDevicePollResult {
+    /// User has not yet completed the browser step. Caller should keep polling.
+    Pending,
+    /// Caller is polling faster than `interval`. New interval echoed back.
+    SlowDown { interval: u64 },
+    /// The user code expired before authorization completed.
+    Expired,
+    /// The user explicitly denied access in the browser.
+    AccessDenied,
+    /// All done — `access_token` is the bearer to store.
+    Authorized { access_token: String },
+}
+
+#[derive(Deserialize)]
+struct DevicePollResponse {
+    access_token: Option<String>,
+    error: Option<String>,
+    interval: Option<u64>,
+}
+
+#[tauri::command]
+async fn github_oauth_device_poll(device_code: String) -> Result<GithubDevicePollResult, String> {
+    let client_id = github_oauth_client_id()?;
+    let client = reqwest::Client::new();
+    let res = client
+        .post("https://github.com/login/oauth/access_token")
+        .header("Accept", "application/json")
+        .form(&[
+            ("client_id", client_id.as_str()),
+            ("device_code", device_code.as_str()),
+            ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
+        ])
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {e}"))?;
+    if !res.status().is_success() {
+        let status = res.status();
+        let body = res.text().await.unwrap_or_default();
+        return Err(format!("GitHub token endpoint returned {status}: {body}"));
+    }
+    let parsed: DevicePollResponse = res
+        .json()
+        .await
+        .map_err(|e| format!("Cannot parse token response: {e}"))?;
+    if let Some(token) = parsed.access_token {
+        return Ok(GithubDevicePollResult::Authorized { access_token: token });
+    }
+    match parsed.error.as_deref() {
+        Some("authorization_pending") => Ok(GithubDevicePollResult::Pending),
+        Some("slow_down") => Ok(GithubDevicePollResult::SlowDown {
+            interval: parsed.interval.unwrap_or(10),
+        }),
+        Some("expired_token") => Ok(GithubDevicePollResult::Expired),
+        Some("access_denied") => Ok(GithubDevicePollResult::AccessDenied),
+        Some(other) => Err(format!("GitHub OAuth error: {other}")),
+        None => Err("GitHub OAuth response missing both access_token and error".to_string()),
+    }
 }
 
 /// Scan a directory for projects that contain a `.project-manager.json`.
@@ -2205,6 +2459,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             read_config,
             write_config,
+            initialize_project,
             delete_config,
             scan_projects,
             spawn_agent,
@@ -2219,6 +2474,9 @@ pub fn run() {
             start_github_poll,
             list_project_files,
             read_file,
+            scan_env_files,
+            github_oauth_device_start,
+            github_oauth_device_poll,
             list_sessions,
             read_session,
             save_session,

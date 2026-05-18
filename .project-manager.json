@@ -1,309 +1,47 @@
 {
-  "schemaVersion": 2,
-  "id": "11111111-d3v1-4000-8000-devpilot00001",
-  "createdAt": "2026-05-12T00:00:00.000Z",
-  "updatedAt": "2026-05-17T11:00:00.000Z",
-  "updatedBy": "Claude Opus 4.7",
-  "project": {
-    "name": "Project Manager",
-    "root": "/Volumes/KLEVV-4T-1/Project-Manager",
-    "defaultIDE": "Cursor"
+  "adapters": {
+    "agents": [
+      {
+        "argsTemplate": [
+          "--cwd",
+          "{root}",
+          "{prompt}"
+        ],
+        "command": "claude",
+        "id": "claude-code",
+        "name": "Claude Code",
+        "type": "agent"
+      }
+    ],
+    "ides": [
+      {
+        "command": "cursor",
+        "id": "Cursor",
+        "name": "Cursor",
+        "type": "ide"
+      },
+      {
+        "command": "code",
+        "id": "VSCode",
+        "name": "Visual Studio Code",
+        "type": "ide"
+      }
+    ]
   },
-  "features": [
-    {
-      "id": "F01",
-      "name": "Sidebar Navigation",
-      "category": "Frontend/UI",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "implementation": "app/ui/Sidebar.tsx"
-      },
-      "updatedAt": "2026-05-12T00:00:00.000Z",
-      "updatedBy": "claude"
-    },
-    {
-      "id": "F02",
-      "name": "Feature Filter Tabs",
-      "category": "Frontend/UX",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "implementation": "app/ui/DashboardClient.tsx"
-      },
-      "notes": "All / Blocked / In Progress / To Do / Done 五個 tab，含每組 count；選擇 persist 到 projectManager.personal.dashboard.statusFilter，重開回到上次篩選。",
-      "updatedAt": "2026-05-17T03:00:00.000Z",
-      "updatedBy": "Claude Opus 4.7"
-    },
-    {
-      "id": "F03",
-      "name": "Live Run Inspector",
-      "category": "Frontend/Monitor",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "implementation": "app/ui/views/RunsView.tsx"
-      },
-      "notes": "Active 區顯示 PID + 計時 + 展開 last 50 行 log + Kill；History 區顯示 exit code + 時長 + 點開展示 log。MainClient 透過 onAgentStdout/onAgentExit 餵資料。",
-      "updatedAt": "2026-05-17T03:00:00.000Z",
-      "updatedBy": "Claude Opus 4.7"
-    },
-    {
-      "id": "F04",
-      "name": "Add Project by GitHub URL",
-      "category": "Core/Integration",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "spec": "docs/01-user-scenarios.md",
-        "implementation": "app/ui/views/ProjectsView.tsx",
-        "rust": "src-tauri/src/lib.rs"
-      },
-      "notes": "ProjectsView 加入 GitHub URL → Rust fetchGithubRepo (GraphQL issues → Feature[])、5 分鐘背景 refresh (start_github_poll)、live feature sync。需 GitHub PAT（KeysView 設定）。",
-      "updatedAt": "2026-05-17T03:00:00.000Z",
-      "updatedBy": "Claude Opus 4.7"
-    },
-    {
-      "id": "F05",
-      "name": "Spec Ingestion Pipeline",
-      "category": "Core/AI",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "spec": "docs/02-prd.md",
-        "implementation": "lib/ingestion/parseMarkdown.ts",
-        "frontend": "app/ui/views/IngestionView.tsx"
-      },
-      "notes": "Markdown 直接解析；DOCX/XLSX 透過 callAnthropic 走 AI fallback（IngestionView 自動帶 sessionId + sessionsDir，對話進 SessionsView）。Browser dev mode 用 mock，Tauri 走 keychain Anthropic key。",
-      "updatedAt": "2026-05-17T03:00:00.000Z",
-      "updatedBy": "Claude Opus 4.7"
-    },
-    {
-      "id": "F06",
-      "name": "Storage Abstraction & Schema v2",
-      "category": "Core/Architecture",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "spec": "docs/architecture/ADR-006-schema-v2-sync-fields.md",
-        "implementation": "lib/storage/",
-        "developmentLogSummaryFolder": "docs/dev-logs/"
-      },
-      "notes": "Async ProjectsRepository + namespaced localStorage + schema v1→v2 migration + ADR-006",
-      "updatedAt": "2026-05-12T00:00:00.000Z",
-      "updatedBy": "claude"
-    },
-    {
-      "id": "F07",
-      "name": "Multi-view Dashboard Shell",
-      "category": "Frontend/UI",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "implementation": "app/ui/MainClient.tsx"
-      },
-      "notes": "13-view shell：Projects, Dashboard, Project Files, Plugins, AI Engineers, Sessions, Channels, Cron Jobs, Logs, Documentation, Keys, Settings, Features。lifted run state, CronJob engine, app shell routing 完成",
-      "updatedAt": "2026-05-12T12:30:00.000Z",
-      "updatedBy": "Claude Sonnet 4.6"
-    },
-    {
-      "id": "F08",
-      "name": "Project Files View",
-      "category": "Frontend/UI",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "implementation": "app/ui/views/ProjectFilesView.tsx"
-      },
-      "updatedAt": "2026-05-12T12:00:00.000Z",
-      "updatedBy": "Claude Sonnet 4.6"
-    },
-    {
-      "id": "F09",
-      "name": "API Key Storage in OS Keychain",
-      "category": "Core/Security",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "spec": "docs/architecture/ADR-004-api-key-storage.md",
-        "implementation": "src-tauri/src/lib.rs"
-      },
-      "notes": "keyring crate，API key 不進 renderer",
-      "updatedAt": "2026-05-12T00:00:00.000Z",
-      "updatedBy": "claude"
-    },
-    {
-      "id": "F10",
-      "name": "Plugins View",
-      "category": "Frontend/UI",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "implementation": "app/ui/views/PluginsView.tsx"
-      },
-      "notes": "v2 catalog（discriminated union: provider/cli/editor/mcp/skill）+ v1→v2 一次性 migration + Marketplace 三 tab UI（Installed / Marketplace / Skills）+ Configure 展開表單。共用 selector helpers 在 lib/storage/plugins.ts。",
-      "updatedAt": "2026-05-17T00:00:00.000Z",
-      "updatedBy": "Claude Opus 4.7"
-    },
-    {
-      "id": "F11",
-      "name": "Documentation View",
-      "category": "Frontend/UI",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "implementation": "app/ui/views/DocumentationView.tsx",
-        "spec": "app/documentation/page.tsx"
-      },
-      "notes": "Hermes Agent API Explorer：fetch /openapi.json，11 個群組側欄，method badge 色碼，endpoint 展開顯示 params/requestBody/responses，LIVE/OFFLINE 狀態指示器。Group.match TS 型別修正完成。",
-      "updatedAt": "2026-05-12T12:30:00.000Z",
-      "updatedBy": "Claude Sonnet 4.6"
-    },
-    {
-      "id": "F12",
-      "name": "Sessions View — AI Conversation History",
-      "category": "Frontend/Monitor",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "implementation": "app/ui/views/SessionsView.tsx",
-        "bridge": "lib/bridge/index.ts"
-      },
-      "notes": "雙欄 UI + AgentSession/SessionMessage + Rust call_anthropic 自動寫入 sessions 目錄。IngestionView AI 解析帶 sessionId + sessionsDir，並改走 KeysView 統一的 anthropic 金鑰位置。",
-      "updatedAt": "2026-05-17T00:00:00.000Z",
-      "updatedBy": "Claude Opus 4.7"
-    },
-    {
-      "id": "F13",
-      "name": "Channels View",
-      "category": "Core/Integration",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "implementation": "app/ui/views/ChannelsView.tsx",
-        "bridge": "lib/bridge/index.ts",
-        "rust": "src-tauri/src/lib.rs"
-      },
-      "notes": "Phase 1（設定表單）+ Phase 2（Telegram long-poll Rust bridge、Start/Stop UI、Recent Activity）+ Phase 3（指令接通真實資料）：/help 列出啟用的指令、/status 多專案摘要與 /status <name> 單專案 in_progress 前 8、/report 過去 7 天 updatedAt 變動的功能、/run <featureId> 用該專案第一個 agent 派遣並回 PID。allowed_chat_ids gate + /run 預設 disabled 為兩層安全閥。",
-      "updatedAt": "2026-05-17T02:00:00.000Z",
-      "updatedBy": "Claude Opus 4.7"
-    },
-    {
-      "id": "F14",
-      "name": "Cron Jobs View",
-      "category": "Core/Integration",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "implementation": "app/ui/views/CronJobsView.tsx",
-        "engine": "app/ui/MainClient.tsx"
-      },
-      "notes": "UI：新增/編輯/刪除/啟用、next run 倒計時、歷史紀錄。Engine：MainClient setInterval 30s heartbeat，到時 spawnAgent + 寫進 cronHistory + 回標 lastRun/lastStatus。設計選擇：cron 綁定 app process lifecycle（會在桌面 app 運作期間 fire），符合 view header「Scheduled commands that run while the app is open」聲明。背景 tray 模式未來可加 Rust cron_tick。",
-      "updatedAt": "2026-05-17T03:00:00.000Z",
-      "updatedBy": "Claude Opus 4.7"
-    },
-    {
-      "id": "F15",
-      "name": "Logs View",
-      "category": "Frontend/Monitor",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "implementation": "app/ui/views/LogsView.tsx"
-      },
-      "notes": "三 tab：Runs（active + history with kill/log expand）、Cron（按天分組的 cronHistory）、Dev Logs（依 feature.paths.developmentLogSummaryFolder 掃描 .md/.html 並用 readFile 顯示內容）。後端 list_project_files + read_file 早已註冊到 invoke_handler。",
-      "updatedAt": "2026-05-17T03:00:00.000Z",
-      "updatedBy": "Claude Opus 4.7"
-    },
-    {
-      "id": "F16",
-      "name": "Keys View",
-      "category": "Core/Security",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "implementation": "app/ui/views/KeysView.tsx"
-      },
-      "notes": "Anthropic / OpenAI / Gemini / GitHub PAT 四個 key；Tauri 走 OS Keychain (keyring crate)、瀏覽器走 localStorage with `projectManager-key:` 前綴；show/hide toggle；Save 後變綠 Saved ✓ 兩秒；Clear 鍵帶 confirm 確認，已設定值才會出現。",
-      "updatedAt": "2026-05-17T03:00:00.000Z",
-      "updatedBy": "Claude Opus 4.7"
-    },
-    {
-      "id": "F17",
-      "name": "AI Engineers Setting",
-      "category": "Frontend/UI",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "implementation": "app/ui/views/EngineersView.tsx"
-      },
-      "notes": "master-detail 兩欄 UI；5 個預設角色模板（Frontend/Backend/Fullstack/QA/DevOps）；EngineerRole 存於 ProjectManagerConfig.engineerRoles（project-level）；TaskDispatchModal 整合：角色選擇器 + systemPrompt + referenceFiles 自動注入 prompt；schema.json 加 engineerRole definition",
-      "updatedAt": "2026-05-12T17:00:00.000Z",
-      "updatedBy": "Claude Sonnet 4.6"
-    },
-    {
-      "id": "F18",
-      "name": "MCP Server Lifecycle",
-      "category": "Core/Integration",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "implementation": "src-tauri/src/lib.rs",
-        "bridge": "lib/bridge/index.ts"
-      },
-      "notes": "Rust commands：mcp_spawn / mcp_kill / mcp_status_all / mcp_logs / mcp_logs_dir + write_mcp_config + open_path。In-memory rolling log buffer (2000 lines) + 持久檔。前端 PluginsView Installed tab 內 Start/Stop/Restart/Logs 控制 + onMcpStatus 事件即時更新。TaskDispatchModal/BatchDispatchModal 透過 augmentArgsWithMcp 把 enabled stdio MCP servers 注入 Claude/Aider CLI（--mcp-config flag）。",
-      "updatedAt": "2026-05-17T00:00:00.000Z",
-      "updatedBy": "Claude Opus 4.7"
-    },
-    {
-      "id": "F19",
-      "name": "Skills Marketplace",
-      "category": "Core/Integration",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "implementation": "src-tauri/src/lib.rs",
-        "bridge": "lib/bridge/index.ts",
-        "frontend": "app/ui/views/PluginsView.tsx"
-      },
-      "notes": "Rust commands：skill_default_dir / skill_list / skill_install_from_url / skill_uninstall / skill_move_files。前端 Plugins → Skills tab：URL 安裝、Rescan、Open folder、Browse skillsmp.com。SettingsView 可改 skills 目錄並提供 move-existing 對話框。預設 ~/.claude/skills 跨平台。",
-      "updatedAt": "2026-05-17T00:00:00.000Z",
-      "updatedBy": "Claude Opus 4.7"
-    },
-    {
-      "id": "F20",
-      "name": "Interactive Terminal Spawn",
-      "category": "Core/Integration",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "implementation": "src-tauri/src/lib.rs",
-        "bridge": "lib/bridge/index.ts"
-      },
-      "notes": "spawn_terminal Rust command：開新的系統 Terminal 視窗執行 CLI（PM 不接管 stdout），給 Claude Code interactive / Aider / Codex 互動模式用。TaskDispatchModal 提供「在 Terminal 開啟」按鈕，macOS 用 AppleScript do script，注意換行需 flatten。",
-      "updatedAt": "2026-05-17T00:00:00.000Z",
-      "updatedBy": "Claude Opus 4.7"
-    },
-    {
-      "id": "F21",
-      "name": "Project Sync & Delete Actions",
-      "category": "Frontend/UX",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "implementation": "app/ui/views/ProjectsView.tsx",
-        "unitIntegrationTest": "__tests__/"
-      },
-      "notes": "每張 project card 新增 hover-revealed Sync (RefreshCw) + Delete (Trash2) 按鈕，header 加 Sync All；Sync 依來源走 readConfig 或 fetchGithubRepo，再用 mergeFeaturesById 把 PM 端 status/progress/notes 合併回硬碟版本，順手 stamp lastSyncedAt。Delete 為二次確認 modal，預設只移除 PM 引用，opt-in 「同時刪除設定檔」會呼叫新加的 Rust delete_config 指令（限制 basename = .project-manager.json 防呆）。附帶修了 Add Project modal 兩個 bug：AI Scan 跟 Manual Add 的輸入框不再共用 state；Manual Add 用新的 resolveConfigPath() 自動把資料夾路徑補上 .project-manager.json，失敗時改顯示「No .project-manager.json found — Try AI Scan」友善訊息（取代 os error 21）。TDD：6 個 resolveConfigPath unit test + 4 個 ProjectsView integration test 全部 pass。",
-      "updatedAt": "2026-05-17T11:00:00.000Z",
-      "updatedBy": "Claude Opus 4.7"
-    }
-  ],
+  "createdAt": "2026-05-12T00:00:00.000Z",
   "engineerRoles": [
     {
+      "commands": [
+        "npm run dev",
+        "npm run typecheck",
+        "npm run build"
+      ],
       "id": "role-frontend",
       "name": "Frontend Engineer",
-      "slug": "frontend",
+      "referenceFiles": [
+        "CLAUDE.md",
+        "docs/Architecture.md"
+      ],
       "skills": [
         "React",
         "TypeScript",
@@ -311,41 +49,40 @@
         "Next.js",
         "TanStack Table"
       ],
-      "commands": [
-        "npm run dev",
-        "npm run typecheck",
-        "npm run build"
-      ],
-      "systemPrompt": "You are a senior frontend engineer specializing in React and TypeScript. Focus on component architecture, type safety, and pixel-perfect UI. Follow the project's existing patterns. Prefer composition over inheritance, keep components small and focused.",
-      "referenceFiles": [
-        "CLAUDE.md",
-        "docs/Architecture.md"
-      ]
+      "slug": "frontend",
+      "systemPrompt": "You are a senior frontend engineer specializing in React and TypeScript. Focus on component architecture, type safety, and pixel-perfect UI. Follow the project's existing patterns. Prefer composition over inheritance, keep components small and focused."
     },
     {
+      "commands": [
+        "cargo check --manifest-path src-tauri/Cargo.toml",
+        "cargo build --manifest-path src-tauri/Cargo.toml"
+      ],
       "id": "role-backend",
       "name": "Backend Engineer",
-      "slug": "backend",
+      "referenceFiles": [
+        "CLAUDE.md",
+        "docs/Architecture.md",
+        "docs/architecture/ADR-004-api-key-storage.md"
+      ],
       "skills": [
         "Rust",
         "Tauri",
         "TypeScript"
       ],
-      "commands": [
-        "cargo check --manifest-path src-tauri/Cargo.toml",
-        "cargo build --manifest-path src-tauri/Cargo.toml"
-      ],
-      "systemPrompt": "You are a senior backend engineer working with Rust and Tauri v2. Focus on Rust bridge commands, process management, security, and performance. Write safe Rust code, handle errors with Result types, never expose secrets to the renderer.",
-      "referenceFiles": [
-        "CLAUDE.md",
-        "docs/Architecture.md",
-        "docs/architecture/ADR-004-api-key-storage.md"
-      ]
+      "slug": "backend",
+      "systemPrompt": "You are a senior backend engineer working with Rust and Tauri v2. Focus on Rust bridge commands, process management, security, and performance. Write safe Rust code, handle errors with Result types, never expose secrets to the renderer."
     },
     {
+      "commands": [
+        "npm run dev",
+        "npm run tauri:dev"
+      ],
       "id": "role-fullstack",
       "name": "Full-stack Engineer",
-      "slug": "fullstack",
+      "referenceFiles": [
+        "CLAUDE.md",
+        "docs/Architecture.md"
+      ],
       "skills": [
         "React",
         "Rust",
@@ -353,20 +90,61 @@
         "Tauri",
         "Next.js"
       ],
-      "commands": [
-        "npm run dev",
-        "npm run tauri:dev"
-      ],
-      "systemPrompt": "You are a senior full-stack engineer working on a Tauri desktop app with Next.js frontend and Rust backend. Balance UI quality with solid Rust bridge design. Read the ADRs before making architectural decisions.",
-      "referenceFiles": [
-        "CLAUDE.md",
-        "docs/Architecture.md"
-      ]
+      "slug": "fullstack",
+      "systemPrompt": "You are a senior full-stack engineer working on a Tauri desktop app with Next.js frontend and Rust backend. Balance UI quality with solid Rust bridge design. Read the ADRs before making architectural decisions."
     },
     {
+      "commands": [
+        "npm run test",
+        "npm run typecheck"
+      ],
+      "id": "role-qa",
+      "name": "QA Engineer",
+      "referenceFiles": [
+        "CLAUDE.md"
+      ],
+      "skills": [
+        "Testing",
+        "Vitest",
+        "TypeScript",
+        "Test Planning"
+      ],
+      "slug": "qa",
+      "systemPrompt": "You are a senior QA engineer. Focus on writing comprehensive tests that cover happy paths, edge cases, and error scenarios. Prefer integration tests over pure mocks. Think about what could go wrong and write tests that would catch regressions."
+    },
+    {
+      "commands": [
+        "npm run build",
+        "cargo build --release --manifest-path src-tauri/Cargo.toml"
+      ],
+      "id": "role-devops",
+      "name": "DevOps Engineer",
+      "referenceFiles": [
+        "CLAUDE.md"
+      ],
+      "skills": [
+        "Docker",
+        "CI/CD",
+        "GitHub Actions",
+        "Tauri Build",
+        "Shell"
+      ],
+      "slug": "devops",
+      "systemPrompt": "You are a senior DevOps engineer. Focus on build pipelines, Tauri app packaging, and release automation. Prefer declarative configuration. Make builds reproducible and releases easy to roll back."
+    },
+    {
+      "commands": [
+        "npm run docs:check",
+        "./start_project_manager.sh",
+        "npm run typecheck"
+      ],
       "id": "role-devex",
       "name": "開發者體驗專員",
-      "slug": "devex",
+      "referenceFiles": [
+        "CLAUDE.md",
+        "docs/engineering/README.md",
+        "DESIGN.md"
+      ],
       "skills": [
         "Developer Experience",
         "CLI Design",
@@ -375,46 +153,349 @@
         "Error Messages",
         "Tooling"
       ],
-      "commands": [
-        "npm run docs:check",
-        "./start_project_manager.sh",
-        "npm run typecheck"
-      ],
-      "systemPrompt": "You are a senior Developer Experience (DX) specialist. Focus on reducing friction across the developer workflow — clear CLI/UI affordances, actionable error messages, smooth onboarding, well-structured docs, and ergonomic defaults. Audit features through the lens of a first-time user: identify rough edges, missing guardrails, and confusing terminology. Prefer small, polish-oriented improvements that compound over time. Cross-reference CLAUDE.md, ADRs, and bilingual docs before suggesting changes.",
-      "referenceFiles": [
-        "CLAUDE.md",
-        "docs/engineering/README.md",
-        "DESIGN.md"
-      ]
+      "slug": "devex",
+      "systemPrompt": "You are a senior Developer Experience (DX) specialist. Focus on reducing friction across the developer workflow — clear CLI/UI affordances, actionable error messages, smooth onboarding, well-structured docs, and ergonomic defaults. Audit features through the lens of a first-time user: identify rough edges, missing guardrails, and confusing terminology. Prefer small, polish-oriented improvements that compound over time. Cross-reference CLAUDE.md, ADRs, and bilingual docs before suggesting changes."
     }
   ],
-  "adapters": {
-    "ides": [
-      {
-        "id": "Cursor",
-        "name": "Cursor",
-        "type": "ide",
-        "command": "cursor"
+  "features": [
+    {
+      "category": "Frontend/UI",
+      "id": "F01",
+      "name": "Sidebar Navigation",
+      "paths": {
+        "implementation": "app/ui/Sidebar.tsx"
       },
-      {
-        "id": "VSCode",
-        "name": "Visual Studio Code",
-        "type": "ide",
-        "command": "code"
-      }
-    ],
-    "agents": [
-      {
-        "id": "claude-code",
-        "name": "Claude Code",
-        "type": "agent",
-        "command": "claude",
-        "argsTemplate": [
-          "--cwd",
-          "{root}",
-          "{prompt}"
-        ]
-      }
-    ]
-  }
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-12T00:00:00.000Z",
+      "updatedBy": "claude"
+    },
+    {
+      "category": "Frontend/UX",
+      "id": "F02",
+      "name": "Feature Filter Tabs",
+      "notes": "All / Blocked / In Progress / To Do / Done 五個 tab，含每組 count；選擇 persist 到 projectManager.personal.dashboard.statusFilter，重開回到上次篩選。",
+      "paths": {
+        "implementation": "app/ui/DashboardClient.tsx"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-17T03:00:00.000Z",
+      "updatedBy": "Claude Opus 4.7"
+    },
+    {
+      "category": "Frontend/Monitor",
+      "id": "F03",
+      "name": "Live Run Inspector",
+      "notes": "Active 區顯示 PID + 計時 + 展開 last 50 行 log + Kill；History 區顯示 exit code + 時長 + 點開展示 log。MainClient 透過 onAgentStdout/onAgentExit 餵資料。",
+      "paths": {
+        "implementation": "app/ui/views/RunsView.tsx"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-17T03:00:00.000Z",
+      "updatedBy": "Claude Opus 4.7"
+    },
+    {
+      "category": "Core/Integration",
+      "id": "F04",
+      "name": "Add Project by GitHub URL",
+      "notes": "ProjectsView 加入 GitHub URL → Rust fetchGithubRepo (GraphQL issues → Feature[])、5 分鐘背景 refresh (start_github_poll)、live feature sync。需 GitHub PAT（KeysView 設定）。",
+      "paths": {
+        "implementation": "app/ui/views/ProjectsView.tsx",
+        "rust": "src-tauri/src/lib.rs",
+        "spec": "docs/01-user-scenarios.md"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-18T02:10:30.941Z",
+      "updatedBy": "Claude Opus 4.7"
+    },
+    {
+      "category": "Core/AI",
+      "id": "F05",
+      "name": "Spec Ingestion Pipeline",
+      "notes": "Markdown 直接解析；DOCX/XLSX 透過 callAnthropic 走 AI fallback（IngestionView 自動帶 sessionId + sessionsDir，對話進 SessionsView）。Browser dev mode 用 mock，Tauri 走 keychain Anthropic key。",
+      "paths": {
+        "frontend": "app/ui/views/IngestionView.tsx",
+        "implementation": "lib/ingestion/parseMarkdown.ts",
+        "spec": "docs/02-prd.md"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-17T03:00:00.000Z",
+      "updatedBy": "Claude Opus 4.7"
+    },
+    {
+      "category": "Core/Architecture",
+      "id": "F06",
+      "name": "Storage Abstraction & Schema v2",
+      "notes": "Async ProjectsRepository + namespaced localStorage + schema v1→v2 migration + ADR-006",
+      "paths": {
+        "developmentLogSummaryFolder": "docs/dev-logs/",
+        "implementation": "lib/storage/",
+        "spec": "docs/architecture/ADR-006-schema-v2-sync-fields.md"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-12T00:00:00.000Z",
+      "updatedBy": "claude"
+    },
+    {
+      "category": "Frontend/UI",
+      "id": "F07",
+      "name": "Multi-view Dashboard Shell",
+      "notes": "13-view shell：Projects, Dashboard, Project Files, Plugins, AI Engineers, Sessions, Channels, Cron Jobs, Logs, Documentation, Keys, Settings, Features。lifted run state, CronJob engine, app shell routing 完成",
+      "paths": {
+        "implementation": "app/ui/MainClient.tsx"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-12T12:30:00.000Z",
+      "updatedBy": "Claude Sonnet 4.6"
+    },
+    {
+      "category": "Frontend/UI",
+      "id": "F08",
+      "name": "Project Files View",
+      "paths": {
+        "implementation": "app/ui/views/ProjectFilesView.tsx"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-12T12:00:00.000Z",
+      "updatedBy": "Claude Sonnet 4.6"
+    },
+    {
+      "category": "Core/Security",
+      "id": "F09",
+      "name": "API Key Storage in OS Keychain",
+      "notes": "keyring crate，API key 不進 renderer",
+      "paths": {
+        "implementation": "src-tauri/src/lib.rs",
+        "spec": "docs/architecture/ADR-004-api-key-storage.md"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-12T00:00:00.000Z",
+      "updatedBy": "claude"
+    },
+    {
+      "category": "Frontend/UI",
+      "id": "F10",
+      "name": "Plugins View",
+      "notes": "v2 catalog（discriminated union: provider/cli/editor/mcp/skill）+ v1→v2 一次性 migration + Marketplace 三 tab UI（Installed / Marketplace / Skills）+ Configure 展開表單。共用 selector helpers 在 lib/storage/plugins.ts。",
+      "paths": {
+        "implementation": "app/ui/views/PluginsView.tsx"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-17T00:00:00.000Z",
+      "updatedBy": "Claude Opus 4.7"
+    },
+    {
+      "category": "Frontend/UI",
+      "id": "F11",
+      "name": "Documentation View",
+      "notes": "Hermes Agent API Explorer：fetch /openapi.json，11 個群組側欄，method badge 色碼，endpoint 展開顯示 params/requestBody/responses，LIVE/OFFLINE 狀態指示器。Group.match TS 型別修正完成。",
+      "paths": {
+        "implementation": "app/ui/views/DocumentationView.tsx",
+        "spec": "app/documentation/page.tsx"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-12T12:30:00.000Z",
+      "updatedBy": "Claude Sonnet 4.6"
+    },
+    {
+      "category": "Frontend/Monitor",
+      "id": "F12",
+      "name": "Sessions View — AI Conversation History",
+      "notes": "雙欄 UI + AgentSession/SessionMessage + Rust call_anthropic 自動寫入 sessions 目錄。IngestionView AI 解析帶 sessionId + sessionsDir，並改走 KeysView 統一的 anthropic 金鑰位置。",
+      "paths": {
+        "bridge": "lib/bridge/index.ts",
+        "implementation": "app/ui/views/SessionsView.tsx"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-17T00:00:00.000Z",
+      "updatedBy": "Claude Opus 4.7"
+    },
+    {
+      "category": "Core/Integration",
+      "id": "F13",
+      "name": "Channels View",
+      "notes": "Phase 1（設定表單）+ Phase 2（Telegram long-poll Rust bridge、Start/Stop UI、Recent Activity）+ Phase 3（指令接通真實資料）：/help 列出啟用的指令、/status 多專案摘要與 /status <name> 單專案 in_progress 前 8、/report 過去 7 天 updatedAt 變動的功能、/run <featureId> 用該專案第一個 agent 派遣並回 PID。allowed_chat_ids gate + /run 預設 disabled 為兩層安全閥。",
+      "paths": {
+        "bridge": "lib/bridge/index.ts",
+        "implementation": "app/ui/views/ChannelsView.tsx",
+        "rust": "src-tauri/src/lib.rs"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-17T02:00:00.000Z",
+      "updatedBy": "Claude Opus 4.7"
+    },
+    {
+      "category": "Core/Integration",
+      "id": "F14",
+      "name": "Cron Jobs View",
+      "notes": "UI：新增/編輯/刪除/啟用、next run 倒計時、歷史紀錄。Engine：MainClient setInterval 30s heartbeat，到時 spawnAgent + 寫進 cronHistory + 回標 lastRun/lastStatus。設計選擇：cron 綁定 app process lifecycle（會在桌面 app 運作期間 fire），符合 view header「Scheduled commands that run while the app is open」聲明。背景 tray 模式未來可加 Rust cron_tick。",
+      "paths": {
+        "engine": "app/ui/MainClient.tsx",
+        "implementation": "app/ui/views/CronJobsView.tsx"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-17T03:00:00.000Z",
+      "updatedBy": "Claude Opus 4.7"
+    },
+    {
+      "category": "Frontend/Monitor",
+      "id": "F15",
+      "name": "Logs View",
+      "notes": "三 tab：Runs（active + history with kill/log expand）、Cron（按天分組的 cronHistory）、Dev Logs（依 feature.paths.developmentLogSummaryFolder 掃描 .md/.html 並用 readFile 顯示內容）。後端 list_project_files + read_file 早已註冊到 invoke_handler。",
+      "paths": {
+        "implementation": "app/ui/views/LogsView.tsx"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-17T03:00:00.000Z",
+      "updatedBy": "Claude Opus 4.7"
+    },
+    {
+      "category": "Core/Security",
+      "id": "F16",
+      "name": "Keys View",
+      "notes": "Anthropic / OpenAI / Gemini / GitHub PAT 四個 key；Tauri 走 OS Keychain (keyring crate)、瀏覽器走 localStorage with `projectManager-key:` 前綴；show/hide toggle；Save 後變綠 Saved ✓ 兩秒；Clear 鍵帶 confirm 確認，已設定值才會出現。",
+      "paths": {
+        "implementation": "app/ui/views/KeysView.tsx"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-17T03:00:00.000Z",
+      "updatedBy": "Claude Opus 4.7"
+    },
+    {
+      "category": "Frontend/UI",
+      "id": "F17",
+      "name": "AI Engineers Setting",
+      "notes": "master-detail 兩欄 UI；5 個預設角色模板（Frontend/Backend/Fullstack/QA/DevOps）；EngineerRole 存於 ProjectManagerConfig.engineerRoles（project-level）；TaskDispatchModal 整合：角色選擇器 + systemPrompt + referenceFiles 自動注入 prompt；schema.json 加 engineerRole definition",
+      "paths": {
+        "implementation": "app/ui/views/EngineersView.tsx"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-12T17:00:00.000Z",
+      "updatedBy": "Claude Sonnet 4.6"
+    },
+    {
+      "category": "Core/Integration",
+      "id": "F18",
+      "name": "MCP Server Lifecycle",
+      "notes": "Rust commands：mcp_spawn / mcp_kill / mcp_status_all / mcp_logs / mcp_logs_dir + write_mcp_config + open_path。In-memory rolling log buffer (2000 lines) + 持久檔。前端 PluginsView Installed tab 內 Start/Stop/Restart/Logs 控制 + onMcpStatus 事件即時更新。TaskDispatchModal/BatchDispatchModal 透過 augmentArgsWithMcp 把 enabled stdio MCP servers 注入 Claude/Aider CLI（--mcp-config flag）。",
+      "paths": {
+        "bridge": "lib/bridge/index.ts",
+        "implementation": "src-tauri/src/lib.rs"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-17T00:00:00.000Z",
+      "updatedBy": "Claude Opus 4.7"
+    },
+    {
+      "category": "Core/Integration",
+      "id": "F19",
+      "name": "Skills Marketplace",
+      "notes": "Rust commands：skill_default_dir / skill_list / skill_install_from_url / skill_uninstall / skill_move_files。前端 Plugins → Skills tab：URL 安裝、Rescan、Open folder、Browse skillsmp.com。SettingsView 可改 skills 目錄並提供 move-existing 對話框。預設 ~/.claude/skills 跨平台。",
+      "paths": {
+        "bridge": "lib/bridge/index.ts",
+        "frontend": "app/ui/views/PluginsView.tsx",
+        "implementation": "src-tauri/src/lib.rs"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-17T00:00:00.000Z",
+      "updatedBy": "Claude Opus 4.7"
+    },
+    {
+      "category": "Core/Integration",
+      "id": "F20",
+      "name": "Interactive Terminal Spawn",
+      "notes": "spawn_terminal Rust command：開新的系統 Terminal 視窗執行 CLI（PM 不接管 stdout），給 Claude Code interactive / Aider / Codex 互動模式用。TaskDispatchModal 提供「在 Terminal 開啟」按鈕，macOS 用 AppleScript do script，注意換行需 flatten。",
+      "paths": {
+        "bridge": "lib/bridge/index.ts",
+        "implementation": "src-tauri/src/lib.rs"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-17T00:00:00.000Z",
+      "updatedBy": "Claude Opus 4.7"
+    },
+    {
+      "category": "Frontend/UX",
+      "id": "F21",
+      "name": "Project Sync & Delete Actions",
+      "notes": "每張 project card 新增 hover-revealed Sync (RefreshCw) + Delete (Trash2) 按鈕，header 加 Sync All；Sync 依來源走 readConfig 或 fetchGithubRepo，再用 mergeFeaturesById 把 PM 端 status/progress/notes 合併回硬碟版本，順手 stamp lastSyncedAt。Delete 為二次確認 modal，預設只移除 PM 引用，opt-in 「同時刪除設定檔」會呼叫新加的 Rust delete_config 指令（限制 basename = .project-manager.json 防呆）。附帶修了 Add Project modal 兩個 bug：AI Scan 跟 Manual Add 的輸入框不再共用 state；Manual Add 用新的 resolveConfigPath() 自動把資料夾路徑補上 .project-manager.json，失敗時改顯示「No .project-manager.json found — Try AI Scan」友善訊息（取代 os error 21）。TDD：6 個 resolveConfigPath unit test + 4 個 ProjectsView integration test 全部 pass。",
+      "paths": {
+        "implementation": "app/ui/views/ProjectsView.tsx",
+        "unitIntegrationTest": "__tests__/"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-17T11:00:00.000Z",
+      "updatedBy": "Claude Opus 4.7"
+    }
+  ],
+  "id": "11111111-d3v1-4000-8000-devpilot00001",
+  "project": {
+    "defaultIDE": "Cursor",
+    "name": "Project Manager",
+    "root": "/Volumes/KLEVV-4T-1/Project-Manager"
+  },
+  "schemaVersion": 4,
+  "updatedAt": "2026-05-17T11:00:00.000Z",
+  "updatedBy": "Claude Opus 4.7"
 }

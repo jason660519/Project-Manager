@@ -3,7 +3,7 @@ export type AdapterType = 'ide' | 'agent';
 export type IDEId = 'Cursor' | 'VSCode' | 'Trae' | 'Antigravity';
 
 // ── Project-progress phase model (schema v3) ─────────────────────────────────
-export type FeaturePhase = 'development' | 'testing' | 'deployment' | 'operations';
+export type FeaturePhase = 'development' | 'e2e_testing' | 'deployment' | 'operations';
 export type TestStatus = 'passed' | 'failed' | 'pending';
 export type DeployStatus = 'production' | 'staging' | 'not_deployed';
 
@@ -59,7 +59,7 @@ export interface Feature {
   points?: number;
   /** Estimated source page / route where the feature lives. */
   locatedPage?: string;
-  // testing
+  // e2e_testing
   testCoverage?: number;
   testStatus?: TestStatus;
   // deployment

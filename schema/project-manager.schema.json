@@ -145,7 +145,10 @@
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
-        "category": { "type": "string" },
+        "category": {
+          "type": "string",
+          "description": "Feature grouping label. On the E2E testing phase, prefer: in_project, cross_project, external, smoke, regression, acceptance, migration, monitoring."
+        },
         "status": {
           "type": "string",
           "enum": ["todo", "in_progress", "done", "on_hold"],
@@ -185,7 +188,7 @@
         },
         "phase": {
           "type": "string",
-          "enum": ["development", "testing", "deployment", "operations"],
+          "enum": ["development", "e2e_testing", "deployment", "operations"],
           "default": "development",
           "description": "Lifecycle phase (v3)."
         },

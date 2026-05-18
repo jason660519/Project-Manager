@@ -31,6 +31,13 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "app/plugins/openclaw",
+    "app/plugins/hermes-agent",
+    "vendor/openclaw",
+    "vendor/hermes-agent",
+    ".next/types/validator.ts",
+    ".next/dev/types/validator.ts",
+    ".project-manager"
   ]
 }

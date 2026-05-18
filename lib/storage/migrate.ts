@@ -22,7 +22,7 @@ interface RawConfig {
   [key: string]: unknown;
 }
 
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 
 export function migrateConfig(raw: unknown): ProjectManagerConfig {
   const cfg = (raw && typeof raw === 'object' ? (raw as RawConfig) : {}) as RawConfig;
@@ -30,6 +30,7 @@ export function migrateConfig(raw: unknown): ProjectManagerConfig {
   let next: RawConfig = { ...cfg };
   if (version < 2) next = migrate_1_to_2(next);
   if (version < 3) next = migrate_2_to_3(next);
+  if (version < 4) next = migrate_3_to_4(next);
   // Cast through unknown: `RawConfig` is intentionally a permissive bag,
   // and the migration steps above are responsible for ensuring the result
   // matches `ProjectManagerConfig`.
@@ -72,6 +73,23 @@ function migrate_2_to_3(cfg: RawConfig): RawConfig {
   return {
     ...cfg,
     schemaVersion: 3,
+    features,
+  };
+}
+
+/**
+ * v3 → v4: renames the lifecycle phase `testing` → `e2e_testing` (E2E tab).
+ */
+function migrate_3_to_4(cfg: RawConfig): RawConfig {
+  const features = Array.isArray(cfg.features)
+    ? (cfg.features as Feature[]).map((f) => ({
+        ...f,
+        phase: (f as { phase?: string }).phase === 'testing' ? 'e2e_testing' : f.phase,
+      }))
+    : [];
+  return {
+    ...cfg,
+    schemaVersion: 4,
     features,
   };
 }

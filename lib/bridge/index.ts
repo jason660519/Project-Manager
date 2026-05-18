@@ -34,6 +34,31 @@ export async function writeConfig(path: string, config: ProjectManagerConfig): P
   return invoke<void>('write_config', { path, config });
 }
 
+export interface InitializeProjectResult {
+  configPath: string;
+  createdDirs: string[];
+}
+
+export type InitializeProjectMode = 'create' | 'merge' | 'overwrite';
+
+/**
+ * Create `docs/features/`, `docs/dev-logs/`, and write `.project-manager.json`.
+ * See `lib/storage/createProjectScaffold.ts` for config assembly before calling this.
+ */
+export async function initializeProject(
+  projectRoot: string,
+  config: ProjectManagerConfig,
+  mode: InitializeProjectMode,
+): Promise<InitializeProjectResult> {
+  if (!isTauri()) throw new Error('initializeProject requires Tauri runtime');
+  const raw = await invoke<{ config_path: string; created_dirs: string[] }>('initialize_project', {
+    projectRoot,
+    config,
+    mode,
+  });
+  return { configPath: raw.config_path, createdDirs: raw.created_dirs };
+}
+
 /**
  * Delete a `.project-manager.json` config file from disk.
  * Rust refuses paths whose basename is not `.project-manager.json` so this
@@ -597,6 +622,74 @@ export async function saveSession(sessionsDir: string, session: AgentSession): P
 export async function readFile(path: string): Promise<string> {
   if (!isTauri()) return '';
   return invoke<string>('read_file', { path });
+}
+
+// ── .env discovery (Keys view bulk import) ────────────────────────────────────
+
+export interface EnvFileInfo {
+  path: string;
+  name: string;
+  content: string;
+}
+
+/**
+ * Scan a project's top-level directory for dotenv-style files (.env, .env.local,
+ * .envrc, …) and return each with its content preloaded.  Files larger than
+ * 256 KB are skipped on the Rust side. Returns `[]` outside Tauri (no FS).
+ */
+export async function scanEnvFiles(root: string): Promise<EnvFileInfo[]> {
+  if (!isTauri()) return [];
+  return invoke<EnvFileInfo[]>('scan_env_files', { root });
+}
+
+// ── GitHub OAuth Device Flow ──────────────────────────────────────────────────
+
+export interface GithubDeviceCode {
+  deviceCode: string;
+  userCode: string;
+  verificationUri: string;
+  expiresIn: number;
+  interval: number;
+}
+
+interface RawDeviceCode {
+  device_code: string;
+  user_code: string;
+  verification_uri: string;
+  expires_in: number;
+  interval: number;
+}
+
+export type GithubDevicePollResult =
+  | { status: 'pending' }
+  | { status: 'slow_down'; interval: number }
+  | { status: 'expired' }
+  | { status: 'access_denied' }
+  | { status: 'authorized'; access_token: string };
+
+/**
+ * Kick off the GitHub OAuth Device Flow. Returns a user code the renderer
+ * displays + a verification URL to open in the browser. Throws with
+ * `OAUTH_NOT_CONFIGURED` when `PM_GITHUB_OAUTH_CLIENT_ID` is unset.
+ */
+export async function githubOAuthDeviceStart(scopes: string[]): Promise<GithubDeviceCode> {
+  if (!isTauri()) throw new Error('githubOAuthDeviceStart requires Tauri runtime');
+  const raw = await invoke<RawDeviceCode>('github_oauth_device_start', {
+    scopes: scopes.join(' '),
+  });
+  return {
+    deviceCode: raw.device_code,
+    userCode: raw.user_code,
+    verificationUri: raw.verification_uri,
+    expiresIn: raw.expires_in,
+    interval: raw.interval,
+  };
+}
+
+/** Poll the token endpoint once. Caller is responsible for the interval loop. */
+export async function githubOAuthDevicePoll(deviceCode: string): Promise<GithubDevicePollResult> {
+  if (!isTauri()) throw new Error('githubOAuthDevicePoll requires Tauri runtime');
+  return invoke<GithubDevicePollResult>('github_oauth_device_poll', { deviceCode });
 }
 
 // ── Project file tree ─────────────────────────────────────────────────────────

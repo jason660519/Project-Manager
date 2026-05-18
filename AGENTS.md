@@ -38,6 +38,12 @@ npm run standards:check
 npm run docs:check
 ```
 
+## OpenAI/Codex Workflow Commands
+
+Claude `.claude/commands/*.md` files are not automatically exposed as Codex slash commands. For Project Manager, durable OpenAI/Codex workflow commands live under `docs/project-process/commands/`.
+
+When the user asks for `/daily-report`, `daily-report`, `每日工作日誌`, or a similar daily progress report request, follow `docs/project-process/commands/daily-report.md` and write the report under `docs/project-process/` using the repo-local date-prefixed filename convention.
+
 ## Context7
 
 Use Context7 MCP to fetch current documentation whenever the task asks about a library, framework, SDK, API, CLI tool, or cloud service. Start with `resolve-library-id` unless the user provides an exact `/org/project` library ID, then use `query-docs` with the selected library ID and the full question.
