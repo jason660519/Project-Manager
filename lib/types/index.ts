@@ -71,6 +71,12 @@ export interface Feature {
   errorRate?: number;
   avgResponseTime?: number;
   lastIncident?: string;
+  // TDD progress track (separate from overall `progress`).
+  tddProgress?: number;
+  /** Assigned engineerRole id (references ProjectManagerConfig.engineerRoles[].id). */
+  assignedRoleId?: string;
+  /** Per-feature IDE override; falls back to project.defaultIDE when unset. */
+  assignedIDE?: IDEId;
   // prompt engineer (row-level auto-loop config)
   promptConfig?: FeaturePromptConfig;
 }

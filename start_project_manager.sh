@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# DevPilot — one-click install / update / start
+# Project Manager — one-click install / update / start
 # Usage:
 #   ./start_project_manager.sh          auto-detect and start (installs if needed)
 #   ./start_project_manager.sh install  force full install check
@@ -65,7 +65,7 @@ ensure_dev_port_available() {
 
   warn "Port $DEV_PORT is currently in use. Resolving conflict…"
 
-  local force_kill="${DEVPILOT_FORCE_KILL_PORT:-0}"
+  local force_kill="${PROJECT_MANAGER_FORCE_KILL_PORT:-0}"
   local pid
   for pid in "${pids[@]}"; do
     local cmdline
@@ -80,7 +80,7 @@ ensure_dev_port_available() {
     error "Port $DEV_PORT is used by a non-Next process (PID $pid): ${cmdline:-unknown}"
     echo ""
     echo "To proceed, either stop that process or run with:"
-    echo "  DEVPILOT_FORCE_KILL_PORT=1 ./start_project_manager.sh start"
+    echo "  PROJECT_MANAGER_FORCE_KILL_PORT=1 ./start_project_manager.sh start"
     exit 1
   done
 
@@ -225,7 +225,7 @@ rust_check() {
 
 # ── State file: track whether full install has run ───────────────────────────
 
-STATE_FILE="$SCRIPT_DIR/.devpilot-installed"
+STATE_FILE="$SCRIPT_DIR/.project-manager-installed"
 
 mark_installed() {
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$STATE_FILE"
@@ -235,17 +235,17 @@ is_installed() {
   [[ -f "$STATE_FILE" ]] && [[ -d "$SCRIPT_DIR/node_modules" ]]
 }
 
-# ── Auto-generate .dev-pilot.json ─────────────────────────────────────────────
+# ── Auto-generate .project-manager.json ─────────────────────────────────────────────
 
 auto_generate_config() {
-  local config_file="$SCRIPT_DIR/.dev-pilot.json"
+  local config_file="$SCRIPT_DIR/.project-manager.json"
 
   if [[ -f "$config_file" ]]; then
-    success ".dev-pilot.json already exists"
+    success ".project-manager.json already exists"
     return 0
   fi
 
-  info "Generating .dev-pilot.json from project structure…"
+  info "Generating .project-manager.json from project structure…"
 
   # Infer project name from package.json or directory name
   local project_name
@@ -275,7 +275,7 @@ auto_generate_config() {
   fi
 
   # Write the config
-  cat > "$config_file" << DEVPILOT_JSON
+  cat > "$config_file" << PROJECT_MANAGER_JSON
 {
   "schemaVersion": 1,
   "project": {
@@ -293,15 +293,15 @@ auto_generate_config() {
     ]
   }
 }
-DEVPILOT_JSON
+PROJECT_MANAGER_JSON
 
-  success "Generated .dev-pilot.json (features empty — use AI Scan in the UI to populate)"
+  success "Generated .project-manager.json (features empty — use AI Scan in the UI to populate)"
 }
 
 # ── Commands ──────────────────────────────────────────────────────────────────
 
 cmd_install() {
-  header "DevPilot — Full Install"
+  header "Project Manager — Full Install"
   check_xcode_clt
   check_homebrew
   check_node
@@ -312,13 +312,13 @@ cmd_install() {
   auto_generate_config
   mark_installed
   echo ""
-  success "Installation complete. Run ./start_project_manager.sh start to launch DevPilot."
+  success "Installation complete. Run ./start_project_manager.sh start to launch Project Manager."
 }
 
 cmd_update() {
-  header "DevPilot — Update"
+  header "Project Manager — Update"
   if ! is_installed; then
-    warn "DevPilot not yet installed. Running full install instead…"
+    warn "Project Manager not yet installed. Running full install instead…"
     cmd_install
     return
   fi
@@ -329,7 +329,7 @@ cmd_update() {
 }
 
 cmd_start() {
-  header "DevPilot — Start"
+  header "Project Manager — Start"
 
   # Ensure cargo is in PATH
   if [[ -f "$HOME/.cargo/env" ]]; then
@@ -344,14 +344,14 @@ cmd_start() {
 
   cd "$SCRIPT_DIR"
   ensure_dev_port_available
-  echo -e "${CYAN}Launching DevPilot desktop app…${RESET}"
+  echo -e "${CYAN}Launching Project Manager desktop app…${RESET}"
   echo -e "${CYAN}(Next.js will start on port ${DEV_PORT}, Tauri window will open shortly)${RESET}"
   echo ""
   npm run tauri:dev
 }
 
 cmd_web() {
-  header "DevPilot — Web Server (Next.js only)"
+  header "Project Manager — Web Server (Next.js only)"
 
   if ! is_installed; then
     warn "First run detected — running install first…"
@@ -391,12 +391,19 @@ cmd_auto() {
 
 echo -e "${BOLD}"
 cat << 'BANNER'
-  ██████╗ ███████╗██╗   ██╗    ██████╗ ██╗██╗      ██████╗ ████████╗
-  ██╔══██╗██╔════╝██║   ██║    ██╔══██╗██║██║     ██╔═══██╗╚══██╔══╝
-  ██║  ██║█████╗  ██║   ██║    ██████╔╝██║██║     ██║   ██║   ██║
-  ██║  ██║██╔══╝  ╚██╗ ██╔╝    ██╔═══╝ ██║██║     ██║   ██║   ██║
-  ██████╔╝███████╗ ╚████╔╝     ██║     ██║███████╗╚██████╔╝   ██║
-  ╚═════╝ ╚══════╝  ╚═══╝      ╚═╝     ╚═╝╚══════╝ ╚═════╝    ╚═╝
+ ██████╗ ██████╗  ██████╗      ██╗███████╗ ██████╗████████╗
+ ██╔══██╗██╔══██╗██╔═══██╗     ██║██╔════╝██╔════╝╚══██╔══╝
+ ██████╔╝██████╔╝██║   ██║     ██║█████╗  ██║        ██║   
+ ██╔═══╝ ██╔══██╗██║   ██║██   ██║██╔══╝  ██║        ██║   
+ ██║     ██║  ██║╚██████╔╝╚██████╔╝███████╗╚██████╗   ██║   
+ ╚═╝     ╚═╝  ╚═╝ ╚═════╝  ╚═════╝ ╚══════╝ ╚═════╝   ╚═╝   
+
+ ███╗   ███╗ █████╗ ███╗   ██╗ █████╗  ██████╗ ███████╗██████╗ 
+ ████╗ ████║██╔══██╗████╗  ██║██╔══██╗██╔════╝ ██╔════╝██╔══██╗
+ ██╔████╔██║███████║██╔██╗ ██║███████║██║  ███╗█████╗  ██████╔╝
+ ██║╚██╔╝██║██╔══██║██║╚██╗██║██╔══██║██║   ██║██╔══╝  ██╔══██╗
+ ██║ ╚═╝ ██║██║  ██║██║ ╚████║██║  ██║╚██████╔╝███████╗██║  ██║
+ ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝
 BANNER
 echo -e "${RESET}"
 

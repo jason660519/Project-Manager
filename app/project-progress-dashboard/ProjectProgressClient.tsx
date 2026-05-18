@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, Upload } from 'lucide-react';
 import type {
-  ActiveRun, AgentAdapterConfig, AnyAdapterConfig, CompletedRun, CronJob, Feature, FeaturePhase,
-  FeaturePromptConfig, ProjectConfig,
+  ActiveRun, AgentAdapterConfig, AnyAdapterConfig, CompletedRun, CronJob, EngineerRole,
+  Feature, FeaturePhase, FeaturePromptConfig, ProjectConfig,
 } from '../../lib/types';
 import { PHASE_IDS } from './types';
 import type { CustomProjectProgressRow } from './types';
@@ -24,6 +24,8 @@ interface ProjectProgressClientProps {
   projectRoot: string;
   features: Feature[];
   adapters: AnyAdapterConfig[];
+  /** Project-level engineer roles, used to populate the per-row Engineer dropdown. */
+  engineerRoles: EngineerRole[];
   cronJobs: CronJob[];
   activeRuns: ActiveRun[];
   runHistory?: CompletedRun[];
@@ -66,8 +68,8 @@ function readInitialPhase(): FeaturePhase {
 }
 
 export function ProjectProgressClient({
-  project, projectRoot, features, adapters, cronJobs, activeRuns, dashboardProjectNames,
-  onCronJobsChange, onFeaturePatch, onFeaturePromptSave, onRunCronJob,
+  project, projectRoot, features, adapters, engineerRoles, cronJobs, activeRuns,
+  dashboardProjectNames, onCronJobsChange, onFeaturePatch, onFeaturePromptSave, onRunCronJob,
   onRunStart, onRunLog, onRunEnd,
 }: ProjectProgressClientProps) {
   const [activePhase, setActivePhase] = useState<FeaturePhase>(() => readInitialPhase());
@@ -179,6 +181,7 @@ export function ProjectProgressClient({
             projectNames={dashboardProjectNames}
             projectRoot={projectRoot}
             features={phaseFeatures}
+            engineerRoles={engineerRoles}
             prefs={activePhasePrefs.prefs}
             patch={activePhasePrefs.patch}
             reset={activePhasePrefs.reset}

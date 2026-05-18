@@ -12,6 +12,13 @@
 export const KEY_SHARED_PROJECTS = 'projectManager.shared.projects';
 export const KEY_PERSONAL_SELECTED_PROJECT_ID = 'projectManager.personal.selectedProjectId';
 export const KEY_PERSONAL_DASHBOARD_PROJECT_IDS = 'projectManager.personal.dashboardProjectIds';
+/**
+ * Flag that records whether bundled sample projects have already been seeded
+ * (or whether existing storage has been migrated past the legacy
+ * force-merge-on-every-boot behaviour). Once true, the user fully owns
+ * their project list — deleted samples never come back.
+ */
+export const KEY_PERSONAL_SEEDED = 'projectManager.personal.seeded';
 
 export const KEY_SHARED_PLUGINS = 'projectManager.shared.plugins';
 export const KEY_SHARED_CHANNELS = 'projectManager.shared.channels';

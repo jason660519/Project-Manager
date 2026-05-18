@@ -28,4 +28,16 @@ export interface ProjectsRepository {
   /** Project IDs included in the dashboard (multi-select). */
   getDashboardProjectIds(): Promise<string[] | null>;
   setDashboardProjectIds(ids: string[]): Promise<void>;
+
+  // ── Seeding state ─────────────────────────────────────────────────────
+  /**
+   * Whether the project list has been "seeded" — i.e. either the bundled
+   * samples were inserted once for a brand-new user, or an upgrading user
+   * has been migrated past the legacy force-merge-on-every-boot behaviour.
+   * Once true, the user fully owns their project list and deleted entries
+   * never come back.
+   */
+  isSeeded(): Promise<boolean>;
+  /** Mark seeding as complete. Idempotent. */
+  markSeeded(): Promise<void>;
 }

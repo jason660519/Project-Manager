@@ -6,11 +6,12 @@ import {
   defaultFeatureSpecPath,
   mergeProjectConfig,
 } from '../lib/storage/createProjectScaffold';
+import { CURRENT_SCHEMA_VERSION } from '../lib/storage/migrate';
 
 describe('buildProjectScaffold', () => {
-  it('returns schema v3 config with empty features and default roles', () => {
+  it('returns latest-schema config with empty features and default roles', () => {
     const cfg = buildProjectScaffold('/Volumes/dev/MyApp');
-    expect(cfg.schemaVersion).toBe(3);
+    expect(cfg.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(cfg.project.root).toBe('/Volumes/dev/MyApp');
     expect(cfg.project.name).toBe('MyApp');
     expect(cfg.features).toEqual([]);

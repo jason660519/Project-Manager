@@ -45,7 +45,15 @@ import { KeyboardShortcutsView } from './views/KeyboardShortcutsView';
 import { SettingsView } from './views/SettingsView';
 import { DocumentationView } from './views/DocumentationView';
 
-const INITIAL_PROJECTS: ProjectEntry[] = [
+/**
+ * Bundled sample projects used to seed a brand-new install so first-time users
+ * have something to explore. After the initial seed (tracked via
+ * `ProjectsRepository.isSeeded`), the user fully owns the list — deleting a
+ * sample is permanent. Existing users upgrading past the legacy
+ * force-merge-on-every-boot behaviour also get these IDs scrubbed out exactly
+ * once during the seeded-flag migration.
+ */
+const SEED_PROJECTS: ProjectEntry[] = [
   {
     id: 'owner-property',
     config: ensureEngineerRoles(sampleConfig1 as ProjectManagerConfig),
@@ -59,6 +67,8 @@ const INITIAL_PROJECTS: ProjectEntry[] = [
   },
 ];
 
+const SEED_PROJECT_IDS = new Set(SEED_PROJECTS.map((p) => p.id));
+
 interface MainClientProps {
   currentView: ViewId;
   initialProjectId?: string;
@@ -66,12 +76,12 @@ interface MainClientProps {
 
 export function MainClient({ currentView, initialProjectId }: MainClientProps) {
   const router = useRouter();
-  const [projects, setProjects] = useState<ProjectEntry[]>(INITIAL_PROJECTS);
+  const [projects, setProjects] = useState<ProjectEntry[]>(SEED_PROJECTS);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
-    initialProjectId ?? INITIAL_PROJECTS[0]?.id ?? '',
+    initialProjectId ?? SEED_PROJECTS[0]?.id ?? '',
   );
   const [selectedDashboardProjectIds, setSelectedDashboardProjectIds] = useState<string[]>(
-    INITIAL_PROJECTS[0] ? [INITIAL_PROJECTS[0].id] : [],
+    SEED_PROJECTS[0] ? [SEED_PROJECTS[0].id] : [],
   );
   const [storageInitialized, setStorageInitialized] = useState(false);
   const [activeRuns, setActiveRuns] = useState<ActiveRun[]>([]);
@@ -84,7 +94,11 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
   // synchronous localStorage in Promises (for future SQLite/cloud backends),
   // but we resolve them inline so the *first* post-mount render already
   // reflects the persisted selection — no async race that could leave a stale
-  // [INITIAL_PROJECTS[0].id] selection sitting in state after navigation.
+  // [SEED_PROJECTS[0].id] selection sitting in state after navigation.
+  //
+  // Seeding contract: a brand-new install gets SEED_PROJECTS once. After that
+  // (or after upgrading past the legacy force-merge behaviour), the user owns
+  // their list completely — deleted samples never come back.
   useEffect(() => {
     let cancelled = false;
     const repo = getProjectsRepository();
@@ -92,16 +106,32 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
       repo.listProjects(),
       repo.getSelectedProjectId(),
       repo.getDashboardProjectIds(),
-    ]).then(([stored, storedSelectedId, storedDashboardIds]) => {
+      repo.isSeeded(),
+    ]).then(([stored, storedSelectedId, storedDashboardIds, seeded]) => {
       if (cancelled) return;
-      // Always keep the canonical (bundled) sample projects with their latest
-      // config; append any user-added projects from storage as extras.
-      const fallbackIds = new Set(INITIAL_PROJECTS.map((p) => p.id));
-      const extras = stored
-        .filter((p) => !fallbackIds.has(p.id))
-        .map((p) => ({ ...p, config: ensureEngineerRoles(p.config) }));
-      const safeProjects =
-        stored.length > 0 ? [...INITIAL_PROJECTS, ...extras] : INITIAL_PROJECTS;
+
+      let safeProjects: ProjectEntry[];
+      if (!seeded) {
+        // One-time seeding / migration path.
+        if (stored.length === 0) {
+          // Brand-new install — show bundled samples as exploration aids.
+          safeProjects = SEED_PROJECTS;
+          void repo.saveProjects(SEED_PROJECTS);
+        } else {
+          // Existing user upgrading: previously their list was force-merged
+          // with SEED_PROJECTS on every boot. Strip the hardcoded sample IDs
+          // exactly once so deleting them in the UI actually sticks.
+          safeProjects = stored
+            .filter((p) => !SEED_PROJECT_IDS.has(p.id))
+            .map((p) => ({ ...p, config: ensureEngineerRoles(p.config) }));
+          void repo.saveProjects(safeProjects);
+        }
+        void repo.markSeeded();
+      } else {
+        // Already seeded — trust storage completely, including an empty list.
+        safeProjects = stored.map((p) => ({ ...p, config: ensureEngineerRoles(p.config) }));
+      }
+
       setProjects(safeProjects);
       setSelectedProjectId(
         resolveInitialProjectId(safeProjects, initialProjectId, storedSelectedId),
@@ -240,17 +270,23 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
     return () => unlisten?.();
   }, [isTauri]);
 
-  // Tauri boot: hydrate local projects from disk immediately (don't wait for the
-  // 2 s poll) and back-fill any missing default engineer roles.
+  // Tauri boot: hydrate local projects from disk immediately (don't wait for
+  // the 2 s poll) and back-fill any missing default engineer roles.
+  //
+  // We read from the *current* project list rather than SEED_PROJECTS so a
+  // user who has deleted the samples never has them silently re-hydrated.
+  // The effect only fires once per session — `setProjects` mutations inside
+  // do not retrigger because `projects` is intentionally not in the deps.
   useEffect(() => {
     if (!isTauri || !storageInitialized) return;
     let cancelled = false;
     (async () => {
       const { readConfig } = await import('../../lib/bridge');
+      const localProjects = projects.filter(
+        (p) => p.configPath && !p.configPath.startsWith('https://'),
+      );
       const reads = await Promise.all(
-        INITIAL_PROJECTS.filter(
-          (p) => p.configPath && !p.configPath.startsWith('https://'),
-        ).map(async (p) => {
+        localProjects.map(async (p) => {
           try {
             const disk = ensureEngineerRoles(await readConfig(p.configPath));
             return { path: p.configPath, config: disk };
@@ -275,6 +311,7 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional one-shot per session
   }, [isTauri, storageInitialized]);
 
   // Persist projects and selected project across route changes/reloads.
@@ -873,6 +910,7 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
           projectRoot={selectedProject.config.project.root}
           features={dashboardFeatures}
           adapters={adapters}
+          engineerRoles={selectedProject.config.engineerRoles ?? []}
           cronJobs={selectedProject.config.cronJobs ?? []}
           activeRuns={activeRuns}
           runHistory={runHistory}

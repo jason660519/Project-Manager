@@ -1,4 +1,4 @@
-import type { FeaturePhase, FeatureStatus, TestStatus, DeployStatus } from '../../lib/types';
+import type { FeaturePhase, FeatureStatus, IDEId, TestStatus, DeployStatus } from '../../lib/types';
 
 /** Phase-row payload persisted in localStorage on top of project features. */
 export interface CustomProjectProgressRow {
@@ -22,6 +22,17 @@ export interface CustomProjectProgressRow {
   errorRate?: number;
   avgResponseTime?: number;
   lastIncident?: string;
+  // Dev-tab fields (custom rows can mirror feature columns).
+  specPath?: string;
+  tddPath?: string;
+  tddReportPath?: string;
+  unitIntegrationTestPath?: string;
+  e2eAcceptanceTestScriptFolder?: string;
+  developmentLogSummaryFolder?: string;
+  tddProgress?: number;
+  assignedRoleId?: string;
+  assignedIDE?: IDEId;
+  notes?: string;
 }
 
 /** Generic per-table preference bag — what the toolbar persists. */

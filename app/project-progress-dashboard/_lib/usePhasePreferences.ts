@@ -10,7 +10,10 @@ const LEGACY_E2E_PHASE_KEY = 'testing';
 
 /** Phase-specific defaults. Column counts must match the column factories. */
 export const DEFAULT_WIDTHS_BY_PHASE: Record<FeaturePhase, number[]> = {
-  development: [120, 60, 110, 220, 110, 140, 100, 100, 140, 120, 100],
+  // 19 cols: project, id, SP, category, name, progress, status, locatedPage,
+  //          spec, tdd, unitInteg, e2eFolder, tddProgress, tddReport, devLog,
+  //          engineer, ide, notes, actions
+  development: [120, 60, 50, 110, 220, 140, 110, 110, 150, 150, 150, 150, 130, 150, 150, 130, 110, 180, 200],
   e2e_testing: [120, 60, 110, 220, 110, 110, 110, 140, 100],
   deployment:  [120, 60, 110, 220, 110, 120, 120, 140, 140],
   operations:  [120, 60, 110, 220, 110, 100, 100, 100, 200],

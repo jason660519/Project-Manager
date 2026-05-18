@@ -609,10 +609,15 @@ export function ProjectsView({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          if (!isTauri) return;
                           void handleInitializeClick(project);
                         }}
-                        disabled={isInitializing || isSyncing}
-                        title="Create .project-manager.json, docs/features/, and docs/dev-logs/"
+                        disabled={isInitializing || isSyncing || !isTauri}
+                        title={
+                          !isTauri
+                            ? 'Initialize requires the desktop app — run ./start_project_manager.sh (without "web") to enable filesystem access.'
+                            : 'Create .project-manager.json, docs/features/, and docs/dev-logs/'
+                        }
                         className="flex h-7 items-center gap-1 border border-emerald-200/30 bg-emerald-500/15 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-emerald-100 hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         <FolderPlus size={12} className={isInitializing ? 'animate-pulse' : ''} />
@@ -652,10 +657,16 @@ export function ProjectsView({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (!isTauri) return;
                         void handleInitializeClick(project);
                       }}
-                      disabled={isInitializing}
-                      className="shrink-0 border border-emerald-200/35 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-emerald-100 hover:bg-emerald-500/30 disabled:opacity-50"
+                      disabled={isInitializing || !isTauri}
+                      title={
+                        !isTauri
+                          ? 'Initialize requires the desktop app — run ./start_project_manager.sh (without "web").'
+                          : undefined
+                      }
+                      className="shrink-0 border border-emerald-200/35 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-emerald-100 hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Initialize
                     </button>

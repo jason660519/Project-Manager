@@ -1,4 +1,4 @@
-import type { Feature, FeaturePhase, FeatureStatus } from '../../../lib/types';
+import type { Feature, FeaturePhase, FeatureStatus, IDEId } from '../../../lib/types';
 import type { CustomProjectProgressRow, PhaseRowMeta } from '../types';
 
 /** Display-side row used by every phase tab. Wraps a project Feature or a custom row. */
@@ -22,7 +22,14 @@ export interface PhaseRow extends PhaseRowMeta {
   avgResponseTime?: number;
   lastIncident?: string;
   specPath?: string;
+  tddPath?: string;
+  tddReportPath?: string;
+  unitIntegrationTestPath?: string;
+  e2eAcceptanceTestScriptFolder?: string;
   devLogFolder?: string;
+  tddProgress?: number;
+  assignedRoleId?: string;
+  assignedIDE?: IDEId;
   /** Underlying feature, when source==='feature'. */
   feature?: Feature;
   /** Underlying custom row, when source==='custom'. */
@@ -56,7 +63,14 @@ export function featureToPhaseRow(feature: Feature, defaultProjectName?: string)
     avgResponseTime: feature.avgResponseTime,
     lastIncident: feature.lastIncident,
     specPath: feature.paths?.spec,
+    tddPath: feature.paths?.tdd,
+    tddReportPath: feature.paths?.tddProgressReport,
+    unitIntegrationTestPath: feature.paths?.unitIntegrationTest,
+    e2eAcceptanceTestScriptFolder: feature.paths?.e2eAcceptanceTestScriptFolder,
     devLogFolder: feature.paths?.developmentLogSummaryFolder,
+    tddProgress: feature.tddProgress,
+    assignedRoleId: feature.assignedRoleId,
+    assignedIDE: feature.assignedIDE,
     feature,
   };
 }
@@ -85,6 +99,16 @@ export function customRowToPhaseRow(row: CustomProjectProgressRow, defaultProjec
     errorRate: row.errorRate,
     avgResponseTime: row.avgResponseTime,
     lastIncident: row.lastIncident,
+    specPath: row.specPath,
+    tddPath: row.tddPath,
+    tddReportPath: row.tddReportPath,
+    unitIntegrationTestPath: row.unitIntegrationTestPath,
+    e2eAcceptanceTestScriptFolder: row.e2eAcceptanceTestScriptFolder,
+    devLogFolder: row.developmentLogSummaryFolder,
+    tddProgress: row.tddProgress,
+    assignedRoleId: row.assignedRoleId,
+    assignedIDE: row.assignedIDE,
+    notes: row.notes,
     custom: row,
   };
 }

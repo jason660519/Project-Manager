@@ -34,6 +34,7 @@ const baseCustom = (overrides: Partial<CustomProjectProgressRow> = {}): CustomPr
 
 const noopHandlers = (): ColumnHandlers => ({
   projectRoot: '/tmp/project',
+  engineerRoles: [],
   hiddenRowKeysSet: new Set(),
   onToggleHideRow: vi.fn(),
   onOpenPromptConfig: vi.fn(),

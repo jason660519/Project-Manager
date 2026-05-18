@@ -210,6 +210,21 @@
         "errorRate": { "type": "number", "minimum": 0 },
         "avgResponseTime": { "type": "number", "minimum": 0 },
         "lastIncident": { "type": "string" },
+        "tddProgress": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "TDD-specific progress percentage, distinct from overall feature progress."
+        },
+        "assignedRoleId": {
+          "type": "string",
+          "description": "Per-feature assigned engineerRole id (references engineerRoles[].id)."
+        },
+        "assignedIDE": {
+          "type": "string",
+          "enum": ["Cursor", "VSCode", "Trae", "Antigravity"],
+          "description": "Per-feature IDE override; falls back to project.defaultIDE when unset."
+        },
         "promptConfig": {
           "type": "object",
           "description": "Auto-loop prompt config (v3).",

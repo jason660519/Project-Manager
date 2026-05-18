@@ -1,6 +1,7 @@
 import type { ProjectEntry } from '../types';
 import {
   KEY_PERSONAL_DASHBOARD_PROJECT_IDS,
+  KEY_PERSONAL_SEEDED,
   KEY_PERSONAL_SELECTED_PROJECT_ID,
   KEY_SHARED_PROJECTS,
   LEGACY_KEY_DASHBOARD_PROJECT_IDS,
@@ -104,5 +105,23 @@ export class LocalStorageProjectsRepository implements ProjectsRepository {
 
   async setDashboardProjectIds(ids: string[]): Promise<void> {
     writeJSON(KEY_PERSONAL_DASHBOARD_PROJECT_IDS, ids);
+  }
+
+  async isSeeded(): Promise<boolean> {
+    if (typeof window === 'undefined') return true;
+    try {
+      return window.localStorage.getItem(KEY_PERSONAL_SEEDED) === 'true';
+    } catch {
+      return true;
+    }
+  }
+
+  async markSeeded(): Promise<void> {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(KEY_PERSONAL_SEEDED, 'true');
+    } catch {
+      /* ignore quota / disabled storage */
+    }
   }
 }
