@@ -31,3 +31,11 @@ vendor/hermes-agent/
 # IDE / editor
 .vscode/
 .idea/
+
+# Claude Code local state
+# - settings.local.json is per-user permissions; never share.
+# - context/sessions is per-user mid-session checkpoints written by
+#   the `context-save` skill. Keep private by default — if a team
+#   wants to share them, remove the line and commit explicitly.
+.claude/settings.local.json
+.context/sessions/
