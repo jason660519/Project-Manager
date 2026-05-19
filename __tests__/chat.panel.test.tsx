@@ -93,7 +93,9 @@ describe('ChatPanel', () => {
     renderPanel(true);
 
     fireEvent.change(screen.getByPlaceholderText(/ask me anything/i), { target: { value: 'status' } });
-    const sendBtn = screen.getAllByRole('button').find((b) => !b.hasAttribute('aria-label'));
+    // The send button is the last button (after file attach)
+    const buttons = screen.getAllByRole('button');
+    const sendBtn = buttons[buttons.length - 1];
     await user.click(sendBtn!);
 
     // Only the send button should be disabled while loading

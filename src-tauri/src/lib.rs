@@ -1,3 +1,5 @@
+mod dev_secrets;
+
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
@@ -1019,13 +1021,25 @@ async fn kill_process(pid: u32) -> Result<(), String> {
     Ok(())
 }
 
-// ── OS Keychain ───────────────────────────────────────────────────────────────
+// ── OS Keychain / dev plaintext file ───────────────────────────────────────────
+
+/// Which backend `get_secret` / `set_secret` use in this process.
+#[tauri::command]
+fn secrets_storage_backend() -> String {
+    dev_secrets::storage_backend_label().to_string()
+}
 
 /// Store a secret in the OS keychain (macOS Keychain / Windows Credential Store /
 /// Linux Secret Service).  Keyed by `service` + `key` so different subsystems can
 /// share the same service name without collision.
+///
+/// Debug builds default to a dev-only JSON file (`~/.project-manager/dev-secrets.json`)
+/// so unsigned `tauri dev` binaries do not trigger repeated Keychain prompts.
 #[tauri::command]
 fn set_secret(service: String, key: String, value: String) -> Result<(), String> {
+    if dev_secrets::dev_plaintext_secrets_enabled() {
+        return dev_secrets::set_dev_secret(&service, &key, &value);
+    }
     let entry = keyring::Entry::new(&service, &key).map_err(|e| e.to_string())?;
     entry.set_password(&value).map_err(|e| e.to_string())
 }
@@ -1035,6 +1049,9 @@ fn set_secret(service: String, key: String, value: String) -> Result<(), String>
 /// keychain access failures.
 #[tauri::command]
 fn get_secret(service: String, key: String) -> Result<Option<String>, String> {
+    if dev_secrets::dev_plaintext_secrets_enabled() {
+        return dev_secrets::get_dev_secret(&service, &key);
+    }
     let entry = keyring::Entry::new(&service, &key).map_err(|e| e.to_string())?;
     match entry.get_password() {
         Ok(val) => Ok(Some(val)),
@@ -3060,6 +3077,7 @@ pub fn run() {
             fetch_github_issues,
             set_secret,
             get_secret,
+            secrets_storage_backend,
             start_github_poll,
             list_project_files,
             read_file,

@@ -526,7 +526,13 @@ export async function fetchGithubIssues(
   return invoke<GithubIssuePayload[]>('fetch_github_issues', { token, repoUrl });
 }
 
-// ── OS Keychain ───────────────────────────────────────────────────────────────
+// ── OS Keychain / dev plaintext file ──────────────────────────────────────────
+
+/** Label for the active secret backend (`keychain` vs dev file). Tauri only. */
+export async function getSecretsStorageBackend(): Promise<string> {
+  if (!isTauri()) return 'localStorage';
+  return invoke<string>('secrets_storage_backend');
+}
 
 /**
  * Store a secret in the OS keychain (Tauri only).

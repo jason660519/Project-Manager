@@ -34,6 +34,8 @@ export interface SendChatMessageRequest {
   navigate?: (href: string) => void;
   /** Optional streaming callback — called with each chunk of text as it arrives. */
   onStream?: (chunk: string) => void;
+  /** Optional provider/model/systemPrompt override from chat settings. */
+  chatSettings?: { provider: string; model: string; systemPrompt: string };
 }
 
 export interface SendChatMessageResult {

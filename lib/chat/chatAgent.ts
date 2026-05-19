@@ -175,10 +175,23 @@ function buildAgentPrompt(content: string, context: ChatContext): string {
  * Load the user's preferred chat provider + model from their Key settings.
  * Returns undefined if not configured (server will use default fallback chain).
  */
-async function loadChatProvider(): Promise<{ provider: string; model?: string } | undefined> {
+async function loadChatProvider(): Promise<{ provider: string; model?: string; systemPrompt?: string } | undefined> {
   if (typeof window === 'undefined') return undefined;
   try {
-    const raw = window.localStorage.getItem('openclaw.llmProviderOrder');
+    // First try the inline chat settings (from ChatSettings component)
+    const settingsRaw = window.localStorage.getItem('pm-chat-settings');
+    if (settingsRaw) {
+      const settings = JSON.parse(settingsRaw);
+      if (settings.provider && settings.provider !== 'auto') {
+        return {
+          provider: settings.provider,
+          model: settings.model || undefined,
+          systemPrompt: settings.systemPrompt || undefined,
+        };
+      }
+    }
+    // Fall back to the Keys view provider order
+    const raw = window.localStorage.getItem('projectManager-llm-provider-order');
     if (!raw) return undefined;
     const order: { provider: string; model?: string; enabled: boolean }[] = JSON.parse(raw);
     const first = order.find((e) => e.enabled);
@@ -208,11 +221,15 @@ async function callChatApi(
   // Load user's preferred provider (if configured)
   const userProvider = await loadChatProvider();
 
-  // Build the payload — include provider/model when the user has a preference
+  // Build the payload — include provider/model/systemPrompt when the user has a preference
   const chatPayload: Record<string, unknown> = { messages };
   if (userProvider) {
     chatPayload.provider = userProvider.provider;
     if (userProvider.model) chatPayload.model = userProvider.model;
+  }
+  // Include custom system prompt if set
+  if (userProvider?.systemPrompt) {
+    chatPayload.systemPrompt = userProvider.systemPrompt;
   }
 
   // If streaming callback is provided, use the streaming endpoint

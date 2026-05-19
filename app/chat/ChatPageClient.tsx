@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useI18n } from '../../lib/i18n';
 import { ChatInput } from '../../components/chat/ChatInput';
 import { ChatMessage as ChatMessageView } from '../../components/chat/ChatMessage';
+import { ChatSettings } from '../../components/chat/ChatSettings';
+import { QuickActions } from '../../components/chat/QuickActions';
 import type { ChatMessage } from '../../lib/chat/types';
 
 interface StoredSession {
@@ -92,6 +94,7 @@ function CurrentSessionMessages({ messages, loading }: { messages: ChatMessage[]
 
 // ────────────────────────────────────────────────────────────────────────────
 
+import { loadChatSettings } from '../../components/chat/ChatSettings';
 import type { ChatContext } from '../../lib/chat/types';
 
 interface ChatPageClientProps {
@@ -102,12 +105,20 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
   const router = useRouter();
   const { t } = useI18n();
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const setInputValueRef = useRef<((value: string) => void) | undefined>(undefined);
 
   // Sessions state
   const [sessions, setSessions] = useState<StoredSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Chat settings (provider, model, system prompt)
+  const [chatSettings, setChatSettings] = useState<{ provider: string; model: string; systemPrompt: string }>({
+    provider: 'auto',
+    model: '',
+    systemPrompt: '',
+  });
 
   // Side toggles
   const [showHistory, setShowHistory] = useState(true);
@@ -130,6 +141,12 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showHistory]);
+
+  // Load persisted settings on mount
+  useEffect(() => {
+    const saved = loadChatSettings();
+    setChatSettings(saved);
+  }, []);
 
   // Load persisted history on first mount
   useEffect(() => {
@@ -161,8 +178,22 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
     });
   }, []);
 
-  const handleSend = async (content: string) => {
+  const handleSend = async (content: string, files?: { name: string; content: string; previewUrl?: string }[]) => {
     if (loading) return;
+
+    // Append file context to the message
+    let augmentedContent = content;
+    if (files && files.length > 0) {
+      const fileBlock = files
+        .map((f) => {
+          const body = f.previewUrl ? `[Image: ${f.name}]` : `\`\`\`\n${f.content.slice(0, 5000)}\n\`\`\``;
+          return `--- File: ${f.name} ---\n${body}\n---`;
+        })
+        .join('\n\n');
+      augmentedContent = content
+        ? `${content}\n\n${fileBlock}`
+        : `Please analyze these files:\n\n${fileBlock}`;
+    }
 
     const userMessage = makeMessage('user', content);
     const nextMessages = [...messages, userMessage];
@@ -197,10 +228,11 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
 
       let accumulated = '';
       const result = await sendChatMessage({
-        content,
+        content: augmentedContent,
         history: nextMessages,
         context: effectiveContext,
         navigate: (href) => router.push(href),
+        chatSettings: chatSettings.provider !== 'auto' ? chatSettings : undefined,
         onStream: (chunk: string) => {
           accumulated += chunk;
           // Update the assistant message in-place
@@ -412,6 +444,20 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
             loading={loading}
             onSend={handleSend}
             externalRef={inputRef}
+            onSetValueRef={setInputValueRef}
+            beforeArea={
+              <QuickActions
+                onAction={(template) => {
+                  setInputValueRef.current?.(template);
+                }}
+              />
+            }
+            afterArea={
+              <ChatSettings
+                current={chatSettings}
+                onChange={(s) => setChatSettings(s)}
+              />
+            }
           />
           <p className="mt-2 flex items-center justify-center gap-2 text-center text-[9px] tracking-[0.06em] text-stone-600/70">
             <span>{t.chat.enterToSend}</span>
