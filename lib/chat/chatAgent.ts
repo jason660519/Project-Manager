@@ -338,6 +338,16 @@ export async function sendChatMessage(request: SendChatMessageRequest): Promise<
     const content = await callChatApi(request.content, request.history, request.onStream);
     return { content };
   } catch (e) {
-    return { content: `Sorry, I could not reach the AI service: ${(e as Error).message}`, error: true };
+    const err = e as Error;
+    if (err.message.includes('ANTHROPIC_API_KEY') || err.message.includes('OPENAI_API_KEY') || err.message.includes('GEMINI_API_KEY')) {
+      return { content: 'The AI assistant cannot respond because no API keys are configured. Please add an API key in Settings or Keys.', error: true };
+    }
+    if (err.message.includes('429') || err.message.includes('rate limit')) {
+      return { content: 'The AI service is currently rate-limited. Please wait a moment and try again.', error: true };
+    }
+    if (err.message.includes('401') || err.message.includes('unauthorized') || err.message.includes('403') || err.message.includes('forbidden')) {
+      return { content: 'The AI service authentication failed. Please check your API keys in Settings.', error: true };
+    }
+    return { content: `Sorry, I could not reach the AI service right now. (${err.message})`, error: true };
   }
 }
