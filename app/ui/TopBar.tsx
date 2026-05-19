@@ -19,6 +19,7 @@ const VIEW_LABELS: Record<ViewId, string> = {
   logs:                'Logs',
   documentation:       'Documentation',
   keys:                'Keys',
+  chat:                'AI Assistant',
   'keyboard-shortcuts': 'Keyboard Shortcuts',
   settings:            'Settings',
   features:            'Features',

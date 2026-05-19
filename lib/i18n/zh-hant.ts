@@ -22,6 +22,7 @@ export const zhHant: Translations = {
     shortcuts: '快捷鍵',
     settings: '設定',
     docs: '文件',
+    chat: '聊天',
   },
   system: {
     checkForUpdates: '檢查更新',
@@ -93,6 +94,14 @@ export const zhHant: Translations = {
   },
   language: {
     label: '語言',
+  },
+  chat: {
+    title: 'AI 助手',
+    placeholder: '隨便問我...',
+    welcome: '你好！我是你的 Project Manager 助手。可以問我功能、執行記錄，或使用 /help 查看指令。',
+    send: '傳送',
+    loading: '思考中...',
+    error: '抱歉，發生錯誤。請再試一次。',
   },
   dispatch: {
     title: '任務派遣',

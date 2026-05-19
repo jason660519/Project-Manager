@@ -22,6 +22,7 @@ export const zh: Translations = {
     shortcuts: '快捷键',
     settings: '设置',
     docs: '文档',
+    chat: '聊天',
   },
   system: {
     checkForUpdates: '检查更新',
@@ -93,6 +94,14 @@ export const zh: Translations = {
   },
   language: {
     label: '语言',
+  },
+  chat: {
+    title: 'AI 助手',
+    placeholder: '随便问我...',
+    welcome: '你好！我是你的 Project Manager 助手。可以问我功能、运行记录，或使用 /help 查看命令。',
+    send: '发送',
+    loading: '思考中...',
+    error: '抱歉，出了点问题。请再试一次。',
   },
   dispatch: {
     title: '任务派遣',

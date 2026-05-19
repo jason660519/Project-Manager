@@ -9,6 +9,7 @@ import {
   Files,
   FileText,
   KeyRound,
+  MessageSquareText,
   Plug,
   Radio,
   RefreshCw,
@@ -23,6 +24,8 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { checkUpdate } from '../../lib/bridge';
+import { ChatPanel } from '../../components/chat/ChatPanel';
+import type { ChatContext } from '../../lib/chat/types';
 import { useI18n } from '../../lib/i18n';
 import type { Translations } from '../../lib/i18n';
 import { ViewId } from '../../lib/types';
@@ -63,6 +66,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'sessions', itemKey: 'sessions', href: '/sessions', icon: ScrollText },
       { id: 'logs',     itemKey: 'logs',     href: '/logs',     icon: FileText },
+      { id: 'chat',     itemKey: 'chat',     href: '/chat',     icon: MessageSquareText },
     ],
   },
   {
@@ -79,9 +83,10 @@ interface SidebarProps {
   currentView: ViewId;
   bridgeStatus: 'dry-run' | 'connected' | 'offline' | 'live';
   activeRunCount: number;
+  chatContext: ChatContext;
 }
 
-export function Sidebar({ currentView, bridgeStatus, activeRunCount }: SidebarProps) {
+export function Sidebar({ currentView, bridgeStatus, activeRunCount, chatContext }: SidebarProps) {
   const isLive = bridgeStatus === 'live';
   const { t } = useI18n();
 
@@ -118,7 +123,7 @@ export function Sidebar({ currentView, bridgeStatus, activeRunCount }: SidebarPr
 
   return (
     <aside
-      className="hidden min-h-screen w-[180px] border-r border-stone-200/15 lg:flex lg:flex-col"
+      className="relative hidden min-h-screen w-[180px] border-r border-stone-200/15 lg:flex lg:flex-col"
       style={{ background: 'var(--pm-sidebar)' }}
     >
       {/* Logo — h-12 matches TopBar so horizontal dividers align */}
@@ -160,6 +165,8 @@ export function Sidebar({ currentView, bridgeStatus, activeRunCount }: SidebarPr
           </div>
         ))}
       </nav>
+
+      <ChatPanel context={chatContext} defaultExpanded={currentView === 'chat'} />
 
       {/* ── Bottom system block ───────────────────────────────────────────── */}
       <div className="border-t border-stone-200/15 px-4 py-3 space-y-2">
