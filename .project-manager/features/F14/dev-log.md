@@ -1,38 +1,52 @@
-# F14 Dev Log — Sidebar Chatbot
+# F14 Dev Log
 
-## 2026-05-20 01:46 +10:00
+## 2026-05-13 — Initial scaffolding
 
-Implemented the Sidebar Chatbot feature end to end.
+### Implementation
 
-### Files changed
+- Created `lib/chat/types.ts` with `ChatMessage`, `ChatRole`, `ChatContext`, `ChatCommandResult`, `SendChatMessageRequest`, `SendChatMessageResult`.
+- Created `lib/chat/chatAgent.ts` with three internal execution paths:
+  1. **Local command** via `localCommand()`: `/help`, `/go <view>`, `/status`
+  2. **Agent dispatch** via `buildAgentPrompt()` + `spawnAgent()`: for projects with configured adapters
+  3. **Fallback AI chat** via `callChatApi()`: when no project/adapter is set
+- Created `components/chat/ChatMessage.tsx` with Markdown rendering via `react-markdown` and `remark-gfm`.
+- Created `components/chat/ChatInput.tsx` with auto-resize textarea, Enter-to-send, loading state.
+- Created `components/chat/ChatPanel.tsx` as the chat panel anchored to the sidebar, with collapsed/expanded toggle, message list, loading state, and empty welcome state.
+- Updated `lib/i18n/*.ts` (en, zh, zh-hant, ja): added `chat` section with 6 keys.
+- Updated `lib/i18n/types.ts`: added `chat` to `Translations` interface.
+- Updated `app/ui/Sidebar.tsx`: added `<ChatPanel>` inside a relative container at the bottom.
 
-- Added `components/chat/ChatPanel.tsx`
-- Added `components/chat/ChatMessage.tsx`
-- Added `components/chat/ChatInput.tsx`
-- Added `lib/chat/chatAgent.ts`
-- Added `lib/chat/types.ts`
-- Added `/chat` route via `app/chat/page.tsx`
-- Updated `app/ui/Sidebar.tsx` to render the collapsible chat panel without changing the 180px sidebar width
-- Updated `app/ui/AppShell.tsx` and `app/ui/MainClient.tsx` to pass selected project, adapters, current view, active runs, and recent runs into chat context
-- Updated `lib/types/index.ts` with `ViewId = 'chat'`
-- Added typed `chat.*` i18n keys to `lib/i18n/types.ts` and all locale dictionaries
-- Added tests for chat rendering, input behavior, Markdown rendering, local commands, and agent dispatch routing
-- Added F14 metadata to `.project-manager/config.json`
+### Tests
 
-### Behavior
+| File | Tests | Key additions |
+|---|---|---|
+| `__tests__/chat.panel.test.tsx` | 7 | Render collapsed/expanded, send/receive messages, command routing, markdown, i18n |
+| `__tests__/chat.input.test.tsx` | 1 | Send on Enter |
+| `__tests__/chat.agent.test.ts` | 8 | 6 local commands + natural language nav + missing adapter error |
 
-- Collapsed sidebar toggle opens `AI Assistant`.
-- Expanded chat is an anchored overlay from the sidebar bottom, so the sidebar remains 180px wide.
-- Messages live in React state for the current session and persist across collapse/expand.
-- `/help`, `/status`, `/go <view>`, and `/dispatch <feature-id>` are handled locally.
-- Natural language navigation like `open settings` maps to app routes.
-- General questions dispatch through the selected project's first agent CLI adapter using the existing runtime adapter and `spawnAgent` bridge path.
-- Assistant messages render Markdown with code block support.
+All tests pass (44 files, 312 tests). TypeScript check passes.
 
-### Verification
+## 2026-05-14 — Streaming, i18n, keyboard shortcuts, polish
 
-- `npm test -- --run` — 41 files, 320 tests passed
-- `npm run typecheck` — passed
+### Implementation
+
+- SSE streaming API (`app/api/chat/stream/route.ts`) for typewriter effect
+- ChatInput auto-resize textarea + autofocus
+- Compact 34x34 icon-only send button with spinner
+- Collapsible history sidebar (localStorage, 50 sessions)
+- Full-page chat at `/chat` with `ChatPageClient.tsx`
+- i18n expanded with 8 new keys across 4 locales
+- Cmd+K / Ctrl+K keyboard shortcut to focus input
+- Timestamp display with day-aware formatting
+- Copy-to-clipboard button on assistant messages
+- Animated typing dots (300ms delay)
+- Error handling refinement (missing key, rate limit, auth errors)
+- Mobile sidebar overlay with backdrop + Escape key
+- remark-gfm for markdown tables/links/strikethrough
+
+### Tests
+
+44 files, 356 tests pass. Build zero errors.
 
 ## 2026-05-20 01:46–09:30 +10:00
 
@@ -91,6 +105,37 @@ Implemented the Sidebar Chatbot feature end to end.
 - `lib/chat/chatAgent.ts` — loadChatProvider reads inline settings first; passes systemPrompt to API
 - `__tests__/chat.input.test.tsx` — updated for new button count + (message, files) signature
 - `__tests__/chat.panel.test.tsx` — updated send button selector
+
+### Tests
+- 44 files, 356 tests passed
+- Build: zero errors
+
+## 2026-05-20 09:40–10:00 +10:00 — Port all features to per-project ChatPanel
+
+### Implementation
+
+Now the per-project sidebar ChatPanel matches the full-page chat feature-for-feature:
+
+- **Streaming responses**: ChatPanel sends messages to the SSE streaming endpoint instead of waiting for full response. Typewriter effect with live accumulation.
+- **ChatSettings integration**: Gear icon in the toolbar opens inline provider/model/system prompt selector. Settings persist to `pm-chat-settings` localStorage.
+- **File attachment**: Attach button opens file picker. Supported files: text, markdown, JSON, YAML, images (shown as thumbnails, up to 1MB, max 5). File content sent as context.
+- **QuickActions integrated**: Plus button opens Plan/Debug/Ask/Image/Skills menu. Each action populates the input with a structured prompt template.
+- **Timestamps**: ChatMessage already had timestamps — working in both panels.
+- **Copy button**: ChatMessage already had copy — working in both panels.
+- **Animated typing dots**: Replaces the static "Thinking..." string in ChatPanel.
+- **Error tags**: Failed messages show red "Error" label in ChatPanel too.
+- **remark-gfm**: Already shared via ChatMessage component.
+- **Animated slide-in**: Already present via CSS class.
+
+### ChatPanel rewritten
+- Full state: `chatSettings`, `files`, streaming state
+- `handleSend` now: accepts files, augments message content, calls streaming API
+- Toolbar: settings gear + quick actions + attach file + send
+- Streaming: uses `/api/chat/stream` SSE with `onStream` callback, live updates into message list
+- All behavior mirrors `ChatPageClient.tsx` but adapted for the sidebar panel
+
+### Files changed
+- `components/chat/ChatPanel.tsx` — major rewrite (streaming, settings, file attach, quick actions)
 
 ### Tests
 - 44 files, 356 tests passed

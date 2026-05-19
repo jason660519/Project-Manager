@@ -2,12 +2,16 @@
 
 import { Bot, ChevronDown, ExternalLink, MessageSquareText, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { sendChatMessage } from '../../lib/chat/chatAgent';
 import type { ChatContext, ChatMessage } from '../../lib/chat/types';
 import { useI18n } from '../../lib/i18n';
-import { ChatInput } from './ChatInput';
+import { ChatInput, type AttachedFile } from './ChatInput';
 import { ChatMessage as ChatMessageView } from './ChatMessage';
+import { ChatSettings } from './ChatSettings';
+import { QuickActions } from './QuickActions';
+
+// ────────────────────────────────────────────────────────────────────────────
 
 interface ChatPanelProps {
   context: ChatContext;
@@ -24,13 +28,34 @@ function makeMessage(role: ChatMessage['role'], content: string, status?: ChatMe
   };
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+
 export function ChatPanel({ context, defaultExpanded = false }: ChatPanelProps) {
   const { t } = useI18n();
   const router = useRouter();
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [chatSettings, setChatSettings] = useState<{ provider: string; model: string; systemPrompt: string }>({
+    provider: 'auto',
+    model: '',
+    systemPrompt: '',
+  });
   const scrollRef = useRef<HTMLDivElement>(null);
+  const setInputValueRef = useRef<((v: string) => void) | undefined>(undefined);
+
+  // Load saved settings
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem('pm-chat-settings');
+      if (raw) {
+        const s = JSON.parse(raw);
+        setChatSettings({ provider: s.provider || 'auto', model: s.model || '', systemPrompt: s.systemPrompt || '' });
+      }
+    } catch { /* ignore */ }
+  }, []);
 
   useEffect(() => {
     if (typeof scrollRef.current?.scrollIntoView === 'function') {
@@ -38,30 +63,72 @@ export function ChatPanel({ context, defaultExpanded = false }: ChatPanelProps) 
     }
   }, [messages, loading, expanded]);
 
-  const handleSend = async (content: string) => {
+  const handleStreamSend = useCallback(async (content: string, files?: AttachedFile[]) => {
     if (loading) return;
+
+    // Augment message with file context
+    let augmentedContent = content;
+    if (files && files.length > 0) {
+      const fileBlock = files
+        .map((f) => {
+          const body = f.previewUrl ? `[Image: ${f.name}]` : `\`\`\`\n${f.content.slice(0, 5000)}\n\`\`\``;
+          return `--- File: ${f.name} ---\n${body}\n---`;
+        })
+        .join('\n\n');
+      augmentedContent = content
+        ? `${content}\n\n${fileBlock}`
+        : `Please analyze these files:\n\n${fileBlock}`;
+    }
+
     const userMessage = makeMessage('user', content);
     const nextMessages = [...messages, userMessage];
     setMessages(nextMessages);
     setLoading(true);
+
+    const assistantId = `assistant-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const placeholder = makeMessage('assistant', '');
+    placeholder.id = assistantId;
+
+    // Show placeholder immediately for streaming
+    setMessages((prev) => [...prev, placeholder]);
+
     try {
+      let accumulated = '';
       const result = await sendChatMessage({
-        content,
+        content: augmentedContent,
         history: nextMessages,
         context,
         navigate: (href) => router.push(href),
+        onStream: (chunk: string) => {
+          accumulated += chunk;
+          setMessages((prev) =>
+            prev.map((m) => (m.id === assistantId ? { ...m, content: accumulated } : m)),
+          );
+        },
+        chatSettings: chatSettings.provider !== 'auto' ? chatSettings : undefined,
       });
-      setMessages((current) => [
-        ...current,
-        makeMessage('assistant', result.content, result.error ? 'error' : 'sent'),
-      ]);
+
+      const finalContent = result.content || accumulated;
+      const assistantMessage = makeMessage('assistant', finalContent, result.error ? 'error' : 'sent');
+      assistantMessage.id = assistantId;
+      setMessages((prev) => {
+        const withoutPlaceholder = prev.filter((m) => m.id !== assistantId);
+        return [...withoutPlaceholder, assistantMessage];
+      });
     } catch {
-      setMessages((current) => [
-        ...current,
-        makeMessage('assistant', t.chat.error, 'error'),
-      ]);
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantId ? { ...m, content: t.chat.error, status: 'error' as const } : m)),
+      );
     } finally {
       setLoading(false);
+    }
+  }, [loading, messages, context, router, chatSettings, t.chat.error]);
+
+  const handleSettingsChange = (s: { provider: string; model: string; systemPrompt: string }) => {
+    setChatSettings(s);
+    // Persist
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('pm-chat-settings', JSON.stringify(s));
     }
   };
 
@@ -82,11 +149,13 @@ export function ChatPanel({ context, defaultExpanded = false }: ChatPanelProps) 
 
   return (
     <div className="absolute bottom-14 left-2 z-50 w-[320px] max-w-[calc(100vw-24px)] rounded border border-stone-200/15 bg-stone-950/95 shadow-2xl shadow-black/40 backdrop-blur animate-in fade-in slide-in-from-bottom-2 duration-200">
+      {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex h-10 items-center gap-2 border-b border-stone-200/15 px-3">
         <Bot size={14} className="text-amber-200/80" />
         <h2 className="min-w-0 flex-1 truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-100">
           {t.chat.title}
         </h2>
+
         <button
           type="button"
           onClick={() => setExpanded(false)}
@@ -113,6 +182,7 @@ export function ChatPanel({ context, defaultExpanded = false }: ChatPanelProps) 
         </button>
       </div>
 
+      {/* ── Messages ────────────────────────────────────────────────────── */}
       <div className="max-h-80 min-h-48 overflow-y-auto p-2">
         {messages.length === 0 ? (
           <div className="rounded border border-dashed border-stone-200/15 bg-white/[0.02] p-3 text-[11px] leading-relaxed text-stone-400">
@@ -125,21 +195,45 @@ export function ChatPanel({ context, defaultExpanded = false }: ChatPanelProps) 
             ))}
           </div>
         )}
+
+        {/* Loading — animated typing dots (mirrors ChatPageClient style) */}
         {loading && (
-          <div className="mt-2 rounded border border-stone-200/15 bg-stone-950/60 px-2.5 py-2 text-[11px] text-stone-400">
-            {t.chat.loading}
+          <div className="mt-2 flex items-center gap-1 rounded border border-stone-200/15 bg-stone-950/60 px-3 py-2.5 text-[11px] text-stone-400">
+            <span className="flex items-center gap-0.5">
+              <span className="inline-block h-1 w-1 animate-bounce rounded-full bg-amber-300/60" style={{ animationDelay: '0ms' }} />
+              <span className="inline-block h-1 w-1 animate-bounce rounded-full bg-amber-300/60" style={{ animationDelay: '150ms' }} />
+              <span className="inline-block h-1 w-1 animate-bounce rounded-full bg-amber-300/60" style={{ animationDelay: '300ms' }} />
+            </span>
           </div>
         )}
+
         <div ref={scrollRef} />
       </div>
 
-      <ChatInput
-        placeholder={t.chat.placeholder}
-        sendLabel={t.chat.send}
-        loadingLabel={t.chat.loading}
-        loading={loading}
-        onSend={handleSend}
-      />
+      {/* ── Input ───────────────────────────────────────────────────────── */}
+      <div className="border-t border-stone-200/15 p-2">
+        <ChatInput
+          placeholder={t.chat.placeholder}
+          sendLabel={t.chat.send}
+          loadingLabel={t.chat.loading}
+          loading={loading}
+          onSend={handleStreamSend}
+          onSetValueRef={setInputValueRef}
+          beforeArea={
+            <QuickActions
+              onAction={(template) => {
+                setInputValueRef.current?.(template);
+              }}
+            />
+          }
+          afterArea={
+            <ChatSettings
+              current={chatSettings}
+              onChange={handleSettingsChange}
+            />
+          }
+        />
+      </div>
     </div>
   );
 }
