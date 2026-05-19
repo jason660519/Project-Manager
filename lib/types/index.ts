@@ -80,6 +80,10 @@ export interface Feature {
   assignedRoleId?: string;
   /** Per-feature IDE override; falls back to project.defaultIDE when unset. */
   assignedIDE?: IDEId;
+  /** Active developer or agent identifier set at dispatch time (e.g. adapter name). */
+  assignedTo?: string;
+  /** ISO 8601 timestamp when the task was claimed via dispatch. */
+  assignedAt?: string;
   // prompt engineer (row-level auto-loop config)
   promptConfig?: FeaturePromptConfig;
 }

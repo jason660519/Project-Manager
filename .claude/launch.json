@@ -4,9 +4,8 @@
     {
       "name": "Project Manager Dev",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["next", "dev"],
-      "port": 43187,
-      "autoPort": true
+      "runtimeArgs": ["next", "dev", "--port", "43187"],
+      "port": 43187
     }
   ]
 }

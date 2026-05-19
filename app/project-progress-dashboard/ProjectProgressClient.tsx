@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, Upload } from 'lucide-react';
 import type {
-  ActiveRun, AgentAdapterConfig, AnyAdapterConfig, CompletedRun, CronJob, EngineerRole,
+  ActiveRun, AnyAdapterConfig, CompletedRun, CronJob, EngineerRole,
   Feature, FeaturePhase, FeaturePromptConfig, ProjectConfig,
 } from '../../lib/types';
 import { PHASE_IDS } from './types';
@@ -116,11 +116,6 @@ export function ProjectProgressClient({
     return features.filter((f) => (f.phase ?? 'development') === activePhase);
   }, [features, activePhase]);
 
-  const agents = useMemo(
-    () => adapters.filter((a): a is AgentAdapterConfig => a.type === 'agent'),
-    [adapters],
-  );
-
   const activePhasePrefs = prefsByPhase[activePhase];
 
   // Header summary uses features (for development, weighted by SP) of the current phase.
@@ -181,11 +176,9 @@ export function ProjectProgressClient({
             projectNames={dashboardProjectNames}
             projectRoot={projectRoot}
             features={phaseFeatures}
-            engineerRoles={engineerRoles}
             prefs={activePhasePrefs.prefs}
             patch={activePhasePrefs.patch}
             reset={activePhasePrefs.reset}
-            agents={agents}
             onFeaturePromptSave={onFeaturePromptSave}
             onFeaturePatch={onFeaturePatch}
             onDispatchRow={(row) => row.source === 'feature' && setDispatchRow(row)}
@@ -207,8 +200,11 @@ export function ProjectProgressClient({
           feature={dispatchRow.feature}
           adapters={adapters}
           projectRoot={(dispatchRow.feature.metadata?.sourceProjectRoot as string | undefined) ?? projectRoot}
+          engineerRoles={engineerRoles}
+          defaultIDE={project.defaultIDE}
           onClose={() => setDispatchRow(null)}
           onExecuted={() => {}}
+          onFeatureUpdate={(featureId, update) => onFeaturePatch(featureId, update)}
           onRunStart={onRunStart}
           onRunLog={onRunLog}
           onRunEnd={onRunEnd}

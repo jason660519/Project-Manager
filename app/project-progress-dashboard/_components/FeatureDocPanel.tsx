@@ -1,14 +1,72 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { ExternalLink, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import type { Components } from 'react-markdown';
+import { readFile, openPath } from '../../../lib/bridge';
 
 interface FeatureDocPanelProps {
   absPath: string | null;
   onClose: () => void;
 }
 
+// ---------------------------------------------------------------------------
+// Mermaid block — lazy-loads mermaid so it doesn't inflate the initial bundle.
+// ---------------------------------------------------------------------------
+function MermaidBlock({ code }: { code: string }) {
+  const id = useId().replace(/:/g, '');
+  const ref = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    import('mermaid').then(({ default: mermaid }) => {
+      if (cancelled) return;
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: 'dark',
+        themeVariables: { background: 'transparent', primaryColor: '#6ee7b7', lineColor: '#6ee7b7' },
+      });
+      mermaid.render(`mg-${id}`, code)
+        .then(({ svg }) => {
+          if (!cancelled && ref.current) ref.current.innerHTML = svg;
+        })
+        .catch((e: unknown) => {
+          if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+        });
+    });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code]);
+
+  if (error) {
+    return (
+      <pre className="text-[11px] text-amber-400/80 whitespace-pre-wrap break-all border border-amber-400/20 rounded p-3">
+        Mermaid error: {error}
+      </pre>
+    );
+  }
+  return <div ref={ref} className="my-3 flex justify-center overflow-x-auto" />;
+}
+
+// ---------------------------------------------------------------------------
+// Custom code block — routes ```mermaid to MermaidBlock, others to <pre><code>.
+// ---------------------------------------------------------------------------
+const mdComponents: Components = {
+  code({ className, children, ...props }) {
+    const lang = /language-(\w+)/.exec(className ?? '')?.[1];
+    const isBlock = !props.node?.position || (props.node.position.start.line !== props.node.position.end.line);
+    if (lang === 'mermaid' && isBlock) {
+      return <MermaidBlock code={String(children).trim()} />;
+    }
+    return <code className={className} {...props}>{children}</code>;
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Panel
+// ---------------------------------------------------------------------------
 export function FeatureDocPanel({ absPath, onClose }: FeatureDocPanelProps) {
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -19,10 +77,12 @@ export function FeatureDocPanel({ absPath, onClose }: FeatureDocPanelProps) {
     setLoading(true);
     setContent(null);
     setError(null);
-    import('../../../lib/bridge')
-      .then(({ readFile }) => readFile(absPath))
+    readFile(absPath)
       .then(setContent)
-      .catch(() => setError('Failed to read file — Tauri runtime required.'))
+      .catch((e: unknown) => {
+        const msg = e instanceof Error ? e.message : String(e);
+        setError(`Failed to read file: ${msg}`);
+      })
       .finally(() => setLoading(false));
   }, [absPath]);
 
@@ -38,7 +98,6 @@ export function FeatureDocPanel({ absPath, onClose }: FeatureDocPanelProps) {
   const openInEditor = async () => {
     if (!absPath) return;
     try {
-      const { openPath } = await import('../../../lib/bridge');
       await openPath(absPath);
     } catch { /* web preview — no-op */ }
   };
@@ -99,7 +158,7 @@ export function FeatureDocPanel({ absPath, onClose }: FeatureDocPanelProps) {
           )}
           {content && content.length > 0 && (
             <div className="pm-prose">
-              <ReactMarkdown>{content}</ReactMarkdown>
+              <ReactMarkdown components={mdComponents}>{content}</ReactMarkdown>
             </div>
           )}
         </div>

@@ -11,14 +11,18 @@ export { applyScanConfigToProject, buildProjectEntryFromPath } from './importPro
 export { ensureEngineerRoles, mergeEngineerRolesById } from './mergeEngineerRoles';
 export { resolveConfigPath } from './resolveConfigPath';
 export {
+  buildRecoveredProjectConfig,
   buildOverwriteScaffold,
   buildProjectScaffold,
   defaultFeaturePaths,
   defaultFeatureSpecPath,
+  hasRecoverableDashboardArtifacts,
   ensureFeaturePaths,
   mergeProjectConfig,
   SCAFFOLD_DOC_DIRS,
   DEFAULT_DEV_LOG_FOLDER,
+  type DashboardArtifactSnapshot,
+  type FeatureReadmeSnapshot,
   type InitializeMode,
   type InitializeProjectOptions,
 } from './createProjectScaffold';

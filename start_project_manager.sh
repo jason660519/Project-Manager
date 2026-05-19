@@ -10,6 +10,10 @@
 #   ./start_project_manager.sh stop      stop all services
 #   ./start_project_manager.sh hermes    start Hermes Agent dashboard only
 #   ./start_project_manager.sh openclaw  start OpenClaw gateway and open dashboard
+#
+# Flags (any command):
+#   --open, --force-open   open browser even when the service is already running
+#   --restart              stop the target service port before starting (hermes/openclaw/all)
 
 set -euo pipefail
 
@@ -27,6 +31,9 @@ RED="\033[31m"
 CYAN="\033[36m"
 BLUE="\033[34m"
 RESET="\033[0m"
+
+FORCE_OPEN=0
+FORCE_RESTART=0
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -79,6 +86,10 @@ wait_for_port() {
   return 1
 }
 
+should_force_open_browser() {
+  [[ "${PROJECT_MANAGER_FORCE_OPEN:-0}" == "1" || "$FORCE_OPEN" == "1" ]]
+}
+
 open_local_url() {
   local url="$1"
   if [[ "${PROJECT_MANAGER_NO_OPEN:-0}" == "1" ]]; then
@@ -95,6 +106,42 @@ open_local_url() {
       warn "Open this URL manually: $url"
     fi
   fi
+}
+
+# Skip browser when the service was already running unless --force-open / PROJECT_MANAGER_FORCE_OPEN=1.
+maybe_open_local_url() {
+  local url="$1"
+  local service_was_running="${2:-0}"
+
+  if [[ "${PROJECT_MANAGER_NO_OPEN:-0}" == "1" ]]; then
+    success "Browser auto-open skipped: $(safe_url_for_display "$url")"
+    return 0
+  fi
+
+  if [[ "$service_was_running" == "1" ]] && ! should_force_open_browser; then
+    info "Browser auto-open skipped (service already running)."
+    echo "  URL:  $(safe_url_for_display "$url")"
+    echo "  Tip:  PROJECT_MANAGER_FORCE_OPEN=1 $0 …  or  --force-open"
+    return 0
+  fi
+
+  open_local_url "$url"
+}
+
+stop_listeners_on_port() {
+  local port="$1"
+  local label="$2"
+  local pids
+  pids="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null || true)"
+  if [[ -z "$pids" ]]; then
+    return 0
+  fi
+  warn "Stopping $label on port ${port}…"
+  local pid
+  for pid in $pids; do
+    kill_pid_if_running "$pid"
+  done
+  success "Port ${port} cleared ($label)"
 }
 
 safe_url_for_display() {
@@ -298,10 +345,27 @@ ensure_dev_port_available() {
     return 0
   fi
 
+  local force_kill="${PROJECT_MANAGER_FORCE_KILL_PORT:-0}"
+  if [[ "$FORCE_RESTART" == "1" ]]; then
+    force_kill="1"
+  fi
+
+  local all_next=1
+  local pid
+  for pid in "${pids[@]}"; do
+    if ! is_next_process "$pid"; then
+      all_next=0
+      break
+    fi
+  done
+
+  if [[ "$all_next" == "1" && "$force_kill" != "1" ]]; then
+    success "Reusing Next.js dev server on port $DEV_PORT (PID ${pids[0]})"
+    return 0
+  fi
+
   warn "Port $DEV_PORT is currently in use. Resolving conflict…"
 
-  local force_kill="${PROJECT_MANAGER_FORCE_KILL_PORT:-0}"
-  local pid
   for pid in "${pids[@]}"; do
     local cmdline
     cmdline="$(ps -p "$pid" -o command= 2>/dev/null || true)"
@@ -616,6 +680,12 @@ cmd_hermes() {
   header "Hermes Agent — Dashboard"
   local log_file="$SCRIPT_DIR/.project-manager/dev-logs/hermes-dashboard.log"
   local url="http://127.0.0.1:${HERMES_PORT}"
+  local already_running=0
+
+  if [[ "$FORCE_RESTART" == "1" ]]; then
+    stop_listeners_on_port "$HERMES_PORT" "Hermes Dashboard"
+  fi
+
   if [[ ! -f "$SCRIPT_DIR/.project-manager/bin/hermes" ]]; then
     warn "Hermes not installed. Installing in Project Manager scope…"
     cd "$SCRIPT_DIR"
@@ -626,6 +696,7 @@ cmd_hermes() {
   fi
 
   if is_port_listening "$HERMES_PORT"; then
+    already_running=1
     success "Hermes Dashboard already running — $url"
   else
     start_background_service \
@@ -638,8 +709,7 @@ cmd_hermes() {
     fi
   fi
 
-  info "Opening Hermes Dashboard: $url"
-  open_local_url "$url"
+  maybe_open_local_url "$url" "$already_running"
   print_app_success "Hermes Agent Dashboard" "$HERMES_PORT" "$url" "$log_file"
 }
 
@@ -647,6 +717,12 @@ cmd_openclaw() {
   header "OpenClaw — Gateway & Dashboard"
   local log_file="$SCRIPT_DIR/.project-manager/dev-logs/openclaw-gateway.log"
   local url="http://127.0.0.1:${OPENCLAW_PORT}/"
+  local already_running=0
+
+  if [[ "$FORCE_RESTART" == "1" ]]; then
+    stop_listeners_on_port "$OPENCLAW_PORT" "OpenClaw Gateway"
+  fi
+
   if [[ ! -f "$SCRIPT_DIR/.project-manager/bin/openclaw" ]]; then
     warn "OpenClaw not installed. Installing in Project Manager scope…"
     cd "$SCRIPT_DIR"
@@ -659,6 +735,7 @@ cmd_openclaw() {
   export OPENCLAW_GATEWAY_PORT="$OPENCLAW_PORT"
 
   if is_port_listening "$OPENCLAW_PORT"; then
+    already_running=1
     success "OpenClaw Gateway already running — $url"
   else
     start_background_service \
@@ -678,15 +755,14 @@ cmd_openclaw() {
     return 1
   fi
 
-  info "Opening OpenClaw Dashboard: $(safe_url_for_display "$url")"
-  open_local_url "$url"
+  maybe_open_local_url "$url" "$already_running"
 
   info "Approving local OpenClaw browser pairing requests automatically…"
   local approved_count
   approved_count="$(approve_openclaw_pending_pairings)"
   if [[ "$approved_count" =~ ^[0-9]+$ ]] && (( approved_count > 0 )); then
     success "Approved $approved_count OpenClaw local pairing request(s)"
-    info "Re-opening OpenClaw Dashboard after pairing approval"
+    info "Opening OpenClaw Dashboard after pairing approval"
     open_local_url "$url"
   else
     success "No pending OpenClaw local pairing requests found"
@@ -697,6 +773,11 @@ cmd_openclaw() {
 
 cmd_all() {
   header "Project Manager — Full Stack (PM + Hermes + OpenClaw)"
+
+  if [[ "$FORCE_RESTART" == "1" ]]; then
+    stop_listeners_on_port "$HERMES_PORT" "Hermes Dashboard"
+    stop_listeners_on_port "$OPENCLAW_PORT" "OpenClaw Gateway"
+  fi
 
   if ! is_installed; then
     cmd_install
@@ -799,6 +880,27 @@ cat << 'BANNER'
 BANNER
 echo -e "${RESET}"
 
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --force-open|--open)
+      FORCE_OPEN=1
+      shift
+      ;;
+    --restart)
+      FORCE_RESTART=1
+      shift
+      ;;
+    -*)
+      error "Unknown flag: $1"
+      echo "Flags: --force-open (alias --open), --restart"
+      exit 1
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
 COMMAND="${1:-menu}"
 
 case "$COMMAND" in
@@ -814,7 +916,7 @@ case "$COMMAND" in
   auto)     cmd_auto    ;;
   *)
     error "Unknown command: $COMMAND"
-    echo "Usage: $0 [install|update|start|web|all|stop|hermes|openclaw|menu]"
+    echo "Usage: $0 [--force-open|--open] [--restart] [install|update|start|web|all|stop|hermes|openclaw|menu]"
     exit 1
     ;;
 esac

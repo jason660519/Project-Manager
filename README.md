@@ -96,3 +96,64 @@ npm run tauri build           # 打包成 .app / .exe
 - [Engineering Docs](./docs/engineering/README.md): runtime bridge、storage/schema、ingestion、security、verification runbooks。
 - [Technical Documentation Audit](./docs/engineering/technical-documentation-audit.md): 目前文件缺口、已補文件與下一批建議。
 - [ADR Index](./docs/architecture/README.md): 已接受的架構決策。
+
+---
+
+## Contributing Translations / 多語言貢獻指南
+
+Project Manager's UI is fully internationalised. Translations live in [`lib/i18n/`](./lib/i18n/) and are enforced by TypeScript — missing keys cause a type error.
+
+### Supported locales
+
+| Code | Language | Status |
+|---|---|---|
+| `en` | English | ✅ Maintained |
+| `zh-hant` | 繁體中文 | ✅ Maintained |
+| `zh` | 简体中文 | 🔍 Needs native reviewer |
+| `ja` | 日本語 | 🔍 Needs native reviewer |
+
+### Fix an incorrect translation
+
+1. Open a GitHub issue labelled **`i18n:<locale>`** (e.g. `i18n:ja`) and describe the incorrect term.
+2. Fork → edit `lib/i18n/<locale>.ts`.
+3. Check [`lib/i18n/GLOSSARY.md`](./lib/i18n/GLOSSARY.md) — canonical terms are defined there. If the glossary is wrong too, update both files in the same PR.
+4. Run `npm run typecheck` — must pass.
+5. Open a PR touching only `lib/i18n/<locale>.ts` (and `GLOSSARY.md` if needed).
+
+### Add a new locale
+
+1. Create `lib/i18n/<bcp47>.ts` implementing every key in the `Translations` interface (TypeScript will error on missing keys).
+2. Add `{ id, label, name, flag }` to `LANGS` in `lib/hooks/useLang.ts` and extend the `LangId` union.
+3. Register the export in `lib/i18n/index.ts`.
+4. Add a column to `lib/i18n/GLOSSARY.md` for the new locale.
+5. Run `npm run typecheck` — must pass.
+6. Open a PR — a native speaker review is required before merge.
+
+### Glossary
+
+[`lib/i18n/GLOSSARY.md`](./lib/i18n/GLOSSARY.md) is the authoritative term reference. Translation files mark contested terms with `// GLOSSARY: <key>` inline comments pointing to the relevant glossary row.
+
+---
+
+Project Manager 的介面已完整國際化，翻譯檔位於 [`lib/i18n/`](./lib/i18n/)，由 TypeScript 強制結構完整性（缺少任何 key 即型別錯誤）。
+
+### 修正錯誤翻譯
+
+1. 開一個標有 **`i18n:<語言代碼>`**（例如 `i18n:zh-hant`）的 GitHub issue，說明哪個詞翻譯有誤。
+2. Fork → 編輯 `lib/i18n/<語言代碼>.ts`。
+3. 先查閱 [`lib/i18n/GLOSSARY.md`](./lib/i18n/GLOSSARY.md) 的術語表 — 若術語表本身也有誤，請在同一個 PR 中一起修正。
+4. 執行 `npm run typecheck`，必須通過。
+5. 開 PR，只異動 `lib/i18n/<語言代碼>.ts`（以及如有需要的 `GLOSSARY.md`）。
+
+### 新增語言
+
+1. 建立 `lib/i18n/<bcp47>.ts`，實作 `Translations` 介面的所有 key（TypeScript 會在缺少 key 時報錯）。
+2. 在 `lib/hooks/useLang.ts` 的 `LANGS` 陣列新增 `{ id, label, name, flag }` 並擴充 `LangId` union。
+3. 在 `lib/i18n/index.ts` 中登錄 export。
+4. 在 `lib/i18n/GLOSSARY.md` 為新語言新增一欄。
+5. 執行 `npm run typecheck`，必須通過。
+6. 開 PR — 合併前需要母語者 review。
+
+### 術語表
+
+[`lib/i18n/GLOSSARY.md`](./lib/i18n/GLOSSARY.md) 是所有關鍵技術詞彙的權威對照表。翻譯檔中用 `// GLOSSARY: <key>` 行內標注來指向對應的術語表條目。

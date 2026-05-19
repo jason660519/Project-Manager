@@ -79,4 +79,47 @@ export interface Translations {
   language: {
     label: string;
   };
+  dispatch: {
+    title: string;
+    phaseLabel: string;
+    engineerLabel: string;
+    workflowLabel: string;
+    runtimeLabel: string;
+    templatesLabel: string;
+    promptLabel: string;
+    openFileLabel: string;
+    noRole: string;
+    noWorkflow: string;
+    loadingSpec: string;
+    systemPromptPrefix: string;
+    refsPrefix: string;
+    /** Uses {count} and {flag} placeholders */
+    mcpInjected: string;
+    advancedTitle: string;
+    autoRetryLabel: string;
+    stopConditionLabel: string;
+    maxIterationsLabel: string;
+    closeBtn: string;
+    backgroundBtn: string;
+    openTerminalBtn: string;
+    dispatchBtn: string;
+    runInPMBtn: string;
+    liveOutput: string;
+    executionLog: string;
+    waitingOutput: string;
+    templateFromScratch: string;
+    templateAddTests: string;
+    templateDebug: string;
+    templateCodeReview: string;
+    templateWriteDocs: string;
+    promptUnspecified: string;
+    promptImplPath: string;
+    promptTestPath: string;
+    promptNotes: string;
+    promptStatus: string;
+    promptSpecHeader: string;
+    /** Uses {name} and {date} placeholders */
+    assignedToWarning: string;
+    assignedToContinue: string;
+  };
 }

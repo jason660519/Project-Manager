@@ -1,0 +1,234 @@
+{
+  "schemaVersion": 4,
+  "id": "5b9422db-4007-48fd-b9c0-dd192299e4dd",
+  "createdAt": "2026-05-19T00:46:36.208Z",
+  "updatedAt": "2026-05-19T00:54:01.767Z",
+  "updatedBy": "Codex recovery from .project-manager/features README files",
+  "project": {
+    "name": "Project Manager",
+    "root": "/Volumes/KLEVV-4T-1/Project-Manager",
+    "defaultIDE": "Cursor"
+  },
+  "features": [
+    {
+      "id": "F01",
+      "name": "Sidebar Navigation",
+      "category": "Frontend/UI",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "featureFolder": ".project-manager/features/F01/",
+        "implementation": "app/ui/Sidebar.tsx"
+      },
+      "notes": ".project-manager/features/F01/README.md",
+      "createdAt": "2026-05-18T23:48:51.000Z",
+      "updatedAt": "2026-05-18T23:48:51.000Z",
+      "phase": "development",
+      "points": 1
+    },
+    {
+      "id": "F02",
+      "name": "Feature Filter Tabs",
+      "category": "Frontend/UX",
+      "status": "in_progress",
+      "progress": 65,
+      "paths": {
+        "featureFolder": ".project-manager/features/F02/",
+        "implementation": "app/ui/DashboardClient.tsx"
+      },
+      "notes": ".project-manager/features/F02/README.md",
+      "createdAt": "2026-05-18T22:54:50.000Z",
+      "updatedAt": "2026-05-18T22:54:50.000Z",
+      "phase": "development",
+      "points": 1
+    },
+    {
+      "id": "F03",
+      "name": "Live Run Inspector",
+      "category": "Frontend/Monitor",
+      "status": "in_progress",
+      "progress": 30,
+      "paths": {
+        "featureFolder": ".project-manager/features/F03/",
+        "implementation": "app/ui/views/RunsView.tsx"
+      },
+      "notes": ".project-manager/features/F03/README.md",
+      "createdAt": "2026-05-18T22:54:57.000Z",
+      "updatedAt": "2026-05-18T22:54:57.000Z",
+      "phase": "development",
+      "points": 1
+    },
+    {
+      "id": "F04",
+      "name": "Add Project by GitHub URL",
+      "category": "Core/Integration",
+      "status": "on_hold",
+      "progress": 10,
+      "paths": {
+        "featureFolder": ".project-manager/features/F04/",
+        "spec": "docs/01-user-scenarios.md"
+      },
+      "notes": ".project-manager/features/F04/README.md",
+      "createdAt": "2026-05-18T22:55:03.000Z",
+      "updatedAt": "2026-05-18T22:55:03.000Z",
+      "phase": "development",
+      "points": 1
+    },
+    {
+      "id": "F05",
+      "name": "Spec Ingestion Pipeline",
+      "category": "Core/AI",
+      "status": "todo",
+      "progress": 0,
+      "paths": {
+        "featureFolder": ".project-manager/features/F05/",
+        "spec": "docs/02-prd.md"
+      },
+      "notes": ".project-manager/features/F05/README.md",
+      "createdAt": "2026-05-18T22:55:11.000Z",
+      "updatedAt": "2026-05-18T22:55:11.000Z",
+      "phase": "development",
+      "points": 1
+    },
+    {
+      "id": "F06",
+      "name": "Storage Abstraction & Schema v2 Sync Fields",
+      "category": "Core/Architecture",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "featureFolder": ".project-manager/features/F06/",
+        "implementation": "lib/storage/",
+        "spec": "docs/architecture/ADR-006-schema-v2-sync-fields.md",
+        "developmentLogSummaryFolder": "docs/dev-logs/"
+      },
+      "notes": ".project-manager/features/F06/README.md",
+      "createdAt": "2026-05-18T22:55:18.000Z",
+      "updatedAt": "2026-05-18T22:55:18.000Z",
+      "phase": "development",
+      "points": 1
+    },
+    {
+      "id": "F07",
+      "name": "Zone 1: Sidebar Redesign",
+      "category": "Frontend/UI",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "featureFolder": ".project-manager/features/F07/",
+        "implementation": "app/ui/Sidebar.tsx"
+      },
+      "notes": ".project-manager/features/F07/README.md",
+      "createdAt": "2026-05-18T22:55:27.000Z",
+      "updatedAt": "2026-05-18T22:55:27.000Z",
+      "phase": "development",
+      "points": 1
+    },
+    {
+      "id": "F08",
+      "name": "Zone 2: Top Command Bar",
+      "category": "Frontend/UI",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "featureFolder": ".project-manager/features/F08/",
+        "implementation": "app/ui/TopBar.tsx"
+      },
+      "notes": ".project-manager/features/F08/README.md",
+      "createdAt": "2026-05-18T22:55:33.000Z",
+      "updatedAt": "2026-05-18T22:55:33.000Z",
+      "phase": "development",
+      "points": 1
+    },
+    {
+      "id": "F09",
+      "name": "Zone 3: ViewHeader (Removed)",
+      "category": "Frontend/UI",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "featureFolder": ".project-manager/features/F09/"
+      },
+      "notes": ".project-manager/features/F09/README.md",
+      "createdAt": "2026-05-18T22:55:41.000Z",
+      "updatedAt": "2026-05-18T22:55:41.000Z",
+      "phase": "development",
+      "points": 1
+    },
+    {
+      "id": "F10",
+      "name": "Zone 4: AppShell Canvas & Layout Grid",
+      "category": "Frontend/UI",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "featureFolder": ".project-manager/features/F10/",
+        "implementation": "app/ui/AppShell.tsx"
+      },
+      "notes": ".project-manager/features/F10/README.md",
+      "createdAt": "2026-05-18T22:55:48.000Z",
+      "updatedAt": "2026-05-18T22:55:48.000Z",
+      "phase": "development",
+      "points": 1
+    },
+    {
+      "id": "F11",
+      "name": "i18n: Multilingual Contributor Guide",
+      "category": "Documentation/i18n",
+      "status": "in_progress",
+      "progress": 40,
+      "paths": {
+        "featureFolder": ".project-manager/features/F11/",
+        "implementation": "lib/hooks/useLang.ts",
+        "spec": ".project-manager/features/F11/feature-spec.md",
+        "tdd": ".project-manager/features/F11/tdd-spec.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F11/"
+      },
+      "notes": ".project-manager/features/F11/README.md",
+      "createdAt": "2026-05-19T00:24:47.000Z",
+      "updatedAt": "2026-05-19T00:24:47.000Z",
+      "phase": "development",
+      "points": 1
+    }
+  ],
+  "adapters": {
+    "ides": [
+      {
+        "id": "Cursor",
+        "name": "Cursor",
+        "type": "ide",
+        "command": "cursor"
+      },
+      {
+        "id": "VSCode",
+        "name": "Visual Studio Code",
+        "type": "ide",
+        "command": "code"
+      }
+    ],
+    "agents": [
+      {
+        "id": "claude-code",
+        "name": "Claude Code",
+        "type": "agent",
+        "command": "claude",
+        "argsTemplate": [
+          "--cwd",
+          "{root}",
+          "{prompt}"
+        ]
+      },
+      {
+        "id": "codex",
+        "name": "Codex",
+        "type": "agent",
+        "command": "codex",
+        "argsTemplate": [
+          "--cwd",
+          "{root}",
+          "{prompt}"
+        ]
+      }
+    ]
+  }
+}

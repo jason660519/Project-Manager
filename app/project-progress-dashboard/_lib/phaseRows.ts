@@ -30,6 +30,10 @@ export interface PhaseRow extends PhaseRowMeta {
   tddProgress?: number;
   assignedRoleId?: string;
   assignedIDE?: IDEId;
+  assignedTo?: string;
+  assignedAt?: string;
+  /** Absolute project root for this row's source project (may differ from the dashboard's selected project). */
+  sourceProjectRoot?: string;
   /** Underlying feature, when source==='feature'. */
   feature?: Feature;
   /** Underlying custom row, when source==='custom'. */
@@ -45,6 +49,7 @@ export function featureToPhaseRow(feature: Feature, defaultProjectName?: string)
     source: 'feature',
     featureId: feature.id,
     projectName: (feature.metadata?.sourceProjectName as string | undefined) ?? defaultProjectName,
+    sourceProjectRoot: feature.metadata?.sourceProjectRoot as string | undefined,
     id: feature.id,
     name: feature.name,
     category: feature.category,
@@ -71,6 +76,8 @@ export function featureToPhaseRow(feature: Feature, defaultProjectName?: string)
     tddProgress: feature.tddProgress,
     assignedRoleId: feature.assignedRoleId,
     assignedIDE: feature.assignedIDE,
+    assignedTo: feature.assignedTo,
+    assignedAt: feature.assignedAt,
     feature,
   };
 }

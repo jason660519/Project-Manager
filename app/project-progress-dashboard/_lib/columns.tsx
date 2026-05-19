@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Bot, Eye, EyeOff, FileText, Pencil, Settings2, Trash2 } from 'lucide-react';
+import { Bot, Eye, EyeOff, FileText, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import type {
-  DeployStatus, EngineerRole, Feature, FeaturePhase, FeatureStatus, IDEId, TestStatus,
+  DeployStatus, Feature, FeaturePhase, FeatureStatus, TestStatus,
 } from '../../../lib/types';
 import type { CustomProjectProgressRow } from '../types';
 import type { PhaseRow } from './phaseRows';
@@ -20,11 +20,8 @@ export interface ColumnDef {
 
 export interface ColumnHandlers {
   projectRoot: string;
-  /** Project engineer roles, used to populate the per-row Engineer dropdown. */
-  engineerRoles: EngineerRole[];
   hiddenRowKeysSet: Set<string>;
   onToggleHideRow: (rowKey: string) => void;
-  onOpenPromptConfig: (row: PhaseRow) => void;
   onDeleteCustomRow: (rowId: string) => void;
   onPatchFeature: (featureId: string, patch: Partial<Feature>) => void;
   onPatchCustomRow: (rowId: string, patch: Partial<CustomProjectProgressRow>) => void;
@@ -34,13 +31,6 @@ export interface ColumnHandlers {
   /** Opens the FeatureDocPanel for the given absolute file path. */
   onOpenNotePanel?: (absPath: string) => void;
 }
-
-const IDE_OPTIONS: ReadonlyArray<{ value: IDEId; label: string }> = [
-  { value: 'Cursor', label: 'Cursor' },
-  { value: 'VSCode', label: 'VSCode' },
-  { value: 'Trae', label: 'Trae' },
-  { value: 'Antigravity', label: 'Antigravity' },
-];
 
 const STATUS_STYLE: Record<FeatureStatus, string> = {
   todo:        'border-stone-300/25 bg-stone-200/10 text-stone-200',
@@ -60,32 +50,6 @@ function patchRow(row: PhaseRow, patch: Partial<Feature> & Partial<CustomProject
     h.onPatchFeature(row.featureId, featurePatch as Partial<Feature>);
   } else if (row.source === 'custom' && row.customRowId) {
     h.onPatchCustomRow(row.customRowId, patch);
-  }
-}
-
-// ── Path-field plumbing ─────────────────────────────────────────────────────
-// Features nest path fields under `paths.*`; custom rows store them flat with
-// `*Path` suffixes. This helper hides the divergence so column cells stay simple.
-type FeaturePathKey =
-  | 'spec' | 'tdd' | 'tddProgressReport' | 'unitIntegrationTest'
-  | 'e2eAcceptanceTestScriptFolder' | 'developmentLogSummaryFolder';
-
-const CUSTOM_PATH_KEYS: Record<FeaturePathKey, keyof CustomProjectProgressRow> = {
-  spec: 'specPath',
-  tdd: 'tddPath',
-  tddProgressReport: 'tddReportPath',
-  unitIntegrationTest: 'unitIntegrationTestPath',
-  e2eAcceptanceTestScriptFolder: 'e2eAcceptanceTestScriptFolder',
-  developmentLogSummaryFolder: 'developmentLogSummaryFolder',
-};
-
-function patchPath(row: PhaseRow, key: FeaturePathKey, value: string | undefined, h: ColumnHandlers) {
-  const cleaned = value && value.trim() !== '' ? value.trim() : undefined;
-  if (row.source === 'feature' && row.featureId) {
-    const currentPaths = row.feature?.paths ?? {};
-    h.onPatchFeature(row.featureId, { paths: { ...currentPaths, [key]: cleaned } });
-  } else if (row.source === 'custom' && row.customRowId) {
-    h.onPatchCustomRow(row.customRowId, { [CUSTOM_PATH_KEYS[key]]: cleaned });
   }
 }
 
@@ -178,60 +142,15 @@ function EditableSelect<T extends string>({
   );
 }
 
-/** Path cell: link when set, placeholder when empty, pencil opens edit input. */
-function EditablePath({
-  projectRoot, value, placeholder, onCommit,
+/** Path cell: opens the linked file/folder when set; placeholder when empty. */
+function PathCell({
+  projectRoot,
+  value,
 }: {
   projectRoot: string;
   value?: string;
-  placeholder: string;
-  onCommit: (next: string | undefined) => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value ?? '');
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => { if (!editing) setDraft(value ?? ''); }, [value, editing]);
-  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
-
-  if (editing) {
-    return (
-      <input
-        ref={inputRef}
-        type="text"
-        value={draft}
-        placeholder={placeholder}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => {
-          setEditing(false);
-          const next = draft.trim();
-          if (next !== (value ?? '')) onCommit(next || undefined);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
-          if (e.key === 'Escape') { setDraft(value ?? ''); setEditing(false); }
-          e.stopPropagation();
-        }}
-        onClick={(e) => e.stopPropagation()}
-        className="h-6 w-full min-w-[8rem] rounded border border-emerald-300/40 bg-[#020a09]/95 px-1 font-mono text-[11px] text-stone-100 focus:outline-none"
-      />
-    );
-  }
-  return (
-    <div className="flex min-w-0 items-center gap-1">
-      <div className="min-w-0 flex-1">
-        <PathLink projectRoot={projectRoot} relPath={value} />
-      </div>
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); setEditing(true); }}
-        className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-stone-400 hover:bg-white/10 hover:text-stone-100"
-        title={value ? 'Edit path' : 'Set path'}
-      >
-        <Pencil size={10} />
-      </button>
-    </div>
-  );
+  return <PathLink projectRoot={projectRoot} relPath={value} />;
 }
 
 // ── Display helpers ─────────────────────────────────────────────────────────
@@ -418,21 +337,15 @@ function actionsCol(): ColumnDef {
       const canDispatch = h.onDispatch && row.source === 'feature';
       return (
         <div className="flex items-center gap-1">
-          <PhaseSwitch row={row} onChange={(p) => h.onChangePhase(row, p)} />
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); h.onOpenPromptConfig(row); }}
-            className="flex h-6 w-6 items-center justify-center rounded border border-stone-200/15 text-stone-300 hover:bg-white/10 hover:text-stone-100"
-            title="Configure prompt"
-          >
-            <Settings2 size={12} />
-          </button>
+          {row.source === 'custom' && (
+            <PhaseSwitch row={row} onChange={(p) => h.onChangePhase(row, p)} />
+          )}
           {canDispatch && (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); h.onDispatch?.(row); }}
               className="flex h-6 items-center gap-1 rounded border border-emerald-200/30 bg-emerald-500/15 px-1.5 text-[11px] text-emerald-100 hover:bg-emerald-500/25"
-              title="Dispatch to agent"
+              title="Dispatch — assign engineer, IDE, phase, and run"
             >
               <Bot size={11} /> Dispatch
             </button>
@@ -515,68 +428,29 @@ const STATUS_OPTIONS = [
 // ── Notes cell — shows a view-button that opens FeatureDocPanel ─────────────
 
 function NotesCell({
-  projectRoot, value, onOpenPanel, onCommit,
+  projectRoot,
+  value,
+  onOpenPanel,
 }: {
   projectRoot: string;
   value?: string;
   onOpenPanel: (absPath: string) => void;
-  onCommit: (next: string | undefined) => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value ?? '');
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => { if (!editing) setDraft(value ?? ''); }, [value, editing]);
-  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
-
-  if (editing) {
-    return (
-      <input
-        ref={inputRef}
-        type="text"
-        value={draft}
-        placeholder=".project-manager/features/F01/README.md"
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => {
-          setEditing(false);
-          const next = draft.trim();
-          if (next !== (value ?? '')) onCommit(next || undefined);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
-          if (e.key === 'Escape') { setDraft(value ?? ''); setEditing(false); }
-          e.stopPropagation();
-        }}
-        onClick={(e) => e.stopPropagation()}
-        className="h-6 w-full min-w-[8rem] rounded border border-emerald-300/40 bg-[#020a09]/95 px-1 font-mono text-[11px] text-stone-100 focus:outline-none"
-      />
-    );
+  if (!value?.trim()) {
+    return <span className="text-xs text-stone-500">—</span>;
   }
 
+  const absPath = resolveProjectPath(projectRoot, value);
   return (
-    <div className="flex items-center gap-1">
-      {value ? (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onOpenPanel(resolveProjectPath(projectRoot, value)); }}
-          title={resolveProjectPath(projectRoot, value)}
-          className="inline-flex items-center gap-1 truncate rounded px-1.5 py-0.5 text-[11px] text-cyan-200/90 hover:bg-white/5 hover:text-cyan-100 transition-colors"
-        >
-          <FileText size={11} className="shrink-0 opacity-80" />
-          <span className="truncate max-w-[120px]">{value.split('/').pop()}</span>
-        </button>
-      ) : (
-        <span className="text-xs text-stone-500">—</span>
-      )}
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); setEditing(true); }}
-        className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-stone-400 hover:bg-white/10 hover:text-stone-100"
-        title={value ? 'Edit path' : 'Set notes path'}
-      >
-        <Pencil size={10} />
-      </button>
-    </div>
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onOpenPanel(absPath); }}
+      title={absPath}
+      className="inline-flex items-center gap-1 truncate rounded px-1.5 py-0.5 text-[11px] text-cyan-200/90 hover:bg-white/5 hover:text-cyan-100 transition-colors"
+    >
+      <FileText size={11} className="shrink-0 opacity-80" />
+      <span className="truncate max-w-[120px]">{value.split('/').pop()}</span>
+    </button>
   );
 }
 
@@ -592,12 +466,24 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
       />
     )},
     { id: 'status', header: 'Status', accessor: (r) => r.status, cell: (r, h) => (
-      <EditableSelect
-        value={r.status as FeatureStatus}
-        options={STATUS_OPTIONS as unknown as Array<{ value: FeatureStatus; label: string }>}
-        palette={STATUS_STYLE}
-        onCommit={(v) => patchRow(r, { status: v }, h)}
-      />
+      <div className="flex flex-col gap-0.5">
+        <EditableSelect
+          value={r.status as FeatureStatus}
+          options={STATUS_OPTIONS as unknown as Array<{ value: FeatureStatus; label: string }>}
+          palette={STATUS_STYLE}
+          onCommit={(v) => patchRow(r, { status: v }, h)}
+        />
+        {r.assignedTo && r.status === 'in_progress' && (
+          <span
+            className="inline-block max-w-[120px] truncate rounded-sm border border-amber-400/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] leading-tight text-amber-200/90"
+            title={r.assignedAt
+              ? `${r.assignedTo} · ${new Date(r.assignedAt).toLocaleString()}`
+              : r.assignedTo}
+          >
+            {r.assignedTo}
+          </span>
+        )}
+      </div>
     )},
     { id: 'page', header: 'Located Page', accessor: (r) => r.locatedPage ?? '', cell: (r, h) => (
       <EditableText
@@ -610,12 +496,7 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
       header: 'Feature Spec',
       accessor: (r) => r.specPath ?? '',
       cell: (r, h) => (
-        <EditablePath
-          projectRoot={h.projectRoot}
-          value={r.specPath}
-          placeholder="docs/features/F01.md"
-          onCommit={(v) => patchPath(r, 'spec', v, h)}
-        />
+        <PathCell projectRoot={h.projectRoot} value={r.specPath} />
       ),
     },
     {
@@ -623,12 +504,7 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
       header: 'TDD Spec',
       accessor: (r) => r.tddPath ?? '',
       cell: (r, h) => (
-        <EditablePath
-          projectRoot={h.projectRoot}
-          value={r.tddPath}
-          placeholder="docs/tdd/F01-tdd.md"
-          onCommit={(v) => patchPath(r, 'tdd', v, h)}
-        />
+        <PathCell projectRoot={h.projectRoot} value={r.tddPath} />
       ),
     },
     {
@@ -636,12 +512,7 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
       header: 'Unit/Integ Test',
       accessor: (r) => r.unitIntegrationTestPath ?? '',
       cell: (r, h) => (
-        <EditablePath
-          projectRoot={h.projectRoot}
-          value={r.unitIntegrationTestPath}
-          placeholder="tests/unit/F01/"
-          onCommit={(v) => patchPath(r, 'unitIntegrationTest', v, h)}
-        />
+        <PathCell projectRoot={h.projectRoot} value={r.unitIntegrationTestPath} />
       ),
     },
     {
@@ -649,12 +520,7 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
       header: 'E2E Folder',
       accessor: (r) => r.e2eAcceptanceTestScriptFolder ?? '',
       cell: (r, h) => (
-        <EditablePath
-          projectRoot={h.projectRoot}
-          value={r.e2eAcceptanceTestScriptFolder}
-          placeholder="tests/e2e/F01/"
-          onCommit={(v) => patchPath(r, 'e2eAcceptanceTestScriptFolder', v, h)}
-        />
+        <PathCell projectRoot={h.projectRoot} value={r.e2eAcceptanceTestScriptFolder} />
       ),
     },
     { id: 'tddProgress', header: 'TDD Progress', accessor: (r) => r.tddProgress ?? -1, cell: (r, h) => (
@@ -669,12 +535,7 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
       header: 'TDD Report',
       accessor: (r) => r.tddReportPath ?? '',
       cell: (r, h) => (
-        <EditablePath
-          projectRoot={h.projectRoot}
-          value={r.tddReportPath}
-          placeholder="docs/tdd/F01-progress.md"
-          onCommit={(v) => patchPath(r, 'tddProgressReport', v, h)}
-        />
+        <PathCell projectRoot={h.projectRoot} value={r.tddReportPath} />
       ),
     },
     {
@@ -682,34 +543,14 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
       header: 'Dev Logs',
       accessor: (r) => r.devLogFolder ?? '',
       cell: (r, h) => (
-        <EditablePath
-          projectRoot={h.projectRoot}
-          value={r.devLogFolder}
-          placeholder="docs/dev-logs/"
-          onCommit={(v) => patchPath(r, 'developmentLogSummaryFolder', v, h)}
-        />
+        <PathCell projectRoot={h.projectRoot} value={r.devLogFolder} />
       ),
     },
-    { id: 'engineer', header: 'AI Engineer', accessor: (r) => r.assignedRoleId ?? '', cell: (r, h) => (
-      <EditableSelect<string>
-        value={r.assignedRoleId}
-        options={h.engineerRoles.map((role) => ({ value: role.id, label: role.name }))}
-        onCommit={(v) => patchRow(r, { assignedRoleId: v || undefined }, h)}
-      />
-    )},
-    { id: 'ide', header: 'IDE', accessor: (r) => r.assignedIDE ?? '', cell: (r, h) => (
-      <EditableSelect<IDEId>
-        value={r.assignedIDE}
-        options={IDE_OPTIONS as unknown as Array<{ value: IDEId; label: string }>}
-        onCommit={(v) => patchRow(r, { assignedIDE: (v || undefined) as IDEId }, h)}
-      />
-    )},
     { id: 'notes', header: 'Notes', accessor: (r) => r.notes ?? '', cell: (r, h) => (
       <NotesCell
-        projectRoot={h.projectRoot}
+        projectRoot={r.sourceProjectRoot ?? h.projectRoot}
         value={r.notes}
         onOpenPanel={(absPath) => h.onOpenNotePanel?.(absPath)}
-        onCommit={(v) => patchRow(r, { notes: v || undefined }, h)}
       />
     )},
     actionsCol(),

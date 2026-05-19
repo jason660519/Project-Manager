@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildRecoveredProjectConfig,
   buildOverwriteScaffold,
   buildProjectScaffold,
   defaultFeaturePaths,
   defaultFeatureSpecPath,
+  hasRecoverableDashboardArtifacts,
   mergeProjectConfig,
 } from '../lib/storage/createProjectScaffold';
 import { CURRENT_SCHEMA_VERSION } from '../lib/storage/migrate';
@@ -21,11 +23,101 @@ describe('buildProjectScaffold', () => {
 });
 
 describe('defaultFeaturePaths', () => {
-  it('points spec and dev log folder at scaffold dirs', () => {
-    expect(defaultFeatureSpecPath('F01', 'Login Flow')).toBe('docs/features/F01-login-flow.md');
+  it('points feature docs and dev logs at the consolidated dashboard dirs', () => {
+    expect(defaultFeatureSpecPath('F01', 'Login Flow')).toBe(
+      '.project-manager/features/F01/feature-spec.md',
+    );
     expect(defaultFeaturePaths('F01', 'Login Flow')).toEqual({
-      spec: 'docs/features/F01-login-flow.md',
-      developmentLogSummaryFolder: 'docs/dev-logs/',
+      featureFolder: '.project-manager/features/F01/',
+      spec: '.project-manager/features/F01/feature-spec.md',
+      developmentLogSummaryFolder: '.project-manager/dev-logs/',
+    });
+  });
+});
+
+describe('dashboard artifact recovery', () => {
+  it('detects existing feature readmes as recoverable dashboard artifacts', () => {
+    expect(
+      hasRecoverableDashboardArtifacts({
+        featureReadmes: [
+          {
+            featureId: 'F01',
+            relativePath: '.project-manager/features/F01/README.md',
+            content: '# F01 — Sidebar Navigation',
+          },
+        ],
+        relativePaths: [],
+      }),
+    ).toBe(true);
+  });
+
+  it('rebuilds config deterministically from existing feature README metadata', () => {
+    const cfg = buildRecoveredProjectConfig('/repo/Project-Manager', {
+      featureReadmes: [
+        {
+          featureId: 'F01',
+          relativePath: '.project-manager/features/F01/README.md',
+          content: [
+            '# F01 — Sidebar Navigation',
+            '',
+            '**Status**: done | **Progress**: 100%',
+            '**Category**: Frontend/UI',
+            '**Implementation**: `app/ui/Sidebar.tsx`',
+          ].join('\n'),
+          updatedAt: '2026-05-19T09:48:51.000Z',
+        },
+        {
+          featureId: 'F11',
+          relativePath: '.project-manager/features/F11/README.md',
+          content: [
+            '# F11 — i18n: Multilingual Contributor Guide',
+            '',
+            '**Status**: in_progress | **Progress**: 40%',
+            '**Category**: Documentation/i18n',
+            '**Implementation**: `lib/i18n/`',
+          ].join('\n'),
+          updatedAt: '2026-05-19T10:24:47.000Z',
+        },
+      ],
+      relativePaths: [
+        '.project-manager/features/F11/feature-spec.md',
+        '.project-manager/features/F11/tdd-spec.md',
+        '.project-manager/features/F11/dev-log.md',
+      ],
+    });
+
+    expect(cfg.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(cfg.project).toMatchObject({
+      name: 'Project-Manager',
+      root: '/repo/Project-Manager',
+      defaultIDE: 'Cursor',
+    });
+    expect(cfg.features.map((f) => f.id)).toEqual(['F01', 'F11']);
+    expect(cfg.features[0]).toMatchObject({
+      id: 'F01',
+      name: 'Sidebar Navigation',
+      status: 'done',
+      progress: 100,
+      category: 'Frontend/UI',
+      notes: '.project-manager/features/F01/README.md',
+      paths: {
+        featureFolder: '.project-manager/features/F01/',
+        implementation: 'app/ui/Sidebar.tsx',
+      },
+    });
+    expect(cfg.features[1]).toMatchObject({
+      id: 'F11',
+      name: 'i18n: Multilingual Contributor Guide',
+      status: 'in_progress',
+      progress: 40,
+      category: 'Documentation/i18n',
+      paths: {
+        featureFolder: '.project-manager/features/F11/',
+        implementation: 'lib/i18n/',
+        spec: '.project-manager/features/F11/feature-spec.md',
+        tdd: '.project-manager/features/F11/tdd-spec.md',
+        developmentLogSummaryFolder: '.project-manager/features/F11/',
+      },
     });
   });
 });

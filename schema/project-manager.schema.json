@@ -226,6 +226,14 @@
           "enum": ["Cursor", "VSCode", "Trae", "Antigravity"],
           "description": "Per-feature IDE override; falls back to project.defaultIDE when unset."
         },
+        "assignedTo": {
+          "type": "string",
+          "description": "Active developer or agent identifier set at dispatch time (e.g. adapter name)."
+        },
+        "assignedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when the task was claimed via dispatch."
+        },
         "promptConfig": {
           "type": "object",
           "description": "Auto-loop prompt config (v3).",

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   augmentArgsWithMcp,
   killProcess,
@@ -18,75 +18,139 @@ import {
 } from '../../lib/agent-workflows';
 import { createRuntimeAdapterFromConfig } from '../../lib/adapters/registry';
 import { collectEnabledMcpServers } from '../../lib/storage/plugins';
-import { AnyAdapterConfig, EngineerRole, ExecutionResult, Feature } from '../../lib/types';
+import { useI18n } from '../../lib/i18n';
+import type { Translations } from '../../lib/i18n/types';
+import {
+  AnyAdapterConfig,
+  EngineerRole,
+  ExecutionResult,
+  Feature,
+  FeaturePhase,
+  FeaturePromptConfig,
+  IDEId,
+} from '../../lib/types';
 
-// ── Prompt templates ──────────────────────────────────────────────────────────
+// ── Prompt helpers ────────────────────────────────────────────────────────────
+
+type DispatchT = Translations['dispatch'];
 
 interface PromptTemplate {
   label: string;
   build: (feature: Feature, specContent?: string) => string;
 }
 
-const PROMPT_TEMPLATES: PromptTemplate[] = [
-  {
-    label: '從零實作',
-    build: (f, spec) =>
-      `請根據 Spec 從頭實作 [${f.id}] ${f.name}。\n` +
-      `實作路徑：${f.paths.implementation ?? '未指定'}\n` +
-      (f.notes ? `備註：${f.notes}\n` : '') +
-      (spec ? `\n--- Spec 內容 ---\n${spec.slice(0, 1500)}` : ''),
-  },
-  {
-    label: '補測試',
-    build: (f) =>
-      `請為 [${f.id}] ${f.name} 的現有實作補齊單元測試與整合測試。\n` +
-      `測試路徑：${f.paths.unitIntegrationTest ?? f.paths.test ?? '未指定'}\n` +
-      `實作路徑：${f.paths.implementation ?? '未指定'}`,
-  },
-  {
-    label: 'Debug',
-    build: (f) =>
-      `[${f.id}] ${f.name} 目前有 bug，請找出根本原因並修復。\n` +
-      `實作路徑：${f.paths.implementation ?? '未指定'}\n` +
-      `目前進度：${f.progress}%`,
-  },
-  {
-    label: 'Code Review',
-    build: (f) =>
-      `請 review [${f.id}] ${f.name} 的實作並給出具體改善建議。\n` +
-      `實作路徑：${f.paths.implementation ?? '未指定'}`,
-  },
-  {
-    label: '文件補全',
-    build: (f) =>
-      `請為 [${f.id}] ${f.name} 補充完整的 JSDoc 與型別說明。\n` +
-      `實作路徑：${f.paths.implementation ?? '未指定'}`,
-  },
-];
+function makePromptTemplates(d: DispatchT): PromptTemplate[] {
+  return [
+    {
+      label: d.templateFromScratch,
+      build: (f, spec) =>
+        `[${f.id}] ${f.name}\n` +
+        `${d.promptImplPath} ${f.paths.implementation ?? d.promptUnspecified}\n` +
+        (f.notes ? `${d.promptNotes} ${f.notes}\n` : '') +
+        (spec ? `\n${d.promptSpecHeader}\n${spec.slice(0, 1500)}` : ''),
+    },
+    {
+      label: d.templateAddTests,
+      build: (f) =>
+        `[${f.id}] ${f.name}\n` +
+        `${d.promptTestPath} ${f.paths.unitIntegrationTest ?? f.paths.test ?? d.promptUnspecified}\n` +
+        `${d.promptImplPath} ${f.paths.implementation ?? d.promptUnspecified}`,
+    },
+    {
+      label: d.templateDebug,
+      build: (f) =>
+        `[${f.id}] ${f.name}\n` +
+        `${d.promptImplPath} ${f.paths.implementation ?? d.promptUnspecified}\n` +
+        `${d.promptStatus} ${f.progress}%`,
+    },
+    {
+      label: d.templateCodeReview,
+      build: (f) =>
+        `[${f.id}] ${f.name}\n` +
+        `${d.promptImplPath} ${f.paths.implementation ?? d.promptUnspecified}`,
+    },
+    {
+      label: d.templateWriteDocs,
+      build: (f) =>
+        `[${f.id}] ${f.name}\n` +
+        `${d.promptImplPath} ${f.paths.implementation ?? d.promptUnspecified}`,
+    },
+  ];
+}
+
+function buildDefaultPrompt(feature: Feature, d: DispatchT, specContent?: string): string {
+  let text = `[${feature.id}] ${feature.name}\n`;
+  text += `${d.promptStatus} ${feature.status} (${feature.progress}%)\n`;
+  text += `${d.promptImplPath} ${feature.paths.implementation ?? d.promptUnspecified}\n`;
+  if (feature.notes) text += `${d.promptNotes} ${feature.notes}\n`;
+  if (specContent) text += `\n${d.promptSpecHeader}\n${specContent.slice(0, 1500)}`;
+  return text;
+}
 
 function resolvePath(filePath: string, projectRoot: string): string {
   if (filePath.startsWith('/')) return filePath;
   return `${projectRoot.replace(/\/$/, '')}/${filePath}`;
 }
 
-function buildDefaultPrompt(feature: Feature, specContent?: string): string {
-  let text = `請幫我處理 [${feature.id}] ${feature.name} 的開發工作。\n`;
-  text += `狀態：${feature.status}（${feature.progress}%）\n`;
-  text += `實作路徑：${feature.paths.implementation ?? '未指定'}\n`;
-  if (feature.notes) text += `備註：${feature.notes}\n`;
-  if (specContent) {
-    text += `\n--- Spec 內容（前段）---\n${specContent.slice(0, 1500)}`;
+const IDE_IDS: IDEId[] = ['Cursor', 'VSCode', 'Trae', 'Antigravity'];
+
+const PHASE_OPTIONS: Array<{ value: FeaturePhase; phaseKey: keyof Translations['phases'] }> = [
+  { value: 'development', phaseKey: 'development' },
+  { value: 'e2e_testing', phaseKey: 'e2eTesting' },
+  { value: 'deployment', phaseKey: 'deployment' },
+  { value: 'operations', phaseKey: 'operations' },
+];
+
+function adapterToIDE(adapter: AnyAdapterConfig): IDEId | undefined {
+  if (adapter.type !== 'ide') return undefined;
+  if (IDE_IDS.includes(adapter.id as IDEId)) return adapter.id as IDEId;
+  return IDE_IDS.find((id) => id === adapter.name);
+}
+
+function resolveInitialAdapterId(
+  feature: Feature,
+  adapters: AnyAdapterConfig[],
+  engineerRoles: EngineerRole[],
+  defaultIDE?: IDEId,
+): string {
+  const savedAgent = feature.promptConfig?.agentId;
+  if (savedAgent && adapters.some((a) => a.id === savedAgent)) return savedAgent;
+
+  if (feature.assignedRoleId) {
+    const role = engineerRoles.find((r) => r.id === feature.assignedRoleId);
+    if (role?.defaultAgentId && adapters.some((a) => a.id === role.defaultAgentId)) {
+      return role.defaultAgentId;
+    }
   }
-  return text;
+
+  const ide = feature.assignedIDE ?? defaultIDE;
+  if (ide) {
+    const ideAdapter = adapters.find(
+      (a) => adapterToIDE(a) === ide || a.id === ide,
+    );
+    if (ideAdapter) return ideAdapter.id;
+  }
+
+  return adapters[0]?.id ?? '';
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
+
+type DispatchFeatureUpdate = Partial<
+  Pick<
+    Feature,
+    | 'status' | 'progress' | 'assignedRoleId' | 'assignedIDE' | 'phase' | 'promptConfig'
+    | 'assignedTo' | 'assignedAt'
+  >
+>;
 
 interface TaskDispatchModalProps {
   feature: Feature;
   adapters: AnyAdapterConfig[];
   projectRoot: string;
   engineerRoles?: EngineerRole[];
+  /** Project default IDE when the feature has no per-row override. */
+  defaultIDE?: IDEId;
   onClose: () => void;
   onExecuted: (result: ExecutionResult) => void;
   onRunStart?: (
@@ -98,10 +162,7 @@ interface TaskDispatchModalProps {
   ) => void;
   onRunLog?: (pid: number, line: string) => void;
   onRunEnd?: (pid: number, exitCode: number) => void;
-  onFeatureUpdate?: (
-    featureId: string,
-    update: Partial<Pick<Feature, 'status' | 'progress'>>,
-  ) => void;
+  onFeatureUpdate?: (featureId: string, update: DispatchFeatureUpdate) => void;
 }
 
 type Phase = 'idle' | 'running' | 'done' | 'error';
@@ -111,6 +172,7 @@ export function TaskDispatchModal({
   adapters,
   projectRoot,
   engineerRoles = [],
+  defaultIDE,
   onClose,
   onExecuted,
   onRunStart,
@@ -118,10 +180,27 @@ export function TaskDispatchModal({
   onRunEnd,
   onFeatureUpdate,
 }: TaskDispatchModalProps) {
-  const [selectedRoleId, setSelectedRoleId] = useState<string>('');
+  const { t } = useI18n();
+  const d = t.dispatch;
+
+  const promptTemplates = useMemo(() => makePromptTemplates(d), [d]);
+
+  const [selectedRoleId, setSelectedRoleId] = useState(feature.assignedRoleId ?? '');
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>('');
-  const [selectedAdapterId, setSelectedAdapterId] = useState(adapters[0]?.id ?? '');
+  const [selectedAdapterId, setSelectedAdapterId] = useState(() =>
+    resolveInitialAdapterId(feature, adapters, engineerRoles, defaultIDE),
+  );
+  const [selectedPhase, setSelectedPhase] = useState<FeaturePhase>(
+    feature.phase ?? 'development',
+  );
   const [prompt, setPrompt] = useState('');
+  const [autoLoop, setAutoLoop] = useState(feature.promptConfig?.autoLoop ?? false);
+  const [stopCondition, setStopCondition] = useState(feature.promptConfig?.stopCondition ?? '');
+  const [maxIterations, setMaxIterations] = useState(feature.promptConfig?.maxIterations ?? 5);
+  const [showAdvanced, setShowAdvanced] = useState(
+    Boolean(feature.promptConfig?.autoLoop || feature.promptConfig?.stopCondition),
+  );
+  const [overrideConfirmed, setOverrideConfirmed] = useState(false);
   const [phase, setPhase] = useState<Phase>('idle');
   const [logs, setLogs] = useState<string[]>([]);
   const [activePid, setActivePid] = useState<number | null>(null);
@@ -146,23 +225,54 @@ export function TaskDispatchModal({
     }
   };
 
-  // Load spec content and build default prompt on mount
+  const buildAssignmentPatch = (): DispatchFeatureUpdate => {
+    const adapter = adapters.find((a) => a.id === selectedAdapterId);
+    const promptConfig: FeaturePromptConfig = {
+      body: prompt.trim() || undefined,
+      agentId: selectedAdapterId || undefined,
+      autoLoop: autoLoop || undefined,
+      stopCondition: autoLoop && stopCondition.trim() ? stopCondition.trim() : undefined,
+      maxIterations: autoLoop ? maxIterations : undefined,
+    };
+    const role = engineerRoles.find((r) => r.id === selectedRoleId);
+    const assignedTo = role
+      ? `${adapter?.name ?? selectedAdapterId} (${role.name})`
+      : (adapter?.name ?? selectedAdapterId);
+    const patch: DispatchFeatureUpdate = {
+      assignedRoleId: selectedRoleId || undefined,
+      phase: selectedPhase,
+      promptConfig,
+      assignedTo: assignedTo || undefined,
+      assignedAt: new Date().toISOString(),
+    };
+    const ide = adapter ? adapterToIDE(adapter) : undefined;
+    if (ide) patch.assignedIDE = ide;
+    return patch;
+  };
+
+  // Load saved prompt or spec content and build default prompt on mount
   useEffect(() => {
     let cancelled = false;
+    const savedBody = feature.promptConfig?.body?.trim();
+    if (savedBody) {
+      setPrompt(savedBody);
+      return;
+    }
+
     const specPath = feature.paths.spec ?? feature.paths.tdd;
 
     if (!specPath) {
-      setPrompt(buildDefaultPrompt(feature));
+      setPrompt(buildDefaultPrompt(feature, d));
       return;
     }
 
     setSpecLoading(true);
     readFile(resolvePath(specPath, projectRoot))
       .then((content) => {
-        if (!cancelled) setPrompt(buildDefaultPrompt(feature, content || undefined));
+        if (!cancelled) setPrompt(buildDefaultPrompt(feature, d, content || undefined));
       })
       .catch(() => {
-        if (!cancelled) setPrompt(buildDefaultPrompt(feature));
+        if (!cancelled) setPrompt(buildDefaultPrompt(feature, d));
       })
       .finally(() => {
         if (!cancelled) setSpecLoading(false);
@@ -171,7 +281,7 @@ export function TaskDispatchModal({
     return () => {
       cancelled = true;
     };
-  }, [feature, projectRoot]);
+  }, [feature, projectRoot]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Recompute MCP injection preview whenever adapter or project root changes.
   useEffect(() => {
@@ -215,10 +325,10 @@ export function TaskDispatchModal({
     if (selectedRole) {
       const parts: string[] = [];
       if (selectedRole.systemPrompt) {
-        parts.push(`[工程師角色: ${selectedRole.name}]\n${selectedRole.systemPrompt}`);
+        parts.push(`[${d.engineerLabel}: ${selectedRole.name}]\n${selectedRole.systemPrompt}`);
       }
       if (selectedRole.referenceFiles.length > 0) {
-        parts.push(`參考文件:\n${selectedRole.referenceFiles.map((f) => `- ${f}`).join('\n')}`);
+        parts.push(`${d.refsPrefix}\n${selectedRole.referenceFiles.map((f) => `- ${f}`).join('\n')}`);
       }
       if (parts.length > 0) {
         effectivePrompt = `${parts.join('\n\n')}\n\n---\n\n${prompt}`;
@@ -250,7 +360,7 @@ export function TaskDispatchModal({
     setPhase('running');
     setLogs([]);
 
-    onFeatureUpdate?.(feature.id, { status: 'in_progress' });
+    onFeatureUpdate?.(feature.id, { ...buildAssignmentPatch(), status: 'in_progress' });
 
     try {
       const { command, args: baseArgs } = await buildCommand(adapter);
@@ -269,6 +379,7 @@ export function TaskDispatchModal({
         setActivePid(null);
         activePidRef.current = null;
         onRunEnd?.(exitPid, code);
+        onFeatureUpdate?.(feature.id, { assignedTo: undefined, assignedAt: undefined });
         if (succeeded) {
           onFeatureUpdate?.(feature.id, { progress: Math.min(feature.progress + 20, 100) });
         }
@@ -282,7 +393,7 @@ export function TaskDispatchModal({
 
       onExecuted({
         success: true,
-        message: `${adapter.name} 已啟動 (PID: ${pid})`,
+        message: `${adapter.name} started (PID: ${pid})`,
         command,
         args,
         dryRun: false,
@@ -305,10 +416,10 @@ export function TaskDispatchModal({
       // so collapse literal newlines in args into spaces before spawning.
       const flatArgs = args.map((a) => a.replace(/\r?\n/g, ' '));
       await spawnTerminal({ command, args: flatArgs, cwd: projectRoot });
-      onFeatureUpdate?.(feature.id, { status: 'in_progress' });
+      onFeatureUpdate?.(feature.id, { ...buildAssignmentPatch(), status: 'in_progress' });
       onExecuted({
         success: true,
-        message: `${adapter.name} 已在新 Terminal 視窗開啟`,
+        message: `${adapter.name} opened in new Terminal window`,
         command,
         args: flatArgs,
         dryRun: false,
@@ -328,6 +439,11 @@ export function TaskDispatchModal({
   };
 
   const isRunning = phase === 'running';
+  const isAssignedBlocked =
+    phase === 'idle' &&
+    !!feature.assignedTo &&
+    feature.status === 'in_progress' &&
+    !overrideConfirmed;
 
   // Target file display for IDE adapters
   const ideTargetFile =
@@ -339,7 +455,7 @@ export function TaskDispatchModal({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-stone-200/12 bg-white/[0.035] px-6 py-4">
           <div>
-            <h3 className="text-lg font-bold text-stone-50">任務派遣</h3>
+            <h3 className="text-lg font-bold text-stone-50">{d.title}</h3>
             <p className="text-xs text-stone-400">
               {feature.id} — {feature.name}
             </p>
@@ -354,20 +470,60 @@ export function TaskDispatchModal({
 
         {/* Body */}
         <div className="space-y-4 p-6">
-          {phase === 'idle' && (
+          {phase === 'idle' && feature.assignedTo && feature.status === 'in_progress' && !overrideConfirmed && (
+            <div className="flex items-start justify-between gap-3 border border-amber-400/30 bg-amber-500/10 px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-amber-200">
+                  {d.assignedToWarning
+                    .replace('{name}', feature.assignedTo)
+                    .replace('{date}', feature.assignedAt
+                      ? new Date(feature.assignedAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
+                      : '—')}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOverrideConfirmed(true)}
+                className="shrink-0 border border-amber-400/40 px-2.5 py-1 text-[11px] font-medium text-amber-200 hover:bg-amber-500/20"
+              >
+                {d.assignedToContinue}
+              </button>
+            </div>
+          )}
+
+        {phase === 'idle' && (
             <>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-stone-200">
+                  {d.phaseLabel}
+                </label>
+                <select
+                  value={selectedPhase}
+                  onChange={(e) => setSelectedPhase(e.target.value as FeaturePhase)}
+                  className="w-full border border-stone-200/20 bg-[#03100f] px-3 py-2 text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
+                >
+                  {PHASE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.value === 'e2e_testing'
+                        ? `E2E — ${t.phases.e2eTesting}`
+                        : `${opt.value.toUpperCase().slice(0, 3)} — ${t.phases[opt.phaseKey]}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* Engineer role selector */}
               {engineerRoles.length > 0 && (
                 <div>
                   <label className="mb-1 block text-sm font-medium text-stone-200">
-                    工程師角色
+                    {d.engineerLabel}
                   </label>
                   <select
                     value={selectedRoleId}
                     onChange={(e) => handleRoleChange(e.target.value)}
                     className="w-full border border-stone-200/20 bg-[#03100f] px-3 py-2 text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
                   >
-                    <option value="">— 不套用角色 —</option>
+                    <option value="">{d.noRole}</option>
                     {engineerRoles.map((r) => (
                       <option key={r.id} value={r.id}>
                         {r.name}
@@ -376,11 +532,11 @@ export function TaskDispatchModal({
                   </select>
                   {selectedRole && (
                     <div className="mt-1.5 border border-stone-200/12 bg-[#061512]/60 px-3 py-2 text-[11px] text-stone-400">
-                      <span className="text-stone-300">系統提示：</span>
+                      <span className="text-stone-300">{d.systemPromptPrefix}</span>
                       {selectedRole.systemPrompt.slice(0, 80)}…
                       {selectedRole.referenceFiles.length > 0 && (
                         <span className="ml-2 text-stone-500">
-                          · 參考：{selectedRole.referenceFiles.join(', ')}
+                          {d.refsPrefix}{selectedRole.referenceFiles.join(', ')}
                         </span>
                       )}
                     </div>
@@ -392,14 +548,14 @@ export function TaskDispatchModal({
               {!isIDE && (
                 <div>
                   <label className="mb-1 block text-sm font-medium text-stone-200">
-                    Agent Workflow
+                    {d.workflowLabel}
                   </label>
                   <select
                     value={selectedWorkflowId}
                     onChange={(e) => setSelectedWorkflowId(e.target.value)}
                     className="w-full border border-stone-200/20 bg-[#03100f] px-3 py-2 text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
                   >
-                    <option value="">— 一般派遣，不套用 workflow —</option>
+                    <option value="">{d.noWorkflow}</option>
                     {DEFAULT_AGENT_WORKFLOWS.map((workflow) => (
                       <option key={workflow.id} value={workflow.id}>
                         {workflow.name} · {workflow.mode}
@@ -424,10 +580,10 @@ export function TaskDispatchModal({
                 </div>
               )}
 
-              {/* Adapter selector */}
+              {/* Adapter selector (agent CLI or IDE) */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-stone-200">
-                  執行環境 / Agent
+                  {d.runtimeLabel}
                 </label>
                 <select
                   value={selectedAdapterId}
@@ -442,8 +598,9 @@ export function TaskDispatchModal({
                 </select>
                 {mcpInjection && (
                   <p className="mt-1.5 text-[11px] text-emerald-300/80">
-                    + {mcpInjection.count} MCP server{mcpInjection.count > 1 ? 's' : ''} 將透過{' '}
-                    <span className="font-mono">{mcpInjection.flag}</span> 注入
+                    {d.mcpInjected
+                      .replace('{count}', String(mcpInjection.count))
+                      .replace('{flag}', mcpInjection.flag)}
                   </p>
                 )}
               </div>
@@ -451,16 +608,16 @@ export function TaskDispatchModal({
               {isIDE ? (
                 /* IDE mode: show target file, no prompt needed */
                 <div className="border border-stone-200/12 bg-[#03100f] p-3">
-                  <p className="mb-1.5 text-xs font-medium text-stone-400">開啟檔案</p>
+                  <p className="mb-1.5 text-xs font-medium text-stone-400">{d.openFileLabel}</p>
                   <p className="break-all font-mono text-xs text-stone-200">{ideTargetFile}</p>
                 </div>
               ) : (
                 /* Agent mode: template picker + prompt textarea */
                 <>
                   <div>
-                    <p className="mb-2 text-xs font-medium text-stone-400">快選模板</p>
+                    <p className="mb-2 text-xs font-medium text-stone-400">{d.templatesLabel}</p>
                     <div className="flex flex-wrap gap-1.5">
-                      {PROMPT_TEMPLATES.map((tpl) => (
+                      {promptTemplates.map((tpl) => (
                         <button
                           key={tpl.label}
                           onClick={() => applyTemplate(tpl)}
@@ -474,10 +631,10 @@ export function TaskDispatchModal({
 
                   <div>
                     <label className="mb-1 block text-sm font-medium text-stone-200">
-                      開發指令 (Prompt)
+                      {d.promptLabel}
                       {specLoading && (
                         <span className="ml-2 animate-pulse text-xs font-normal text-stone-500">
-                          載入 Spec…
+                          {d.loadingSpec}
                         </span>
                       )}
                     </label>
@@ -490,6 +647,58 @@ export function TaskDispatchModal({
                   </div>
                 </>
               )}
+
+              <div className="border border-stone-200/12">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced((v) => !v)}
+                  className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium text-stone-300 hover:bg-white/5"
+                >
+                  {d.advancedTitle}
+                  <span className="text-stone-500">{showAdvanced ? '−' : '+'}</span>
+                </button>
+                {showAdvanced && (
+                  <div className="space-y-3 border-t border-stone-200/12 px-3 py-3 text-xs text-stone-200">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={autoLoop}
+                        onChange={(e) => setAutoLoop(e.target.checked)}
+                        className="accent-emerald-400"
+                      />
+                      {d.autoRetryLabel}
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-[10px] uppercase tracking-[0.12em] text-stone-400">
+                        {d.stopConditionLabel}
+                      </span>
+                      <input
+                        value={stopCondition}
+                        onChange={(e) => setStopCondition(e.target.value)}
+                        placeholder="e.g. all tests pass"
+                        disabled={!autoLoop}
+                        className="h-7 w-full border border-stone-200/15 bg-[#03100f] px-2 text-xs text-stone-100 disabled:opacity-50"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-[10px] uppercase tracking-[0.12em] text-stone-400">
+                        {d.maxIterationsLabel}
+                      </span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={50}
+                        value={maxIterations}
+                        onChange={(e) =>
+                          setMaxIterations(Math.max(1, Math.min(50, Number(e.target.value) || 1)))
+                        }
+                        disabled={!autoLoop}
+                        className="h-7 w-24 border border-stone-200/15 bg-[#03100f] px-2 text-xs text-stone-100 disabled:opacity-50"
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
             </>
           )}
 
@@ -497,7 +706,7 @@ export function TaskDispatchModal({
             <div>
               <div className="mb-1 flex items-center justify-between">
                 <label className="text-sm font-medium text-stone-200">
-                  {isRunning ? 'Live Output' : 'Execution Log'}
+                  {isRunning ? d.liveOutput : d.executionLog}
                 </label>
                 {activePid != null && (
                   <span className="text-xs text-stone-400">PID {activePid}</span>
@@ -505,7 +714,7 @@ export function TaskDispatchModal({
               </div>
               <div className="max-h-64 overflow-auto border border-stone-200/12 bg-[#03100f] p-3 font-mono text-xs leading-5 text-stone-200">
                 {logs.length === 0 ? (
-                  <span className="animate-pulse text-stone-500">Waiting for output…</span>
+                  <span className="animate-pulse text-stone-500">{d.waitingOutput}</span>
                 ) : (
                   logs.map((line, i) => (
                     <div key={i} className="whitespace-pre-wrap break-all">
@@ -525,7 +734,7 @@ export function TaskDispatchModal({
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-stone-300 hover:bg-white/5"
           >
-            {isRunning ? '背景執行' : '關閉'}
+            {isRunning ? d.backgroundBtn : d.closeBtn}
           </button>
           {isRunning && activePid != null && (
             <button
@@ -538,20 +747,19 @@ export function TaskDispatchModal({
           {phase === 'idle' && !isIDE && (
             <button
               onClick={handleOpenInTerminal}
-              disabled={specLoading}
+              disabled={specLoading || isAssignedBlocked}
               className="border border-stone-200/25 px-4 py-2 text-sm font-medium text-stone-200 hover:bg-white/5 disabled:opacity-50"
-              title="開新的系統 Terminal 視窗執行（PM 不攔截 stdout）"
             >
-              在 Terminal 開啟
+              {d.openTerminalBtn}
             </button>
           )}
           {phase === 'idle' && (
             <button
               onClick={handleExecute}
-              disabled={specLoading}
+              disabled={specLoading || isAssignedBlocked}
               className="bg-stone-100 px-4 py-2 text-sm font-medium text-[#071d1a] hover:bg-amber-100 disabled:opacity-50"
             >
-              {isIDE ? '確認派遣' : '在 PM 內執行'}
+              {isIDE ? d.dispatchBtn : d.runInPMBtn}
             </button>
           )}
         </div>

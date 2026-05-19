@@ -34,10 +34,8 @@ const baseCustom = (overrides: Partial<CustomProjectProgressRow> = {}): CustomPr
 
 const noopHandlers = (): ColumnHandlers => ({
   projectRoot: '/tmp/project',
-  engineerRoles: [],
   hiddenRowKeysSet: new Set(),
   onToggleHideRow: vi.fn(),
-  onOpenPromptConfig: vi.fn(),
   onDeleteCustomRow: vi.fn(),
   onPatchFeature: vi.fn(),
   onPatchCustomRow: vi.fn(),
@@ -132,13 +130,24 @@ describe('column cell editing — custom rows route through onPatchCustomRow', (
 });
 
 describe('phase switcher in actions column', () => {
-  it('moving a feature row to e2e_testing calls onChangePhase with the new phase', async () => {
-    const user = userEvent.setup();
+  it('is shown for custom rows only', () => {
+    const customRow = customRowToPhaseRow(baseCustom({ rowId: 'C-10', phase: 'development' }));
+    renderCell('development', 'actions', customRow);
+    expect(screen.getByTitle('Move feature to another phase')).toBeInTheDocument();
+  });
+
+  it('is hidden for feature rows (phase moves via Dispatch modal)', () => {
     const row = featureToPhaseRow(baseFeature({ id: 'F10', phase: 'development' }));
+    renderCell('development', 'actions', row);
+    expect(screen.queryByTitle('Move feature to another phase')).toBeNull();
+  });
+
+  it('moving a custom row to e2e_testing calls onChangePhase with the new phase', async () => {
+    const user = userEvent.setup();
+    const row = customRowToPhaseRow(baseCustom({ rowId: 'C-11', phase: 'development' }));
     const onChangePhase = vi.fn();
     renderCell('development', 'actions', row, { onChangePhase });
 
-    // The phase select is the first <select> in the actions cell.
     const phaseSelect = screen.getByTitle('Move feature to another phase') as HTMLSelectElement;
     await user.selectOptions(phaseSelect, 'e2e_testing');
 
@@ -152,19 +161,19 @@ describe('feature-only Dispatch button', () => {
     const row = featureToPhaseRow(baseFeature({ id: 'F11' }));
     const onDispatch = vi.fn();
     renderCell('development', 'actions', row, { onDispatch });
-    expect(screen.getByTitle('Dispatch to agent')).toBeInTheDocument();
+    expect(screen.getByTitle(/Dispatch — assign engineer/)).toBeInTheDocument();
   });
 
   it('is hidden for custom rows even when onDispatch is provided', () => {
     const row = customRowToPhaseRow(baseCustom({ rowId: 'C-11' }));
     const onDispatch = vi.fn();
     renderCell('development', 'actions', row, { onDispatch });
-    expect(screen.queryByTitle('Dispatch to agent')).toBeNull();
+    expect(screen.queryByTitle(/Dispatch — assign engineer/)).toBeNull();
   });
 
   it('is hidden for feature rows when onDispatch is undefined', () => {
     const row = featureToPhaseRow(baseFeature({ id: 'F12' }));
     renderCell('development', 'actions', row);
-    expect(screen.queryByTitle('Dispatch to agent')).toBeNull();
+    expect(screen.queryByTitle(/Dispatch — assign engineer/)).toBeNull();
   });
 });

@@ -47,6 +47,54 @@ import { KeyboardShortcutsView } from './views/KeyboardShortcutsView';
 import { SettingsView } from './views/SettingsView';
 import { DocumentationView } from './views/DocumentationView';
 
+type BridgeFileNode = {
+  name: string;
+  path: string;
+  isDir?: boolean;
+  is_dir?: boolean;
+  children?: BridgeFileNode[];
+};
+
+function nodeIsDir(node: BridgeFileNode): boolean {
+  return node.isDir ?? node.is_dir ?? false;
+}
+
+function collectFilePaths(nodes: BridgeFileNode[]): string[] {
+  return nodes.flatMap((node) =>
+    nodeIsDir(node) ? collectFilePaths(node.children ?? []) : [node.path],
+  );
+}
+
+async function collectDashboardArtifactSnapshot(
+  root: string,
+  listProjectFiles: (root: string, maxDepth?: number) => Promise<BridgeFileNode[]>,
+  readFile: (path: string) => Promise<string>,
+) {
+  const normalizedRoot = root.replace(/\/+$/, '');
+  const files = collectFilePaths(await listProjectFiles(normalizedRoot, 4));
+  const relativePaths = files.map((file) =>
+    file.startsWith(`${normalizedRoot}/`) ? file.slice(normalizedRoot.length + 1) : file,
+  );
+  const readmeMatches = relativePaths
+    .map((relativePath) => ({
+      relativePath,
+      match: relativePath.match(/^\.project-manager\/features\/(F\d+)\/README\.md$/),
+    }))
+    .filter((item): item is { relativePath: string; match: RegExpMatchArray } =>
+      Boolean(item.match),
+    );
+
+  const featureReadmes = await Promise.all(
+    readmeMatches.map(async ({ relativePath, match }) => ({
+      featureId: match[1],
+      relativePath,
+      content: await readFile(`${normalizedRoot}/${relativePath}`),
+    })),
+  );
+
+  return { featureReadmes, relativePaths };
+}
+
 /**
  * Bundled sample projects used to seed a brand-new install so first-time users
  * have something to explore. After the initial seed (tracked via
@@ -475,7 +523,7 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
   );
 
   const handleFeatureUpdate = useCallback(
-    (featureId: string, update: Partial<Pick<Feature, 'status' | 'progress'>>) => {
+    (featureId: string, update: Partial<Feature>) => {
       setProjects((prev) =>
         prev.map((p) => {
           if (p.id !== selectedProjectId) return p;
@@ -654,18 +702,22 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
       if (!isTauri) throw new Error('Initialize requires the Project Manager desktop app');
 
       const {
+        buildRecoveredProjectConfig,
         buildOverwriteScaffold,
         buildProjectScaffold,
         ensureFeaturePaths,
+        hasRecoverableDashboardArtifacts,
         mergeProjectConfig,
       } = await import('../../lib/storage');
-      const { initializeProject, readConfig, writeConfig } = await import('../../lib/bridge');
+      const { initializeProject, listProjectFiles, readConfig, readFile, writeConfig } =
+        await import('../../lib/bridge');
 
       const root =
         target.config.project.root ||
         target.configPath.replace(/\/\.project-manager\.json$/, '');
       let config = buildProjectScaffold(root, { projectName: target.config.project.name });
       let invokeMode: 'create' | 'merge' | 'overwrite' = mode;
+      let shouldTryRecovery = mode === 'create';
 
       if (mode === 'merge' || mode === 'overwrite') {
         try {
@@ -676,6 +728,16 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
               : buildOverwriteScaffold(root, existing.project.name);
         } catch {
           invokeMode = 'create';
+          shouldTryRecovery = true;
+        }
+      }
+
+      if (shouldTryRecovery) {
+        const snapshot = await collectDashboardArtifactSnapshot(root, listProjectFiles, readFile);
+        if (hasRecoverableDashboardArtifacts(snapshot)) {
+          config = buildRecoveredProjectConfig(root, snapshot, {
+            projectName: target.config.project.name,
+          });
         }
       }
 

@@ -21,7 +21,7 @@ import {
   Wifi,
   WifiOff,
 } from 'lucide-react';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { checkUpdate } from '../../lib/bridge';
 import { useI18n } from '../../lib/i18n';
 import type { Translations } from '../../lib/i18n';
@@ -81,11 +81,15 @@ interface SidebarProps {
   activeRunCount: number;
 }
 
-const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-
 export function Sidebar({ currentView, bridgeStatus, activeRunCount }: SidebarProps) {
   const isLive = bridgeStatus === 'live';
   const { t } = useI18n();
+
+  // Defer isTauri to client-side to avoid SSR/client hydration mismatch.
+  const [isTauri, setIsTauri] = useState(false);
+  useEffect(() => {
+    setIsTauri(typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window);
+  }, []);
 
   // Update check
   const [updateLoading, setUpdateLoading] = useState(false);

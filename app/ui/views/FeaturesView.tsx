@@ -19,7 +19,7 @@ interface FeaturesViewProps {
   onRunStart: (pid: number, featureId: string, featureName: string, command: string, args: string[]) => void;
   onRunLog: (pid: number, line: string) => void;
   onRunEnd: (pid: number, exitCode: number) => void;
-  onFeatureUpdate?: (featureId: string, update: Partial<Pick<Feature, 'status' | 'progress'>>) => void;
+  onFeatureUpdate?: (featureId: string, update: Partial<Feature>) => void;
 }
 
 const FILTER_OPTIONS: Array<{ label: string; value: FeatureStatus | 'all' }> = [

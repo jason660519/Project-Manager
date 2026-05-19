@@ -61,6 +61,50 @@ struct InitializeProjectResult {
     created_dirs: Vec<String>,
 }
 
+fn init_backup_path(config_path: &Path) -> PathBuf {
+    let stamp = now_iso8601()
+        .replace(':', "-")
+        .replace('T', "-")
+        .trim_end_matches('Z')
+        .to_string();
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.subsec_nanos())
+        .unwrap_or(0);
+    config_path.with_file_name(format!("config.before-init-{stamp}-{nanos:09}.json"))
+}
+
+async fn has_recoverable_feature_readmes(dashboard_dir: &Path) -> bool {
+    let features_dir = dashboard_dir.join("features");
+    let Ok(mut entries) = tokio::fs::read_dir(&features_dir).await else {
+        return false;
+    };
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        let Ok(file_type) = entry.file_type().await else {
+            continue;
+        };
+        if !file_type.is_dir() {
+            continue;
+        }
+        if tokio::fs::metadata(entry.path().join("README.md"))
+            .await
+            .map(|m| m.is_file())
+            .unwrap_or(false)
+        {
+            return true;
+        }
+    }
+    false
+}
+
+fn config_has_no_features(config: &serde_json::Value) -> bool {
+    config
+        .get("features")
+        .and_then(|v| v.as_array())
+        .map(|features| features.is_empty())
+        .unwrap_or(true)
+}
+
 /// Create the consolidated `.project-manager/` folder (ADR-008) and write
 /// `config.json` for a local project.
 /// `mode` is one of `create` | `merge` | `overwrite`. Caller supplies the
@@ -95,6 +139,17 @@ async fn initialize_project(
         other => return Err(format!("Invalid initialize mode: {other}")),
     }
 
+    if mode == "create"
+        && !exists
+        && config_has_no_features(&config)
+        && has_recoverable_feature_readmes(&dashboard_dir).await
+    {
+        return Err(format!(
+            "RECOVERABLE_ARTIFACTS_EXIST: {} contains feature README files. Rebuild config from existing dashboard artifacts before initializing.",
+            dashboard_dir.join("features").display()
+        ));
+    }
+
     // Create the dashboard root and its canonical subdirectories so they're
     // immediately visible to the engineer in their file tree.
     let scaffold_dirs = [
@@ -119,6 +174,19 @@ async fn initialize_project(
         if let Some(s) = dir.to_str() {
             created_dirs.push(s.to_string());
         }
+    }
+
+    if exists && matches!(mode.as_str(), "merge" | "overwrite") {
+        let backup_path = init_backup_path(&config_path);
+        tokio::fs::copy(&config_path, &backup_path)
+            .await
+            .map_err(|e| {
+                format!(
+                    "Cannot back up {} to {}: {e}",
+                    config_path.display(),
+                    backup_path.display()
+                )
+            })?;
     }
 
     let content =
@@ -2333,6 +2401,83 @@ mod skill_tests {
             dir.display()
         );
         assert!(!path.contains("/escape.md"), "traversal not blocked: {path}");
+
+        cleanup(&dir).await;
+    }
+
+    #[tokio::test]
+    async fn initialize_project_backs_up_existing_config_before_merge_write() {
+        let dir = unique_test_dir("initialize_backup");
+        cleanup(&dir).await;
+        tokio::fs::create_dir_all(dir.join(".project-manager"))
+            .await
+            .unwrap();
+        let config_path = dir.join(".project-manager/config.json");
+        tokio::fs::write(&config_path, br#"{"features":[{"id":"old"}]}"#)
+            .await
+            .unwrap();
+
+        initialize_project(
+            dir.to_string_lossy().to_string(),
+            serde_json::json!({ "features": [{ "id": "new" }] }),
+            "merge".to_string(),
+        )
+        .await
+        .expect("initialize merge");
+
+        let mut backups = Vec::new();
+        let mut entries = tokio::fs::read_dir(dir.join(".project-manager"))
+            .await
+            .unwrap();
+        while let Some(entry) = entries.next_entry().await.unwrap() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with("config.before-init-") && name.ends_with(".json") {
+                backups.push(entry.path());
+            }
+        }
+        assert_eq!(backups.len(), 1, "expected one config backup, got {backups:?}");
+        let backup = tokio::fs::read_to_string(&backups[0]).await.unwrap();
+        assert!(
+            backup.contains("\"old\""),
+            "backup must preserve previous config content, got {backup}"
+        );
+
+        cleanup(&dir).await;
+    }
+
+    #[tokio::test]
+    async fn initialize_project_refuses_empty_create_when_feature_docs_exist() {
+        let dir = unique_test_dir("initialize_recoverable_artifacts");
+        cleanup(&dir).await;
+        tokio::fs::create_dir_all(dir.join(".project-manager/features/F01"))
+            .await
+            .unwrap();
+        tokio::fs::write(
+            dir.join(".project-manager/features/F01/README.md"),
+            b"# F01 \xE2\x80\x94 Existing Feature",
+        )
+        .await
+        .unwrap();
+
+        let result = initialize_project(
+            dir.to_string_lossy().to_string(),
+            serde_json::json!({ "features": [] }),
+            "create".to_string(),
+        )
+        .await;
+
+        let err = match result {
+            Ok(_) => panic!("empty create should be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("RECOVERABLE_ARTIFACTS_EXIST"),
+            "unexpected error: {err}"
+        );
+        assert!(
+            !dir.join(".project-manager/config.json").exists(),
+            "must not write a config when recoverable feature docs exist"
+        );
 
         cleanup(&dir).await;
     }

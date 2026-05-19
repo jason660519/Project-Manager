@@ -53,20 +53,6 @@ function isMissingConfigError(message: string): boolean {
   );
 }
 
-function formatRelativeTime(iso: string): string {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return '';
-  const diffSecs = Math.floor((Date.now() - then) / 1000);
-  if (diffSecs < 5) return 'just now';
-  if (diffSecs < 60) return `${diffSecs}s ago`;
-  const mins = Math.floor(diffSecs / 60);
-  if (mins < 60) return `${mins} min${mins === 1 ? '' : 's'} ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} hr${hours === 1 ? '' : 's'} ago`;
-  const days = Math.floor(hours / 24);
-  return `${days} day${days === 1 ? '' : 's'} ago`;
-}
-
 export function ProjectsView({
   projects,
   selectedProjectId,
@@ -658,16 +644,16 @@ export function ProjectsView({
               }`}
             >
               <div
-                className="flex cursor-pointer items-center justify-between px-4 py-3"
+                className="flex cursor-pointer items-start justify-between gap-3 px-4 py-3"
                 onClick={() => onSelectProject(project.id)}
               >
-                <div className="flex min-w-0 items-center gap-3">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
                   <input
                     type="checkbox"
                     checked={isDashboardSelected}
                     onChange={(e) => onToggleDashboardProject(project.id, e.target.checked)}
                     onClick={(e) => e.stopPropagation()}
-                    className="h-4 w-4 cursor-pointer accent-emerald-400"
+                    className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-emerald-400"
                     title="Include this project in Dashboard"
                   />
                   <div className="min-w-0">
@@ -692,17 +678,12 @@ export function ProjectsView({
                         </span>
                       )}
                     </div>
-                    <p className="mt-0.5 max-w-sm truncate text-xs text-stone-500">
+                    <p className="mt-0.5 break-all font-mono text-xs text-stone-500">
                       {project.configPath}
-                    </p>
-                    <p className="mt-0.5 text-[10px] text-stone-500">
-                      {project.lastSyncedAt
-                        ? `Synced ${formatRelativeTime(project.lastSyncedAt)}`
-                        : 'Not synced yet'}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 text-xs text-stone-400">
+                <div className="flex shrink-0 items-center gap-3 text-xs text-stone-400">
                   <span>{features.length} features</span>
                   {/* Two actions only: Initialize/Initialized toggle + Delete. */}
                   <div className="flex items-center gap-1">

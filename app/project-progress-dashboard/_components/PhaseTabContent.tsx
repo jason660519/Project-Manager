@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import type { AgentAdapterConfig, EngineerRole, Feature, FeaturePhase, FeaturePromptConfig } from '../../../lib/types';
+import type { Feature, FeaturePhase, FeaturePromptConfig } from '../../../lib/types';
 import { useI18n } from '../../../lib/i18n';
 import type { CustomProjectProgressRow, PhaseTablePrefs } from '../types';
 import { buildPhaseRows, type PhaseRow } from '../_lib/phaseRows';
@@ -16,7 +16,6 @@ import {
 import { PhaseTable } from './PhaseTable';
 import { PhaseTableToolbar } from './PhaseTableToolbar';
 import { AddRowModal } from './AddRowModal';
-import { PromptEngineerModal } from './PromptEngineerModal';
 import { FeatureDocPanel } from './FeatureDocPanel';
 
 interface PhaseTabContentProps {
@@ -25,11 +24,9 @@ interface PhaseTabContentProps {
   projectNames?: string[];
   projectRoot: string;
   features: Feature[];
-  engineerRoles: EngineerRole[];
   prefs: PhaseTablePrefs;
   patch: (next: Partial<PhaseTablePrefs>) => void;
   reset: () => void;
-  agents: AgentAdapterConfig[];
   onFeaturePromptSave: (featureId: string, config: FeaturePromptConfig) => void;
   /** Generic feature patcher — receives the namespaced feature id (`<projectId>::<featureId>`). */
   onFeaturePatch: (namespacedFeatureId: string, patch: Partial<Feature>) => void;
@@ -38,7 +35,7 @@ interface PhaseTabContentProps {
 }
 
 export function PhaseTabContent({
-  phase, projectName, projectNames, projectRoot, features, engineerRoles, prefs, patch, reset, agents,
+  phase, projectName, projectNames, projectRoot, features, prefs, patch, reset,
   onFeaturePromptSave, onFeaturePatch, onDispatchRow,
 }: PhaseTabContentProps) {
   const { t } = useI18n();
@@ -48,7 +45,6 @@ export function PhaseTabContent({
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [showHiddenRows, setShowHiddenRows] = useState(false);
   const [addRowOpen, setAddRowOpen] = useState(false);
-  const [promptRow, setPromptRow] = useState<PhaseRow | null>(null);
   const [notesPanelPath, setNotesPanelPath] = useState<string | null>(null);
 
   // All rows for this phase (features + custom rows).
@@ -108,12 +104,6 @@ export function PhaseTabContent({
     return set;
   }, [allRows]);
 
-  const onPromptSave = useCallback((row: PhaseRow, config: FeaturePromptConfig) => {
-    if (row.source === 'feature' && row.feature) {
-      onFeaturePromptSave(row.feature.id, config);
-    }
-  }, [onFeaturePromptSave]);
-
   // Route a per-feature patch using the dashboard's namespaced id, since
   // MainClient needs `<projectId>::<featureId>` to look up the right project.
   const onPatchFeature = useCallback(
@@ -170,17 +160,15 @@ export function PhaseTabContent({
 
   const handlers = useMemo(() => ({
     projectRoot,
-    engineerRoles,
     hiddenRowKeysSet: hiddenSet,
     onToggleHideRow,
     onDeleteCustomRow,
-    onOpenPromptConfig: (row: PhaseRow) => setPromptRow(row),
     onPatchFeature,
     onPatchCustomRow,
     onChangePhase,
     onDispatch: onDispatchRow,
     onOpenNotePanel: (absPath: string) => setNotesPanelPath(absPath),
-  }), [projectRoot, engineerRoles, hiddenSet, onToggleHideRow, onDeleteCustomRow, onPatchFeature, onPatchCustomRow, onChangePhase, onDispatchRow]);
+  }), [projectRoot, hiddenSet, onToggleHideRow, onDeleteCustomRow, onPatchFeature, onPatchCustomRow, onChangePhase, onDispatchRow]);
 
   return (
     <div className="flex flex-col gap-2">
@@ -228,13 +216,6 @@ export function PhaseTabContent({
         projectNames={projectNames}
         existingIds={existingIds}
         onAdd={onAdd}
-      />
-      <PromptEngineerModal
-        open={promptRow != null}
-        onClose={() => setPromptRow(null)}
-        row={promptRow}
-        agents={agents}
-        onSave={onPromptSave}
       />
       <FeatureDocPanel
         absPath={notesPanelPath}

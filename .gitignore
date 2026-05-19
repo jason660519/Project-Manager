@@ -24,7 +24,21 @@ src-tauri/.cargo/
 
 # Local tool state
 .devpilot-installed
-.project-manager/
+.project-manager/*
+!.project-manager/config.json
+!.project-manager/features/
+!.project-manager/features/**
+!.project-manager/dev-logs/
+!.project-manager/dev-logs/.gitkeep
+!.project-manager/dev-logs/*.md
+.project-manager/config.before-init-*.json
+.project-manager/config.generated-*.backup.json
+.project-manager/bin/
+.project-manager/dev-logs/*.log
+.project-manager/dev-logs/*.pid
+.project-manager/hermes/
+.project-manager/openclaw/
+.project-manager/vendor/
 vendor/openclaw/
 vendor/hermes-agent/
 
