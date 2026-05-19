@@ -32,6 +32,8 @@ export interface SendChatMessageRequest {
   history: ChatMessage[];
   context: ChatContext;
   navigate?: (href: string) => void;
+  /** Optional streaming callback — called with each chunk of text as it arrives. */
+  onStream?: (chunk: string) => void;
 }
 
 export interface SendChatMessageResult {
