@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { ViewId } from '../../lib/types';
 import { I18nProvider } from '../../lib/i18n';
+import type { ChatContext } from '../../lib/chat/types';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 
@@ -11,6 +12,7 @@ interface AppShellProps {
   currentView: ViewId;
   bridgeStatus: 'dry-run' | 'connected' | 'offline' | 'live';
   activeRunCount: number;
+  chatContext: ChatContext;
 }
 
 export function AppShell({
@@ -18,6 +20,7 @@ export function AppShell({
   currentView,
   bridgeStatus,
   activeRunCount,
+  chatContext,
 }: AppShellProps) {
   return (
     <I18nProvider>
@@ -31,6 +34,7 @@ export function AppShell({
           currentView={currentView}
           bridgeStatus={bridgeStatus}
           activeRunCount={activeRunCount}
+          chatContext={chatContext}
         />
         <div className="flex min-w-0 flex-col border-l border-stone-200/15">
           <TopBar currentView={currentView} activeRunCount={activeRunCount} />
