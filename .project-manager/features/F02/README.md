@@ -1,6 +1,6 @@
 # F02 — Feature Filter Tabs
 
-**Status**: in_progress | **Progress**: 65%  
+**Status**: done | **Progress**: 100%  
 **Category**: Frontend/UX  
 **Implementation**: `app/ui/DashboardClient.tsx`
 
@@ -12,14 +12,17 @@ Phase-based tab navigation on the Project Progress Dashboard. Allows filtering f
 - Deployment
 - Operations
 
-## Remaining Work
+## Completed Work
 
-- Persist active tab per project in `localStorage` or URL search param
-- Animate tab transition (subtle fade or slide)
-- Show per-tab counts in tab label badge
+- Active tab persists per project through `localStorage`.
+- Active tab syncs through the `phase` URL search param while preserving unrelated params.
+- Browser back/forward navigation updates the selected phase.
+- Tab content transitions with a subtle fade/slide.
+- Per-tab badges show normalized feature counts for every phase.
 
 ## Related Files
 
-- `app/project-progress-dashboard/` — dashboard page
-- `app/project-progress-dashboard/_lib/columns.tsx` — per-phase column definitions
-- `app/project-progress-dashboard/_lib/phaseRows.ts` — feature → display row mapping
+- `app/ui/DashboardClient.tsx` — dashboard phase tabs and feature matrix filtering
+- `__tests__/dashboardClient.phaseTabs.test.tsx` — render, persistence, URL sync, badges, and animation tests
+- `.project-manager/features/F02/feature-spec.md` — completed feature spec
+- `.project-manager/features/F02/tdd-spec.md` — completed test plan

@@ -207,7 +207,7 @@ export interface EngineerRole {
   testPrompt?: string;
 }
 
-export type ViewId = 'dashboard' | 'features' | 'projects' | 'project-files' | 'plugins' | 'settings' | 'engineers' | 'channels' | 'sessions' | 'cron-jobs' | 'logs' | 'keys' | 'documentation' | 'skills' | 'keyboard-shortcuts';
+export type ViewId = 'dashboard' | 'features' | 'projects' | 'project-files' | 'plugins' | 'settings' | 'engineers' | 'channels' | 'sessions' | 'cron-jobs' | 'logs' | 'keys' | 'documentation' | 'skills' | 'chat' | 'keyboard-shortcuts';
 
 export type IssueState = 'open' | 'closed';
 
@@ -293,7 +293,7 @@ export interface ActiveRun {
   args: string[];
   startedAt: number;
   logs: string[];
-  phase: 'running' | 'done' | 'error';
+  phase: 'pending' | 'running' | 'done' | 'error';
 }
 
 export interface CompletedRun {

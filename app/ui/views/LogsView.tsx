@@ -12,6 +12,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import type { ActiveRun, CompletedRun, CronRun, Feature, ProjectEntry } from '../../../lib/types';
+import { useI18n } from '../../../lib/i18n';
 
 type Tab = 'runs' | 'cron' | 'devlogs';
 
@@ -32,23 +33,23 @@ function fmtDuration(ms: number) {
   return `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 
-function fmtTime(ts: number | string) {
-  return new Date(ts).toLocaleTimeString('zh-TW', {
+function fmtTime(ts: number | string, locale: string) {
+  return new Date(ts).toLocaleTimeString(locale, {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
   });
 }
 
-function fmtRelative(iso: string): string {
+function fmtRelative(iso: string, ago: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const s = Math.floor(diff / 1000);
-  if (s < 60) return `${s}s ago`;
+  if (s < 60) return `${s}s ${ago}`;
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
+  if (m < 60) return `${m}m ${ago}`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+  if (h < 24) return `${h}h ${ago}`;
+  return `${Math.floor(h / 24)}d ${ago}`;
 }
 
 // ── Runs tab ──────────────────────────────────────────────────────────────────
@@ -62,6 +63,7 @@ function RunsTab({
   runHistory: CompletedRun[];
   onKillRun: (pid: number) => void;
 }) {
+  const { t } = useI18n();
   const [expandedPid, setExpandedPid] = useState<number | null>(null);
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
 
@@ -69,7 +71,7 @@ function RunsTab({
     <div className="space-y-6">
       {activeRuns.length > 0 && (
         <section>
-          <h2 className="mb-3 text-xs uppercase tracking-[0.18em] text-stone-400">Active</h2>
+          <h2 className="mb-3 text-xs uppercase tracking-[0.18em] text-stone-400">{t.logs.active}</h2>
           <div className="space-y-3">
             {activeRuns.map((run) => (
               <div key={run.pid} className="border border-emerald-200/25 bg-[rgb(var(--pm-panel))]/72">
@@ -92,13 +94,13 @@ function RunsTab({
                       onClick={() => setExpandedPid(expandedPid === run.pid ? null : run.pid)}
                       className="border border-stone-200/20 px-2 py-1 text-xs text-stone-300 hover:bg-white/5"
                     >
-                      {expandedPid === run.pid ? 'Hide' : 'Log'}
+                      {expandedPid === run.pid ? t.logs.hide : t.logs.log}
                     </button>
                     <button
                       onClick={() => onKillRun(run.pid)}
                       className="border border-red-500/40 px-2 py-1 text-xs text-red-300 hover:bg-red-950/40"
                     >
-                      Kill
+                      {t.logs.kill}
                     </button>
                   </div>
                 </div>
@@ -106,7 +108,7 @@ function RunsTab({
                   <div className="border-t border-stone-200/12 bg-[rgb(var(--pm-input))] p-3">
                     <div className="max-h-48 overflow-auto font-mono text-xs leading-5 text-stone-300">
                       {run.logs.length === 0 ? (
-                        <span className="animate-pulse text-stone-500">Waiting…</span>
+                        <span className="animate-pulse text-stone-500">{t.logs.waiting}</span>
                       ) : (
                         run.logs.slice(-50).map((line, i) => (
                           <div key={i} className="whitespace-pre-wrap break-all">{line}</div>
@@ -122,12 +124,12 @@ function RunsTab({
       )}
 
       <section>
-        <h2 className="mb-3 text-xs uppercase tracking-[0.18em] text-stone-400">History</h2>
+        <h2 className="mb-3 text-xs uppercase tracking-[0.18em] text-stone-400">{t.logs.history}</h2>
         {runHistory.length === 0 ? (
           <div className="flex min-h-40 flex-col items-center justify-center border border-dashed border-stone-200/18 text-center">
             <Terminal className="mb-2 text-stone-500" size={24} />
-            <p className="text-sm text-stone-400">No runs yet in this session.</p>
-            <p className="mt-1 text-xs text-stone-500">Dispatch a feature to see history here.</p>
+            <p className="text-sm text-stone-400">{t.logs.noRuns}</p>
+            <p className="mt-1 text-xs text-stone-500">{t.logs.noRunsHint}</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -146,7 +148,7 @@ function RunsTab({
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-stone-100">{run.featureName}</span>
                       <span className={`text-xs ${run.success ? 'text-emerald-400' : 'text-red-400'}`}>
-                        exit {run.exitCode}
+                        {t.logs.exit} {run.exitCode}
                       </span>
                     </div>
                     <p className="mt-0.5 truncate font-mono text-xs text-stone-500">
@@ -158,7 +160,7 @@ function RunsTab({
                       <Clock size={11} />
                       {fmtDuration(run.completedAt - run.startedAt)}
                     </span>
-                    <span>{fmtTime(run.completedAt)}</span>
+                    <span>{fmtTime(run.completedAt, t.logs.dateLocale)}</span>
                   </div>
                 </div>
                 {expandedIdx === i && run.logs.length > 0 && (
@@ -182,19 +184,20 @@ function RunsTab({
 // ── Cron tab ──────────────────────────────────────────────────────────────────
 
 function CronTab({ cronHistory }: { cronHistory: CronRun[] }) {
+  const { t } = useI18n();
   if (cronHistory.length === 0) {
     return (
       <div className="flex min-h-40 flex-col items-center justify-center border border-dashed border-stone-200/18 text-center">
         <Clock className="mb-2 text-stone-500" size={24} />
-        <p className="text-sm text-stone-400">No cron runs recorded yet.</p>
-        <p className="mt-1 text-xs text-stone-500">Cron jobs appear here as they fire.</p>
+        <p className="text-sm text-stone-400">{t.logs.noCronRuns}</p>
+        <p className="mt-1 text-xs text-stone-500">{t.logs.noCronRunsHint}</p>
       </div>
     );
   }
 
   const grouped: Record<string, CronRun[]> = {};
   for (const r of [...cronHistory].reverse()) {
-    const day = new Date(r.firedAt).toLocaleDateString('zh-TW', {
+    const day = new Date(r.firedAt).toLocaleDateString(t.logs.dateLocale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -222,7 +225,7 @@ function CronTab({ cronHistory }: { cronHistory: CronRun[] }) {
                 {run.pid && (
                   <span className="font-mono text-xs text-stone-600">PID {run.pid}</span>
                 )}
-                <span className="text-xs text-stone-500">{fmtRelative(run.firedAt)}</span>
+                <span className="text-xs text-stone-500">{fmtRelative(run.firedAt, t.logs.ago)}</span>
               </div>
             ))}
           </div>
@@ -247,6 +250,7 @@ function DevLogsTab({
   projects: ProjectEntry[];
   selectedProjectId: string;
 }) {
+  const { t } = useI18n();
   const [selected, setSelected] = useState<DevLogEntry | null>(null);
   const [fileList, setFileList] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
@@ -291,7 +295,7 @@ function DevLogsTab({
       const { readFile } = await import('../../../lib/bridge');
       setContent(await readFile(path));
     } catch {
-      setContent('(Unable to read file — Tauri runtime required)');
+      setContent(t.logs.readFileError);
     } finally {
       setLoading(false);
     }
@@ -301,9 +305,9 @@ function DevLogsTab({
     return (
       <div className="flex min-h-40 flex-col items-center justify-center border border-dashed border-stone-200/18 text-center">
         <FileText className="mb-2 text-stone-500" size={24} />
-        <p className="text-sm text-stone-400">No dev log folders configured.</p>
+        <p className="text-sm text-stone-400">{t.logs.noDevLogFolders}</p>
         <p className="mt-1 text-xs text-stone-500">
-          Set <code className="text-stone-400">paths.developmentLogSummaryFolder</code> on a feature to see logs here.
+          {t.logs.noDevLogFoldersHint}
         </p>
       </div>
     );
@@ -313,7 +317,7 @@ function DevLogsTab({
     <div className="flex gap-4">
       {/* Feature list */}
       <aside className="w-52 shrink-0">
-        <p className="mb-2 text-[10px] uppercase tracking-widest text-stone-500">Features</p>
+        <p className="mb-2 text-[10px] uppercase tracking-widest text-stone-500">{t.logs.features}</p>
         <div className="divide-y divide-stone-200/8 border border-stone-200/12">
           {entries.map((e) => (
             <button
@@ -338,17 +342,16 @@ function DevLogsTab({
       <div className="min-w-0 flex-1 space-y-4">
         {!selected ? (
           <div className="flex min-h-32 items-center justify-center text-xs text-stone-500">
-            Select a feature to browse its dev logs.
+            {t.logs.selectFeature}
           </div>
         ) : (
           <>
             {/* File list */}
             {loading && fileList.length === 0 ? (
-              <p className="text-xs text-stone-500">Loading…</p>
+              <p className="text-xs text-stone-500">{t.logs.loading}</p>
             ) : fileList.length === 0 ? (
               <p className="text-xs text-stone-500">
-                No .md / .html files found in{' '}
-                <code className="text-stone-400">{selected.folder}</code>
+                {t.logs.noFilesFound.replace('{folder}', selected.folder)}
               </p>
             ) : (
               <div className="flex flex-wrap gap-2">
@@ -380,11 +383,11 @@ function DevLogsTab({
                   <span className="font-mono text-[11px] text-stone-400">
                     {selectedFile.split('/').pop()}
                   </span>
-                  {loading && <span className="text-[11px] text-stone-500">Loading…</span>}
+                  {loading && <span className="text-[11px] text-stone-500">{t.logs.loading}</span>}
                 </div>
                 <div className="max-h-[60vh] overflow-auto p-4">
                   <pre className="whitespace-pre-wrap font-mono text-xs leading-5 text-stone-300">
-                    {content || (loading ? '' : '(empty)')}
+                    {content || (loading ? '' : t.logs.empty)}
                   </pre>
                 </div>
               </div>
@@ -398,12 +401,6 @@ function DevLogsTab({
 
 // ── Main LogsView ─────────────────────────────────────────────────────────────
 
-const TAB_LABELS: Record<Tab, string> = {
-  runs: 'Runs',
-  cron: 'Cron',
-  devlogs: 'Dev Logs',
-};
-
 export function LogsView({
   activeRuns,
   runHistory,
@@ -412,6 +409,7 @@ export function LogsView({
   selectedProjectId,
   onKillRun,
 }: LogsViewProps) {
+  const { t } = useI18n();
   const [tab, setTab] = useState<Tab>('runs');
 
   const badge: Partial<Record<Tab, number>> = {
@@ -422,21 +420,21 @@ export function LogsView({
     <div className="space-y-5">
       {/* Tab bar */}
       <div className="flex items-end gap-1 border-b border-stone-200/12">
-        {(Object.keys(TAB_LABELS) as Tab[]).map((t) => (
+        {(['runs', 'cron', 'devlogs'] as Tab[]).map((tabKey) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
+            key={tabKey}
+            onClick={() => setTab(tabKey)}
             className={[
               'relative px-4 py-2.5 text-xs font-medium uppercase tracking-[0.14em] transition-colors',
-              tab === t
+              tab === tabKey
                 ? 'border-b-2 border-emerald-400 text-stone-100'
                 : 'text-stone-400 hover:text-stone-200',
             ].join(' ')}
           >
-            {TAB_LABELS[t]}
-            {badge[t] !== undefined && (
+            {t.logs.tabs[tabKey]}
+            {badge[tabKey] !== undefined && (
               <span className="ml-1.5 rounded-sm bg-emerald-500/20 px-1.5 py-0.5 text-[10px] text-emerald-300">
-                {badge[t]}
+                {badge[tabKey]}
               </span>
             )}
           </button>

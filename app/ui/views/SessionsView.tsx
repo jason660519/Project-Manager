@@ -3,28 +3,29 @@
 import { useEffect, useState } from 'react';
 import { MessageSquare, Clock, Cpu, ScrollText, ChevronRight } from 'lucide-react';
 import type { AgentSession } from '../../../lib/types';
+import { useI18n } from '../../../lib/i18n';
 
 interface SessionsViewProps {
   projectRoot?: string;
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, locale: string): string {
   const d = new Date(iso);
-  return d.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  return d.toLocaleDateString(locale, { year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+function formatTime(iso: string, locale: string): string {
+  return new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
 }
 
 function formatTokens(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 }
 
-function groupByDate(sessions: AgentSession[]): Record<string, AgentSession[]> {
+function groupByDate(sessions: AgentSession[], locale: string): Record<string, AgentSession[]> {
   const groups: Record<string, AgentSession[]> = {};
   for (const s of sessions) {
-    const key = formatDate(s.startedAt);
+    const key = formatDate(s.startedAt, locale);
     if (!groups[key]) groups[key] = [];
     groups[key].push(s);
   }
@@ -32,30 +33,34 @@ function groupByDate(sessions: AgentSession[]): Record<string, AgentSession[]> {
 }
 
 function EmptyState() {
+  const { t } = useI18n();
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 text-stone-500">
       <ScrollText size={32} strokeWidth={1.2} />
-      <p className="text-sm">選一個 session 查看對話內容</p>
+      <p className="text-sm">{t.sessions.selectSession}</p>
     </div>
   );
 }
 
 function NoSessions() {
+  const { t } = useI18n();
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-stone-500">
       <MessageSquare size={32} strokeWidth={1.2} />
       <p className="text-center text-sm leading-6">
-        尚無對話紀錄。
+        {t.sessions.noSessions}
         <br />
-        透過 Ingestion 或 AI 功能發起對話後，紀錄會自動出現在這裡。
+        {t.sessions.noSessionsHint}
       </p>
     </div>
   );
 }
 
 function TranscriptView({ session }: { session: AgentSession }) {
+  const { t } = useI18n();
   const totalTokens = session.totalInputTokens + session.totalOutputTokens;
   const turns = session.messages.filter((m) => m.role !== 'system').length;
+  const locale = t.sessions.dateLocale;
 
   return (
     <div className="flex h-full flex-col">
@@ -69,10 +74,10 @@ function TranscriptView({ session }: { session: AgentSession }) {
           </span>
           <span className="flex items-center gap-1">
             <Clock size={11} />
-            {formatTime(session.startedAt)}
+            {formatTime(session.startedAt, locale)}
           </span>
-          <span>{turns} turns</span>
-          <span>{formatTokens(totalTokens)} tokens</span>
+          <span>{turns} {t.sessions.turns}</span>
+          <span>{formatTokens(totalTokens)} {t.sessions.tokens}</span>
           <span
             className={[
               'rounded-sm px-1.5 py-0.5 text-[10px] uppercase tracking-wider',
@@ -87,7 +92,7 @@ function TranscriptView({ session }: { session: AgentSession }) {
           </span>
         </div>
         {session.featureId && (
-          <p className="mt-0.5 text-[11px] text-stone-500">feature: {session.featureId}</p>
+          <p className="mt-0.5 text-[11px] text-stone-500">{t.sessions.feature}: {session.featureId}</p>
         )}
       </div>
 
@@ -133,14 +138,17 @@ function TranscriptView({ session }: { session: AgentSession }) {
 
       {/* Footer */}
       <div className="shrink-0 border-t border-stone-200/10 px-6 py-2.5 text-[11px] text-stone-500">
-        共 {session.totalInputTokens.toLocaleString()} input + {session.totalOutputTokens.toLocaleString()} output ={' '}
-        {totalTokens.toLocaleString()} tokens
+        {t.sessions.tokenSummary
+          .replace('{input}', session.totalInputTokens.toLocaleString(locale))
+          .replace('{output}', session.totalOutputTokens.toLocaleString(locale))
+          .replace('{total}', totalTokens.toLocaleString(locale))}
       </div>
     </div>
   );
 }
 
 export function SessionsView({ projectRoot }: SessionsViewProps) {
+  const { t } = useI18n();
   const [sessions, setSessions] = useState<AgentSession[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -158,7 +166,8 @@ export function SessionsView({ projectRoot }: SessionsViewProps) {
   }, [sessionsDir]);
 
   const selected = sessions.find((s) => s.id === selectedId) ?? null;
-  const grouped = groupByDate(sessions);
+  const locale = t.sessions.dateLocale;
+  const grouped = groupByDate(sessions, locale);
 
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
@@ -166,10 +175,10 @@ export function SessionsView({ projectRoot }: SessionsViewProps) {
       <aside className="flex w-72 shrink-0 flex-col border-r border-stone-200/10">
         <div className="shrink-0 border-b border-stone-200/10 px-4 py-4">
           <h1 className="text-[13px] font-semibold uppercase tracking-[0.18em] text-stone-50">
-            Sessions
+            {t.sessions.title}
           </h1>
           <p className="mt-0.5 text-[11px] text-stone-400">
-            {loading ? '載入中…' : `${sessions.length} 筆對話紀錄`}
+            {loading ? t.common.loading : t.sessions.recordsCount.replace('{count}', sessions.length.toLocaleString(locale))}
           </p>
         </div>
 
@@ -207,9 +216,9 @@ export function SessionsView({ projectRoot }: SessionsViewProps) {
                         {session.title}
                       </p>
                       <p className="mt-0.5 text-[11px] text-stone-500">
-                        {turns} turns · {formatTokens(totalTokens)} tokens
+                        {turns} {t.sessions.turns} · {formatTokens(totalTokens)} {t.sessions.tokens}
                       </p>
-                      <p className="mt-0.5 text-[10px] text-stone-600">{formatTime(session.startedAt)}</p>
+                      <p className="mt-0.5 text-[10px] text-stone-600">{formatTime(session.startedAt, locale)}</p>
                     </div>
                   </button>
                 );

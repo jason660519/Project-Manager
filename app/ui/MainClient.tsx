@@ -996,6 +996,19 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
       currentView={currentView}
       bridgeStatus={bridgeStatus}
       activeRunCount={activeRuns.length}
+      chatContext={{
+        currentView,
+        selectedProject,
+        adapters,
+        activeRunCount: activeRuns.length,
+        activeRuns: activeRuns.map((run) => ({
+          featureId: run.featureId,
+          featureName: run.featureName,
+          phase: run.phase,
+          startedAt: run.startedAt,
+        })),
+        recentRuns: runHistory.slice(0, 5),
+      }}
     >
       {currentView === 'dashboard' && selectedProject && (
         <ProjectProgressClient
@@ -1072,6 +1085,18 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
       {currentView === 'keys' && <KeysView />}
       {currentView === 'settings' && <SettingsView />}
       {currentView === 'documentation' && <DocumentationView />}
+      {currentView === 'chat' && (
+        <div className="flex min-h-[55vh] items-center justify-center">
+          <div className="max-w-md border border-stone-200/15 bg-white/[0.03] p-6 text-center">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-200">
+              AI Assistant
+            </p>
+            <p className="mt-2 text-sm leading-6 text-stone-400">
+              Use the assistant panel anchored at the bottom of the sidebar.
+            </p>
+          </div>
+        </div>
+      )}
       {currentView === 'engineers' && selectedProject && (
         <EngineersView
           roles={selectedProject.config.engineerRoles ?? []}

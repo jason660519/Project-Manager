@@ -56,6 +56,17 @@ const mockCompletedRuns: CompletedRun[] = [
   },
 ];
 
+const mockPendingRun: ActiveRun = {
+  pid: 1003,
+  featureId: 'F14',
+  featureName: 'Pending Dispatch',
+  command: 'codex',
+  args: ['--task', 'F14'],
+  startedAt: now - 1000,
+  logs: ['should stay hidden until running'],
+  phase: 'pending',
+};
+
 function renderView(activeRuns?: ActiveRun[], runHistory?: CompletedRun[]) {
   const onKillRun = vi.fn();
   return {
@@ -141,6 +152,15 @@ describe('RunsView — rendering', () => {
     // Second run (PID 1002) has empty logs
     fireEvent.click(viewButtons[1]);
     expect(screen.getByText('Waiting for output…')).toBeInTheDocument();
+  });
+
+  it('A5b: pending active run shows preparing indicator and hides live logs', () => {
+    renderView([mockPendingRun], []);
+
+    expect(screen.getByText('Preparing…')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('View Log'));
+    expect(screen.queryByText('should stay hidden until running')).not.toBeInTheDocument();
+    expect(screen.queryByText('Waiting for output…')).not.toBeInTheDocument();
   });
 
   it('A6: toggles log view on history item', () => {

@@ -2,9 +2,35 @@
 
 ## Current State
 
-- Live run inspection is in progress.
+- Live run inspection is complete.
 - The feature currently references `app/ui/views/RunsView.tsx`.
 - Future bridge and stream-related work notes should be recorded here.
+
+## 2026-05-20 02:01 — Final completion: pending run phase
+
+**Completed by F03 Live Run Inspector subagent:**
+
+1. Added explicit `pending` phase to the dispatch modal status machine:
+   - `idle -> pending` while building the command, augmenting MCP args, subscribing to events, and spawning
+   - `pending -> running` only after a PID is returned
+   - `running -> done/error` on bridge exit events
+2. Added `pending` to `ActiveRun.phase` so live-run consumers can distinguish a preparing run from an attached process.
+3. Updated the dispatch modal UI to show a preparing indicator during `pending` and defer the live-output panel until a PID exists.
+4. Updated `RunsView` to render pending active runs with a localized preparing indicator and to hide live logs while the run is still preparing.
+5. Added regression coverage for:
+   - pending preparation before PID, then live output after spawn
+   - running -> done bridge exit transition
+   - running -> error bridge exit transition
+   - pending active-run rendering in `RunsView`
+6. Verified the `Continue CI/CD` quick template is present in `TaskDispatchModal` and all locale/type files.
+
+**Project progress metadata**:
+- F03 marked `done`, progress `100%` in `.project-manager/config.json`.
+
+**Verification**:
+- Targeted tests passed: `npm test -- --run __tests__/dispatch.kill-confirm.test.tsx __tests__/runs/RunsView.test.tsx __tests__/dispatch.modal-states.test.ts`
+- Full test suite passed: `npm test -- --run` (43 files, 346 tests).
+- Typecheck passed: `npm run typecheck`.
 
 ## 2026-05-19 14:14 — F03 Live Run Inspector enhancements
 
