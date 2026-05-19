@@ -24,6 +24,7 @@ export interface Translations {
     shortcuts: string;
     settings: string;
     docs: string;
+    chat: string;
   };
   system: {
     checkForUpdates: string;
@@ -97,6 +98,22 @@ export interface Translations {
   };
   language: {
     label: string;
+  };
+  chat: {
+    title: string;
+    placeholder: string;
+    welcome: string;
+    send: string;
+    loading: string;
+    error: string;
+    history: string;
+    newChat: string;
+    new: string;
+    noConversations: string;
+    welcomeTitle: string;
+    enterToSend: string;
+    deleteSession: string;
+    openFullChat: string;
   };
   dispatch: {
     title: string;

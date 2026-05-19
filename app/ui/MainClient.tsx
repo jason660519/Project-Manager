@@ -46,6 +46,7 @@ import { detectProviders } from '../../lib/keys/detectProviders';
 import { SettingsView } from './views/SettingsView';
 import { DocumentationView } from './views/DocumentationView';
 import { SkillsView } from './views/SkillsView';
+import { ChatPageClient } from '../chat/ChatPageClient';
 
 type BridgeFileNode = {
   name: string;
@@ -996,6 +997,19 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
       currentView={currentView}
       bridgeStatus={bridgeStatus}
       activeRunCount={activeRuns.length}
+      chatContext={{
+        currentView,
+        selectedProject,
+        adapters,
+        activeRunCount: activeRuns.length,
+        activeRuns: activeRuns.map((run) => ({
+          featureId: run.featureId,
+          featureName: run.featureName,
+          phase: run.phase,
+          startedAt: run.startedAt,
+        })),
+        recentRuns: runHistory.slice(0, 5),
+      }}
     >
       {currentView === 'dashboard' && selectedProject && (
         <ProjectProgressClient
@@ -1072,6 +1086,23 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
       {currentView === 'keys' && <KeysView />}
       {currentView === 'settings' && <SettingsView />}
       {currentView === 'documentation' && <DocumentationView />}
+      {currentView === 'chat' && (
+        <ChatPageClient
+          initialChatContext={{
+            currentView,
+            selectedProject,
+            adapters,
+            activeRunCount: activeRuns.length,
+            activeRuns: activeRuns.map((run) => ({
+              featureId: run.featureId,
+              featureName: run.featureName,
+              phase: run.phase,
+              startedAt: run.startedAt,
+            })),
+            recentRuns: runHistory.slice(0, 5),
+          }}
+        />
+      )}
       {currentView === 'engineers' && selectedProject && (
         <EngineersView
           roles={selectedProject.config.engineerRoles ?? []}

@@ -22,6 +22,7 @@ export const en: Translations = {
     shortcuts: 'Shortcuts',
     settings: 'Settings',
     docs: 'Docs',
+    chat: 'Chat',
   },
   system: {
     checkForUpdates: 'Check for Updates',
@@ -91,6 +92,22 @@ export const en: Translations = {
   },
   language: {
     label: 'Language',
+  },
+  chat: {
+    title: 'AI Assistant',
+    placeholder: 'Ask me anything...',
+    welcome: "Hi! I'm your Project Manager assistant. Ask me about features, runs, or use /help for commands.",
+    send: 'Send',
+    loading: 'Thinking...',
+    error: 'Sorry, something went wrong. Please try again.',
+    history: 'History',
+    newChat: 'New Chat',
+    new: 'New',
+    noConversations: 'No conversations yet. Start a new chat above.',
+    welcomeTitle: 'Project Manager Assistant',
+    enterToSend: 'Enter to send · Shift+Enter for new line',
+    deleteSession: 'Delete session',
+    openFullChat: 'Open full chat page',
   },
   dispatch: {
     title: 'Task Dispatch',

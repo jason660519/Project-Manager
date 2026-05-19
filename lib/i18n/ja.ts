@@ -22,6 +22,7 @@ export const ja: Translations = {
     shortcuts: 'ショートカット',
     settings: '設定',
     docs: 'ドキュメント',
+    chat: 'チャット',
   },
   system: {
     checkForUpdates: 'アップデートを確認',
@@ -93,6 +94,22 @@ export const ja: Translations = {
   },
   language: {
     label: '言語',
+  },
+  chat: {
+    title: 'AIアシスタント',
+    placeholder: '何でも聞いてください...',
+    welcome: 'こんにちは。Project Managerアシスタントです。機能や実行状況について質問するか、/helpでコマンドを確認できます。',
+    send: '送信',
+    loading: '考え中...',
+    error: '問題が発生しました。もう一度お試しください。',
+    history: '履歴',
+    newChat: '新規チャット',
+    new: '新規',
+    noConversations: 'まだ会話がありません。上記の新規ボタンから開始してください。',
+    welcomeTitle: 'Project Manager アシスタント',
+    enterToSend: 'Enterで送信 · Shift+Enterで改行',
+    deleteSession: '会話を削除',
+    openFullChat: '全画面チャットを開く',
   },
   dispatch: {
     title: 'タスクディスパッチ',
