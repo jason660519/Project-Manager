@@ -6,14 +6,35 @@ interface ChatApiMessage {
 }
 
 interface RequestBody {
-  model?: string;
   messages: ChatApiMessage[];
+  /** Provider id to use (e.g. "anthropic", "openai"). Omit for default chain. */
+  provider?: string;
+  /** Model override. Omit to use the provider's default. */
+  model?: string;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
 // Streaming chat API using SSE (Server-Sent Events).
-// Tries providers: Anthropic → OpenAI → Gemini
+// Accepts `provider` + `model` or falls back to default chain.
 // ────────────────────────────────────────────────────────────────────────────
+
+/** Default model for each provider when none is specified. */
+const DEFAULT_MODELS: Record<string, string> = {
+  anthropic: 'claude-sonnet-4-6',
+  openai: 'gpt-4o',
+  gemini: 'gemini-1.5-pro-latest',
+  deepseek: 'deepseek-chat',
+  grok: 'grok-2-latest',
+  kimi: 'moonshot-v1-8k',
+  openrouter: 'anthropic/claude-3.5-sonnet',
+  perplexity: 'llama-3.1-sonar-large-128k-online',
+  together: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
+  zhipu: 'glm-4-plus',
+  qwen: 'qwen-plus',
+};
+
+/** Fallback chain when no provider is specified by the client. */
+const FALLBACK_PROVIDERS = ['anthropic', 'openai', 'gemini'];
 
 function getSystemPrompt(): string {
   return [
@@ -54,116 +75,165 @@ async function* parseSSE<T>(reader: ReadableStreamDefaultReader<Uint8Array>, par
   }
 }
 
-// ── Anthropic streaming ──────────────────────────────────────────────
+// ── Provider streaming generators ──────────────────────────────────────
 
-async function* streamAnthropic(messages: ChatApiMessage[]): AsyncGenerator<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
+async function* streamProvider(
+  provider: string,
+  model: string,
+  messages: ChatApiMessage[],
+): AsyncGenerator<string> {
+  const envKey = `${provider.toUpperCase()}_API_KEY`;
+  const apiKey = process.env[envKey];
+  if (!apiKey) throw new Error(`${envKey} not configured`);
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      stream: true,
-      system: getSystemPrompt(),
-      messages: messages.filter((m) => m.role !== 'system'),
-    }),
-  });
+  const sys = getSystemPrompt();
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Anthropic ${res.status}: ${text.slice(0, 200)}`);
+  switch (provider) {
+    case 'anthropic': {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 4096,
+          stream: true,
+          system: sys,
+          messages: messages.filter((m) => m.role !== 'system'),
+        }),
+      });
+      if (!res.ok) throw new Error(`Anthropic ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error('No response body');
+      yield* parseSSE<{ delta?: { text?: string }; type?: string }>(reader, (json) => json.delta?.text ?? '');
+      return;
+    }
+
+    case 'openai': {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          max_tokens: 4096,
+          stream: true,
+          messages: [{ role: 'system', content: sys }, ...messages],
+        }),
+      });
+      if (!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error('No response body');
+      yield* parseSSE<{ choices?: { delta?: { content?: string } }[] }>(reader, (json) => json.choices?.[0]?.delta?.content ?? '');
+      return;
+    }
+
+    case 'gemini': {
+      const contents: { role: string; parts: { text: string }[] }[] = [];
+      for (const msg of messages) {
+        if (msg.role === 'system') continue;
+        contents.push({ role: msg.role === 'assistant' ? 'model' : 'user', parts: [{ text: msg.content }] });
+      }
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: sys }] },
+            contents,
+            generationConfig: { maxOutputTokens: 4096 },
+          }),
+        },
+      );
+      if (!res.ok) throw new Error(`Gemini ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error('No response body');
+      yield* parseSSE<Record<string, unknown>>(reader, (json) => {
+        const cands = json.candidates as Array<Record<string, unknown>> | undefined;
+        if (!cands) return '';
+        const content = cands[0]?.content as Record<string, unknown> | undefined;
+        const parts = content?.parts as Array<Record<string, unknown>> | undefined;
+        return (parts?.[0]?.text as string) ?? '';
+      });
+      return;
+    }
+
+    // OpenAI-compatible providers
+    case 'deepseek':
+    case 'grok':
+    case 'kimi':
+    case 'openrouter':
+    case 'perplexity':
+    case 'together':
+    case 'zhipu':
+    case 'qwen': {
+      const baseUrls: Record<string, string> = {
+        deepseek: 'https://api.deepseek.com',
+        grok: 'https://api.x.ai',
+        kimi: 'https://api.moonshot.cn',
+        openrouter: 'https://openrouter.ai/api',
+        perplexity: 'https://api.perplexity.ai',
+        together: 'https://api.together.xyz',
+        zhipu: 'https://open.bigmodel.cn/api/paas/v4',
+        qwen: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      };
+      const base = baseUrls[provider];
+      if (!base) throw new Error(`Unknown provider: ${provider}`);
+      const res = await fetch(`${base}/chat/completions`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          max_tokens: 4096,
+          stream: true,
+          messages: [{ role: 'system', content: sys }, ...messages],
+        }),
+      });
+      if (!res.ok) throw new Error(`${provider} ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error('No response body');
+      yield* parseSSE<{ choices?: { delta?: { content?: string } }[] }>(reader, (json) => json.choices?.[0]?.delta?.content ?? '');
+      return;
+    }
+
+    default:
+      throw new Error(`Unsupported provider: ${provider}`);
   }
-
-  const reader = res.body?.getReader();
-  if (!reader) throw new Error('No response body');
-
-  yield* parseSSE<{ delta?: { text?: string }; type?: string }>(reader, (json) => {
-    // Anthropic SSE: content_block_delta events carry delta.text
-    return json.delta?.text ?? '';
-  });
 }
 
-// ── OpenAI streaming ─────────────────────────────────────────────────
+/** Build a streaming Response for a given (provider, model) pair. */
+function makeStreamResponse(
+  provider: string,
+  model: string,
+  gen: AsyncGenerator<string>,
+): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const chunk of gen) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
+        }
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`));
+      } catch (e) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: (e as Error).message })}\n\n`));
+      } finally {
+        controller.close();
+      }
+    },
+  });
 
-async function* streamOpenAI(messages: ChatApiMessage[]): AsyncGenerator<string> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
-
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
+  return new Response(stream, {
     headers: {
-      authorization: `Bearer ${apiKey}`,
-      'content-type': 'application/json',
+      'content-type': 'text/event-stream',
+      'cache-control': 'no-cache',
+      'connection': 'keep-alive',
+      'x-ai-provider': provider,
+      'x-ai-model': model,
     },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      max_tokens: 4096,
-      stream: true,
-      messages: [
-        { role: 'system', content: getSystemPrompt() },
-        ...messages,
-      ],
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`OpenAI ${res.status}: ${text.slice(0, 200)}`);
-  }
-
-  const reader = res.body?.getReader();
-  if (!reader) throw new Error('No response body');
-
-  yield* parseSSE<{ choices?: { delta?: { content?: string } }[] }>(reader, (json) => {
-    return json.choices?.[0]?.delta?.content ?? '';
-  });
-}
-
-// ── Gemini streaming ─────────────────────────────────────────────────
-
-async function* streamGemini(messages: ChatApiMessage[]): AsyncGenerator<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
-
-  const contents: { role: string; parts: { text: string }[] }[] = [];
-  for (const msg of messages) {
-    if (msg.role === 'system') continue;
-    contents.push({
-      role: msg.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: msg.content }],
-    });
-  }
-
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: getSystemPrompt() }] },
-        contents,
-        generationConfig: { maxOutputTokens: 4096 },
-      }),
-    },
-  );
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Gemini ${res.status}: ${text.slice(0, 200)}`);
-  }
-
-  const reader = res.body?.getReader();
-  if (!reader) throw new Error('No response body');
-
-  yield* parseSSE<{ candidates?: { content?: { parts?: { text?: string }[] } }[] }>(reader, (json) => {
-    return json.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
   });
 }
 
@@ -178,56 +248,44 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // Attempt each provider until one starts streaming.
-  // Providers that throw during the first `next()` call are skipped.
-  const errors: string[] = [];
-  const providers: [string, () => AsyncGenerator<string>][] = [
-    ['anthropic', () => streamAnthropic(body.messages)],
-    ['openai', () => streamOpenAI(body.messages)],
-    ['gemini', () => streamGemini(body.messages)],
-  ];
-
-  for (const [name, genFn] of providers) {
+  // If the client specified a provider, try only that one
+  if (body.provider) {
+    const model = body.model || DEFAULT_MODELS[body.provider] || 'default';
+    const gen = streamProvider(body.provider, model, body.messages);
+    // Pre-authorization check
     try {
-      const gen = genFn();
-      // Pre-authorization check: advance to first yield so we catch auth/rate errors
-      // before committing to the streaming response.
       const iterator = gen[Symbol.asyncIterator]();
       const first = await iterator.next();
-
-      // Build a wrapper generator that includes the pre-fetched first chunk
       async function* withFirst(): AsyncGenerator<string> {
         if (first.done) return;
         yield first.value;
         yield* gen;
       }
-
-      const encoder = new TextEncoder();
-      const stream = new ReadableStream({
-        async start(controller) {
-          try {
-            for await (const chunk of withFirst()) {
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
-            }
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`));
-          } catch (e) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: (e as Error).message })}\n\n`));
-          } finally {
-            controller.close();
-          }
-        },
-      });
-
-      return new Response(stream, {
-        headers: {
-          'content-type': 'text/event-stream',
-          'cache-control': 'no-cache',
-          'connection': 'keep-alive',
-          'x-ai-provider': name,
-        },
-      });
+      return makeStreamResponse(body.provider, model, withFirst());
     } catch (e) {
-      errors.push(`${name}: ${(e as Error).message}`);
+      return new Response(JSON.stringify({ error: `${body.provider} failed`, details: (e as Error).message }), {
+        status: 502,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+  }
+
+  // No provider specified — try fallback chain
+  const errors: string[] = [];
+  for (const provider of FALLBACK_PROVIDERS) {
+    const model = body.model || DEFAULT_MODELS[provider];
+    try {
+      const gen = streamProvider(provider, model, body.messages);
+      const iterator = gen[Symbol.asyncIterator]();
+      const first = await iterator.next();
+      async function* withFirst(): AsyncGenerator<string> {
+        if (first.done) return;
+        yield first.value;
+        yield* gen;
+      }
+      return makeStreamResponse(provider, model, withFirst());
+    } catch (e) {
+      errors.push(`${provider}: ${(e as Error).message}`);
     }
   }
 
