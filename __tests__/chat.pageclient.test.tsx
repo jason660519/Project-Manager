@@ -36,6 +36,7 @@ describe('ChatPageClient', () => {
   beforeEach(() => {
     localStorageMock.clear();
     vi.clearAllMocks();
+    Element.prototype.scrollIntoView = vi.fn();
     mockSendChatMessage.mockResolvedValue({
       content: 'Hello! I am the assistant. How can I help you?',
       handledLocally: false,
