@@ -293,7 +293,7 @@ export interface ActiveRun {
   args: string[];
   startedAt: number;
   logs: string[];
-  phase: 'running' | 'done' | 'error';
+  phase: 'pending' | 'running' | 'done' | 'error';
 }
 
 export interface CompletedRun {

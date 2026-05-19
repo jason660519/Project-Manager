@@ -48,14 +48,22 @@ export function RunsView({ activeRuns, runHistory, onKillRun }: RunsViewProps) {
         <section>
           <h2 className="mb-3 text-xs uppercase tracking-[0.18em] text-stone-400">{t.runs.active}</h2>
           <div className="space-y-3">
-            {activeRuns.map((run) => (
+            {activeRuns.map((run) => {
+              const isPending = run.phase === 'pending';
+              return (
               <div key={run.pid} className="border border-emerald-200/25 bg-[rgb(var(--pm-panel))]/72">
                 <div className="flex items-center gap-3 px-4 py-3">
-                  <Activity size={15} className="shrink-0 animate-pulse text-emerald-400" />
+                  <Activity
+                    size={15}
+                    className={`shrink-0 animate-pulse ${isPending ? 'text-amber-300' : 'text-emerald-400'}`}
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-stone-100">{run.featureName}</span>
                       <span className="font-mono text-xs text-stone-500">PID {run.pid}</span>
+                      {isPending && (
+                        <span className="text-xs text-amber-300">{t.runs.preparing}</span>
+                      )}
                     </div>
                     <p className="mt-0.5 truncate font-mono text-xs text-stone-400">
                       {run.command} {run.args.join(' ')}
@@ -100,7 +108,7 @@ export function RunsView({ activeRuns, runHistory, onKillRun }: RunsViewProps) {
                     )}
                   </div>
                 </div>
-                {expandedPid === run.pid && (
+                {expandedPid === run.pid && !isPending && (
                   <div className="border-t border-stone-200/12 bg-[rgb(var(--pm-input))] p-3">
                     <div className="max-h-48 overflow-auto font-mono text-xs leading-5 text-stone-300">
                       {run.logs.length === 0 ? (
@@ -116,7 +124,8 @@ export function RunsView({ activeRuns, runHistory, onKillRun }: RunsViewProps) {
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}

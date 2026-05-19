@@ -20,7 +20,23 @@
 - `{count}` template placeholder used for "X runs active" — components do `replace('{count}', n)`. No pluralisation library needed at this scale.
 - GLOSSARY.md placed at `lib/i18n/GLOSSARY.md` with a canonical 4-locale term table.
 
+## 2026-05-19 — Session 2: TDD tests + vitest integration
+
+**Goal**: Add completeness and context tests for i18n layer; integrate into vitest.
+
+**Changes**:
+- Created `lib/i18n/__tests__/completeness.test.ts` — 9 leaf-path tests (every locale has all keys, no extra keys, no empty strings)
+- Created `lib/i18n/__tests__/context.test.tsx` — 4 render tests (default locale, switch translations, localStorage persist, document.lang update)
+- Updated `vitest.config.ts` include pattern to cover `lib/**/__tests__/**/*.test.{ts,tsx}`
+- Added `/// <reference types="vitest/globals" />` to context test for typecheck
+
+**Verification**: `npm run typecheck` ✓, 35 test files, 287 tests ✓
+
+---
+
 **Files created**:
+- `lib/i18n/__tests__/completeness.test.ts`
+- `lib/i18n/__tests__/context.test.tsx`
 - `lib/i18n/types.ts`
 - `lib/i18n/en.ts`
 - `lib/i18n/zh-hant.ts`
