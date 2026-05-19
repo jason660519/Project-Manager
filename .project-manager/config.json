@@ -251,8 +251,8 @@
       "id": "F13",
       "name": "Dispatch UX Improvements & Bug Fixes",
       "category": "Frontend/Dispatch",
-      "status": "in_progress",
-      "progress": 85,
+      "status": "done",
+      "progress": 100,
       "paths": {
         "featureFolder": ".project-manager/features/F13/",
         "spec": ".project-manager/features/F13/feature-spec.md",
@@ -263,9 +263,9 @@
       "readmePath": ".project-manager/features/F13/README.md",
       "notes": "Fix missing loading/error/empty states in TaskDispatchModal and BatchDispatchModal. Add kill confirmation, adapter fallback, command availability check, and MCP validation feedback.",
       "createdAt": "2026-05-19T13:47:00.000Z",
-      "updatedAt": "2026-05-19T14:08:00.000Z",
-      "updatedBy": "openclaw/OpenClaw + f13_engineer",
-      "phase": "development",
+      "updatedAt": "2026-05-20T02:06:00.000+10:00",
+      "updatedBy": "openclaw/Codex",
+      "phase": "deployment",
       "points": 1
     }
   ],

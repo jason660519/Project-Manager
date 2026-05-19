@@ -163,8 +163,11 @@ export const zh: Translations = {
     mcpEmpty: '未配置 MCP 服务器',
     commandPreparing: '准备派遣命令…',
     dispatchNoAdapter: '未选择执行目标',
+    noAvailableAdapters: 'No available adapters',
+    noAvailableAdaptersHint: '请先配置 IDE 或 Agent 适配器。',
     batchEmptyTitle: '没有可批量派遣的功能',
     batchEmptyHint: '请先在 Dashboard 添加功能',
+    batchNeedAgent: 'Need at least one agent',
     adapterWarningHint: '先前指定的适配器「{id}」已不存在。改用「{fallback}」。',
   },
 };

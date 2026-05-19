@@ -1,97 +1,58 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { execFile } from 'child_process';
+import { checkCommandExists, clearCommandExistsCache } from '../lib/adapters/availability';
 
-// ── Helper to test command availability (without actually running `which`) ────
+vi.mock('child_process', () => ({
+  execFile: vi.fn(),
+}));
 
-describe('commandExists (checkCommand utility)', () => {
-  it('returns false for empty command', () => {
-    // The checkCommand in TaskDispatchModal returns false for empty strings
-    const checkCommand = async (cmd: string): Promise<boolean> => {
-      if (!cmd) return false;
-      return true; // fallback for environments without `which`
-    };
-    expect(checkCommand('')).resolves.toBe(false);
+const execFileMock = vi.mocked(execFile);
+
+function mockCommandLookup(error: Error | null) {
+  execFileMock.mockImplementationOnce(((_file: string, _args: readonly string[], callback: unknown) => {
+    (callback as (error: Error | null, stdout: string, stderr: string) => void)(error, '', '');
+    return {} as ReturnType<typeof execFile>;
+  }) as typeof execFile);
+}
+
+describe('checkCommandExists', () => {
+  beforeEach(() => {
+    clearCommandExistsCache();
+    vi.clearAllMocks();
   });
 
-  it('caches results on second call (synchronous repeat)', () => {
-    // The checkCommand is called once per adapter on mount via useEffect
-    // Simulate mounting behavior — should check each adapter once
-    const seen = new Set<string>();
-    const spy = vi.fn((id: string) => {
-      seen.add(id);
-      return true;
-    });
+  it('returns true when the command is installed', async () => {
+    mockCommandLookup(null);
 
-    const adapters = [
-      { id: 'cursor', command: 'cursor' },
-      { id: 'codex', command: 'codex' },
-    ];
-
-    adapters.forEach((a) => spy(a.id));
-    adapters.forEach((a) => spy(a.id)); // second pass should be no-op in real impl
-
-    // The count depends on whether we dedupe — at minimum each id was seen
-    expect(seen.size).toBe(2);
-    expect(spy).toHaveBeenCalledTimes(4);
-  });
-});
-
-// ── Adapter fallback logic ────────────────────────────────────────────────────
-
-describe('resolveInitialAdapterId [fallback]', () => {
-  const adapters = [
-    { id: 'claude-code', name: 'Claude Code', type: 'agent' as const, command: 'claude' },
-    { id: 'codex', name: 'Codex', type: 'agent' as const, command: 'codex' },
-  ];
-
-  it('returns first available adapter when assigned adapter is missing', () => {
-    // Simulate: feature.promptConfig?.agentId = 'nonexistent'
-    const savedId = 'nonexistent';
-    const result = adapters.some((a) => a.id === savedId)
-      ? savedId
-      : adapters[0]?.id ?? null;
-
-    expect(result).toBe('claude-code');
-    expect(adapters.find((a) => a.id === result)).not.toBeUndefined();
+    await expect(checkCommandExists('cursor')).resolves.toBe(true);
   });
 
-  it('returns the saved adapter id when it still exists', () => {
+  it('returns false when the command is missing', async () => {
+    mockCommandLookup(new Error('not found'));
+
+    await expect(checkCommandExists('nonexistent-tool')).resolves.toBe(false);
+  });
+
+  it('caches results', async () => {
+    mockCommandLookup(null);
+
+    await expect(checkCommandExists('cursor')).resolves.toBe(true);
+    await expect(checkCommandExists('cursor')).resolves.toBe(true);
+    expect(execFileMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns false for an empty command', async () => {
+    await expect(checkCommandExists('')).resolves.toBe(false);
+    expect(execFileMock).not.toHaveBeenCalled();
+  });
+
+  it('falls back safely when no adapters are available', () => {
+    const adapters: Array<{ id: string }> = [];
     const savedId = 'codex';
-    const result = adapters.some((a) => a.id === savedId)
+    const resolved = adapters.some((adapter) => adapter.id === savedId)
       ? savedId
-      : adapters[0]?.id ?? null;
+      : adapters[0]?.id;
 
-    expect(result).toBe('codex');
-  });
-
-  it('returns null/undefined when there are no adapters at all', () => {
-    const savedId = 'claude-code';
-    const emptyAdapters: typeof adapters = [];
-    const result = emptyAdapters.some((a) => a.id === savedId)
-      ? savedId
-      : emptyAdapters[0]?.id ?? null;
-
-    expect(result).toBeNull();
-  });
-});
-
-// ── MCP server count fallback ─────────────────────────────────────────────────
-
-describe('MCP injection state', () => {
-  it('returns null when no MCP servers are enabled', () => {
-    const serverCount = 0;
-    const injection = serverCount > 0 ? { count: serverCount, flag: '--mcp' } : null;
-    expect(injection).toBeNull();
-  });
-
-  it('returns injection info when servers exist', () => {
-    const serverCount = 3;
-    const injection = serverCount > 0 ? { count: serverCount, flag: '--mcp' } : null;
-    expect(injection).toEqual({ count: 3, flag: '--mcp' });
-  });
-
-  it('handles a single MCP server', () => {
-    const serverCount = 1;
-    const injection = serverCount > 0 ? { count: serverCount, flag: '--mcp' } : null;
-    expect(injection).toEqual({ count: 1, flag: '--mcp' });
+    expect(resolved).toBeUndefined();
   });
 });

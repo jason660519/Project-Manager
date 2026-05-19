@@ -163,8 +163,11 @@ export const ja: Translations = {
     mcpEmpty: 'MCPサーバーが設定されていません',
     commandPreparing: 'ディスパッチコマンドを準備中…',
     dispatchNoAdapter: '実行ターゲットが選択されていません',
+    noAvailableAdapters: 'No available adapters',
+    noAvailableAdaptersHint: 'ディスパッチする前に IDE またはエージェントアダプターを設定してください。',
     batchEmptyTitle: 'ディスパッチする機能がありません',
     batchEmptyHint: 'Dashboardで先に機能を追加してください',
+    batchNeedAgent: 'Need at least one agent',
     adapterWarningHint: '以前指定されたアダプター「{id}」は設定されていません。「{fallback}」を使用します。',
   },
 };

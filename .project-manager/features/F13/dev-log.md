@@ -46,3 +46,17 @@
 - Component-level tests for error banner rendering
 - Component-level tests for MCP loading/error states
 - Integration tests with actual bridge calls (e2e test suite)
+
+## 2026-05-20
+
+### Completed Final 10%
+- Added the close-only Task Dispatch empty-adapter state with exact "No available adapters" copy and no dispatch action.
+- Disabled the prompt textarea while spec content is loading.
+- Extracted shared checkCommandExists helper with command-result caching and covered it in dispatch.availability.test.ts.
+- Added Batch Dispatch no-agent handling with exact "Need at least one agent" copy and close-only behavior.
+- Added BatchDispatchModal.state.test.tsx covering the five Suite B state cases.
+- Marked F13 done at 100% in .project-manager/config.json.
+
+### Verification
+- `npm test -- --run` — 43 files, 346 tests passed.
+- `npm run typecheck` — Next typegen and `tsc --noEmit` passed.

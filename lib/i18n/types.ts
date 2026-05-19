@@ -172,8 +172,11 @@ export interface Translations {
     mcpEmpty: string;
     commandPreparing: string;
     dispatchNoAdapter: string;
+    noAvailableAdapters: string;
+    noAvailableAdaptersHint: string;
     batchEmptyTitle: string;
     batchEmptyHint: string;
+    batchNeedAgent: string;
     /** Uses {id} and {fallback} placeholders */
     adapterWarningHint: string;
   };
