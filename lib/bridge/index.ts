@@ -342,6 +342,16 @@ export async function skillUninstall(path: string, skillsDir: string): Promise<v
   return invoke<void>('skill_uninstall', { path, skillsDir });
 }
 
+/**
+ * Write (or overwrite) a skill file at `absPath`.
+ * The path must end with `.md` and must be inside `skillsDir`.
+ * Parent directories are created automatically.
+ */
+export async function skillSave(absPath: string, skillsDir: string, content: string): Promise<void> {
+  if (!isTauri()) throw new Error('skillSave requires Tauri runtime');
+  return invoke<void>('skill_save', { path: absPath, skillsDir, content });
+}
+
 /** Move existing skill files into `newDir`. Returns the new absolute paths. */
 export async function skillMoveFiles(paths: string[], newDir: string): Promise<string[]> {
   if (!isTauri()) return [];

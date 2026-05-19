@@ -178,6 +178,16 @@ export interface ProjectManagerConfig {
 
 // ── App navigation & run-store types ─────────────────────────────────────────
 
+export interface WorkingScope {
+  /** Directory paths this engineer is allowed to modify (e.g. "src/feature-x/"). */
+  allowedPaths: string[];
+  /**
+   * soft  — scope is injected into the AI prompt as a constraint only.
+   * strict — dispatch modal shows a red warning when the feature path is outside scope.
+   */
+  mode: 'soft' | 'strict';
+}
+
 export interface EngineerRole {
   id: string;
   name: string;
@@ -188,6 +198,7 @@ export interface EngineerRole {
   referenceFiles: string[];
   defaultAgentId?: string;
   notes?: string;
+  workingScope?: WorkingScope;
   /** LLM provider used by the in-page Test panel. Empty = fall back to Settings provider order. */
   testProviderId?: string;
   /** Model id for the chosen test provider. Empty = use that provider's defaultModel. */
@@ -196,7 +207,7 @@ export interface EngineerRole {
   testPrompt?: string;
 }
 
-export type ViewId = 'dashboard' | 'features' | 'projects' | 'project-files' | 'plugins' | 'settings' | 'engineers' | 'channels' | 'sessions' | 'cron-jobs' | 'logs' | 'keys' | 'documentation';
+export type ViewId = 'dashboard' | 'features' | 'projects' | 'project-files' | 'plugins' | 'settings' | 'engineers' | 'channels' | 'sessions' | 'cron-jobs' | 'logs' | 'keys' | 'documentation' | 'skills' | 'keyboard-shortcuts';
 
 export type IssueState = 'open' | 'closed';
 

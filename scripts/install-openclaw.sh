@@ -136,6 +136,8 @@ fs.mkdirSync(process.argv[2], { recursive: true });
 fs.writeFileSync(process.argv[8], JSON.stringify(manifest, null, 2) + "\n");
 ' "$OPENCLAW_SRC" "$OPENCLAW_RUNTIME" "$OPENCLAW_STATE_DIR" "$OPENCLAW_WORKSPACE_DIR" "$OPENCLAW_CONFIG_PATH" "$current_ref" "$current_desc" "$MANIFEST"
 
+bash "$ROOT_DIR/scripts/sync-openclaw-env.sh" || true
+
 echo "OpenClaw installed in Project Manager scope."
 echo "OpenClaw source:    $OPENCLAW_SRC"
 echo "OpenClaw state:     $OPENCLAW_STATE_DIR"

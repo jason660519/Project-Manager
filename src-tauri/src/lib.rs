@@ -2240,27 +2240,114 @@ async fn skill_install_from_url(
     Ok(target_path.to_string_lossy().to_string())
 }
 
-/// Delete a skill file. Validated that the canonicalized target is inside the
-/// canonicalized skills directory — refuses anything outside (so a malicious /
-/// stale catalog entry can't trick PM into deleting unrelated files).
+/// Delete a skill file. Validates that the canonicalized target is inside
+/// the skills directory — refuses anything outside (path-traversal guard).
+///
+/// `skills_dir` is canonicalized when it exists on disk.  When it does not
+/// exist (e.g. a project that has never had a skills dir, or the UI is still
+/// showing stale cards from the previous project after switching), we fall
+/// back to manual `..`-resolution so we can still produce a clear "outside
+/// skills directory" refusal rather than a confusing filesystem error.
 #[tauri::command]
 async fn skill_uninstall(path: String, skills_dir: String) -> Result<(), String> {
+    // The target file must exist — we need its canonical path.
     let target_canon = tokio::fs::canonicalize(&path)
         .await
-        .map_err(|e| format!("Cannot resolve {path}: {e}"))?;
-    let dir_canon = tokio::fs::canonicalize(&skills_dir)
-        .await
-        .map_err(|e| format!("Cannot resolve skills dir {skills_dir}: {e}"))?;
-    if !target_canon.starts_with(&dir_canon) {
+        .map_err(|e| format!("Cannot resolve skill file {path}: {e}"))?;
+
+    // Try to canonicalize the skills dir.  If it does not exist on disk yet,
+    // fall back to manual normalization (collapse `..` / `.` components).
+    let dir_resolved = match tokio::fs::canonicalize(&skills_dir).await {
+        Ok(canon) => canon,
+        Err(_) => {
+            let mut norm = PathBuf::new();
+            for comp in PathBuf::from(&skills_dir).components() {
+                match comp {
+                    std::path::Component::ParentDir => { norm.pop(); }
+                    std::path::Component::CurDir   => {}
+                    c => norm.push(c),
+                }
+            }
+            norm
+        }
+    };
+
+    if !target_canon.starts_with(&dir_resolved) {
         return Err(format!(
             "Refused: {} is outside skills directory {}",
             target_canon.display(),
-            dir_canon.display()
+            dir_resolved.display()
         ));
     }
+
     tokio::fs::remove_file(&target_canon)
         .await
         .map_err(|e| format!("Delete failed: {e}"))?;
+    Ok(())
+}
+
+/// Write (or overwrite) a skill file at `path`. The path must end with `.md`
+/// and must reside inside `skills_dir` after path normalization.
+/// Parent directories are created automatically.
+#[tauri::command]
+async fn skill_save(path: String, skills_dir: String, content: String) -> Result<(), String> {
+    let target = PathBuf::from(&path);
+
+    // Must end in .md
+    let ext = target
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_ascii_lowercase());
+    if ext.as_deref() != Some("md") {
+        return Err(format!("Refused: skill path must end with .md — got {path}"));
+    }
+
+    // Ensure the skills directory exists so canonicalize works on it.
+    let skills_path = PathBuf::from(&skills_dir);
+    tokio::fs::create_dir_all(&skills_path)
+        .await
+        .map_err(|e| format!("Cannot create skills directory: {e}"))?;
+    let dir_canon = tokio::fs::canonicalize(&skills_path)
+        .await
+        .map_err(|e| format!("Cannot resolve skills directory: {e}"))?;
+
+    // Resolve the target to an absolute path.
+    let target_abs = if target.is_absolute() {
+        target.clone()
+    } else {
+        dir_canon.join(&target)
+    };
+
+    // Normalize without requiring the file to exist yet (no canonicalize).
+    let mut norm = PathBuf::new();
+    for comp in target_abs.components() {
+        match comp {
+            std::path::Component::ParentDir => { norm.pop(); }
+            std::path::Component::CurDir => {}
+            c => norm.push(c),
+        }
+    }
+
+    // Security check: must be inside skills_dir.
+    if !norm.starts_with(&dir_canon) {
+        return Err(format!(
+            "Refused: {} is outside skills directory {}",
+            norm.display(),
+            dir_canon.display()
+        ));
+    }
+
+    // Create parent directories (e.g. category/slug/).
+    if let Some(parent) = norm.parent() {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| format!("Cannot create parent directories: {e}"))?;
+    }
+
+    tokio::fs::write(&norm, content.as_bytes())
+        .await
+        .map_err(|e| format!("Write failed: {e}"))?;
+
     Ok(())
 }
 
@@ -2991,6 +3078,7 @@ pub fn run() {
             open_path,
             skill_default_dir,
             skill_list,
+            skill_save,
             skill_install_from_url,
             skill_uninstall,
             skill_move_files,

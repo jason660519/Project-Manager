@@ -734,6 +734,11 @@ cmd_openclaw() {
 
   export OPENCLAW_GATEWAY_PORT="$OPENCLAW_PORT"
 
+  info "Syncing OpenClaw API keys and auth profiles from project .env…"
+  if ! bash "$SCRIPT_DIR/scripts/sync-openclaw-env.sh"; then
+    warn "OpenClaw env sync failed; chat may not work until API keys are configured"
+  fi
+
   if is_port_listening "$OPENCLAW_PORT"; then
     already_running=1
     success "OpenClaw Gateway already running — $url"

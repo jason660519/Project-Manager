@@ -6,6 +6,44 @@
 - The feature currently references `app/ui/views/RunsView.tsx`.
 - Future bridge and stream-related work notes should be recorded here.
 
+## 2026-05-19 14:14 — F03 Live Run Inspector enhancements
+
+**Completed by f03_engineer subagent:**
+
+1. ✅ Created `feature-spec.md` with 7 user stories, 7 acceptance criteria, UI mockup
+2. ✅ Created `tdd-spec.md` with 3 test suites (A: rendering, B: kill confirm, C: empty states), 20 test cases
+3. ✅ Added `runs` section to i18n `types.ts` with 15 new keys
+4. ✅ Translated runs section in all 4 locales (en, zh-hant, zh, ja)
+5. ✅ Implemented kill confirmation dialog in `RunsView.tsx`:
+   - New `killConfirmPid` state
+   - Click Kill → shows inline confirmation with `killConfirmTitle` + Confirm/Cancel buttons
+   - Confirm → calls `onKillRun(pid)` and clears state
+   - Cancel → clears state without calling callback
+6. ✅ Replaced all hardcoded strings in `RunsView.tsx` with `t.runs.*` i18n keys:
+   - `t.runs.active` / `t.runs.history` (section headers)
+   - `t.runs.kill` / `t.runs.killConfirmTitle` / `t.runs.killConfirm` / `t.runs.killCancel` (kill flow)
+   - `t.runs.viewLog` / `t.runs.hideLog` (log toggle)
+   - `t.runs.waitingOutput` (no logs yet)
+   - `t.runs.noRuns` / `t.runs.noRunsHint` (empty state)
+   - `t.runs.exit` (exit code label)
+   - `t.runs.runsSummary` (header summary with count placeholder)
+7. ✅ Wrote `__tests__/runs/RunsView.test.tsx` with 14 tests covering:
+   - Active runs rendering (A1)
+   - Run history rendering (A2)
+   - Empty history state (A3)
+   - Log toggle active (A4)
+   - Waiting for output (A5)
+   - Log toggle history (A6)
+   - Success/failure icons (A7)
+   - Header summary (A8)
+   - Kill confirmation show (B1)
+   - Kill confirm fire (B2)
+   - Kill cancel no-fire (B3)
+   - Per-run confirmation state (B4)
+   - Empty both sections (C1)
+   - Empty history + active visible (C2)
+8. ✅ Typecheck and all tests pass: **33 files, 273 tests, 0 failures**
+
 ## 2026-05-19 — Pre-implementation: Execution Target selector
 
 **Request**: Replace the confusing `Runtime / IDE` selector with a clearer execution-target model before continuing Task Dispatch work.

@@ -15,6 +15,7 @@ import {
   ScrollText,
   Settings,
   ShieldCheck,
+  Sparkles,
   Timer,
   Users2,
   Wifi,
@@ -52,6 +53,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'engineers', itemKey: 'engineers', href: '/engineers', icon: Users2 },
       { id: 'plugins',   itemKey: 'plugins',   href: '/plugins',   icon: Plug },
+      { id: 'skills',    itemKey: 'skills',    href: '/skills',    icon: Sparkles },
       { id: 'channels',  itemKey: 'channels',  href: '/channels',  icon: Radio },
       { id: 'cron-jobs', itemKey: 'cronJobs',  href: '/cron-jobs', icon: Timer },
     ],

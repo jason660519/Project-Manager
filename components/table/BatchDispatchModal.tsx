@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import {
   augmentArgsWithMcp,
+  killProcess,
   mcpInjectionFlag,
   onAgentExit,
   onAgentStdout,
@@ -15,6 +16,7 @@ import {
   getAgentWorkflowById,
 } from '../../lib/agent-workflows';
 import { collectEnabledMcpServers } from '../../lib/storage/plugins';
+import { useI18n } from '../../lib/i18n';
 import { AgentAdapterConfig, AnyAdapterConfig, Feature } from '../../lib/types';
 
 // ── Batch prompt templates ────────────────────────────────────────────────────
@@ -98,7 +100,10 @@ export function BatchDispatchModal({
   onRunEnd,
   onFeatureUpdate,
 }: BatchDispatchModalProps) {
+  const { t } = useI18n();
+  const d = t.dispatch;
   const agentAdapters = adapters.filter((a) => a.type === 'agent');
+  const emptyState = features.length === 0;
 
   const [selectedAdapterId, setSelectedAdapterId] = useState(agentAdapters[0]?.id ?? '');
   const [selectedTemplate, setSelectedTemplate] = useState(0);
@@ -108,6 +113,8 @@ export function BatchDispatchModal({
     features.map((f) => ({ feature: f, phase: 'pending', logs: [] })),
   );
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [killConfirmBatchPid, setKillConfirmBatchPid] = useState<number | null>(null);
+  const killBatchPidRef = useRef<number | null>(null);
 
   const unlistenRefs = useRef<Array<() => void>>([]);
 
@@ -221,6 +228,30 @@ export function BatchDispatchModal({
     setBatchPhase('done');
   };
 
+  const handleRequestBatchKill = (pid: number, featureName: string) => {
+    killBatchPidRef.current = pid;
+    setKillConfirmBatchPid(pid);
+  };
+
+  const handleConfirmBatchKill = async (pid: number) => {
+    await killProcess(pid);
+    setKillConfirmBatchPid(null);
+    killBatchPidRef.current = null;
+    // Remove the PID from the item, updating its phase to 'done' with a kill note
+    setItems((prev) =>
+      prev.map((item) =>
+        item.pid === pid
+          ? { ...item, pid: undefined, phase: 'done' as const, logs: [...item.logs, '── killed by user ──'] }
+          : item,
+      ),
+    );
+  };
+
+  const handleCancelBatchKill = () => {
+    setKillConfirmBatchPid(null);
+    killBatchPidRef.current = null;
+  };
+
   const doneCount = items.filter((i) => i.phase === 'done').length;
   const errorCount = items.filter((i) => i.phase === 'error').length;
   const runningCount = items.filter((i) => i.phase === 'running').length;
@@ -245,7 +276,14 @@ export function BatchDispatchModal({
 
         {/* Body */}
         <div className="space-y-4 overflow-y-auto p-6" style={{ maxHeight: '70vh' }}>
-          {batchPhase === 'idle' && (
+          {emptyState && batchPhase === 'idle' && (
+            <div className="flex flex-col items-center justify-center py-8">
+              <p className="text-sm text-stone-400">{d.batchEmptyTitle}</p>
+              <p className="mt-1 text-xs text-stone-500">{d.batchEmptyHint}</p>
+            </div>
+          )}
+
+          {!emptyState && batchPhase === 'idle' && (
             <>
               {/* Agent selector (only shown when multiple agents exist) */}
               {agentAdapters.length > 1 && (
@@ -335,6 +373,34 @@ export function BatchDispatchModal({
             </div>
           )}
 
+          {/* Kill confirmation dialog */}
+          {killConfirmBatchPid != null && (
+            <div className="border border-red-500/40 bg-red-950/30 px-4 py-3">
+              <p className="mb-2 text-sm font-semibold text-red-200">
+                {d.killConfirmTitle}
+              </p>
+              <p className="mb-3 text-xs text-stone-400">
+                {d.killConfirmBody
+                  .replace('{pid}', String(killConfirmBatchPid))
+                  .replace('{feature}', items.find(i => i.pid === killConfirmBatchPid)?.feature.name ?? '')}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleConfirmBatchKill(killConfirmBatchPid)}
+                  className="border border-red-500/50 px-3 py-1.5 text-xs font-medium text-red-200 hover:bg-red-950/60"
+                >
+                  {d.killConfirm}
+                </button>
+                <button
+                  onClick={handleCancelBatchKill}
+                  className="border border-stone-200/25 px-3 py-1.5 text-xs font-medium text-stone-300 hover:bg-white/5"
+                >
+                  {d.killCancel}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Feature list */}
           <div className="space-y-1">
             {items.map((item) => (
@@ -357,10 +423,28 @@ export function BatchDispatchModal({
                   {item.phase === 'error' && (
                     <XCircle size={14} className="shrink-0 text-red-400" />
                   )}
+                  {item.phase === 'error' && item.logs.some(l => l.startsWith('Error:')) && (
+                    <span className="max-w-[200px] truncate text-xs text-red-300">
+                      {item.logs.find(l => l.startsWith('Error:'))}
+                    </span>
+                  )}
                   <span className="font-mono text-xs text-stone-500">[{item.feature.id}]</span>
                   <span className="flex-1 text-sm text-stone-200">{item.feature.name}</span>
                   {item.pid != null && (
-                    <span className="text-xs text-stone-500">PID {item.pid}</span>
+                    <>
+                      <span className="text-xs text-stone-500">PID {item.pid}</span>
+                      {killConfirmBatchPid == null && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRequestBatchKill(item.pid!, item.feature.name);
+                          }}
+                          className="border border-red-500/40 px-2 py-0.5 text-[10px] font-medium text-red-300 hover:bg-red-950/40"
+                        >
+                          Kill
+                        </button>
+                      )}
+                    </>
                   )}
                   {item.logs.length > 0 && (
                     <span className="text-xs text-stone-600">
@@ -386,16 +470,16 @@ export function BatchDispatchModal({
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 border-t border-stone-200/12 bg-white/[0.035] px-6 py-4">
-          {batchPhase === 'idle' && agentAdapters.length === 0 && (
+          {!emptyState && batchPhase === 'idle' && agentAdapters.length === 0 && (
             <p className="mr-auto text-xs text-stone-500">批次派遣需要至少一個 Agent 適配器</p>
           )}
           <button
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-stone-300 hover:bg-white/5"
           >
-            {batchPhase === 'running' ? '背景執行' : '關閉'}
+            {'關閉'}
           </button>
-          {batchPhase === 'idle' && agentAdapters.length > 0 && (
+          {!emptyState && batchPhase === 'idle' && agentAdapters.length > 0 && (
             <button
               onClick={handleDispatchAll}
               className="bg-stone-100 px-4 py-2 text-sm font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100"

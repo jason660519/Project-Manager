@@ -2,14 +2,33 @@
   "schemaVersion": 5,
   "id": "5b9422db-4007-48fd-b9c0-dd192299e4dd",
   "createdAt": "2026-05-19T00:46:36.208Z",
-  "updatedAt": "2026-05-19T01:57:39.100Z",
-  "updatedBy": "Codex dashboard fixed-label artifact normalization",
+  "updatedAt": "2026-05-19T14:14:00.000Z",
+  "updatedBy": "f03_engineer",
   "project": {
     "name": "Project Manager",
     "root": "/Volumes/KLEVV-4T-1/Project-Manager",
     "defaultIDE": "Cursor"
   },
   "features": [
+    {
+      "id": "F12",
+      "name": "Skills Management Page",
+      "category": "Execution/Engineer Tools",
+      "status": "in_progress",
+      "progress": 70,
+      "paths": {
+        "featureFolder": ".project-manager/features/F12/",
+        "spec": ".project-manager/features/F12/feature-spec.md",
+        "tdd": ".project-manager/features/F12/tdd-spec.md",
+        "implementation": "app/ui/views/SkillsView.tsx",
+        "developmentLogSummaryFolder": ".project-manager/features/F12/"
+      },
+      "readmePath": ".project-manager/features/F12/README.md",
+      "createdAt": "2026-05-19T00:30:00.000Z",
+      "updatedAt": "2026-05-19T00:30:00.000Z",
+      "phase": "development",
+      "points": 1
+    },
     {
       "id": "F01",
       "name": "Sidebar Navigation",
@@ -54,7 +73,7 @@
       "name": "Live Run Inspector",
       "category": "Frontend/Monitor",
       "status": "in_progress",
-      "progress": 30,
+      "progress": 80,
       "paths": {
         "featureFolder": ".project-manager/features/F03/",
         "implementation": "app/ui/views/RunsView.tsx",
@@ -63,9 +82,10 @@
       },
       "readmePath": ".project-manager/features/F03/README.md",
       "createdAt": "2026-05-18T22:54:57.000Z",
-      "updatedAt": "2026-05-18T22:54:57.000Z",
+      "updatedAt": "2026-05-19T14:14:00.000Z",
       "phase": "development",
-      "points": 1
+      "points": 1,
+      "updatedBy": "f03_engineer"
     },
     {
       "id": "F04",
@@ -226,6 +246,27 @@
       "metadata": {
         "notesSummary": "Browser mode uses .env environment variables (server side), Tauri mode uses macOS Keychain."
       }
+    },
+    {
+      "id": "F13",
+      "name": "Dispatch UX Improvements & Bug Fixes",
+      "category": "Frontend/Dispatch",
+      "status": "in_progress",
+      "progress": 85,
+      "paths": {
+        "featureFolder": ".project-manager/features/F13/",
+        "spec": ".project-manager/features/F13/feature-spec.md",
+        "tdd": ".project-manager/features/F13/tdd-spec.md",
+        "implementation": "components/table/TaskDispatchModal.tsx",
+        "developmentLogSummaryFolder": ".project-manager/features/F13/"
+      },
+      "readmePath": ".project-manager/features/F13/README.md",
+      "notes": "Fix missing loading/error/empty states in TaskDispatchModal and BatchDispatchModal. Add kill confirmation, adapter fallback, command availability check, and MCP validation feedback.",
+      "createdAt": "2026-05-19T13:47:00.000Z",
+      "updatedAt": "2026-05-19T14:08:00.000Z",
+      "updatedBy": "openclaw/OpenClaw + f13_engineer",
+      "phase": "development",
+      "points": 1
     }
   ],
   "adapters": {

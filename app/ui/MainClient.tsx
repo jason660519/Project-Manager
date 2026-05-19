@@ -45,6 +45,7 @@ import { parseEnvText } from '../../lib/keys/envParser';
 import { detectProviders } from '../../lib/keys/detectProviders';
 import { SettingsView } from './views/SettingsView';
 import { DocumentationView } from './views/DocumentationView';
+import { SkillsView } from './views/SkillsView';
 
 type BridgeFileNode = {
   name: string;
@@ -1044,6 +1045,9 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
         />
       )}
       {currentView === 'plugins' && <PluginsView />}
+      {currentView === 'skills' && (
+        <SkillsView projectRoot={selectedProject?.config.project.root ?? ''} />
+      )}
       {currentView === 'channels' && <ChannelsView />}
       {currentView === 'sessions' && selectedProject && (
         <SessionsView projectRoot={selectedProject.config.project.root} />

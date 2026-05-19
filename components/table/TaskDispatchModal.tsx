@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   augmentArgsWithMcp,
   killProcess,
@@ -550,11 +550,58 @@ export function TaskDispatchModal({
   const [logs, setLogs] = useState<string[]>([]);
   const [activePid, setActivePid] = useState<number | null>(null);
   const [specLoading, setSpecLoading] = useState(false);
+  const [commandLoading, setCommandLoading] = useState(false);
+  const [mcpLoading, setMcpLoading] = useState(false);
+  const [mcpError, setMcpError] = useState<string | null>(null);
+  const [killConfirmPid, setKillConfirmPid] = useState<number | null>(null);
+  const [adapterWarning, setAdapterWarning] = useState<string | null>(null);
+  const [dispatchError, setDispatchError] = useState<string | null>(null);
   const [mcpInjection, setMcpInjection] = useState<{ count: number; flag: string } | null>(null);
+  const [commandExists, setCommandExists] = useState<Record<string, boolean>>({});
 
   const logEndRef = useRef<HTMLDivElement>(null);
   const unlistenRefs = useRef<Array<() => void>>([]);
   const activePidRef = useRef<number | null>(null);
+
+  // ── Command availability check ─────────────────────────────────────────────
+  const checkCommand = useCallback(async (cmd: string): Promise<boolean> => {
+    if (!cmd) return false;
+    try {
+      const proc = await import('child_process');
+      return new Promise((resolve) => {
+        proc.exec(`which "${cmd.replace(/"/g, '\\"')}"`, (error) => {
+          resolve(!error);
+        });
+      });
+    } catch {
+      // In browser/serverless environments, `which` is unavailable; assume present.
+      return true;
+    }
+  }, []);
+
+  // Check availability of all adapters on mount
+  useEffect(() => {
+    let cancelled = false;
+    const checkAll = async () => {
+      const result: Record<string, boolean> = {};
+      for (const adapter of adapters) {
+        result[adapter.id] = await checkCommand(adapter.command);
+      }
+      if (!cancelled) setCommandExists(result);
+    };
+    checkAll();
+    return () => { cancelled = true; };
+  }, [adapters, checkCommand]);
+
+  // Adapter fallback warning
+  useEffect(() => {
+    const savedId = feature.promptConfig?.agentId;
+    if (savedId && !adapters.some((a) => a.id === savedId) && adapters.length > 0) {
+      setAdapterWarning(d.adapterWarningHint.replace('{id}', savedId).replace('{fallback}', adapters[0].name));
+    } else {
+      setAdapterWarning(null);
+    }
+  }, [adapters, feature.promptConfig?.agentId]);
 
   const selectedAdapter = adapters.find((a) => a.id === selectedAdapterId);
   const selectedTargetKind = getAdapterExecutionKind(selectedAdapter);
@@ -670,16 +717,35 @@ export function TaskDispatchModal({
   useEffect(() => {
     if (!selectedAdapter || selectedTargetKind !== 'agent-cli') {
       setMcpInjection(null);
+      setMcpLoading(false);
+      setMcpError(null);
       return;
     }
     const flag = mcpInjectionFlag(selectedAdapter.command);
     if (!flag) {
       setMcpInjection(null);
+      setMcpLoading(false);
+      setMcpError(null);
       return;
     }
-    const servers = collectEnabledMcpServers(projectRoot);
-    const count = Object.keys(servers).length;
-    setMcpInjection(count > 0 ? { count, flag } : null);
+    let cancelled = false;
+    setMcpLoading(true);
+    setMcpError(null);
+    try {
+      const servers = collectEnabledMcpServers(projectRoot);
+      if (!cancelled) {
+        const count = Object.keys(servers).length;
+        setMcpInjection(count > 0 ? { count, flag } : null);
+        setMcpLoading(false);
+      }
+    } catch (err) {
+      if (!cancelled) {
+        setMcpError(`Failed to load MCP servers: ${err instanceof Error ? err.message : String(err)}`);
+        setMcpInjection(null);
+        setMcpLoading(false);
+      }
+    }
+    return () => { cancelled = true; };
   }, [selectedAdapter, selectedTargetKind, projectRoot]);
 
   useEffect(() => {
@@ -719,6 +785,11 @@ export function TaskDispatchModal({
       if (selectedRole.referenceFiles.length > 0) {
         parts.push(`${d.refsPrefix}\n${selectedRole.referenceFiles.map((f) => `- ${f}`).join('\n')}`);
       }
+      if (selectedRole.workingScope && selectedRole.workingScope.allowedPaths.length > 0) {
+        parts.push(
+          `[Working Scope]\nOnly modify files within these paths:\n${selectedRole.workingScope.allowedPaths.map((p) => `- ${p}`).join('\n')}\nDo not create or edit files outside these directories.`,
+        );
+      }
       if (parts.length > 0) {
         effectivePrompt = `${parts.join('\n\n')}\n\n---\n\n${effectivePrompt}`;
       }
@@ -742,12 +813,19 @@ export function TaskDispatchModal({
     return { command: result.command, args: result.args };
   };
 
+
+
   const handleExecute = async () => {
     const adapter = adapters.find((a) => a.id === selectedAdapterId);
-    if (!adapter) return;
+    if (!adapter) {
+      setDispatchError(d.dispatchNoAdapter);
+      return;
+    }
 
     setPhase('running');
     setLogs([]);
+    setDispatchError(null);
+    setCommandLoading(true);
 
     onFeatureUpdate?.(feature.id, { ...buildAssignmentPatch(), status: 'in_progress' });
 
@@ -791,6 +869,9 @@ export function TaskDispatchModal({
     } catch (err) {
       setLogs((prev) => [...prev, `Error: ${err}`]);
       setPhase('error');
+      setDispatchError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCommandLoading(false);
     }
   };
 
@@ -843,11 +924,20 @@ export function TaskDispatchModal({
     }
   };
 
-  const handleKill = async () => {
-    if (activePid == null) return;
-    await killProcess(activePid);
+  const handleRequestKill = (pid: number) => {
+    setKillConfirmPid(pid);
+  };
+
+  const handleConfirmKill = async () => {
+    if (killConfirmPid == null) return;
+    await killProcess(killConfirmPid);
     setActivePid(null);
     activePidRef.current = null;
+    setKillConfirmPid(null);
+  };
+
+  const handleCancelKill = () => {
+    setKillConfirmPid(null);
   };
 
   const isRunning = phase === 'running';
@@ -860,6 +950,20 @@ export function TaskDispatchModal({
   // Target file display for IDE adapters
   const ideTargetFile =
     feature.paths.implementation ?? feature.paths.tdd ?? feature.paths.spec ?? '.';
+
+  // Working scope out-of-bounds check for strict mode
+  const scopeWarning: string | null = (() => {
+    if (!selectedRole?.workingScope || selectedRole.workingScope.mode !== 'strict') return null;
+    const { allowedPaths } = selectedRole.workingScope;
+    if (allowedPaths.length === 0) return null;
+    const implPath = feature.paths.implementation ?? feature.paths.tdd ?? feature.paths.spec ?? '';
+    const readmePath = feature.readmePath ?? '';
+    const pathsToCheck = [implPath, readmePath].filter(Boolean);
+    const inScope = pathsToCheck.length === 0 || pathsToCheck.some((fp) =>
+      allowedPaths.some((allowed) => fp.startsWith(allowed))
+    );
+    return inScope ? null : `Outside working scope: ${allowedPaths.join(', ')}`;
+  })();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
@@ -882,6 +986,20 @@ export function TaskDispatchModal({
 
         {/* Body */}
         <div className="space-y-4 p-6">
+          {adapterWarning && (
+            <div className="flex items-start gap-3 border border-amber-400/30 bg-amber-500/10 px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-amber-200">{adapterWarning}</p>
+              </div>
+            </div>
+          )}
+
+          {dispatchError && phase === 'idle' && (
+            <div className="border border-red-500/30 bg-red-500/10 px-4 py-3">
+              <p className="text-xs font-medium text-red-200">{dispatchError}</p>
+            </div>
+          )}
+
           {phase === 'idle' && feature.assignedTo && feature.status === 'in_progress' && !overrideConfirmed && (
             <div className="flex items-start justify-between gap-3 border border-amber-400/30 bg-amber-500/10 px-4 py-3">
               <div className="min-w-0">
@@ -943,13 +1061,38 @@ export function TaskDispatchModal({
                     ))}
                   </select>
                   {selectedRole && (
-                    <div className="mt-1.5 border border-stone-200/12 bg-[rgb(var(--pm-rail))]/60 px-3 py-2 text-[11px] text-stone-400">
-                      <span className="text-stone-300">{d.systemPromptPrefix}</span>
-                      {selectedRole.systemPrompt.slice(0, 80)}…
-                      {selectedRole.referenceFiles.length > 0 && (
-                        <span className="ml-2 text-stone-500">
-                          {d.refsPrefix}{selectedRole.referenceFiles.join(', ')}
-                        </span>
+                    <div className="mt-1.5 space-y-1.5">
+                      <div className="border border-stone-200/12 bg-[rgb(var(--pm-rail))]/60 px-3 py-2 text-[11px] text-stone-400">
+                        <span className="text-stone-300">{d.systemPromptPrefix}</span>
+                        {selectedRole.systemPrompt.slice(0, 80)}…
+                        {selectedRole.referenceFiles.length > 0 && (
+                          <span className="ml-2 text-stone-500">
+                            {d.refsPrefix}{selectedRole.referenceFiles.join(', ')}
+                          </span>
+                        )}
+                        {selectedRole.workingScope && selectedRole.workingScope.allowedPaths.length > 0 && (
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            <span className={[
+                              'border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em]',
+                              selectedRole.workingScope.mode === 'strict'
+                                ? 'border-orange-300/35 text-orange-300/80'
+                                : 'border-emerald-300/25 text-emerald-300/70',
+                            ].join(' ')}>
+                              scope·{selectedRole.workingScope.mode}
+                            </span>
+                            {selectedRole.workingScope.allowedPaths.map((p) => (
+                              <span key={p} className="font-mono text-[10px] text-stone-500">{p}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {scopeWarning && (
+                        <div className="flex items-start gap-2 border border-orange-400/35 bg-orange-950/40 px-3 py-2 text-[11px] text-orange-200/90">
+                          <span className="mt-0.5 shrink-0 font-mono text-[10px] uppercase tracking-[0.1em] text-orange-400/80">
+                            scope
+                          </span>
+                          <span>{scopeWarning}. Dispatching will inject scope constraints, but this feature may be outside the engineer&apos;s configured area.</span>
+                        </div>
                       )}
                     </div>
                   )}
@@ -1040,19 +1183,39 @@ export function TaskDispatchModal({
                 >
                   {executionTargetGroups.map((group) => (
                     <optgroup key={group.label} label={group.label}>
-                      {group.adapters.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.name}
-                        </option>
-                      ))}
+                      {group.adapters.map((a) => {
+                        const cmdAvailable = commandExists[a.id] !== false;
+                        return (
+                          <option key={a.id} value={a.id}>
+                            {a.name}{' '}
+                            {!cmdAvailable ? `⚠ ${d.adapterNotFound}` : ''}
+                          </option>
+                        );
+                      })}
                     </optgroup>
                   ))}
                 </select>
-                {mcpInjection && (
+                {mcpLoading && (
+                  <div className="mt-1.5 flex items-center gap-2 text-[11px] text-stone-400">
+                    <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-stone-400 border-t-transparent" />
+                    {d.mcpLoading}
+                  </div>
+                )}
+                {mcpError && (
+                  <div className="mt-1.5 border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-[11px] text-red-200">
+                    {mcpError}
+                  </div>
+                )}
+                {!mcpLoading && !mcpError && mcpInjection && (
                   <p className="mt-1.5 text-[11px] text-emerald-300/80">
                     {d.mcpInjected
                       .replace('{count}', String(mcpInjection.count))
                       .replace('{flag}', mcpInjection.flag)}
+                  </p>
+                )}
+                {!mcpLoading && !mcpError && !mcpInjection && selectedTargetKind === 'agent-cli' && (
+                  <p className="mt-1.5 text-[11px] text-stone-500">
+                    {d.mcpEmpty}
                   </p>
                 )}
                 {isAgentApp && (
@@ -1161,6 +1324,32 @@ export function TaskDispatchModal({
             </>
           )}
 
+          {/* Kill confirmation dialog */}
+          {killConfirmPid != null && (
+            <div className="border border-red-500/40 bg-red-950/30 px-4 py-3">
+              <p className="mb-2 text-sm font-semibold text-red-200">
+                {d.killConfirmTitle}
+              </p>
+              <p className="mb-3 text-xs text-stone-400">
+                {d.killConfirmBody.replace('{pid}', String(killConfirmPid)).replace('{feature}', feature.name)}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleConfirmKill}
+                  className="border border-red-500/50 px-3 py-1.5 text-xs font-medium text-red-200 hover:bg-red-950/60"
+                >
+                  {d.killConfirm}
+                </button>
+                <button
+                  onClick={handleCancelKill}
+                  className="border border-stone-200/25 px-3 py-1.5 text-xs font-medium text-stone-300 hover:bg-white/5"
+                >
+                  {d.killCancel}
+                </button>
+              </div>
+            </div>
+          )}
+
           {phase !== 'idle' && (
             <div>
               <div className="mb-1 flex items-center justify-between">
@@ -1171,8 +1360,16 @@ export function TaskDispatchModal({
                   <span className="text-xs text-stone-400">PID {activePid}</span>
                 )}
               </div>
+              {/* Command loading spinner */}
+              {commandLoading && (
+                <div className="mb-2 flex items-center gap-2 text-xs text-stone-400">
+                  <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-stone-400 border-t-transparent" />
+                  {d.commandPreparing}
+                </div>
+              )}
+
               <div className="max-h-64 overflow-auto border border-stone-200/12 bg-[rgb(var(--pm-input))] p-3 font-mono text-xs leading-5 text-stone-200">
-                {logs.length === 0 ? (
+                {logs.length === 0 && !commandLoading ? (
                   <span className="animate-pulse text-stone-500">{d.waitingOutput}</span>
                 ) : (
                   logs.map((line, i) => (
@@ -1183,6 +1380,13 @@ export function TaskDispatchModal({
                 )}
                 <div ref={logEndRef} />
               </div>
+
+              {/* Post-run error banner */}
+              {phase === 'error' && dispatchError && (
+                <div className="mt-2 border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                  {dispatchError}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1195,9 +1399,9 @@ export function TaskDispatchModal({
           >
             {isRunning ? d.backgroundBtn : d.closeBtn}
           </button>
-          {isRunning && activePid != null && (
+          {isRunning && activePid != null && killConfirmPid == null && (
             <button
-              onClick={handleKill}
+              onClick={() => handleRequestKill(activePid)}
               className="border border-red-500/40 px-4 py-2 text-sm font-medium text-red-300 hover:bg-red-950/40"
             >
               Kill

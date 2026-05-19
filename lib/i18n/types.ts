@@ -17,6 +17,7 @@ export interface Translations {
     plugins: string;
     channels: string;
     cronJobs: string;
+    skills: string;
     sessions: string;
     logs: string;
     keys: string;
@@ -67,6 +68,24 @@ export interface Translations {
   dashboard: {
     title: string;
     projectName: string;
+  };
+  runs: {
+    active: string;
+    history: string;
+    noRuns: string;
+    noRunsHint: string;
+    waitingOutput: string;
+    kill: string;
+    killConfirmTitle: string;
+    /** Uses {pid} and {feature} placeholders */
+    killConfirmBody: string;
+    killConfirm: string;
+    killCancel: string;
+    viewLog: string;
+    hideLog: string;
+    exit: string;
+    /** Uses {count} placeholder */
+    runsSummary: string;
   };
   features: {
     filterAll: string;
@@ -141,5 +160,21 @@ export interface Translations {
     /** Uses {name} and {date} placeholders */
     assignedToWarning: string;
     assignedToContinue: string;
+    /** Kill confirmation */
+    killConfirmTitle: string;
+    /** Uses {pid} and {feature} placeholders */
+    killConfirmBody: string;
+    killConfirm: string;
+    killCancel: string;
+    /** Command not found */
+    adapterNotFound: string;
+    mcpLoading: string;
+    mcpEmpty: string;
+    commandPreparing: string;
+    dispatchNoAdapter: string;
+    batchEmptyTitle: string;
+    batchEmptyHint: string;
+    /** Uses {id} and {fallback} placeholders */
+    adapterWarningHint: string;
   };
 }

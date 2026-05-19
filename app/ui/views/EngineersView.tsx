@@ -1,14 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2, Play, Plus, RefreshCw, Sparkles, Trash2, Users2, Workflow, X } from 'lucide-react';
+import { FolderLock, Loader2, Play, Plus, RefreshCw, Sparkles, Trash2, Users2, Workflow, X } from 'lucide-react';
 import { DEFAULT_AGENT_WORKFLOWS } from '../../../lib/agent-workflows';
 import { DEFAULT_ENGINEER_ROLES } from '../../../lib/defaults/engineerRoles';
 import { listLlmProviders, type LlmProviderId } from '../../../lib/keys/llmProviders';
 import { hasProviderKey, loadProviderKey } from '../../../lib/keys/loadProviderKey';
 import { loadProviderOrder, type ProviderOrderEntry } from '../../../lib/keys/providerOrder';
 import { callSingleProvider } from '../../../lib/scanner/runProjectScan';
-import type { AnyAdapterConfig, EngineerRole } from '../../../lib/types';
+import type { AnyAdapterConfig, EngineerRole, WorkingScope } from '../../../lib/types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -59,6 +59,9 @@ interface FormState {
   testProviderId: string;
   testModel: string;
   testPrompt: string;
+  scopePaths: string[];
+  scopeMode: 'soft' | 'strict';
+  scopeInput: string;
 }
 
 function roleToForm(role: EngineerRole): FormState {
@@ -72,10 +75,17 @@ function roleToForm(role: EngineerRole): FormState {
     testProviderId: role.testProviderId ?? '',
     testModel: role.testModel ?? '',
     testPrompt: role.testPrompt ?? '',
+    scopePaths: role.workingScope?.allowedPaths ?? [],
+    scopeMode: role.workingScope?.mode ?? 'soft',
+    scopeInput: '',
   };
 }
 
 function formToRole(id: string, form: FormState, existing: EngineerRole): EngineerRole {
+  const workingScope: WorkingScope | undefined =
+    form.scopePaths.length > 0
+      ? { allowedPaths: form.scopePaths, mode: form.scopeMode }
+      : undefined;
   return {
     id,
     name: form.name || 'Unnamed Role',
@@ -86,6 +96,7 @@ function formToRole(id: string, form: FormState, existing: EngineerRole): Engine
     referenceFiles: existing.referenceFiles,
     defaultAgentId: form.defaultAgentId || undefined,
     notes: form.notes || undefined,
+    workingScope,
     testProviderId: form.testProviderId || undefined,
     testModel: form.testModel || undefined,
     testPrompt: form.testPrompt || undefined,
@@ -489,6 +500,108 @@ function DetailPanel({ role, agents, onSave, onDelete }: DetailPanelProps) {
         )}
       </div>
 
+      {/* Working Scope */}
+      <div className="space-y-3 border border-stone-200/15 bg-[rgb(var(--pm-card-3))]/40 p-3">
+        <div className="flex items-center gap-2">
+          <FolderLock size={13} className="text-stone-400" />
+          <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">
+            Working Scope
+          </span>
+          <span className="ml-auto text-[10px] text-stone-600">
+            Restrict which paths this engineer may modify
+          </span>
+        </div>
+
+        {/* Path tag input */}
+        <div>
+          <div className="flex gap-2">
+            <input
+              value={form.scopeInput}
+              onChange={(e) => setForm((prev) => ({ ...prev, scopeInput: e.target.value }))}
+              onKeyDown={(e) => {
+                if ((e.key === 'Enter' || e.key === ',') && form.scopeInput.trim()) {
+                  e.preventDefault();
+                  const path = form.scopeInput.trim().replace(/,+$/, '');
+                  if (path && !form.scopePaths.includes(path)) {
+                    setForm((prev) => ({ ...prev, scopePaths: [...prev.scopePaths, path], scopeInput: '' }));
+                    setDirty(true);
+                  } else {
+                    setForm((prev) => ({ ...prev, scopeInput: '' }));
+                  }
+                }
+              }}
+              placeholder="src/feature-x/  (Enter to add)"
+              className={`${inputCls} flex-1 font-mono text-xs`}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const path = form.scopeInput.trim().replace(/,+$/, '');
+                if (path && !form.scopePaths.includes(path)) {
+                  setForm((prev) => ({ ...prev, scopePaths: [...prev.scopePaths, path], scopeInput: '' }));
+                  setDirty(true);
+                } else {
+                  setForm((prev) => ({ ...prev, scopeInput: '' }));
+                }
+              }}
+              className="border border-stone-200/18 px-3 py-2 text-xs text-stone-400 hover:border-emerald-300/30 hover:text-emerald-200"
+            >
+              Add
+            </button>
+          </div>
+          {form.scopePaths.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {form.scopePaths.map((p) => (
+                <span
+                  key={p}
+                  className="inline-flex items-center gap-1 border border-emerald-300/25 bg-emerald-950/40 px-2 py-0.5 font-mono text-[10px] text-emerald-200/80"
+                >
+                  {p}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForm((prev) => ({ ...prev, scopePaths: prev.scopePaths.filter((x) => x !== p) }));
+                      setDirty(true);
+                    }}
+                    className="ml-0.5 text-stone-500 hover:text-red-400"
+                    aria-label={`Remove ${p}`}
+                  >
+                    <X size={9} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Mode toggle */}
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] uppercase tracking-[0.12em] text-stone-500">Mode</span>
+          {(['soft', 'strict'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => { setForm((prev) => ({ ...prev, scopeMode: m })); setDirty(true); }}
+              className={[
+                'border px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors',
+                form.scopeMode === m
+                  ? m === 'strict'
+                    ? 'border-orange-300/40 bg-orange-950/50 text-orange-200/90'
+                    : 'border-emerald-300/35 bg-emerald-950/50 text-emerald-200/80'
+                  : 'border-stone-200/15 text-stone-600 hover:border-stone-200/30 hover:text-stone-400',
+              ].join(' ')}
+            >
+              {m}
+            </button>
+          ))}
+          <span className="text-[10px] text-stone-600">
+            {form.scopeMode === 'strict'
+              ? 'Prompt injection + dispatch warning when outside scope'
+              : 'Prompt injection only'}
+          </span>
+        </div>
+      </div>
+
       {/* Notes */}
       <FormField label="Notes">
         <textarea
@@ -653,6 +766,12 @@ export function EngineersView({ roles, agents, onRolesChange }: EngineersViewPro
                   {role.skills.length > 0 && (
                     <p className="mt-0.5 truncate text-[10px] text-stone-500">
                       {role.skills.slice(0, 3).join(' · ')}
+                    </p>
+                  )}
+                  {role.workingScope && role.workingScope.allowedPaths.length > 0 && (
+                    <p className="mt-0.5 flex items-center gap-1 text-[10px] text-emerald-400/70">
+                      <FolderLock size={9} />
+                      {role.workingScope.mode === 'strict' ? 'strict' : 'soft'} scope
                     </p>
                   )}
                 </button>

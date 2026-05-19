@@ -27,6 +27,7 @@
     "openclaw:dashboard": "bash scripts/openclaw.sh dashboard --no-open",
     "openclaw:update": "bash scripts/update-openclaw.sh",
     "openclaw:rollback": "bash scripts/rollback-openclaw.sh",
+    "openclaw:sync-env": "bash scripts/sync-openclaw-env.sh",
     "test": "vitest run",
     "test:watch": "vitest",
     "tauri:dev": "tauri dev",
