@@ -9,13 +9,22 @@ interface ChatInputProps {
   loadingLabel: string;
   loading: boolean;
   onSend: (message: string) => void;
+  /** External ref for focus delegation (e.g. keyboard shortcuts) */
+  externalRef?: React.RefObject<HTMLTextAreaElement | null>;
 }
 
-export function ChatInput({ placeholder, sendLabel, loadingLabel, loading, onSend }: ChatInputProps) {
+export function ChatInput({ placeholder, sendLabel, loadingLabel, loading, onSend, externalRef }: ChatInputProps) {
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sentRef = useRef(false);
   const canSend = value.trim().length > 0 && !loading;
+
+  // Sync external ref for keyboard shortcut delegation
+  useEffect(() => {
+    if (externalRef) {
+      (externalRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = textareaRef.current;
+    }
+  });
 
   // Autofocus on mount
   useEffect(() => {
