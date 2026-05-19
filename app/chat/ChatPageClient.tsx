@@ -335,7 +335,7 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
                   key={cmd}
                   type="button"
                   onClick={() => handleSend(cmd)}
-                  className="rounded border border-stone-200/15 bg-white/[0.04] px-3 py-1.5 font-mono text-[10px] text-amber-100/80 transition-colors hover:bg-white/[0.08] hover:border-amber-200/30"
+                  className="rounded-full border border-stone-300/20 bg-white/[0.04] px-3.5 py-1.5 font-mono text-[10px] text-amber-100/80 transition-all hover:bg-amber-500/12 hover:border-amber-300/40 hover:text-amber-50 active:scale-[0.97]"
                 >
                   {cmd}
                 </button>
@@ -355,6 +355,9 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
             loading={loading}
             onSend={handleSend}
           />
+          <p className="mt-2 text-center text-[9px] tracking-[0.06em] text-stone-600/70">
+            Enter to send &middot; Shift+Enter for new line
+          </p>
         </div>
       </div>
     </div>
