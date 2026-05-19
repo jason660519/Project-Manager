@@ -63,7 +63,7 @@ export function PhaseTable({ rows, columns, prefs, patch, handlers, categoryFilt
   }, [prefs.colWidths, patch]);
 
   return (
-    <div className="relative max-h-[60vh] overflow-auto border border-stone-200/15 bg-[#061512]/70">
+    <div className="relative max-h-[60vh] overflow-auto border border-stone-200/15 bg-[rgb(var(--pm-rail))]/70">
       <table className="border-collapse text-left" style={{ minWidth: prefs.colWidths.reduce((s, w) => s + w, 0) }}>
         <colgroup>
           {prefs.colWidths.map((w, i) => (
@@ -78,7 +78,7 @@ export function PhaseTable({ rows, columns, prefs, patch, handlers, categoryFilt
                 <th
                   key={col.id}
                   className={clsx(
-                    'sticky top-0 z-20 select-none border-b border-r border-stone-200/15 bg-[#0a2622] px-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-stone-300',
+                    'sticky top-0 z-20 select-none border-b border-r border-stone-200/15 bg-[rgb(var(--pm-card))] px-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-stone-300',
                     isFrozen && 'z-30',
                   )}
                   style={{
@@ -122,7 +122,7 @@ export function PhaseTable({ rows, columns, prefs, patch, handlers, categoryFilt
                 onClick={onClick}
                 className={clsx(
                   'group cursor-pointer border-b border-stone-200/10 transition-colors hover:bg-white/5',
-                  isFrozenRow && 'bg-[#0a2622]/85',
+                  isFrozenRow && 'bg-[rgb(var(--pm-card))]/85',
                 )}
               >
                 {columns.map((col, colIdx) => {
@@ -132,7 +132,7 @@ export function PhaseTable({ rows, columns, prefs, patch, handlers, categoryFilt
                       key={col.id}
                       className={clsx(
                         'border-r border-stone-200/10 px-3 py-2 text-sm text-stone-200',
-                        isFrozen && 'sticky z-10 bg-[#061512]/95',
+                        isFrozen && 'sticky z-10 bg-[rgb(var(--pm-rail))]/95',
                         isFrozenRow && 'sticky',
                       )}
                       style={{

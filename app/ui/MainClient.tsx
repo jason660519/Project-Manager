@@ -43,7 +43,6 @@ import { KeysView } from './views/KeysView';
 import { EnvImportModal } from './views/_components/EnvImportModal';
 import { parseEnvText } from '../../lib/keys/envParser';
 import { detectProviders } from '../../lib/keys/detectProviders';
-import { KeyboardShortcutsView } from './views/KeyboardShortcutsView';
 import { SettingsView } from './views/SettingsView';
 import { DocumentationView } from './views/DocumentationView';
 
@@ -284,7 +283,7 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
       if (isTextInput) return;
       if (event.shiftKey && (event.key === '?' || event.key === '/')) {
         event.preventDefault();
-        router.push('/keyboard-shortcuts');
+        router.push('/settings');
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -1067,7 +1066,6 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
         />
       )}
       {currentView === 'keys' && <KeysView />}
-      {currentView === 'keyboard-shortcuts' && <KeyboardShortcutsView />}
       {currentView === 'settings' && <SettingsView />}
       {currentView === 'documentation' && <DocumentationView />}
       {currentView === 'engineers' && selectedProject && (

@@ -118,7 +118,7 @@ export function OAuthDeviceModal({ provider, onClose, onAuthorized }: OAuthDevic
       aria-modal="true"
       aria-label={`Sign in to ${provider.label}`}
     >
-      <div className="flex w-full max-w-md flex-col border border-stone-200/20 bg-[#071d1a]">
+      <div className="flex w-full max-w-md flex-col border border-stone-200/20 bg-[rgb(var(--pm-panel))]">
         <header className="flex items-center justify-between border-b border-stone-200/12 px-5 py-3">
           <h2 className="text-sm font-medium uppercase tracking-[0.16em] text-stone-100">
             Sign in to {provider.label}
@@ -149,7 +149,7 @@ export function OAuthDeviceModal({ provider, onClose, onAuthorized }: OAuthDevic
                 </li>
                 <li>Enter this code:</li>
               </ol>
-              <div className="flex items-center justify-between border border-stone-200/22 bg-[#03100f] px-4 py-3">
+              <div className="flex items-center justify-between border border-stone-200/22 bg-[rgb(var(--pm-input))] px-4 py-3">
                 <span className="font-mono text-2xl tracking-[0.22em] text-stone-50">
                   {phase.userCode}
                 </span>

@@ -1,7 +1,7 @@
 ---
 name: 'Create TanStack Table'
 description: 'Build or extend data tables in Project-Manager using raw TanStack Table v8. Triggered when creating a new table, adding columns, or modifying TableCore. Covers column patterns, numeric sort rules, complex cell extraction, layout pitfalls, and the project colour system.'
-applyTo: 'components/table/**,app/ui/views/**'
+applyTo: 'components/table/**,app/ui/views/**,app/project-progress-dashboard/**'
 ---
 
 # Create TanStack Table — Project-Manager
@@ -112,12 +112,43 @@ Project-Manager uses a dark stone/emerald palette. Use these instead of hardcode
 
 ## Common Cell Patterns
 
-### Null / empty path cell
+### Dashboard path cells
+
+Project Progress Dashboard path columns must not display raw file paths. Render fixed labels and keep the full absolute path in `title` only. Markdown artifacts should open the dashboard document panel, not the OS default Markdown app.
 
 ```tsx
-function renderPathCell(value?: string) {
-  if (!value) return <span className="text-xs text-stone-500">—</span>;
-  return <span className="font-mono text-xs text-stone-300">{value}</span>;
+function renderDashboardPathCell(
+  projectRoot: string,
+  relPath: string | undefined,
+  label: string,
+  onOpenPanel?: (absPath: string) => void,
+) {
+  return (
+    <PathLink
+      projectRoot={projectRoot}
+      relPath={relPath}
+      label={label}
+      onOpenPanel={onOpenPanel}
+    />
+  );
+}
+```
+
+Use these canonical labels for Project Progress Dashboard document columns:
+
+| Column | Label |
+|---|---|
+| README | `README.md` |
+| Feature Spec | `feature-spec.md` |
+| TDD Spec | `tdd-spec.md` |
+| TDD Report | `tdd-report.md` |
+| Dev Logs | `dev-log.md` |
+
+### Null / empty value cell
+
+```tsx
+function renderEmptyCell() {
+  return <span className="text-xs text-stone-500">—</span>;
 }
 ```
 

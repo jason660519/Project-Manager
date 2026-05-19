@@ -170,7 +170,7 @@ export function TableCore({ data, onDispatch, onRowClick, selectedIds, onToggleS
   return (
     <div className="overflow-x-auto bg-transparent">
       <table className="w-full border-collapse text-left">
-        <thead className="sticky top-0 z-10 border-b border-stone-200/12 bg-[#071d1a]">
+        <thead className="sticky top-0 z-10 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
               {headerGroup.headers.map((header) => (

@@ -1,8 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AddRowModal } from '../app/project-progress-dashboard/_components/AddRowModal';
 import { DEFAULT_E2E_CATEGORY } from '../app/project-progress-dashboard/_lib/e2eCategories';
+import { I18nProvider } from '../lib/i18n';
+
+beforeEach(() => {
+  window.localStorage.setItem('pm-lang', 'zh-hant');
+});
 
 const renderOpen = (
   phase: 'development' | 'e2e_testing' | 'deployment' | 'operations',
@@ -11,15 +16,17 @@ const renderOpen = (
 ) => {
   const onClose = vi.fn();
   render(
-    <AddRowModal
-      open
-      onClose={onClose}
-      phase={phase}
-      defaultProjectName={opts.defaultProjectName ?? 'Demo Project'}
-      projectNames={opts.projectNames}
-      existingIds={new Set()}
-      onAdd={onAdd}
-    />,
+    <I18nProvider>
+      <AddRowModal
+        open
+        onClose={onClose}
+        phase={phase}
+        defaultProjectName={opts.defaultProjectName ?? 'Demo Project'}
+        projectNames={opts.projectNames}
+        existingIds={new Set()}
+        onAdd={onAdd}
+      />
+    </I18nProvider>,
   );
   return { onAdd, onClose };
 };
@@ -137,14 +144,16 @@ describe('AddRowModal submission payloads', () => {
     const user = userEvent.setup();
     const onAdd = vi.fn();
     render(
-      <AddRowModal
-        open
-        onClose={vi.fn()}
-        phase="development"
-        defaultProjectName="Demo Project"
-        existingIds={new Set(['DUP'])}
-        onAdd={onAdd}
-      />,
+      <I18nProvider>
+        <AddRowModal
+          open
+          onClose={vi.fn()}
+          phase="development"
+          defaultProjectName="Demo Project"
+          existingIds={new Set(['DUP'])}
+          onAdd={onAdd}
+        />
+      </I18nProvider>,
     );
     await user.type(screen.getByPlaceholderText('e.g. C-001'), 'DUP');
     await user.type(screen.getByLabelText('Name *'), 'name');

@@ -47,7 +47,7 @@ export function PromptEngineerModal({ open, onClose, row, agents, onSave }: Prom
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-xl rounded border border-stone-200/20 bg-[#061512] p-4 shadow-2xl">
+      <div className="w-full max-w-xl rounded border border-stone-200/20 bg-[rgb(var(--pm-rail))] p-4 shadow-2xl">
         <div className="mb-3 flex items-center justify-between">
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-stone-100">
@@ -73,7 +73,7 @@ export function PromptEngineerModal({ open, onClose, row, agents, onSave }: Prom
               onChange={(e) => setBody(e.target.value)}
               rows={6}
               placeholder="Describe what the agent should do for this feature…"
-              className="w-full rounded border border-stone-200/15 bg-[#020a09]/95 p-2 text-xs text-stone-100 focus:outline-none focus:border-emerald-400/40"
+              className="w-full rounded border border-stone-200/15 bg-[rgb(var(--pm-code))]/95 p-2 text-xs text-stone-100 focus:outline-none focus:border-emerald-400/40"
             />
           </label>
           <div className="grid grid-cols-2 gap-2">
@@ -82,7 +82,7 @@ export function PromptEngineerModal({ open, onClose, row, agents, onSave }: Prom
               <select
                 value={agentId}
                 onChange={(e) => setAgentId(e.target.value)}
-                className="h-7 w-full rounded border border-stone-200/15 bg-[#061512] px-2 text-xs text-stone-100"
+                className="h-7 w-full rounded border border-stone-200/15 bg-[rgb(var(--pm-rail))] px-2 text-xs text-stone-100"
               >
                 {agents.length === 0 && <option value="">(no agents configured)</option>}
                 {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
@@ -94,7 +94,7 @@ export function PromptEngineerModal({ open, onClose, row, agents, onSave }: Prom
                 type="number" min={1} max={50}
                 value={maxIterations}
                 onChange={(e) => setMaxIterations(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
-                className="h-7 w-full rounded border border-stone-200/15 bg-[#061512] px-2 text-xs text-stone-100"
+                className="h-7 w-full rounded border border-stone-200/15 bg-[rgb(var(--pm-rail))] px-2 text-xs text-stone-100"
               />
             </label>
           </div>
@@ -113,7 +113,7 @@ export function PromptEngineerModal({ open, onClose, row, agents, onSave }: Prom
               value={stopCondition}
               onChange={(e) => setStopCondition(e.target.value)}
               placeholder="e.g. 'all tests pass' (substring match)"
-              className="h-7 w-full rounded border border-stone-200/15 bg-[#061512] px-2 text-xs text-stone-100"
+              className="h-7 w-full rounded border border-stone-200/15 bg-[rgb(var(--pm-rail))] px-2 text-xs text-stone-100"
               disabled={!autoLoop}
             />
           </label>

@@ -2041,13 +2041,26 @@ async fn write_mcp_config(
     Ok(path.to_string_lossy().to_string())
 }
 
-/// Open a file or directory in the OS's default handler (Finder/Explorer/xdg-open).
+fn is_markdown_path(path: &str) -> bool {
+    Path::new(path)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| matches!(ext.to_ascii_lowercase().as_str(), "md" | "markdown"))
+        .unwrap_or(false)
+}
+
+/// Open a file or directory in the OS handler. Markdown files on macOS use
+/// TextEdit so Project Manager never triggers a paid default Markdown app.
 /// Generic helper — also used by future Skills UI to reveal the skills dir.
 #[tauri::command]
 async fn open_path(path: String) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        tokio::process::Command::new("open")
+        let mut command = tokio::process::Command::new("open");
+        if is_markdown_path(&path) {
+            command.arg("-a").arg("TextEdit");
+        }
+        command
             .arg(&path)
             .spawn()
             .map_err(|e| format!("open failed: {e}"))?;
@@ -2480,6 +2493,14 @@ mod skill_tests {
         );
 
         cleanup(&dir).await;
+    }
+
+    #[test]
+    fn markdown_path_detection_is_case_insensitive() {
+        assert!(is_markdown_path("/tmp/README.md"));
+        assert!(is_markdown_path("/tmp/FeatureSpec.MARKDOWN"));
+        assert!(!is_markdown_path("/tmp/spec.txt"));
+        assert!(!is_markdown_path("/tmp/feature-docs"));
     }
 
     #[tokio::test]

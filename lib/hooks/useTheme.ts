@@ -8,7 +8,7 @@ export interface ThemeMeta {
   id: ThemeId;
   label: string;
   description: string;
-  /** Two hex colors for the mini swatch preview */
+  /** Two CSS color values for the mini swatch preview */
   swatch: [string, string];
 }
 
@@ -17,25 +17,25 @@ export const THEMES: ThemeMeta[] = [
     id: 'emerald',
     label: 'Emerald',
     description: 'Classic dark emerald — the canonical PM look',
-    swatch: ['#071b18', '#6ee7b7'],
+    swatch: ['rgb(var(--pm-bg-rgb))', 'rgb(110 231 183)'],
   },
   {
     id: 'midnight',
     label: 'Midnight',
     description: 'Deep blue-violet with cool accents',
-    swatch: ['#0a0a1f', '#a78bfa'],
+    swatch: ['rgb(10 10 31)', 'rgb(167 139 250)'],
   },
   {
     id: 'ember',
     label: 'Ember',
     description: 'Warm crimson and bronze — forge vibes',
-    swatch: ['#1a0a06', '#fb923c'],
+    swatch: ['rgb(26 10 6)', 'rgb(251 146 60)'],
   },
   {
     id: 'mono',
     label: 'Mono',
     description: 'Clean grayscale — minimal and focused',
-    swatch: ['#0e0e0e', '#e5e5e5'],
+    swatch: ['rgb(14 14 14)', 'rgb(229 229 229)'],
   },
 ];
 

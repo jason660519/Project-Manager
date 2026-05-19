@@ -1,9 +1,9 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "id": "5b9422db-4007-48fd-b9c0-dd192299e4dd",
   "createdAt": "2026-05-19T00:46:36.208Z",
-  "updatedAt": "2026-05-19T00:54:01.767Z",
-  "updatedBy": "Codex recovery from .project-manager/features README files",
+  "updatedAt": "2026-05-19T01:57:39.100Z",
+  "updatedBy": "Codex dashboard fixed-label artifact normalization",
   "project": {
     "name": "Project Manager",
     "root": "/Volumes/KLEVV-4T-1/Project-Manager",
@@ -18,9 +18,10 @@
       "progress": 100,
       "paths": {
         "featureFolder": ".project-manager/features/F01/",
-        "implementation": "app/ui/Sidebar.tsx"
+        "implementation": "app/ui/Sidebar.tsx",
+        "developmentLogSummaryFolder": ".project-manager/features/F01/"
       },
-      "notes": ".project-manager/features/F01/README.md",
+      "readmePath": ".project-manager/features/F01/README.md",
       "createdAt": "2026-05-18T23:48:51.000Z",
       "updatedAt": "2026-05-18T23:48:51.000Z",
       "phase": "development",
@@ -34,13 +35,19 @@
       "progress": 65,
       "paths": {
         "featureFolder": ".project-manager/features/F02/",
-        "implementation": "app/ui/DashboardClient.tsx"
+        "implementation": "app/ui/DashboardClient.tsx",
+        "test": "__tests__/dashboardLayout.test.ts",
+        "developmentLogSummaryFolder": ".project-manager/features/F02/"
       },
-      "notes": ".project-manager/features/F02/README.md",
+      "notes": "Display feature progress, status, and dispatch operations on the home page dashboard.",
+      "readmePath": ".project-manager/features/F02/README.md",
       "createdAt": "2026-05-18T22:54:50.000Z",
       "updatedAt": "2026-05-18T22:54:50.000Z",
       "phase": "development",
-      "points": 1
+      "points": 1,
+      "metadata": {
+        "notesSummary": "Display feature progress, status, and dispatch operations on the home page dashboard."
+      }
     },
     {
       "id": "F03",
@@ -50,9 +57,11 @@
       "progress": 30,
       "paths": {
         "featureFolder": ".project-manager/features/F03/",
-        "implementation": "app/ui/views/RunsView.tsx"
+        "implementation": "app/ui/views/RunsView.tsx",
+        "test": "__tests__/agentWorkflows.test.ts",
+        "developmentLogSummaryFolder": ".project-manager/features/F03/"
       },
-      "notes": ".project-manager/features/F03/README.md",
+      "readmePath": ".project-manager/features/F03/README.md",
       "createdAt": "2026-05-18T22:54:57.000Z",
       "updatedAt": "2026-05-18T22:54:57.000Z",
       "phase": "development",
@@ -66,9 +75,11 @@
       "progress": 10,
       "paths": {
         "featureFolder": ".project-manager/features/F04/",
-        "spec": "docs/01-user-scenarios.md"
+        "spec": ".project-manager/features/F04/feature-spec.md",
+        "implementation": "app/api/anthropic/route.ts",
+        "developmentLogSummaryFolder": ".project-manager/features/F04/"
       },
-      "notes": ".project-manager/features/F04/README.md",
+      "readmePath": ".project-manager/features/F04/README.md",
       "createdAt": "2026-05-18T22:55:03.000Z",
       "updatedAt": "2026-05-18T22:55:03.000Z",
       "phase": "development",
@@ -82,13 +93,18 @@
       "progress": 0,
       "paths": {
         "featureFolder": ".project-manager/features/F05/",
-        "spec": "docs/02-prd.md"
+        "spec": ".project-manager/features/F05/feature-spec.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F05/"
       },
-      "notes": ".project-manager/features/F05/README.md",
+      "notes": "Tauri app with AI calls in Rust layer, key stored in macOS Keychain, real Agent CLI spawning.",
+      "readmePath": ".project-manager/features/F05/README.md",
       "createdAt": "2026-05-18T22:55:11.000Z",
       "updatedAt": "2026-05-18T22:55:11.000Z",
       "phase": "development",
-      "points": 1
+      "points": 1,
+      "metadata": {
+        "notesSummary": "Tauri app with AI calls in Rust layer, key stored in macOS Keychain, real Agent CLI spawning."
+      }
     },
     {
       "id": "F06",
@@ -99,10 +115,10 @@
       "paths": {
         "featureFolder": ".project-manager/features/F06/",
         "implementation": "lib/storage/",
-        "spec": "docs/architecture/ADR-006-schema-v2-sync-fields.md",
-        "developmentLogSummaryFolder": "docs/dev-logs/"
+        "spec": ".project-manager/features/F06/feature-spec.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F06/"
       },
-      "notes": ".project-manager/features/F06/README.md",
+      "readmePath": ".project-manager/features/F06/README.md",
       "createdAt": "2026-05-18T22:55:18.000Z",
       "updatedAt": "2026-05-18T22:55:18.000Z",
       "phase": "development",
@@ -116,9 +132,10 @@
       "progress": 100,
       "paths": {
         "featureFolder": ".project-manager/features/F07/",
-        "implementation": "app/ui/Sidebar.tsx"
+        "implementation": "app/ui/Sidebar.tsx",
+        "developmentLogSummaryFolder": ".project-manager/features/F07/"
       },
-      "notes": ".project-manager/features/F07/README.md",
+      "readmePath": ".project-manager/features/F07/README.md",
       "createdAt": "2026-05-18T22:55:27.000Z",
       "updatedAt": "2026-05-18T22:55:27.000Z",
       "phase": "development",
@@ -132,13 +149,18 @@
       "progress": 100,
       "paths": {
         "featureFolder": ".project-manager/features/F08/",
-        "implementation": "app/ui/TopBar.tsx"
+        "implementation": "app/ui/TopBar.tsx",
+        "developmentLogSummaryFolder": ".project-manager/features/F08/"
       },
-      "notes": ".project-manager/features/F08/README.md",
+      "notes": "Automatically extract and store context from user project content or existing specs for precise AI Agent prompts.",
+      "readmePath": ".project-manager/features/F08/README.md",
       "createdAt": "2026-05-18T22:55:33.000Z",
       "updatedAt": "2026-05-18T22:55:33.000Z",
       "phase": "development",
-      "points": 1
+      "points": 1,
+      "metadata": {
+        "notesSummary": "Automatically extract and store context from user project content or existing specs for precise AI Agent prompts."
+      }
     },
     {
       "id": "F09",
@@ -147,13 +169,18 @@
       "status": "done",
       "progress": 100,
       "paths": {
-        "featureFolder": ".project-manager/features/F09/"
+        "featureFolder": ".project-manager/features/F09/",
+        "developmentLogSummaryFolder": ".project-manager/features/F09/"
       },
-      "notes": ".project-manager/features/F09/README.md",
+      "notes": "Progress data travels with the project, no strong dependency on centralized database.",
+      "readmePath": ".project-manager/features/F09/README.md",
       "createdAt": "2026-05-18T22:55:41.000Z",
       "updatedAt": "2026-05-18T22:55:41.000Z",
       "phase": "development",
-      "points": 1
+      "points": 1,
+      "metadata": {
+        "notesSummary": "Progress data travels with the project, no strong dependency on centralized database."
+      }
     },
     {
       "id": "F10",
@@ -163,13 +190,18 @@
       "progress": 100,
       "paths": {
         "featureFolder": ".project-manager/features/F10/",
-        "implementation": "app/ui/AppShell.tsx"
+        "implementation": "app/ui/AppShell.tsx",
+        "developmentLogSummaryFolder": ".project-manager/features/F10/"
       },
-      "notes": ".project-manager/features/F10/README.md",
+      "notes": "Full internationalization supported locales: en, zh-hant, zh, ja. TypeScript enforced missing keys.",
+      "readmePath": ".project-manager/features/F10/README.md",
       "createdAt": "2026-05-18T22:55:48.000Z",
       "updatedAt": "2026-05-18T22:55:48.000Z",
       "phase": "development",
-      "points": 1
+      "points": 1,
+      "metadata": {
+        "notesSummary": "Full internationalization supported locales: en, zh-hant, zh, ja. TypeScript enforced missing keys."
+      }
     },
     {
       "id": "F11",
@@ -182,13 +214,18 @@
         "implementation": "lib/hooks/useLang.ts",
         "spec": ".project-manager/features/F11/feature-spec.md",
         "tdd": ".project-manager/features/F11/tdd-spec.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F11/"
+        "developmentLogSummaryFolder": ".project-manager/features/F11/",
+        "test": "__tests__/keys.detectProviders.test.ts"
       },
-      "notes": ".project-manager/features/F11/README.md",
+      "notes": "Browser mode uses .env environment variables (server side), Tauri mode uses macOS Keychain.",
+      "readmePath": ".project-manager/features/F11/README.md",
       "createdAt": "2026-05-19T00:24:47.000Z",
       "updatedAt": "2026-05-19T00:24:47.000Z",
       "phase": "development",
-      "points": 1
+      "points": 1,
+      "metadata": {
+        "notesSummary": "Browser mode uses .env environment variables (server side), Tauri mode uses macOS Keychain."
+      }
     }
   ],
   "adapters": {

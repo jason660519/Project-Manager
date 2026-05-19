@@ -64,6 +64,17 @@ Keep the report factual. Do not invent tasks, verification results, issue IDs, o
 
 Project Manager does not currently have the Owner SPA `roadmap.ts` workflow. Do not update a roadmap by default.
 
+Project Manager feature-local artifacts use the schema v5 document contract:
+
+| Artifact | Config field |
+| :-- | :-- |
+| `.project-manager/features/<ID>/README.md` | `feature.readmePath` |
+| `.project-manager/features/<ID>/feature-spec.md` | `feature.paths.spec` |
+| `.project-manager/features/<ID>/tdd-spec.md` | `feature.paths.tdd` |
+| `.project-manager/features/<ID>/dev-log.md` | `feature.paths.developmentLogSummaryFolder` points to the feature folder |
+
+`feature.notes` is short summary text only. Do not put README or artifact paths in `notes`.
+
 Only update `.project-manager.json` or feature progress fields when:
 
 - the user explicitly asks for a feature/row progress update; or

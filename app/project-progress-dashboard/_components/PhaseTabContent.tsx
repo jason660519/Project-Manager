@@ -227,7 +227,7 @@ export function PhaseTabContent({
 
 function SummaryCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded border border-stone-200/15 bg-[#0a2622]/70 px-2 py-1">
+    <div className="rounded border border-stone-200/15 bg-[rgb(var(--pm-card))]/70 px-2 py-1">
       <p className="text-[10px] uppercase tracking-[0.1em] text-stone-400">{label}</p>
       <p className="text-sm font-semibold text-stone-100">{value}</p>
     </div>

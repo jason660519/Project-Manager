@@ -98,8 +98,8 @@ function CircularProgressCard({
   return (
     <div className={
       compact
-        ? 'flex items-center gap-2 rounded border border-stone-200/15 bg-[#0a2622]/70 px-2 py-1'
-        : 'flex items-center gap-4 rounded border border-stone-200/15 bg-[#0a2622]/70 px-4 py-3'
+        ? 'flex items-center gap-2 rounded border border-stone-200/15 bg-[rgb(var(--pm-card))]/70 px-2 py-1'
+        : 'flex items-center gap-4 rounded border border-stone-200/15 bg-[rgb(var(--pm-card))]/70 px-4 py-3'
     }>
       <div className="relative" style={{ width: size, height: size }}>
         <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">

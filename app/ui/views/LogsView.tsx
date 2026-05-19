@@ -72,7 +72,7 @@ function RunsTab({
           <h2 className="mb-3 text-xs uppercase tracking-[0.18em] text-stone-400">Active</h2>
           <div className="space-y-3">
             {activeRuns.map((run) => (
-              <div key={run.pid} className="border border-emerald-200/25 bg-[#071d1a]/72">
+              <div key={run.pid} className="border border-emerald-200/25 bg-[rgb(var(--pm-panel))]/72">
                 <div className="flex items-center gap-3 px-4 py-3">
                   <Activity size={15} className="shrink-0 animate-pulse text-emerald-400" />
                   <div className="min-w-0 flex-1">
@@ -103,7 +103,7 @@ function RunsTab({
                   </div>
                 </div>
                 {expandedPid === run.pid && (
-                  <div className="border-t border-stone-200/12 bg-[#03100f] p-3">
+                  <div className="border-t border-stone-200/12 bg-[rgb(var(--pm-input))] p-3">
                     <div className="max-h-48 overflow-auto font-mono text-xs leading-5 text-stone-300">
                       {run.logs.length === 0 ? (
                         <span className="animate-pulse text-stone-500">Waiting…</span>
@@ -132,7 +132,7 @@ function RunsTab({
         ) : (
           <div className="space-y-2">
             {runHistory.map((run, i) => (
-              <div key={`${run.pid}-${i}`} className="border border-stone-200/18 bg-[#071d1a]/72">
+              <div key={`${run.pid}-${i}`} className="border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72">
                 <div
                   className="flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-white/[0.03]"
                   onClick={() => setExpandedIdx(expandedIdx === i ? null : i)}
@@ -162,7 +162,7 @@ function RunsTab({
                   </div>
                 </div>
                 {expandedIdx === i && run.logs.length > 0 && (
-                  <div className="border-t border-stone-200/12 bg-[#03100f] p-3">
+                  <div className="border-t border-stone-200/12 bg-[rgb(var(--pm-input))] p-3">
                     <div className="max-h-48 overflow-auto font-mono text-xs leading-5 text-stone-300">
                       {run.logs.slice(-50).map((line, li) => (
                         <div key={li} className="whitespace-pre-wrap break-all">{line}</div>
@@ -375,7 +375,7 @@ function DevLogsTab({
 
             {/* File content */}
             {selectedFile && (
-              <div className="border border-stone-200/12 bg-[#03100f]">
+              <div className="border border-stone-200/12 bg-[rgb(var(--pm-input))]">
                 <div className="flex items-center justify-between border-b border-stone-200/10 px-4 py-2">
                   <span className="font-mono text-[11px] text-stone-400">
                     {selectedFile.split('/').pop()}

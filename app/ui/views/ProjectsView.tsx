@@ -601,7 +601,7 @@ export function ProjectsView({
           </button>
           <button
             onClick={() => setShowAddModal(true)}
-            className="inline-flex h-9 items-center gap-2 bg-stone-100 px-3 text-xs font-medium uppercase tracking-[0.14em] text-[#071d1a] hover:bg-amber-100"
+            className="inline-flex h-9 items-center gap-2 bg-stone-100 px-3 text-xs font-medium uppercase tracking-[0.14em] text-[rgb(var(--pm-panel))] hover:bg-amber-100"
           >
             <Plus size={14} />
             Add Project
@@ -612,7 +612,7 @@ export function ProjectsView({
       {/* Project List */}
       <div className="space-y-3">
         {projects.length === 0 && (
-          <div className="border border-dashed border-stone-200/20 bg-[#071d1a]/40 px-6 py-10 text-center">
+          <div className="border border-dashed border-stone-200/20 bg-[rgb(var(--pm-panel))]/40 px-6 py-10 text-center">
             <p className="text-sm text-stone-300">No projects yet</p>
             <p className="mt-1 text-xs text-stone-500">
               Add a local folder or GitHub repo to start tracking progress.
@@ -637,7 +637,7 @@ export function ProjectsView({
           return (
             <div
               key={project.id}
-              className={`group border bg-[#071d1a]/72 transition-colors ${
+              className={`group border bg-[rgb(var(--pm-panel))]/72 transition-colors ${
                 isSelected
                   ? 'border-emerald-200/35'
                   : 'border-stone-200/18 hover:border-stone-200/30'
@@ -806,7 +806,7 @@ export function ProjectsView({
 
       {/* Weekly Report */}
       {reportText && (
-        <div className="border border-stone-200/18 bg-[#071d1a]/72">
+        <div className="border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72">
           <div className="flex items-center justify-between border-b border-stone-200/12 px-4 py-3">
             <h2 className="text-sm font-medium uppercase tracking-[0.16em] text-stone-100">
               Weekly Report
@@ -837,7 +837,7 @@ export function ProjectsView({
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md border border-red-400/30 bg-[#071d1a] shadow-2xl">
+          <div className="w-full max-w-md border border-red-400/30 bg-[rgb(var(--pm-panel))] shadow-2xl">
             <div className="flex items-center gap-2 border-b border-stone-200/12 bg-red-500/10 px-6 py-4">
               <AlertTriangle size={18} className="text-red-300" />
               <h3 className="text-base font-semibold text-stone-50">Remove project?</h3>
@@ -915,7 +915,7 @@ export function ProjectsView({
       {/* Add Project Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg border border-stone-200/18 bg-[#071d1a] shadow-2xl">
+          <div className="w-full max-w-lg border border-stone-200/18 bg-[rgb(var(--pm-panel))] shadow-2xl">
             <div className="flex items-center justify-between border-b border-stone-200/12 bg-white/[0.035] px-6 py-4">
               <h3 className="text-lg font-bold text-stone-50">
                 Add Project
@@ -942,7 +942,7 @@ export function ProjectsView({
                     onClick={() => setAddMode(id)}
                     className={`flex flex-1 items-center justify-center gap-2 py-2 text-xs uppercase tracking-[0.14em] transition-colors ${
                       addMode === id
-                        ? 'bg-stone-100 text-[#071d1a]'
+                        ? 'bg-stone-100 text-[rgb(var(--pm-panel))]'
                         : 'text-stone-300 hover:bg-white/5'
                     }`}
                   >
@@ -1001,7 +1001,7 @@ export function ProjectsView({
                             value={manualConfigPath}
                             onChange={(e) => setManualConfigPath(e.target.value)}
                             placeholder="/path/to/project (auto-detects .project-manager/)"
-                            className="min-w-0 flex-1 border border-stone-200/20 bg-[#03100f] px-3 py-2 font-mono text-xs text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
+                            className="min-w-0 flex-1 border border-stone-200/20 bg-[rgb(var(--pm-input))] px-3 py-2 font-mono text-xs text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
                           />
                           <button
                             type="button"
@@ -1043,7 +1043,7 @@ export function ProjectsView({
                           value={githubUrl}
                           onChange={(e) => setGithubUrl(e.target.value)}
                           placeholder="https://github.com/user/my-app"
-                          className="w-full border border-stone-200/20 bg-[#03100f] px-3 py-2 font-mono text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
+                          className="w-full border border-stone-200/20 bg-[rgb(var(--pm-input))] px-3 py-2 font-mono text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
                         />
                       </div>
                       <div>
@@ -1063,7 +1063,7 @@ export function ProjectsView({
                             );
                           }}
                           placeholder="ghp_..."
-                          className="w-full border border-stone-200/20 bg-[#03100f] px-3 py-2 font-mono text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
+                          className="w-full border border-stone-200/20 bg-[rgb(var(--pm-input))] px-3 py-2 font-mono text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
                         />
                       </div>
                       <p className="text-[11px] text-amber-100/60">
@@ -1092,7 +1092,7 @@ export function ProjectsView({
                     ? !manualConfigPath.trim()
                     : !githubUrl.trim() || !isTauri)
                 }
-                className="bg-stone-100 px-4 py-2 text-sm font-medium text-[#071d1a] hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
+                className="bg-stone-100 px-4 py-2 text-sm font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {adding
                   ? 'Importing…'

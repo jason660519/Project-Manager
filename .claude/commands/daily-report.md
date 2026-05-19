@@ -13,8 +13,8 @@
 
 | 項目 | Owner-Property | Project Manager |
 | :-- | :-- | :-- |
-| 進度資料來源 | `apps/superadmin/app/data/roadmap.ts`（TS 陣列） | `.project-manager/config.json`（schema v4，ADR-006 / ADR-008） |
-| Dev log 目錄 | `project-process/dev-logs/` | `.project-manager/dev-logs/` |
+| 進度資料來源 | `apps/superadmin/app/data/roadmap.ts`（TS 陣列） | `.project-manager/config.json`（schema v5，ADR-006 / ADR-008 / ADR-009） |
+| Dev log 目錄 | `project-process/dev-logs/` | daily report 放 `.project-manager/dev-logs/`；feature dashboard log 放 `.project-manager/features/<ID>/dev-log.md` |
 | Issue tracker | VIS Paperclip（內建系統） | 無對外 tracker；GitHub 整合可選 |
 | Dashboard | superadmin 自帶 | Project Manager 自己的 `/project-progress-dashboard`（讀 `.project-manager/config.json`） |
 
@@ -72,13 +72,16 @@ Project Manager dashboard 顯示優先序：
 | :-- | :-- |
 | `progress` | 進度百分比 |
 | `status` | `todo` / `in_progress` / `done` / `on_hold` |
-| `paths.developmentLogSummaryFolder` | 步驟二產出的 dev log 所在目錄（`.project-manager/dev-logs/`） |
-| `paths.spec` / `tdd` / `implementation` | 對應交付物路徑 |
-| `notes` | 今日完成摘要（一句話） |
+| `readmePath` | `.project-manager/features/<ID>/README.md`，dashboard README 欄位的唯一標準指標 |
+| `paths.developmentLogSummaryFolder` | `.project-manager/features/<ID>/`，dashboard 會固定連到該資料夾下的 `dev-log.md` |
+| `paths.spec` / `tdd` / `implementation` | 對應交付物路徑；標準檔名優先用 `feature-spec.md` / `tdd-spec.md` |
+| `notes` | 今日完成摘要（一句話）；不可存 README 或其他檔案路徑 |
 | `updatedAt` | 今日 ISO 8601 timestamp（schema v2，ADR-006） |
 | `updatedBy` | 執行者標識（預設 `claude`） |
 
-**若為新功能：** 在 `features` 陣列末尾 append。ID 跟現有命名規則（`F01` / `F02` / …）。新 feature 必填：`id` / `name` / `category` / `status` / `progress` / `paths`，建議補 `notes` / `updatedAt` / `updatedBy`。
+**若為新功能：** 在 `features` 陣列末尾 append。ID 跟現有命名規則（`F01` / `F02` / …）。新 feature 必填：`id` / `name` / `category` / `status` / `progress` / `readmePath` / `paths`，建議補 `notes` / `updatedAt` / `updatedBy`，並建立 `.project-manager/features/<ID>/README.md`。
+
+Dashboard 顯示規則：欄位只顯示固定文字（`README.md`、`feature-spec.md`、`tdd-spec.md`、`dev-log.md`），完整路徑只放在 tooltip；Markdown 檔從右側文件面板開啟，不用系統預設 Markdown app。
 
 **document-level 也要更新：**
 - root `updatedAt` bump 為今日 ISO

@@ -45,7 +45,7 @@ export function PhaseTableToolbar({
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-stone-200/15 bg-[#0a2622]/40 px-3 py-2">
+    <div className="flex flex-wrap items-center gap-2 border-b border-stone-200/15 bg-[rgb(var(--pm-card))]/40 px-3 py-2">
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-stone-400" size={12} />
@@ -54,7 +54,7 @@ export function PhaseTableToolbar({
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Search…"
-          className="h-7 w-44 rounded border border-stone-200/15 bg-[#061512]/80 pl-7 pr-2 text-xs text-stone-100 placeholder:text-stone-500 focus:outline-none focus:border-emerald-400/40"
+          className="h-7 w-44 rounded border border-stone-200/15 bg-[rgb(var(--pm-rail))]/80 pl-7 pr-2 text-xs text-stone-100 placeholder:text-stone-500 focus:outline-none focus:border-emerald-400/40"
         />
       </div>
 
@@ -69,7 +69,7 @@ export function PhaseTableToolbar({
           <AlignLeft size={12} /> Align
         </button>
         {showAlignMenu && (
-          <div className="absolute right-0 top-8 z-30 w-64 rounded border border-stone-200/20 bg-[#061512] p-2 shadow-xl">
+          <div className="absolute right-0 top-8 z-30 w-64 rounded border border-stone-200/20 bg-[rgb(var(--pm-rail))] p-2 shadow-xl">
             <p className="mb-1 text-[10px] uppercase tracking-[0.12em] text-stone-400">Column alignment</p>
             {columns.map((col, idx) => (
               <div key={col.id} className="mb-1 flex items-center justify-between gap-2">
@@ -109,7 +109,7 @@ export function PhaseTableToolbar({
           max={5}
           value={prefs.freezeRowCount}
           onChange={(e) => patch({ freezeRowCount: Math.max(0, Math.min(5, Number(e.target.value) || 0)) })}
-          className="h-6 w-10 rounded border border-stone-200/15 bg-[#061512]/80 px-1 text-center text-xs text-stone-100"
+          className="h-6 w-10 rounded border border-stone-200/15 bg-[rgb(var(--pm-rail))]/80 px-1 text-center text-xs text-stone-100"
         />
         <label className="text-[10px] text-stone-400">cols</label>
         <input
@@ -118,7 +118,7 @@ export function PhaseTableToolbar({
           max={5}
           value={prefs.frozenDataColCount}
           onChange={(e) => patch({ frozenDataColCount: Math.max(0, Math.min(5, Number(e.target.value) || 0)) })}
-          className="h-6 w-10 rounded border border-stone-200/15 bg-[#061512]/80 px-1 text-center text-xs text-stone-100"
+          className="h-6 w-10 rounded border border-stone-200/15 bg-[rgb(var(--pm-rail))]/80 px-1 text-center text-xs text-stone-100"
         />
       </div>
 
@@ -145,14 +145,14 @@ export function PhaseTableToolbar({
           <Save size={12} /> Presets
         </button>
         {showPresetMenu && (
-          <div className="absolute right-0 top-8 z-30 w-60 rounded border border-stone-200/20 bg-[#061512] p-2 shadow-xl">
+          <div className="absolute right-0 top-8 z-30 w-60 rounded border border-stone-200/20 bg-[rgb(var(--pm-rail))] p-2 shadow-xl">
             <p className="mb-1 text-[10px] uppercase tracking-[0.12em] text-stone-400">Width presets</p>
             <div className="mb-2 flex items-center gap-1">
               <input
                 value={presetName}
                 onChange={(e) => setPresetName(e.target.value)}
                 placeholder="preset name"
-                className="h-6 flex-1 rounded border border-stone-200/15 bg-[#061512] px-2 text-xs text-stone-100"
+                className="h-6 flex-1 rounded border border-stone-200/15 bg-[rgb(var(--pm-rail))] px-2 text-xs text-stone-100"
               />
               <button
                 onClick={savePreset}

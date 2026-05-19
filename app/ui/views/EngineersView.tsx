@@ -125,7 +125,7 @@ interface PlaygroundResult {
 // ── Shared UI ─────────────────────────────────────────────────────────────────
 
 const inputCls =
-  'w-full border border-stone-200/20 bg-[#03100f] px-3 py-2 text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35 placeholder:text-stone-600';
+  'w-full border border-stone-200/20 bg-[rgb(var(--pm-input))] px-3 py-2 text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35 placeholder:text-stone-600';
 
 function FormField({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -343,7 +343,7 @@ function DetailPanel({ role, agents, onSave, onDelete }: DetailPanelProps) {
       </FormField>
 
       {/* ── AI Provider Test ──────────────────────────────────────────────── */}
-      <div className="space-y-3 border border-cyan-300/15 bg-[#04201d]/55 p-3">
+      <div className="space-y-3 border border-cyan-300/15 bg-[rgb(var(--pm-card-3))]/55 p-3">
         <div className="flex items-center gap-2">
           <Sparkles size={13} className="text-cyan-300/80" />
           <span className="text-[11px] uppercase tracking-[0.14em] text-cyan-200/85">
@@ -461,7 +461,7 @@ function DetailPanel({ role, agents, onSave, onDelete }: DetailPanelProps) {
         </div>
 
         {testResult && (
-          <div className="border border-stone-200/12 bg-[#020908] px-3 py-2 text-[11px]">
+          <div className="border border-stone-200/12 bg-[rgb(var(--pm-deep))] px-3 py-2 text-[11px]">
             <div className="mb-1 flex flex-wrap items-center gap-3 text-stone-500">
               <span>
                 {testResult.error ? (
@@ -521,7 +521,7 @@ function DetailPanel({ role, agents, onSave, onDelete }: DetailPanelProps) {
           <button
             onClick={handleSave}
             disabled={!dirty}
-            className="bg-stone-100 px-4 py-1.5 text-xs font-medium text-[#071d1a] hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
+            className="bg-stone-100 px-4 py-1.5 text-xs font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Save
           </button>
@@ -588,7 +588,7 @@ export function EngineersView({ roles, agents, onRolesChange }: EngineersViewPro
         </p>
       </div>
 
-      <div className="mb-4 border border-stone-200/12 bg-[#071d1a]/72 p-3">
+      <div className="mb-4 border border-stone-200/12 bg-[rgb(var(--pm-panel))]/72 p-3">
         <div className="mb-2 flex items-center gap-2">
           <Workflow size={13} className="text-stone-400" />
           <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">
@@ -600,7 +600,7 @@ export function EngineersView({ roles, agents, onRolesChange }: EngineersViewPro
         </div>
         <div className="grid gap-2 md:grid-cols-3">
           {DEFAULT_AGENT_WORKFLOWS.map((workflow) => (
-            <div key={workflow.id} className="border border-stone-200/10 bg-[#03100f]/50 p-2">
+            <div key={workflow.id} className="border border-stone-200/10 bg-[rgb(var(--pm-input))]/50 p-2">
               <div className="flex items-center gap-2">
                 <span className="truncate text-xs font-medium text-stone-200">
                   {workflow.name}
@@ -618,7 +618,7 @@ export function EngineersView({ roles, agents, onRolesChange }: EngineersViewPro
       </div>
 
       {/* Master-detail layout — fixed viewport height so both panels scroll independently */}
-      <div className="flex h-[calc(100vh-22rem)] min-h-[34rem] gap-0 border border-stone-200/18 bg-[#071d1a]/72">
+      <div className="flex h-[calc(100vh-22rem)] min-h-[34rem] gap-0 border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72">
         {/* Left — role list */}
         <div className="flex w-60 shrink-0 flex-col border-r border-stone-200/15">
           <div className="flex items-center gap-2 border-b border-stone-200/12 px-3 py-2.5">

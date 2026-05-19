@@ -23,7 +23,7 @@ interface RawConfig {
   [key: string]: unknown;
 }
 
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 5;
 
 export function migrateConfig(raw: unknown): ProjectManagerConfig {
   const cfg = (raw && typeof raw === 'object' ? (raw as RawConfig) : {}) as RawConfig;
@@ -32,6 +32,7 @@ export function migrateConfig(raw: unknown): ProjectManagerConfig {
   if (version < 2) next = migrate_1_to_2(next);
   if (version < 3) next = migrate_2_to_3(next);
   if (version < 4) next = migrate_3_to_4(next);
+  if (version < 5) next = migrate_4_to_5(next);
   // Cast through unknown: `RawConfig` is intentionally a permissive bag,
   // and the migration steps above are responsible for ensuring the result
   // matches `ProjectManagerConfig`.
@@ -93,6 +94,55 @@ function migrate_3_to_4(cfg: RawConfig): RawConfig {
     schemaVersion: 4,
     features,
   };
+}
+
+/**
+ * v4 → v5: splits README file pointers from free-form notes.
+ *
+ * Historically `Feature.notes` was used for both short text and README paths,
+ * which caused UI code to try opening prose as a filesystem path. v5 adds
+ * `readmePath` as the canonical README pointer and keeps `notes` for text.
+ */
+function migrate_4_to_5(cfg: RawConfig): RawConfig {
+  const features = Array.isArray(cfg.features)
+    ? (cfg.features as Feature[]).map((f) => {
+        const legacyNotes = typeof f.notes === 'string' ? f.notes.trim() : undefined;
+        const readmePath =
+          (f as Feature & { readmePath?: string }).readmePath ??
+          (legacyNotes && looksLikeReadmePath(legacyNotes) ? legacyNotes : undefined) ??
+          (f.paths?.spec && looksLikeReadmePath(f.paths.spec) ? f.paths.spec : undefined) ??
+          (f.paths?.featureFolder ? `${f.paths.featureFolder.replace(/\/?$/, '/')}README.md` : undefined);
+        const summary =
+          legacyNotes && looksLikeReadmePath(legacyNotes)
+            ? stringFromMetadata(f.metadata, 'notesSummary')
+            : legacyNotes || undefined;
+        const paths =
+          f.paths?.spec && looksLikeReadmePath(f.paths.spec)
+            ? { ...f.paths, spec: undefined }
+            : f.paths;
+        return {
+          ...f,
+          paths,
+          readmePath,
+          notes: summary,
+        };
+      })
+    : [];
+  return {
+    ...cfg,
+    schemaVersion: 5,
+    features,
+  };
+}
+
+function looksLikeReadmePath(value: string): boolean {
+  return /(^|\/)README\.md$/i.test(value.trim());
+}
+
+function stringFromMetadata(metadata: unknown, key: string): string | undefined {
+  if (!metadata || typeof metadata !== 'object') return undefined;
+  const value = (metadata as Record<string, unknown>)[key];
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
 /**

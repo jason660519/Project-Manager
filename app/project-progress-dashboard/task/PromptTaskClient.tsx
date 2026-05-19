@@ -96,7 +96,7 @@ export function PromptTaskClient() {
 
 function Frame({ children }: { children: React.ReactNode }) {
   return (
-    <main className="min-h-screen bg-[#071b18] text-stone-100">
+    <main className="min-h-screen bg-[rgb(var(--pm-bg-rgb))] text-stone-100">
       <div className="mx-auto max-w-3xl p-6">{children}</div>
     </main>
   );
@@ -202,7 +202,7 @@ function PromptTaskEditor({ row }: { row: ResolvedRow }) {
   const cancel = useCallback(() => { cancelRef.current = true; }, []);
 
   return (
-    <main className="min-h-screen bg-[#071b18] text-stone-100">
+    <main className="min-h-screen bg-[rgb(var(--pm-bg-rgb))] text-stone-100">
       <div className="mx-auto max-w-3xl space-y-4 p-6">
         <Link href="/project-progress-dashboard" className="inline-flex items-center gap-1 text-emerald-300 text-sm">
           <ArrowLeft size={14} /> Back to dashboard
@@ -214,14 +214,14 @@ function PromptTaskEditor({ row }: { row: ResolvedRow }) {
           </p>
         </header>
 
-        <section className="space-y-3 rounded border border-stone-200/15 bg-[#0a2622]/70 p-4">
+        <section className="space-y-3 rounded border border-stone-200/15 bg-[rgb(var(--pm-card))]/70 p-4">
           <label className="block">
             <span className="mb-1 block text-[10px] uppercase tracking-[0.12em] text-stone-400">Prompt body</span>
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={8}
-              className="w-full rounded border border-stone-200/15 bg-[#020a09]/95 p-2 text-xs text-stone-100 focus:outline-none focus:border-emerald-400/40"
+              className="w-full rounded border border-stone-200/15 bg-[rgb(var(--pm-code))]/95 p-2 text-xs text-stone-100 focus:outline-none focus:border-emerald-400/40"
             />
           </label>
           <div className="grid grid-cols-2 gap-3">
@@ -230,7 +230,7 @@ function PromptTaskEditor({ row }: { row: ResolvedRow }) {
               <select
                 value={agentId}
                 onChange={(e) => setAgentId(e.target.value)}
-                className="h-7 w-full rounded border border-stone-200/15 bg-[#061512] px-2 text-xs text-stone-100"
+                className="h-7 w-full rounded border border-stone-200/15 bg-[rgb(var(--pm-rail))] px-2 text-xs text-stone-100"
               >
                 {row.agents.length === 0 && <option value="">(no agents configured)</option>}
                 {row.agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
@@ -242,7 +242,7 @@ function PromptTaskEditor({ row }: { row: ResolvedRow }) {
                 type="number" min={1} max={50}
                 value={maxIterations}
                 onChange={(e) => setMaxIterations(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
-                className="h-7 w-full rounded border border-stone-200/15 bg-[#061512] px-2 text-xs text-stone-100"
+                className="h-7 w-full rounded border border-stone-200/15 bg-[rgb(var(--pm-rail))] px-2 text-xs text-stone-100"
               />
             </label>
           </div>
@@ -257,7 +257,7 @@ function PromptTaskEditor({ row }: { row: ResolvedRow }) {
               onChange={(e) => setStopCondition(e.target.value)}
               disabled={!autoLoop}
               placeholder="substring match against run output"
-              className="h-7 w-full rounded border border-stone-200/15 bg-[#061512] px-2 text-xs text-stone-100 disabled:opacity-40"
+              className="h-7 w-full rounded border border-stone-200/15 bg-[rgb(var(--pm-rail))] px-2 text-xs text-stone-100 disabled:opacity-40"
             />
           </label>
 
@@ -286,7 +286,7 @@ function PromptTaskEditor({ row }: { row: ResolvedRow }) {
         </section>
 
         {iterations.length > 0 && (
-          <section className="rounded border border-stone-200/15 bg-[#0a2622]/70 p-4">
+          <section className="rounded border border-stone-200/15 bg-[rgb(var(--pm-card))]/70 p-4">
             <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-stone-100 mb-2">
               Iterations ({iterations.length})
             </h2>

@@ -17,7 +17,7 @@ export function MetricStrip({ items }: MetricStripProps) {
   return (
     <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
       {items.map((item) => (
-        <div key={item.label} className="border border-stone-200/18 bg-[#08231f]/72">
+        <div key={item.label} className="border border-stone-200/18 bg-[rgb(var(--pm-card-2))]/72">
           <div className="flex items-center justify-between border-b border-stone-200/12 px-4 py-3">
             <h2 className="text-sm font-medium uppercase tracking-[0.16em] text-stone-100">{item.label}</h2>
             <div className="text-stone-300/70">{item.icon}</div>

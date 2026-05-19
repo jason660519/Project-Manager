@@ -205,7 +205,7 @@ const ALL_PLATFORM_TEMPLATES: Array<{ platform: ChannelPlatform; defaultLabel: s
 // ── Shared UI helpers ─────────────────────────────────────────────────────────
 
 const inputCls =
-  'w-full border border-stone-200/20 bg-[#03100f] px-3 py-2 text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35 placeholder:text-stone-600';
+  'w-full border border-stone-200/20 bg-[rgb(var(--pm-input))] px-3 py-2 text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35 placeholder:text-stone-600';
 
 function uid(): string {
   return typeof crypto !== 'undefined'
@@ -251,7 +251,7 @@ function SaveCancelRow({ onSave, onCancel }: { onSave: () => void; onCancel: () 
       </button>
       <button
         onClick={onSave}
-        className="bg-stone-100 px-3 py-1.5 text-xs font-medium text-[#071d1a] hover:bg-amber-100"
+        className="bg-stone-100 px-3 py-1.5 text-xs font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100"
       >
         Save
       </button>
@@ -350,7 +350,7 @@ function ChannelForm({
     onChange({ ...form, showSecrets: { ...form.showSecrets, [key]: !form.showSecrets[key] } });
 
   return (
-    <div className="space-y-4 bg-[#061512]/60 p-4">
+    <div className="space-y-4 bg-[rgb(var(--pm-rail))]/60 p-4">
       {/* Top row: label + mode */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FormField label="Channel Label">
@@ -530,7 +530,7 @@ function ChannelsSection({
   };
 
   return (
-    <section className="border border-stone-200/18 bg-[#071d1a]/72">
+    <section className="border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72">
       <SectionHeader icon={Radio} title="Channels" count={channels.length} color="text-emerald-300" />
 
       <div className="divide-y divide-stone-200/8">
@@ -677,7 +677,7 @@ function CommandMappingsSection({
     onChange(mappings.map((m) => (m.id === id ? { ...m, enabled: !m.enabled } : m)));
 
   return (
-    <section className="border border-stone-200/18 bg-[#071d1a]/72">
+    <section className="border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72">
       <SectionHeader icon={Zap} title="Command Mappings" count={mappings.filter((m) => m.enabled).length} color="text-amber-300" />
 
       <div className="divide-y divide-stone-200/8">
@@ -733,7 +733,7 @@ function CommandMappingsSection({
 
 function SetupGuideSection() {
   return (
-    <section className="border border-stone-200/18 bg-[#071d1a]/72">
+    <section className="border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72">
       <SectionHeader icon={MessageCircle} title="Getting Started" count={0} color="text-stone-400" />
       <div className="space-y-4 p-4">
         <div>
@@ -775,7 +775,7 @@ function RecentActivitySection({
     channels.find((c) => c.id === channelId)?.label ?? channelId.slice(0, 6);
 
   return (
-    <section className="border border-stone-200/18 bg-[#071d1a]/72">
+    <section className="border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72">
       <SectionHeader icon={MessageCircle} title="Recent Activity" count={messages.length} color="text-stone-400" />
       <div className="max-h-72 overflow-y-auto">
         {messages.length === 0 ? (

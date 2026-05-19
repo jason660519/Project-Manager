@@ -26,7 +26,7 @@ function MermaidBlock({ code }: { code: string }) {
       mermaid.initialize({
         startOnLoad: false,
         theme: 'dark',
-        themeVariables: { background: 'transparent', primaryColor: '#6ee7b7', lineColor: '#6ee7b7' },
+        themeVariables: { background: 'transparent', primaryColor: 'rgb(110 231 183)', lineColor: 'rgb(110 231 183)' },
       });
       mermaid.render(`mg-${id}`, code)
         .then(({ svg }) => {

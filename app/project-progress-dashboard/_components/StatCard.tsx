@@ -18,7 +18,7 @@ interface StatCardProps {
 export function StatCard({ label, value, subValue, icon: Icon, bgClass, colorClass, compact = false }: StatCardProps) {
   if (compact) {
     return (
-      <div className="flex items-center gap-2 rounded border border-stone-200/15 bg-[#0a2622]/70 px-2 py-1">
+      <div className="flex items-center gap-2 rounded border border-stone-200/15 bg-[rgb(var(--pm-card))]/70 px-2 py-1">
         <div className={clsx('flex h-7 w-7 items-center justify-center rounded', bgClass)}>
           <Icon className={clsx('h-3.5 w-3.5', colorClass)} />
         </div>
@@ -33,7 +33,7 @@ export function StatCard({ label, value, subValue, icon: Icon, bgClass, colorCla
     );
   }
   return (
-    <div className="flex items-center gap-4 rounded border border-stone-200/15 bg-[#0a2622]/70 px-4 py-3">
+    <div className="flex items-center gap-4 rounded border border-stone-200/15 bg-[rgb(var(--pm-card))]/70 px-4 py-3">
       <div className={clsx('flex h-12 w-12 items-center justify-center rounded', bgClass)}>
         <Icon className={clsx('h-5 w-5', colorClass)} />
       </div>

@@ -158,7 +158,7 @@ export function CronJobsView({ cronJobs, cronHistory, onCronJobsChange }: CronJo
         ].map(({ label, value }) => (
           <div
             key={label}
-            className="border border-stone-200/12 bg-[#071d1a]/60 px-4 py-3"
+            className="border border-stone-200/12 bg-[rgb(var(--pm-panel))]/60 px-4 py-3"
           >
             <p className="text-[10px] uppercase tracking-[0.16em] text-stone-500">{label}</p>
             <p className="mt-1 text-sm font-semibold text-stone-100">{value}</p>
@@ -288,7 +288,7 @@ export function CronJobsView({ cronJobs, cronHistory, onCronJobsChange }: CronJo
       {/* Create / Edit form panel */}
       {showForm && (
         <div className="fixed inset-0 z-40 flex items-start justify-end bg-black/40">
-          <div className="flex h-full w-[420px] flex-col border-l border-stone-200/15 bg-[#061512]">
+          <div className="flex h-full w-[420px] flex-col border-l border-stone-200/15 bg-[rgb(var(--pm-rail))]">
             <div className="flex items-center justify-between border-b border-stone-200/15 px-5 py-4">
               <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-100">
                 {editingId ? 'Edit Job' : 'New Job'}
@@ -378,7 +378,7 @@ export function CronJobsView({ cronJobs, cronHistory, onCronJobsChange }: CronJo
                   <div className="flex-1">
                     <label className="mb-1 block text-[11px] text-stone-400">Unit</label>
                     <select
-                      className="w-full border border-stone-200/15 bg-[#061512] px-3 py-2 text-xs text-stone-100 focus:border-stone-200/40 focus:outline-none"
+                      className="w-full border border-stone-200/15 bg-[rgb(var(--pm-rail))] px-3 py-2 text-xs text-stone-100 focus:border-stone-200/40 focus:outline-none"
                       value={form.schedule.unit}
                       onChange={(e) =>
                         setForm((f) => ({

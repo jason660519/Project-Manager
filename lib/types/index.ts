@@ -1,6 +1,7 @@
 export type FeatureStatus = 'todo' | 'in_progress' | 'done' | 'on_hold';
-export type AdapterType = 'ide' | 'agent';
-export type IDEId = 'Cursor' | 'VSCode' | 'Trae' | 'Antigravity';
+export type AdapterType = 'ide' | 'agent' | 'app';
+export type ExecutionTargetKind = 'ide' | 'agent-cli' | 'agent-app';
+export type IDEId = 'Cursor' | 'VSCode' | 'Trae' | 'Antigravity' | 'Kiro';
 
 // ── Project-progress phase model (schema v3) ─────────────────────────────────
 export type FeaturePhase = 'development' | 'e2e_testing' | 'deployment' | 'operations';
@@ -13,6 +14,10 @@ export interface FeaturePromptConfig {
   body?: string;
   /** Which adapter id to dispatch with (matches AdapterConfig.agents[].id). */
   agentId?: string;
+  /** LLM provider/company selected for this dispatch. */
+  modelProviderId?: string;
+  /** Concrete model id selected for this dispatch. */
+  modelId?: string;
   /** When true, the runner re-fires the prompt until stopCondition matches. */
   autoLoop?: boolean;
   /** Stop condition for the auto-loop: substring match against the last run output. */
@@ -45,8 +50,10 @@ export interface Feature {
   status: FeatureStatus;
   progress: number;
   paths: FeaturePaths;
-  /** Relative path to the feature's notes document (e.g. `.project-manager/features/F01/README.md`). */
+  /** Short human-authored summary or note. File pointers belong in readmePath / paths. */
   notes?: string;
+  /** Relative path to the feature overview README (e.g. `.project-manager/features/F01/README.md`). */
+  readmePath?: string;
   // ── Sync audit fields (schema v2, ADR-006) ─────────────────────────────
   /** ISO 8601 timestamp set when the feature was first created. */
   createdAt?: string;
@@ -98,6 +105,8 @@ export interface AdapterDescriptor {
   id: string;
   name: string;
   type: AdapterType;
+  /** UI/behavior class for dispatch targets. Defaults from `type` when omitted. */
+  targetKind?: ExecutionTargetKind;
 }
 
 export interface IDEAdapterConfig extends AdapterDescriptor {
@@ -107,6 +116,14 @@ export interface IDEAdapterConfig extends AdapterDescriptor {
 
 export interface AgentAdapterConfig extends AdapterDescriptor {
   type: 'agent';
+  targetKind?: 'agent-cli';
+  command: string;
+  argsTemplate: string[];
+}
+
+export interface AgentAppAdapterConfig extends AdapterDescriptor {
+  type: 'app';
+  targetKind?: 'agent-app';
   command: string;
   argsTemplate: string[];
 }
@@ -114,6 +131,7 @@ export interface AgentAdapterConfig extends AdapterDescriptor {
 export interface AdapterConfig {
   ides: IDEAdapterConfig[];
   agents: AgentAdapterConfig[];
+  apps?: AgentAppAdapterConfig[];
 }
 
 export interface RuntimeAdapter extends AdapterDescriptor {
@@ -137,10 +155,10 @@ export interface ExecutionResult {
   pid?: number;
 }
 
-export type AnyAdapterConfig = IDEAdapterConfig | AgentAdapterConfig;
+export type AnyAdapterConfig = IDEAdapterConfig | AgentAdapterConfig | AgentAppAdapterConfig;
 
 export interface ProjectManagerConfig {
-  /** Increment when making breaking changes to the config structure. Current: 3 */
+  /** Increment when making breaking changes to the config structure. Current: 5 */
   schemaVersion: number;
   engineerRoles?: EngineerRole[];
   // ── Sync identity + audit fields (schema v2, ADR-006) ──────────────────
@@ -178,7 +196,7 @@ export interface EngineerRole {
   testPrompt?: string;
 }
 
-export type ViewId = 'dashboard' | 'features' | 'projects' | 'project-files' | 'plugins' | 'settings' | 'keyboard-shortcuts' | 'engineers' | 'channels' | 'sessions' | 'cron-jobs' | 'logs' | 'keys' | 'documentation';
+export type ViewId = 'dashboard' | 'features' | 'projects' | 'project-files' | 'plugins' | 'settings' | 'engineers' | 'channels' | 'sessions' | 'cron-jobs' | 'logs' | 'keys' | 'documentation';
 
 export type IssueState = 'open' | 'closed';
 

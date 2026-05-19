@@ -1,7 +1,7 @@
 # Storage and Schema
 
-> Status: Active  
-> Last updated: 2026-05-15  
+> Status: Active
+> Last updated: 2026-05-19
 > Primary files: `lib/storage/*`, `lib/types/index.ts`, `schema/project-manager.schema.json`, `config/samples/*`
 
 ---
@@ -10,7 +10,7 @@
 
 ## 1. Source of Truth
 
-Project Manager uses project-scoped `.project-manager.json` documents as the long-term source of truth. UI state and imported project lists can be cached locally, but the project config format is owned by:
+Project Manager uses project-scoped `.project-manager/config.json` documents as the long-term source of truth. UI state and imported project lists can be cached locally, but the project config format is owned by:
 
 1. `lib/types/index.ts`
 2. `schema/project-manager.schema.json`
@@ -21,7 +21,7 @@ Any schema change must update all four.
 
 ## 2. Schema Version
 
-Current schema version: `2`.
+Current schema version: `5`.
 
 Schema v2 adds:
 
@@ -36,6 +36,15 @@ Schema v2 adds:
 | Feature | `updatedBy` | Reserved editor identity. |
 
 The decision is recorded in [ADR-006](../architecture/ADR-006-schema-v2-sync-fields.md).
+
+Schema v5 separates README file pointers from free-form notes:
+
+| Scope | Field | Purpose |
+| --- | --- | --- |
+| Feature | `readmePath` | Relative path to the feature overview README. |
+| Feature | `notes` | Short human-authored summary or note; never a file path. |
+
+Migration v5 moves legacy README paths out of `notes` and removes README paths that were incorrectly stored in `paths.spec`.
 
 ## 3. Migration Pipeline
 
@@ -97,7 +106,7 @@ Before changing schema or storage:
 
 ## 1. Source of Truth
 
-Project Manager 以專案內的 `.project-manager.json` 作為長期 source of truth。UI state 與 imported project list 可以在本機快取，但 project config format 由以下檔案共同定義：
+Project Manager 以專案內的 `.project-manager/config.json` 作為長期 source of truth。UI state 與 imported project list 可以在本機快取，但 project config format 由以下檔案共同定義：
 
 1. `lib/types/index.ts`
 2. `schema/project-manager.schema.json`
@@ -108,7 +117,7 @@ Project Manager 以專案內的 `.project-manager.json` 作為長期 source of t
 
 ## 2. Schema Version
 
-目前 schema version：`2`。
+目前 schema version：`5`。
 
 Schema v2 新增：
 
@@ -123,6 +132,15 @@ Schema v2 新增：
 | Feature | `updatedBy` | 預留 editor identity。 |
 
 決策記錄在 [ADR-006](../architecture/ADR-006-schema-v2-sync-fields.md)。
+
+Schema v5 將 README 檔案指標與自由文字 notes 拆開：
+
+| 範圍 | 欄位 | 用途 |
+| --- | --- | --- |
+| Feature | `readmePath` | 指向 feature overview README 的相對路徑。 |
+| Feature | `notes` | 短文字摘要或人工備註；不可存檔案路徑。 |
+
+v5 migration 會把舊 `notes` 內的 README path 搬到 `readmePath`，並移除誤放在 `paths.spec` 的 README path。
 
 ## 3. Migration Pipeline
 

@@ -154,7 +154,7 @@ export function buildRecoveredProjectConfig(
         status,
         progress: normalizeProgress(extractLineValue(doc.content, 'Progress'), status),
         paths,
-        notes: doc.relativePath,
+        readmePath: doc.relativePath,
         createdAt: doc.createdAt ?? doc.updatedAt ?? now,
         updatedAt: doc.updatedAt ?? now,
         phase: 'development',
@@ -259,6 +259,10 @@ export function mergeProjectConfig(
         (existing.adapters?.agents?.length ?? 0) > 0
           ? existing.adapters!.agents
           : scaffold.adapters.agents,
+      apps:
+        (existing.adapters?.apps?.length ?? 0) > 0
+          ? existing.adapters!.apps
+          : scaffold.adapters.apps,
     },
   });
   return migrateConfig(next);

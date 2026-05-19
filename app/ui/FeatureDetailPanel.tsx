@@ -56,7 +56,7 @@ export function FeatureDetailPanel({
   const hasPaths = Object.values(feature.paths).some(Boolean);
 
   return (
-    <aside className="flex flex-col border border-stone-200/18 bg-[#071d1a]/72">
+    <aside className="flex flex-col border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72">
       {/* Header */}
       <div className="flex items-start justify-between border-b border-stone-200/12 px-4 py-3">
         <div className="min-w-0 flex-1">
@@ -107,7 +107,7 @@ export function FeatureDetailPanel({
               <span className="text-[11px] uppercase tracking-[0.14em] text-emerald-300">Running</span>
               <span className="ml-auto font-mono text-xs text-stone-500">PID {activeRun.pid}</span>
             </div>
-            <div className="max-h-24 overflow-auto border border-stone-200/12 bg-[#03100f] p-2">
+            <div className="max-h-24 overflow-auto border border-stone-200/12 bg-[rgb(var(--pm-input))] p-2">
               <div className="font-mono text-xs leading-4 text-stone-300">
                 {activeRun.logs.length === 0 ? (
                   <span className="animate-pulse text-stone-500">Waiting…</span>

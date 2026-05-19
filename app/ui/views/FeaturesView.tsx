@@ -124,7 +124,7 @@ export function FeaturesView({
                 onClick={() => setStatusFilter(opt.value)}
                 className={`border-r border-stone-200/18 px-3 py-2 text-xs uppercase tracking-[0.14em] transition-colors last:border-r-0 ${
                   statusFilter === opt.value
-                    ? 'bg-stone-100 font-medium text-[#071d1a]'
+                    ? 'bg-stone-100 font-medium text-[rgb(var(--pm-panel))]'
                     : 'text-stone-400 hover:bg-white/5 hover:text-stone-100'
                 }`}
               >
@@ -160,14 +160,14 @@ export function FeaturesView({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search..."
-            className="w-48 border border-stone-200/18 bg-[#071d1a]/50 py-1.5 pl-8 pr-3 text-xs text-stone-200 outline-none placeholder:text-stone-500 focus:ring-1 focus:ring-emerald-300/35"
+            className="w-48 border border-stone-200/18 bg-[rgb(var(--pm-panel))]/50 py-1.5 pl-8 pr-3 text-xs text-stone-200 outline-none placeholder:text-stone-500 focus:ring-1 focus:ring-emerald-300/35"
           />
         </div>
       </div>
 
       {/* Table + Detail Panel */}
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="min-w-0 border border-stone-200/18 bg-[#071d1a]/72">
+        <div className="min-w-0 border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72">
           <TableCore
             data={filtered}
             onRowClick={(f) => setSelectedFeature(f === selectedFeature ? null : f)}

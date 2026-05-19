@@ -31,7 +31,7 @@ src-tauri/.cargo/
 !.project-manager/dev-logs/
 !.project-manager/dev-logs/.gitkeep
 !.project-manager/dev-logs/*.md
-.project-manager/config.before-init-*.json
+.project-manager/config.before-*.json
 .project-manager/config.generated-*.backup.json
 .project-manager/bin/
 .project-manager/dev-logs/*.log

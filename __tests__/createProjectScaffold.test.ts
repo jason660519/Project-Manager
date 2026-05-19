@@ -99,7 +99,7 @@ describe('dashboard artifact recovery', () => {
       status: 'done',
       progress: 100,
       category: 'Frontend/UI',
-      notes: '.project-manager/features/F01/README.md',
+      readmePath: '.project-manager/features/F01/README.md',
       paths: {
         featureFolder: '.project-manager/features/F01/',
         implementation: 'app/ui/Sidebar.tsx',

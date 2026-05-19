@@ -237,7 +237,7 @@ function CoverageSection({ features, projectRoot }: { features: Feature[]; proje
   ];
 
   return (
-    <section className="border border-stone-200/15 bg-[#071d1a]/72">
+    <section className="border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72">
       <div className="flex items-center gap-2 border-b border-stone-200/12 px-4 py-2.5">
         <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-200">
           Feature → File Coverage
@@ -484,7 +484,7 @@ function ProjectPanel({ project }: { project: ProjectEntry }) {
       <CoverageSection features={features} projectRoot={root} />
 
       {/* File Tree Panel */}
-      <section className="border border-stone-200/15 bg-[#071d1a]/72">
+      <section className="border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72">
         {/* Header */}
         <div className="flex flex-wrap items-center gap-2 border-b border-stone-200/12 px-4 py-2.5">
           <FolderOpen size={14} className="shrink-0 text-amber-200/70" />
@@ -501,7 +501,7 @@ function ProjectPanel({ project }: { project: ProjectEntry }) {
             <select
               value={filterFeatureId ?? ''}
               onChange={(e) => setFilterFeatureId(e.target.value || null)}
-              className="appearance-none border border-stone-200/15 bg-[#03100f] py-1 pl-6 pr-6 text-[10px] text-stone-300 outline-none focus:ring-1 focus:ring-emerald-300/35"
+              className="appearance-none border border-stone-200/15 bg-[rgb(var(--pm-input))] py-1 pl-6 pr-6 text-[10px] text-stone-300 outline-none focus:ring-1 focus:ring-emerald-300/35"
             >
               <option value="">All Features</option>
               {features.map((f) => (
@@ -519,7 +519,7 @@ function ProjectPanel({ project }: { project: ProjectEntry }) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search…"
-              className="w-32 border border-stone-200/15 bg-[#03100f] py-1 pl-6 pr-2 text-[10px] text-stone-300 outline-none placeholder:text-stone-600 focus:ring-1 focus:ring-emerald-300/35"
+              className="w-32 border border-stone-200/15 bg-[rgb(var(--pm-input))] py-1 pl-6 pr-2 text-[10px] text-stone-300 outline-none placeholder:text-stone-600 focus:ring-1 focus:ring-emerald-300/35"
             />
           </div>
 

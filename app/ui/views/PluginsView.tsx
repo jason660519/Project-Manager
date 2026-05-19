@@ -87,17 +87,17 @@ const MARKETPLACE: MarketplacePlugin[] = [
   // AI Providers
   {
     id: 'anthropic', name: 'Anthropic', description: 'Access Claude models including Opus, Sonnet, and Haiku.',
-    category: 'ai', kind: 'provider', accentColor: 'bg-[#c47a3a]', initials: 'AN',
+    category: 'ai', kind: 'provider', accentColor: 'bg-[rgb(196_122_58)]', initials: 'AN',
     defaultProvider: { baseUrl: 'https://api.anthropic.com', defaultModel: 'claude-sonnet-4-6', models: ['claude-opus-4-7', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'] },
   },
   {
     id: 'openai', name: 'OpenAI', description: 'GPT-4o, o1, o3-mini and other OpenAI models.',
-    category: 'ai', kind: 'provider', accentColor: 'bg-[#10a37f]', initials: 'OA',
+    category: 'ai', kind: 'provider', accentColor: 'bg-[rgb(16_163_127)]', initials: 'OA',
     defaultProvider: { baseUrl: 'https://api.openai.com/v1', defaultModel: 'gpt-4o', models: ['gpt-4o', 'gpt-4o-mini', 'o1', 'o3-mini'] },
   },
   {
     id: 'google', name: 'Google Gemini', description: 'Gemini 2.5 Pro, Flash and Gemini 1.5 models.',
-    category: 'ai', kind: 'provider', accentColor: 'bg-[#4285f4]', initials: 'GG',
+    category: 'ai', kind: 'provider', accentColor: 'bg-[rgb(66_133_244)]', initials: 'GG',
     defaultProvider: { baseUrl: 'https://generativelanguage.googleapis.com/v1beta', defaultModel: 'gemini-2.0-flash', models: ['gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-pro'] },
   },
   {
@@ -108,12 +108,12 @@ const MARKETPLACE: MarketplacePlugin[] = [
   // Code CLIs
   {
     id: 'claude-code', name: 'Claude Code', description: 'Agentic CLI for software engineering tasks.',
-    category: 'dev', kind: 'cli', accentColor: 'bg-[#c47a3a]', initials: 'CC',
+    category: 'dev', kind: 'cli', accentColor: 'bg-[rgb(196_122_58)]', initials: 'CC',
     defaultCli: { command: 'claude', argsTemplate: ['--cwd', '{root}', '{prompt}'], providerId: 'anthropic' },
   },
   {
     id: 'codex', name: 'Codex CLI', description: 'OpenAI Codex command-line agent for code tasks.',
-    category: 'dev', kind: 'cli', accentColor: 'bg-[#10a37f]', initials: 'CX',
+    category: 'dev', kind: 'cli', accentColor: 'bg-[rgb(16_163_127)]', initials: 'CX',
     defaultCli: { command: 'codex', argsTemplate: ['exec', '--cwd', '{root}', '{prompt}'], providerId: 'openai' },
   },
   {
@@ -134,27 +134,27 @@ const MARKETPLACE: MarketplacePlugin[] = [
   // Editors
   {
     id: 'cursor', name: 'Cursor', description: 'AI-first code editor built on VS Code.',
-    category: 'dev', kind: 'editor', accentColor: 'bg-[#6b6cf6]', initials: 'CR',
+    category: 'dev', kind: 'editor', accentColor: 'bg-[rgb(107_108_246)]', initials: 'CR',
     defaultEditor: { command: 'cursor' },
   },
   {
     id: 'vscode', name: 'VS Code', description: 'Microsoft Visual Studio Code editor.',
-    category: 'dev', kind: 'editor', accentColor: 'bg-[#007acc]', initials: 'VS',
+    category: 'dev', kind: 'editor', accentColor: 'bg-[rgb(0_122_204)]', initials: 'VS',
     defaultEditor: { command: 'code' },
   },
   {
     id: 'zed', name: 'Zed', description: 'High-performance multiplayer code editor.',
-    category: 'dev', kind: 'editor', accentColor: 'bg-[#084ccd]', initials: 'ZD',
+    category: 'dev', kind: 'editor', accentColor: 'bg-[rgb(8_76_205)]', initials: 'ZD',
     defaultEditor: { command: 'zed' },
   },
   {
     id: 'trae', name: 'Trae', description: 'ByteDance AI-native code editor.',
-    category: 'dev', kind: 'editor', accentColor: 'bg-[#1a6b5c]', initials: 'TR',
+    category: 'dev', kind: 'editor', accentColor: 'bg-[rgb(26_107_92)]', initials: 'TR',
     defaultEditor: { command: 'trae' },
   },
   {
     id: 'antigravity', name: 'Antigravity', description: 'Antigravity AI-native IDE.',
-    category: 'dev', kind: 'editor', accentColor: 'bg-[#2b2540]', initials: 'AG',
+    category: 'dev', kind: 'editor', accentColor: 'bg-[rgb(43_37_64)]', initials: 'AG',
     defaultEditor: { command: 'antigravity' },
   },
   // MCP servers
@@ -165,12 +165,12 @@ const MARKETPLACE: MarketplacePlugin[] = [
   },
   {
     id: 'mcp-chrome', name: 'Chrome MCP', description: 'Drive a Chrome browser so the AI can navigate, click, and read pages.',
-    category: 'dev', kind: 'mcp', accentColor: 'bg-[#4285f4]', initials: 'CM',
+    category: 'dev', kind: 'mcp', accentColor: 'bg-[rgb(66_133_244)]', initials: 'CM',
     defaultMcp: { transport: 'stdio', command: 'npx', args: ['-y', 'chrome-mcp-server'] },
   },
   {
     id: 'mcp-slack', name: 'Slack MCP', description: 'Post messages and read channels via the Slack MCP server.',
-    category: 'notify', kind: 'mcp', accentColor: 'bg-[#4a154b]', initials: 'SM',
+    category: 'notify', kind: 'mcp', accentColor: 'bg-[rgb(74_21_75)]', initials: 'SM',
     defaultMcp: { transport: 'stdio', command: 'npx', args: ['-y', '@modelcontextprotocol/server-slack'], env: { SLACK_BOT_TOKEN: '' } },
   },
   // Future integrations (placeholder — kept as CLIs for back-compat; future phases may reclassify as MCP)
@@ -181,17 +181,17 @@ const MARKETPLACE: MarketplacePlugin[] = [
   },
   {
     id: 'linear', name: 'Linear', description: 'Pull issues and cycles into Project Manager features.',
-    category: 'pm', kind: 'cli', accentColor: 'bg-[#5e6ad2]', initials: 'LN',
+    category: 'pm', kind: 'cli', accentColor: 'bg-[rgb(94_106_210)]', initials: 'LN',
     defaultCli: { command: 'linear', argsTemplate: [] },
   },
   {
     id: 'slack', name: 'Slack (CLI)', description: 'Slack CLI launcher (legacy — prefer the Slack MCP entry).',
-    category: 'notify', kind: 'cli', accentColor: 'bg-[#4a154b]', initials: 'SL',
+    category: 'notify', kind: 'cli', accentColor: 'bg-[rgb(74_21_75)]', initials: 'SL',
     defaultCli: { command: 'slack', argsTemplate: [] },
   },
   {
     id: 'sentry', name: 'Sentry', description: 'Import recent errors as engineering tasks.',
-    category: 'ci', kind: 'cli', accentColor: 'bg-[#fb4226]', initials: 'SE',
+    category: 'ci', kind: 'cli', accentColor: 'bg-[rgb(251_66_38)]', initials: 'SE',
     defaultCli: { command: 'sentry', argsTemplate: [] },
   },
 ];
@@ -271,7 +271,7 @@ function McpStatusPill({ status }: { status?: McpRunStatus }) {
 }
 
 const inputCls =
-  'w-full border border-stone-200/20 bg-[#03100f] px-3 py-2 text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35 placeholder:text-stone-600';
+  'w-full border border-stone-200/20 bg-[rgb(var(--pm-input))] px-3 py-2 text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35 placeholder:text-stone-600';
 
 // ─── Configure forms ───────────────────────────────────────────────────────────
 
@@ -299,7 +299,7 @@ function ProviderConfigForm({
       setForm((f) => ({ ...f, [k]: e.target.value }));
 
   return (
-    <div className="space-y-3 border-t border-stone-200/12 bg-[#061512]/60 p-4">
+    <div className="space-y-3 border-t border-stone-200/12 bg-[rgb(var(--pm-rail))]/60 p-4">
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">Base URL</label>
@@ -342,7 +342,7 @@ function ProviderConfigForm({
               form.apiKey,
             )
           }
-          className="bg-stone-100 px-3 py-1.5 text-xs font-medium text-[#071d1a] hover:bg-amber-100"
+          className="bg-stone-100 px-3 py-1.5 text-xs font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100"
         >
           Save
         </button>
@@ -373,7 +373,7 @@ function CliConfigForm({
       setForm((f) => ({ ...f, [k]: e.target.value }));
 
   return (
-    <div className="space-y-3 border-t border-stone-200/12 bg-[#061512]/60 p-4">
+    <div className="space-y-3 border-t border-stone-200/12 bg-[rgb(var(--pm-rail))]/60 p-4">
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">Command</label>
@@ -406,7 +406,7 @@ function CliConfigForm({
               providerId: form.providerId || undefined,
             })
           }
-          className="bg-stone-100 px-3 py-1.5 text-xs font-medium text-[#071d1a] hover:bg-amber-100"
+          className="bg-stone-100 px-3 py-1.5 text-xs font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100"
         >
           Save
         </button>
@@ -426,7 +426,7 @@ function EditorConfigForm({
 }) {
   const [command, setCommand] = useState(entry.command);
   return (
-    <div className="space-y-3 border-t border-stone-200/12 bg-[#061512]/60 p-4">
+    <div className="space-y-3 border-t border-stone-200/12 bg-[rgb(var(--pm-rail))]/60 p-4">
       <div className="space-y-1">
         <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">Command</label>
         <input value={command} onChange={(e) => setCommand(e.target.value)} className={`${inputCls} font-mono`} />
@@ -435,7 +435,7 @@ function EditorConfigForm({
         <button onClick={onCancel} className="px-3 py-1.5 text-xs text-stone-400 hover:text-stone-100">Cancel</button>
         <button
           onClick={() => onSave({ ...entry, command })}
-          className="bg-stone-100 px-3 py-1.5 text-xs font-medium text-[#071d1a] hover:bg-amber-100"
+          className="bg-stone-100 px-3 py-1.5 text-xs font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100"
         >
           Save
         </button>
@@ -484,7 +484,7 @@ function McpConfigForm({
   };
 
   return (
-    <div className="space-y-3 border-t border-stone-200/12 bg-[#061512]/60 p-4">
+    <div className="space-y-3 border-t border-stone-200/12 bg-[rgb(var(--pm-rail))]/60 p-4">
       <div className="space-y-3">
         <div className="space-y-1">
           <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">Command</label>
@@ -510,7 +510,7 @@ function McpConfigForm({
       </div>
       <div className="flex justify-end gap-2">
         <button onClick={onCancel} className="px-3 py-1.5 text-xs text-stone-400 hover:text-stone-100">Cancel</button>
-        <button onClick={handleSave} className="bg-stone-100 px-3 py-1.5 text-xs font-medium text-[#071d1a] hover:bg-amber-100">
+        <button onClick={handleSave} className="bg-stone-100 px-3 py-1.5 text-xs font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100">
           Save
         </button>
       </div>
@@ -566,7 +566,7 @@ function McpLogsViewer({ pluginId, onClose }: { pluginId: string; onClose: () =>
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-      <div className="flex w-full max-w-3xl flex-col overflow-hidden border border-stone-200/18 bg-[#071d1a] shadow-2xl">
+      <div className="flex w-full max-w-3xl flex-col overflow-hidden border border-stone-200/18 bg-[rgb(var(--pm-panel))] shadow-2xl">
         <div className="flex items-center justify-between border-b border-stone-200/12 bg-white/[0.035] px-6 py-4">
           <div>
             <h3 className="text-lg font-bold text-stone-50">MCP Logs</h3>
@@ -576,7 +576,7 @@ function McpLogsViewer({ pluginId, onClose }: { pluginId: string; onClose: () =>
             &times;
           </button>
         </div>
-        <div className="max-h-[60vh] min-h-[300px] overflow-auto bg-[#03100f] p-3 font-mono text-xs leading-5 text-stone-200">
+        <div className="max-h-[60vh] min-h-[300px] overflow-auto bg-[rgb(var(--pm-input))] p-3 font-mono text-xs leading-5 text-stone-200">
           {lines.length === 0 ? (
             <span className="text-stone-500">No log lines yet.</span>
           ) : (
@@ -594,7 +594,7 @@ function McpLogsViewer({ pluginId, onClose }: { pluginId: string; onClose: () =>
           >
             <FolderOpen size={12} /> Open log folder
           </button>
-          <button onClick={onClose} className="bg-stone-100 px-3 py-1.5 text-xs font-medium text-[#071d1a] hover:bg-amber-100">
+          <button onClick={onClose} className="bg-stone-100 px-3 py-1.5 text-xs font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100">
             Close
           </button>
         </div>
@@ -661,7 +661,7 @@ function InstalledTab({
   }
 
   return (
-    <div className="divide-y divide-stone-200/10 border border-stone-200/18 bg-[#071d1a]/72">
+    <div className="divide-y divide-stone-200/10 border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72">
       {rows.map((row) => {
         const id = row.id;
         const mp = marketplaceFor(id);
@@ -845,7 +845,7 @@ function MarketplaceTab({
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search plugins…"
-        className="w-full border border-stone-200/18 bg-[#071d1a]/72 px-4 py-2 text-sm text-stone-100 outline-none placeholder:text-stone-600 focus:ring-2 focus:ring-emerald-300/25"
+        className="w-full border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72 px-4 py-2 text-sm text-stone-100 outline-none placeholder:text-stone-600 focus:ring-2 focus:ring-emerald-300/25"
       />
 
       {/* Category filter */}
@@ -879,7 +879,7 @@ function MarketplaceTab({
                 className={`flex items-start gap-3 border p-4 transition-colors ${
                   installed
                     ? 'border-emerald-400/20 bg-emerald-950/30'
-                    : 'border-stone-200/18 bg-[#071d1a]/72 hover:border-stone-200/30'
+                    : 'border-stone-200/18 bg-[rgb(var(--pm-panel))]/72 hover:border-stone-200/30'
                 }`}
               >
                 <PluginLogo initials={mp.initials} accentColor={mp.accentColor} />
@@ -982,12 +982,12 @@ function SkillsTab({ skillsDir }: { skillsDir: string }) {
   const btnCls =
     'flex items-center gap-1.5 border border-stone-200/25 px-3 py-1.5 text-xs text-stone-300 hover:bg-white/5 disabled:opacity-50';
   const primaryCls =
-    'bg-stone-100 px-3 py-1.5 text-xs font-medium text-[#071d1a] hover:bg-amber-100 disabled:opacity-50';
+    'bg-stone-100 px-3 py-1.5 text-xs font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100 disabled:opacity-50';
 
   return (
     <div className="space-y-4">
       {/* Directory + actions */}
-      <div className="space-y-3 border border-stone-200/12 bg-[#061512]/60 p-4">
+      <div className="space-y-3 border border-stone-200/12 bg-[rgb(var(--pm-rail))]/60 p-4">
         <div>
           <p className="text-[11px] uppercase tracking-[0.14em] text-stone-500">Skills directory</p>
           <p className="mt-0.5 break-all font-mono text-xs text-stone-300">
@@ -1042,7 +1042,7 @@ function SkillsTab({ skillsDir }: { skillsDir: string }) {
       {skills.length === 0 ? (
         <p className="py-12 text-center text-sm text-stone-500">No skills found in this directory.</p>
       ) : (
-        <div className="divide-y divide-stone-200/10 border border-stone-200/18 bg-[#071d1a]/72">
+        <div className="divide-y divide-stone-200/10 border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72">
           {skills.map((s) => (
             <div key={s.absPath} className="flex items-center gap-3 px-4 py-3">
               <FallbackLogo kind="skill" size="sm" />

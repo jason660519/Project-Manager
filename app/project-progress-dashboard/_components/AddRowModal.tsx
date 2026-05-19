@@ -119,7 +119,7 @@ export function AddRowModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded border border-stone-200/20 bg-[#061512] p-4 shadow-2xl">
+      <div className="w-full max-w-md rounded border border-stone-200/20 bg-[rgb(var(--pm-rail))] p-4 shadow-2xl">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-stone-100">
             Add row · {phaseLabel}

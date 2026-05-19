@@ -107,7 +107,7 @@ function EditableText({
         e.stopPropagation();
       }}
       onClick={(e) => e.stopPropagation()}
-      className="h-6 w-20 rounded border border-emerald-300/40 bg-[#020a09]/95 px-1 text-xs text-stone-100 focus:outline-none"
+      className="h-6 w-20 rounded border border-emerald-300/40 bg-[rgb(var(--pm-code))]/95 px-1 text-xs text-stone-100 focus:outline-none"
     />
   );
 }
@@ -129,7 +129,7 @@ function EditableSelect<T extends string>({
       onChange={(e) => { e.stopPropagation(); handleChange(e.target.value); }}
       onClick={(e) => e.stopPropagation()}
       className={clsx(
-        'h-6 cursor-pointer rounded border bg-[#061512]/90 px-1.5 text-[11px] focus:outline-none focus:border-emerald-300/50',
+        'h-6 cursor-pointer rounded border bg-[rgb(var(--pm-rail))]/90 px-1.5 text-[11px] focus:outline-none focus:border-emerald-300/50',
         colour ?? 'border-stone-200/20 text-stone-200',
       )}
       title={display}
@@ -146,11 +146,22 @@ function EditableSelect<T extends string>({
 function PathCell({
   projectRoot,
   value,
+  label,
+  onOpenPanel,
 }: {
   projectRoot: string;
   value?: string;
+  label?: string;
+  onOpenPanel?: (absPath: string) => void;
 }) {
-  return <PathLink projectRoot={projectRoot} relPath={value} />;
+  return <PathLink projectRoot={projectRoot} relPath={value} label={label} onOpenPanel={onOpenPanel} />;
+}
+
+function devLogPath(value?: string): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  if (/\.md$/i.test(trimmed)) return trimmed;
+  return `${trimmed.replace(/\/?$/, '/')}dev-log.md`;
 }
 
 // ── Display helpers ─────────────────────────────────────────────────────────
@@ -235,7 +246,7 @@ function EditableProgressBar({
             e.stopPropagation();
           }}
           onClick={(e) => e.stopPropagation()}
-          className="h-6 w-14 rounded border border-emerald-300/40 bg-[#020a09]/95 px-1 text-right font-mono text-xs text-stone-100 focus:outline-none"
+          className="h-6 w-14 rounded border border-emerald-300/40 bg-[rgb(var(--pm-code))]/95 px-1 text-right font-mono text-xs text-stone-100 focus:outline-none"
         />
       </div>
     );
@@ -383,7 +394,7 @@ function PhaseSwitch({ row, onChange }: { row: PhaseRow; onChange: (p: FeaturePh
       value={current}
       onChange={(e) => { e.stopPropagation(); onChange(e.target.value as FeaturePhase); }}
       onClick={(e) => e.stopPropagation()}
-      className="h-6 rounded border border-stone-200/20 bg-[#061512]/90 px-1.5 text-[10px] uppercase tracking-[0.08em] text-stone-200 hover:border-emerald-300/40"
+      className="h-6 rounded border border-stone-200/20 bg-[rgb(var(--pm-rail))]/90 px-1.5 text-[10px] uppercase tracking-[0.08em] text-stone-200 hover:border-emerald-300/40"
       title="Move feature to another phase"
     >
       <option value="development">DEV</option>
@@ -429,18 +440,19 @@ const STATUS_OPTIONS = [
 
 function NotesCell({
   projectRoot,
-  value,
+  readmePath,
   onOpenPanel,
 }: {
   projectRoot: string;
-  value?: string;
+  readmePath?: string;
   onOpenPanel: (absPath: string) => void;
 }) {
-  if (!value?.trim()) {
+  const candidate = readmePath?.trim();
+  if (!candidate) {
     return <span className="text-xs text-stone-500">—</span>;
   }
 
-  const absPath = resolveProjectPath(projectRoot, value);
+  const absPath = resolveProjectPath(projectRoot, candidate);
   return (
     <button
       type="button"
@@ -449,7 +461,7 @@ function NotesCell({
       className="inline-flex items-center gap-1 truncate rounded px-1.5 py-0.5 text-[11px] text-cyan-200/90 hover:bg-white/5 hover:text-cyan-100 transition-colors"
     >
       <FileText size={11} className="shrink-0 opacity-80" />
-      <span className="truncate max-w-[120px]">{value.split('/').pop()}</span>
+      <span className="truncate max-w-[120px]">README.md</span>
     </button>
   );
 }
@@ -496,7 +508,12 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
       header: 'Feature Spec',
       accessor: (r) => r.specPath ?? '',
       cell: (r, h) => (
-        <PathCell projectRoot={h.projectRoot} value={r.specPath} />
+        <PathCell
+          projectRoot={r.sourceProjectRoot ?? h.projectRoot}
+          value={r.specPath}
+          label="feature-spec.md"
+          onOpenPanel={h.onOpenNotePanel}
+        />
       ),
     },
     {
@@ -504,7 +521,12 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
       header: 'TDD Spec',
       accessor: (r) => r.tddPath ?? '',
       cell: (r, h) => (
-        <PathCell projectRoot={h.projectRoot} value={r.tddPath} />
+        <PathCell
+          projectRoot={r.sourceProjectRoot ?? h.projectRoot}
+          value={r.tddPath}
+          label="tdd-spec.md"
+          onOpenPanel={h.onOpenNotePanel}
+        />
       ),
     },
     {
@@ -512,7 +534,12 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
       header: 'Unit/Integ Test',
       accessor: (r) => r.unitIntegrationTestPath ?? '',
       cell: (r, h) => (
-        <PathCell projectRoot={h.projectRoot} value={r.unitIntegrationTestPath} />
+        <PathCell
+          projectRoot={r.sourceProjectRoot ?? h.projectRoot}
+          value={r.unitIntegrationTestPath}
+          label="unit-integration-test"
+          onOpenPanel={h.onOpenNotePanel}
+        />
       ),
     },
     {
@@ -520,7 +547,12 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
       header: 'E2E Folder',
       accessor: (r) => r.e2eAcceptanceTestScriptFolder ?? '',
       cell: (r, h) => (
-        <PathCell projectRoot={h.projectRoot} value={r.e2eAcceptanceTestScriptFolder} />
+        <PathCell
+          projectRoot={r.sourceProjectRoot ?? h.projectRoot}
+          value={r.e2eAcceptanceTestScriptFolder}
+          label="e2e-folder"
+          onOpenPanel={h.onOpenNotePanel}
+        />
       ),
     },
     { id: 'tddProgress', header: 'TDD Progress', accessor: (r) => r.tddProgress ?? -1, cell: (r, h) => (
@@ -535,7 +567,12 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
       header: 'TDD Report',
       accessor: (r) => r.tddReportPath ?? '',
       cell: (r, h) => (
-        <PathCell projectRoot={h.projectRoot} value={r.tddReportPath} />
+        <PathCell
+          projectRoot={r.sourceProjectRoot ?? h.projectRoot}
+          value={r.tddReportPath}
+          label="tdd-report.md"
+          onOpenPanel={h.onOpenNotePanel}
+        />
       ),
     },
     {
@@ -543,13 +580,18 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
       header: 'Dev Logs',
       accessor: (r) => r.devLogFolder ?? '',
       cell: (r, h) => (
-        <PathCell projectRoot={h.projectRoot} value={r.devLogFolder} />
+        <PathCell
+          projectRoot={r.sourceProjectRoot ?? h.projectRoot}
+          value={devLogPath(r.devLogFolder)}
+          label="dev-log.md"
+          onOpenPanel={h.onOpenNotePanel}
+        />
       ),
     },
-    { id: 'notes', header: 'Notes', accessor: (r) => r.notes ?? '', cell: (r, h) => (
+    { id: 'notes', header: 'README', accessor: (r) => r.notes ?? '', cell: (r, h) => (
       <NotesCell
         projectRoot={r.sourceProjectRoot ?? h.projectRoot}
-        value={r.notes}
+        readmePath={r.readmePath}
         onOpenPanel={(absPath) => h.onOpenNotePanel?.(absPath)}
       />
     )},

@@ -9,7 +9,6 @@ import {
   Files,
   FileText,
   KeyRound,
-  Keyboard,
   Plug,
   Radio,
   RefreshCw,
@@ -67,9 +66,8 @@ const NAV_GROUPS: NavGroup[] = [
   {
     groupKey: 'system',
     items: [
-      { id: 'keys',               itemKey: 'keys',      href: '/keys',               icon: KeyRound },
-      { id: 'keyboard-shortcuts', itemKey: 'shortcuts', href: '/keyboard-shortcuts', icon: Keyboard },
-      { id: 'settings',           itemKey: 'settings',  href: '/settings',           icon: Settings },
+      { id: 'keys',     itemKey: 'keys',     href: '/keys',     icon: KeyRound },
+      { id: 'settings', itemKey: 'settings', href: '/settings', icon: Settings },
       { id: 'documentation',      itemKey: 'docs',      href: '/documentation',      icon: BookOpen },
     ],
   },

@@ -20,11 +20,12 @@ interface AgentOpsPanelProps {
 export function AgentOpsPanel({ adapters, activeRuns }: AgentOpsPanelProps) {
   const [expanded, setExpanded] = useState(false);
   const agents = adapters.filter((a) => a.type === 'agent');
+  const apps = adapters.filter((a) => a.type === 'app');
   const ides = adapters.filter((a) => a.type === 'ide');
   const busyByCommand = new Set(activeRuns.map((r) => r.command));
 
   return (
-    <div className="rounded border border-stone-200/15 bg-[#0a2622]/70">
+    <div className="rounded border border-stone-200/15 bg-[rgb(var(--pm-card))]/70">
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
@@ -33,7 +34,7 @@ export function AgentOpsPanel({ adapters, activeRuns }: AgentOpsPanelProps) {
         <div className="flex items-center gap-2">
           <Activity className="h-4 w-4 text-emerald-300" />
           <span className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-100">
-            Agents ({agents.length})
+            Agents ({agents.length + apps.length})
           </span>
           <span className="text-[11px] text-stone-400">
             · {activeRuns.length} running
@@ -43,11 +44,11 @@ export function AgentOpsPanel({ adapters, activeRuns }: AgentOpsPanelProps) {
       </button>
       {expanded && (
         <div className="border-t border-stone-200/15 p-2">
-          {[...agents, ...ides].length === 0 ? (
+          {[...agents, ...apps, ...ides].length === 0 ? (
             <p className="text-[11px] text-stone-500">No adapters configured.</p>
           ) : (
             <div className="grid gap-1">
-              {[...agents, ...ides].map((a) => {
+              {[...agents, ...apps, ...ides].map((a) => {
                 const busy = busyByCommand.has(a.command);
                 return (
                   <div
@@ -55,7 +56,7 @@ export function AgentOpsPanel({ adapters, activeRuns }: AgentOpsPanelProps) {
                     className="flex items-center justify-between gap-2 rounded border border-stone-200/10 px-2 py-1.5"
                   >
                     <div className="flex items-center gap-2">
-                      {a.type === 'agent'
+                      {a.type !== 'ide'
                         ? <Bot size={14} className="text-emerald-300" />
                         : <Cpu size={14} className="text-cyan-300" />}
                       <div>

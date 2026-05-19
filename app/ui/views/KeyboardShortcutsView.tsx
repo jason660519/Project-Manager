@@ -53,7 +53,7 @@ const SHORTCUT_GROUPS: Array<{
 
 function KeyCap({ value }: { value: string }) {
   return (
-    <span className="inline-flex min-w-7 items-center justify-center border border-stone-200/20 bg-[#03100f] px-2 py-1 font-mono text-[11px] font-medium text-stone-100">
+    <span className="inline-flex min-w-7 items-center justify-center border border-stone-200/20 bg-[rgb(var(--pm-input))] px-2 py-1 font-mono text-[11px] font-medium text-stone-100">
       {value}
     </span>
   );
@@ -78,7 +78,7 @@ function StatusBadge({ status }: { status: ShortcutRow['status'] }) {
 export function KeyboardShortcutsView() {
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 border border-stone-200/18 bg-[#071d1a]/72 p-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-3 border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72 p-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-amber-200/25 text-amber-100">
             <Keyboard size={18} />
@@ -94,13 +94,13 @@ export function KeyboardShortcutsView() {
         </div>
         <div className="flex items-center gap-2 text-[11px] text-stone-400">
           <MousePointerClick size={14} className="text-stone-500" />
-          <span>Left toolbar entry is active at `/keyboard-shortcuts`.</span>
+          <span>Press <kbd className="border border-stone-200/20 bg-[rgb(var(--pm-input))] px-1 font-mono text-[10px]">Shift</kbd> + <kbd className="border border-stone-200/20 bg-[rgb(var(--pm-input))] px-1 font-mono text-[10px]">?</kbd> from anywhere to jump here.</span>
         </div>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
         {SHORTCUT_GROUPS.map((group) => (
-          <section key={group.title} className="border border-stone-200/18 bg-[#071d1a]/72">
+          <section key={group.title} className="border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72">
             <div className="flex items-center gap-3 border-b border-stone-200/12 px-4 py-3">
               <group.icon size={15} className="text-stone-300" />
               <h3 className="text-sm font-medium uppercase tracking-[0.16em] text-stone-100">

@@ -232,7 +232,7 @@ export function IngestionView({ project, onImportFeatures }: IngestionViewProps)
           className={`flex min-h-64 cursor-pointer flex-col items-center justify-center border-2 border-dashed transition-colors ${
             dragOver
               ? 'border-emerald-400/60 bg-emerald-950/30'
-              : 'border-stone-200/20 bg-[#071d1a]/50 hover:border-stone-200/40 hover:bg-[#071d1a]/80'
+              : 'border-stone-200/20 bg-[rgb(var(--pm-panel))]/50 hover:border-stone-200/40 hover:bg-[rgb(var(--pm-panel))]/80'
           }`}
         >
           <input
@@ -256,7 +256,7 @@ export function IngestionView({ project, onImportFeatures }: IngestionViewProps)
 
       {/* Processing */}
       {phase === 'processing' && (
-        <div className="flex min-h-64 flex-col items-center justify-center border border-stone-200/18 bg-[#071d1a]/72">
+        <div className="flex min-h-64 flex-col items-center justify-center border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72">
           <div className="mb-4 h-8 w-8 animate-spin border-2 border-stone-600 border-t-emerald-400" />
           <p className="text-sm text-stone-200">Parsing {fileName}…</p>
           <p className="mt-2 text-xs text-stone-500">
@@ -272,7 +272,7 @@ export function IngestionView({ project, onImportFeatures }: IngestionViewProps)
       {/* Review */}
       {phase === 'review' && (
         <div className="space-y-4">
-          <div className="flex items-center gap-3 border border-stone-200/18 bg-[#071d1a]/72 px-4 py-3">
+          <div className="flex items-center gap-3 border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72 px-4 py-3">
             <FileInput size={16} className="text-amber-100" />
             <span className="text-sm text-stone-200">{fileName}</span>
             <span className="ml-auto mr-3 text-[10px] uppercase tracking-[0.14em] text-stone-500">
@@ -283,7 +283,7 @@ export function IngestionView({ project, onImportFeatures }: IngestionViewProps)
             </button>
           </div>
 
-          <div className="border border-stone-200/18 bg-[#071d1a]/72">
+          <div className="border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72">
             <div className="border-b border-stone-200/12 px-4 py-3">
               <h2 className="text-sm font-medium uppercase tracking-[0.16em] text-stone-100">
                 Generated Drafts ({draftFeatures.length})
@@ -313,7 +313,7 @@ export function IngestionView({ project, onImportFeatures }: IngestionViewProps)
                             updated[i] = { ...feature, status: e.target.value as FeatureStatus };
                             setDraftFeatures(updated);
                           }}
-                          className="border border-stone-200/20 bg-[#03100f] px-2 py-1 text-xs text-stone-200 outline-none"
+                          className="border border-stone-200/20 bg-[rgb(var(--pm-input))] px-2 py-1 text-xs text-stone-200 outline-none"
                         >
                           <option value="todo">To Do</option>
                           <option value="in_progress">In Progress</option>
@@ -347,7 +347,7 @@ export function IngestionView({ project, onImportFeatures }: IngestionViewProps)
             </button>
             <button
               onClick={handleConfirm}
-              className="bg-stone-100 px-4 py-2 text-sm font-medium text-[#071d1a] hover:bg-amber-100"
+              className="bg-stone-100 px-4 py-2 text-sm font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100"
             >
               Import {draftFeatures.length} Feature{draftFeatures.length !== 1 ? 's' : ''}
             </button>
@@ -365,7 +365,7 @@ export function IngestionView({ project, onImportFeatures }: IngestionViewProps)
       )}
 
       {/* Target project info */}
-      <div className="border border-stone-200/12 bg-[#071d1a]/40 p-4">
+      <div className="border border-stone-200/12 bg-[rgb(var(--pm-panel))]/40 p-4">
         <h3 className="mb-2 text-xs uppercase tracking-[0.16em] text-stone-400">Target Project</h3>
         <p className="text-sm font-medium text-stone-200">{project.name}</p>
         <p className="mt-1 truncate text-xs text-stone-500">{project.root}</p>

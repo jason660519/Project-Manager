@@ -114,7 +114,7 @@ function TranscriptView({ session }: { session: AgentSession }) {
                 className={[
                   'max-w-[78%] rounded-sm px-3 py-2.5 text-[13px] leading-6',
                   msg.role === 'assistant'
-                    ? 'bg-[#071d1a]/80 text-stone-200'
+                    ? 'bg-[rgb(var(--pm-panel))]/80 text-stone-200'
                     : 'bg-stone-800/80 text-stone-100',
                 ].join(' ')}
               >
@@ -177,7 +177,7 @@ export function SessionsView({ projectRoot }: SessionsViewProps) {
           {!loading && sessions.length === 0 && <NoSessions />}
           {Object.entries(grouped).map(([date, group]) => (
             <div key={date}>
-              <div className="sticky top-0 bg-[#061512]/95 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-stone-500">
+              <div className="sticky top-0 bg-[rgb(var(--pm-rail))]/95 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-stone-500">
                 {date}
               </div>
               {group.map((session) => {

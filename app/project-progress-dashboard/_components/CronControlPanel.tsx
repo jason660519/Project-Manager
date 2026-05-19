@@ -49,7 +49,7 @@ export function CronControlPanel({ cronJobs, onCronJobsChange, onRunJob }: CronC
   }, [onRunJob]);
 
   return (
-    <div className="rounded border border-stone-200/15 bg-[#0a2622]/70">
+    <div className="rounded border border-stone-200/15 bg-[rgb(var(--pm-card))]/70">
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}

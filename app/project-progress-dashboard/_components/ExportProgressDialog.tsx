@@ -51,7 +51,7 @@ export function ExportProgressDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-2xl rounded border border-stone-200/20 bg-[#061512] p-4 shadow-2xl">
+      <div className="w-full max-w-2xl rounded border border-stone-200/20 bg-[rgb(var(--pm-rail))] p-4 shadow-2xl">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-stone-100">
             Export progress snapshot
@@ -65,7 +65,7 @@ export function ExportProgressDialog({
         <textarea
           value={json}
           readOnly
-          className="h-80 w-full resize-none rounded border border-stone-200/15 bg-[#020a09]/90 p-3 font-mono text-[11px] text-stone-200 focus:outline-none"
+          className="h-80 w-full resize-none rounded border border-stone-200/15 bg-[rgb(var(--pm-code))]/90 p-3 font-mono text-[11px] text-stone-200 focus:outline-none"
         />
         <div className="mt-3 flex justify-end gap-2">
           <button

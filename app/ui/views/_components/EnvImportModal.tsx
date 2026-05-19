@@ -96,7 +96,7 @@ export function EnvImportModal({ projectRoot, onClose, onImported }: EnvImportMo
       aria-modal="true"
       aria-label="Import .env"
     >
-      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col border border-stone-200/20 bg-[#071d1a]">
+      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col border border-stone-200/20 bg-[rgb(var(--pm-panel))]">
         <header className="flex items-center justify-between border-b border-stone-200/12 px-5 py-3">
           <div className="flex items-center gap-2.5">
             <Upload size={15} className="text-amber-100" />
@@ -129,7 +129,7 @@ export function EnvImportModal({ projectRoot, onClose, onImported }: EnvImportMo
             <div
               onDrop={handleDrop}
               onDragOver={(e) => e.preventDefault()}
-              className="border border-dashed border-stone-200/22 bg-[#03100f] p-2"
+              className="border border-dashed border-stone-200/22 bg-[rgb(var(--pm-input))] p-2"
             >
               <textarea
                 value={pasteText}
@@ -203,7 +203,7 @@ GITHUB_TOKEN=ghp_..."
           <button
             onClick={() => void handleImport()}
             disabled={selectedCount === 0 || saving}
-            className="bg-stone-100 px-4 py-1.5 text-sm font-medium text-[#071d1a] hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
+            className="bg-stone-100 px-4 py-1.5 text-sm font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {saving ? 'Importing…' : `Import ${selectedCount}`}
           </button>

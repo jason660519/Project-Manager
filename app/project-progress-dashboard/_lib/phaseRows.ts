@@ -27,6 +27,7 @@ export interface PhaseRow extends PhaseRowMeta {
   unitIntegrationTestPath?: string;
   e2eAcceptanceTestScriptFolder?: string;
   devLogFolder?: string;
+  readmePath?: string;
   tddProgress?: number;
   assignedRoleId?: string;
   assignedIDE?: IDEId;
@@ -58,6 +59,10 @@ export function featureToPhaseRow(feature: Feature, defaultProjectName?: string)
     points: safePoints(feature),
     locatedPage: feature.locatedPage,
     notes: feature.notes,
+    readmePath: feature.readmePath
+      ?? (feature.paths?.featureFolder
+        ? `${feature.paths.featureFolder.replace(/\/?$/, '/')}README.md`
+        : undefined),
     testCoverage: feature.testCoverage,
     testStatus: feature.testStatus,
     deployStatus: feature.deployStatus,
@@ -116,6 +121,7 @@ export function customRowToPhaseRow(row: CustomProjectProgressRow, defaultProjec
     assignedRoleId: row.assignedRoleId,
     assignedIDE: row.assignedIDE,
     notes: row.notes,
+    readmePath: row.readmePath,
     custom: row,
   };
 }

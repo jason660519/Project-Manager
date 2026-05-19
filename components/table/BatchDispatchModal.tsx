@@ -228,7 +228,7 @@ export function BatchDispatchModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-      <div className="flex w-full max-w-2xl flex-col overflow-hidden border border-stone-200/18 bg-[#071d1a] shadow-2xl">
+      <div className="flex w-full max-w-2xl flex-col overflow-hidden border border-stone-200/18 bg-[rgb(var(--pm-panel))] shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-stone-200/12 bg-white/[0.035] px-6 py-4">
           <div>
@@ -254,7 +254,7 @@ export function BatchDispatchModal({
                   <select
                     value={selectedAdapterId}
                     onChange={(e) => setSelectedAdapterId(e.target.value)}
-                    className="w-full border border-stone-200/20 bg-[#03100f] px-3 py-2 text-sm text-stone-100 outline-none"
+                    className="w-full border border-stone-200/20 bg-[rgb(var(--pm-input))] px-3 py-2 text-sm text-stone-100 outline-none"
                   >
                     {agentAdapters.map((a) => (
                       <option key={a.id} value={a.id}>
@@ -273,7 +273,7 @@ export function BatchDispatchModal({
                 <select
                   value={selectedWorkflowId}
                   onChange={(e) => setSelectedWorkflowId(e.target.value)}
-                  className="w-full border border-stone-200/20 bg-[#03100f] px-3 py-2 text-sm text-stone-100 outline-none"
+                  className="w-full border border-stone-200/20 bg-[rgb(var(--pm-input))] px-3 py-2 text-sm text-stone-100 outline-none"
                 >
                   <option value="">— 一般批次派遣，不套用 workflow —</option>
                   {DEFAULT_AGENT_WORKFLOWS.map((workflow) => (
@@ -283,7 +283,7 @@ export function BatchDispatchModal({
                   ))}
                 </select>
                 {selectedWorkflow && (
-                  <div className="mt-1.5 border border-stone-200/12 bg-[#061512]/60 px-3 py-2 text-[11px] text-stone-400">
+                  <div className="mt-1.5 border border-stone-200/12 bg-[rgb(var(--pm-rail))]/60 px-3 py-2 text-[11px] text-stone-400">
                     <span className="border border-amber-200/25 px-1.5 py-0.5 font-mono uppercase tracking-[0.12em] text-amber-200/80">
                       {selectedWorkflow.mode}
                     </span>
@@ -338,7 +338,7 @@ export function BatchDispatchModal({
           {/* Feature list */}
           <div className="space-y-1">
             {items.map((item) => (
-              <div key={item.feature.id} className="border border-stone-200/12 bg-[#03100f]/50">
+              <div key={item.feature.id} className="border border-stone-200/12 bg-[rgb(var(--pm-input))]/50">
                 <div
                   className="flex cursor-pointer items-center gap-3 px-3 py-2.5"
                   onClick={() =>
@@ -398,7 +398,7 @@ export function BatchDispatchModal({
           {batchPhase === 'idle' && agentAdapters.length > 0 && (
             <button
               onClick={handleDispatchAll}
-              className="bg-stone-100 px-4 py-2 text-sm font-medium text-[#071d1a] hover:bg-amber-100"
+              className="bg-stone-100 px-4 py-2 text-sm font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100"
             >
               開始批次派遣
             </button>

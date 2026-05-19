@@ -79,7 +79,7 @@ export function CategoryColumnFilter({
 
       {open && (
         <div
-          className="absolute left-0 top-full z-40 mt-1 w-56 rounded border border-stone-200/20 bg-[#061512] p-2 shadow-xl"
+          className="absolute left-0 top-full z-40 mt-1 w-56 rounded border border-stone-200/20 bg-[rgb(var(--pm-rail))] p-2 shadow-xl"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mb-2 flex gap-1">

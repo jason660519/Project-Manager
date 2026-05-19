@@ -35,7 +35,7 @@ interface SheetTabsProps {
 export function SheetTabs({ activePhase, onPhaseChange, phaseCounts }: SheetTabsProps) {
   const { t } = useI18n();
   return (
-    <div className="flex items-end gap-0 border-t border-stone-200/15 bg-[#061512]/70 overflow-x-auto flex-none">
+    <div className="flex items-end gap-0 border-t border-stone-200/15 bg-[rgb(var(--pm-rail))]/70 overflow-x-auto flex-none">
       {SHEETS.map((sheet) => {
         const isActive = activePhase === sheet.id;
         const Icon = sheet.icon;

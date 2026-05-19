@@ -48,7 +48,7 @@ export function PostImportScanDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg border border-emerald-200/25 bg-[#071d1a] shadow-2xl">
+      <div className="w-full max-w-lg border border-emerald-200/25 bg-[rgb(var(--pm-panel))] shadow-2xl">
         <div className="flex items-center justify-between border-b border-stone-200/12 px-6 py-4">
           <div className="flex items-center gap-2">
             <Bot size={18} className="text-emerald-300" />
@@ -71,7 +71,7 @@ export function PostImportScanDialog({
             <code className="font-mono text-stone-200">.project-manager/</code> dashboard folder or an empty feature list.
             Run AI Scan now to generate one?
           </p>
-          <ul className="max-h-48 space-y-2 overflow-y-auto border border-stone-200/12 bg-[#03100f] p-3">
+          <ul className="max-h-48 space-y-2 overflow-y-auto border border-stone-200/12 bg-[rgb(var(--pm-input))] p-3">
             {list.map((item) => (
               <li key={item.id} className="flex items-start gap-2 text-xs">
                 <input

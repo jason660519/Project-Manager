@@ -33,6 +33,7 @@ export interface CustomProjectProgressRow {
   assignedRoleId?: string;
   assignedIDE?: IDEId;
   notes?: string;
+  readmePath?: string;
 }
 
 /** Generic per-table preference bag — what the toolbar persists. */
