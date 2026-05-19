@@ -142,8 +142,12 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
       setActiveSessionId(sessionId);
     }
 
+    // Create a placeholder assistant message that will accumulate streamed text
+    const assistantId = `assistant-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const placeholder = makeMessage('assistant', '');
+    placeholder.id = assistantId;
+
     try {
-      // For now, use a simple echo until we can wire real project context here
       const { sendChatMessage } = await import('../../lib/chat/chatAgent');
       const effectiveContext = initialChatContext ?? {
         currentView: 'chat',
@@ -153,18 +157,33 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
         activeRunCount: 0,
         recentRuns: [],
       };
+
+      // Add placeholder, then start streaming updates into it
+      setMessages([...nextMessages, placeholder]);
+
+      let accumulated = '';
       const result = await sendChatMessage({
         content,
         history: nextMessages,
         context: effectiveContext,
         navigate: (href) => router.push(href),
+        onStream: (chunk: string) => {
+          accumulated += chunk;
+          // Update the assistant message in-place
+          setMessages((prev) =>
+            prev.map((m) => (m.id === assistantId ? { ...m, content: accumulated } : m)),
+          );
+        },
       });
 
+      const finalContent = result.content || accumulated;
       const assistantMessage = makeMessage(
         'assistant',
-        result.content,
+        finalContent,
         result.error ? 'error' : 'sent',
       );
+      assistantMessage.id = assistantId;
+
       const finalMessages = [...nextMessages, assistantMessage];
       setMessages(finalMessages);
       persistCurrentSession(finalMessages, sessionId);

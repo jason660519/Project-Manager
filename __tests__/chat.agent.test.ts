@@ -4,6 +4,13 @@ import type { ChatContext } from '../lib/chat/types';
 import { spawnAgent } from '../lib/bridge';
 import { createRuntimeAdapterFromConfig } from '../lib/adapters/registry';
 
+// Mock global fetch so AI chat API fallback doesn't throw in tests
+const mockFetch = vi.fn().mockResolvedValue({
+  ok: true,
+  json: () => Promise.resolve({ content: 'Hello from the AI assistant!' }),
+});
+vi.stubGlobal('fetch', mockFetch);
+
 vi.mock('../lib/bridge', () => ({
   onAgentExit: vi.fn().mockResolvedValue(vi.fn()),
   onAgentStdout: vi.fn().mockResolvedValue(vi.fn()),
@@ -80,13 +87,39 @@ describe('sendChatMessage', () => {
     expect(result.content).toMatch(/configured project agent/i);
   });
 
-  it('returns an error when no agent adapter is configured', async () => {
+  it('falls back to AI chat API when no agent adapter is configured', async () => {
+    const result = await sendChatMessage({
+      content: 'question',
+      history: [],
+      context: { ...context, adapters: [] },
+    });
+    expect(result.error).toBeFalsy();
+    expect(mockFetch).toHaveBeenCalledWith('/api/chat', expect.objectContaining({
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+    }));
+    expect(result.content).toContain('Hello from the AI assistant');
+  });
+
+  it('returns error when AI chat API call fails', async () => {
+    mockFetch.mockRejectedValueOnce(new Error('Network error'));
     const result = await sendChatMessage({
       content: 'question',
       history: [],
       context: { ...context, adapters: [] },
     });
     expect(result.error).toBe(true);
-    expect(result.content).toMatch(/no agent adapter/i);
+    expect(result.content).toMatch(/could not reach/i);
+  });
+
+  it('falls back to AI chat API when no project is selected', async () => {
+    const result = await sendChatMessage({
+      content: 'what is agile?',
+      history: [],
+      context: { currentView: 'chat', adapters: [], activeRunCount: 0, recentRuns: [] },
+    });
+    expect(result.error).toBeFalsy();
+    expect(mockFetch).toHaveBeenCalled();
+    expect(result.content).toContain('Hello from the AI assistant');
   });
 });

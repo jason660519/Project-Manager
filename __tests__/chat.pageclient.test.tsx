@@ -19,9 +19,10 @@ const localStorageMock = {
 };
 Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock, writable: true });
 
-// Mock chatAgent to avoid actually calling it
-vi.mock('../../lib/chat/chatAgent', () => ({
-  sendChatMessage: vi.fn().mockResolvedValue({
+// Mock chatAgent so CP never hits the real AI API
+const mockSendChatMessage = vi.fn();
+vi.mock(import('../lib/chat/chatAgent'), async () => ({
+  sendChatMessage: mockSendChatMessage.mockResolvedValue({
     content: 'Hello! I am the assistant. How can I help you?',
     handledLocally: false,
   }),
@@ -97,7 +98,7 @@ describe('ChatPageClient', () => {
     expect(stored[0].messages[0].content).toBe('Hello!');
   });
 
-  it('shows error response when no project context is provided', async () => {
+  it('shows AI response when no project context is provided', async () => {
     const user = userEvent.setup();
     render(<ChatPageClient />);
 
@@ -108,8 +109,8 @@ describe('ChatPageClient', () => {
     // Wait for the mock async sendChatMessage to resolve
     await new Promise((r) => setTimeout(r, 100));
 
-    // Without project context, chatAgent returns error
-    expect(screen.getByText(/Select a project first/i)).toBeInTheDocument();
+    // Without project context, chatAgent falls through to the AI chat API
+    expect(screen.getByText(/I am the assistant/i)).toBeInTheDocument();
   });
 
   it('deletes a session from history', async () => {

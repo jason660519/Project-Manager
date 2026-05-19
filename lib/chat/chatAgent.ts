@@ -10,7 +10,7 @@ import {
   type AgentStdioPayload,
 } from '../bridge';
 import type { Feature } from '../types';
-import type { ChatContext, SendChatMessageRequest, SendChatMessageResult } from './types';
+import type { ChatContext, ChatMessage, SendChatMessageRequest, SendChatMessageResult } from './types';
 
 const ROUTES: Record<string, string> = {
   projects: '/projects',
@@ -171,6 +171,94 @@ function buildAgentPrompt(content: string, context: ChatContext): string {
   ].join('\n');
 }
 
+/**
+ * Call the server-side AI proxy with conversation history.
+ * Never exposes API keys to the browser.
+ * If onStream is provided, uses SSE streaming for typewriter effect.
+ */
+async function callChatApi(
+  content: string,
+  history: ChatMessage[],
+  onStream?: (chunk: string) => void,
+): Promise<string> {
+  const messages = history.map((m) => ({
+    role: m.role === 'user' ? 'user' as const : 'assistant' as const,
+    content: m.content,
+  }));
+  messages.push({ role: 'user', content });
+
+  // If streaming callback is provided, use the streaming endpoint
+  if (onStream) {
+    const res = await fetch('/api/chat/stream', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ messages }),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || 'Streaming chat API failed');
+    }
+
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error('No response body for streaming');
+
+    const decoder = new TextDecoder();
+    let result = '';
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        const dataPrefix = 'data: ';
+        if (!trimmed.startsWith(dataPrefix)) continue;
+
+        try {
+          const json = JSON.parse(trimmed.slice(dataPrefix.length));
+          if (json.done) break;
+          if (json.text) {
+            result += json.text;
+            onStream(json.text);
+          }
+          if (json.error) {
+            throw new Error(json.error);
+          }
+        } catch (parseErr) {
+          if (parseErr instanceof Error && parseErr.message !== 'Unexpected end of JSON input') {
+            throw parseErr;
+          }
+        }
+      }
+    }
+
+    return result;
+  }
+
+  // Non-streaming fallback
+  const res = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ messages }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error ?? 'Chat API failed');
+  }
+
+  const data = await res.json();
+  return data.content ?? '';
+}
+
 function waitForAgentOutput(pid: number): Promise<string> {
   if (pid === 0 || typeof window === 'undefined') {
     return Promise.resolve('I sent this to the configured project agent. No live output is available in browser dry-run mode.');
@@ -212,33 +300,44 @@ export async function sendChatMessage(request: SendChatMessageRequest): Promise<
   if (local) return local;
 
   const project = request.context.selectedProject;
-  if (!project) {
-    return { content: 'Select a project first so I can answer with project context.', error: true };
-  }
-
   const adapter = request.context.adapters.find((candidate) =>
     getAdapterExecutionKind(candidate) === 'agent-cli'
   );
-  if (!adapter) {
-    return { content: 'No agent adapter is configured for this project.', error: true };
+
+  // If we have both a project and an agent adapter, dispatch through the agent bridge.
+  // This gives the agent access to file context, project files, etc.
+  if (project && adapter) {
+    const runtime = createRuntimeAdapterFromConfig(adapter);
+    const prompt = buildAgentPrompt(request.content, request.context);
+    const result = await runtime.execute({
+      feature: fallbackFeature(request.context),
+      prompt,
+      projectRoot: project.config.project.root,
+    });
+
+    if (!result.success || !result.command || !result.args) {
+      // Fallback to API chat if agent command preparation fails
+      try {
+        const content = await callChatApi(request.content, request.history, request.onStream);
+        return { content };
+      } catch {
+        return { content: result.message || 'The agent command could not be prepared.', error: true };
+      }
+    }
+
+    const pid = await spawnAgent({
+      command: result.command,
+      args: result.args,
+      workingDir: project.config.project.root,
+    });
+    return { content: await waitForAgentOutput(pid) };
   }
 
-  const runtime = createRuntimeAdapterFromConfig(adapter);
-  const prompt = buildAgentPrompt(request.content, request.context);
-  const result = await runtime.execute({
-    feature: fallbackFeature(request.context),
-    prompt,
-    projectRoot: project.config.project.root,
-  });
-
-  if (!result.success || !result.command || !result.args) {
-    return { content: result.message || 'The agent command could not be prepared.', error: true };
+  // No project or no adapter configured — use the AI chat API directly
+  try {
+    const content = await callChatApi(request.content, request.history, request.onStream);
+    return { content };
+  } catch (e) {
+    return { content: `Sorry, I could not reach the AI service: ${(e as Error).message}`, error: true };
   }
-
-  const pid = await spawnAgent({
-    command: result.command,
-    args: result.args,
-    workingDir: project.config.project.root,
-  });
-  return { content: await waitForAgentOutput(pid) };
 }
