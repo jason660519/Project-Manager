@@ -46,6 +46,7 @@ import { detectProviders } from '../../lib/keys/detectProviders';
 import { SettingsView } from './views/SettingsView';
 import { DocumentationView } from './views/DocumentationView';
 import { SkillsView } from './views/SkillsView';
+import { ChatPageClient } from '../chat/ChatPageClient';
 
 type BridgeFileNode = {
   name: string;
@@ -1086,16 +1087,21 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
       {currentView === 'settings' && <SettingsView />}
       {currentView === 'documentation' && <DocumentationView />}
       {currentView === 'chat' && (
-        <div className="flex min-h-[55vh] items-center justify-center">
-          <div className="max-w-md border border-stone-200/15 bg-white/[0.03] p-6 text-center">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-200">
-              AI Assistant
-            </p>
-            <p className="mt-2 text-sm leading-6 text-stone-400">
-              Use the assistant panel anchored at the bottom of the sidebar.
-            </p>
-          </div>
-        </div>
+        <ChatPageClient
+          initialChatContext={{
+            currentView,
+            selectedProject,
+            adapters,
+            activeRunCount: activeRuns.length,
+            activeRuns: activeRuns.map((run) => ({
+              featureId: run.featureId,
+              featureName: run.featureName,
+              phase: run.phase,
+              startedAt: run.startedAt,
+            })),
+            recentRuns: runHistory.slice(0, 5),
+          }}
+        />
       )}
       {currentView === 'engineers' && selectedProject && (
         <EngineersView

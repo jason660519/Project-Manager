@@ -1,6 +1,6 @@
 'use client';
 
-import { Bot, ChevronDown, MessageSquareText, X } from 'lucide-react';
+import { Bot, ChevronDown, ExternalLink, MessageSquareText, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { sendChatMessage } from '../../lib/chat/chatAgent';
@@ -81,7 +81,7 @@ export function ChatPanel({ context, defaultExpanded = false }: ChatPanelProps) 
   }
 
   return (
-    <div className="absolute bottom-14 left-2 z-50 w-[320px] max-w-[calc(100vw-24px)] rounded border border-stone-200/15 bg-stone-950/95 shadow-2xl shadow-black/40 backdrop-blur">
+    <div className="absolute bottom-14 left-2 z-50 w-[320px] max-w-[calc(100vw-24px)] rounded border border-stone-200/15 bg-stone-950/95 shadow-2xl shadow-black/40 backdrop-blur animate-in fade-in slide-in-from-bottom-2 duration-200">
       <div className="flex h-10 items-center gap-2 border-b border-stone-200/15 px-3">
         <Bot size={14} className="text-amber-200/80" />
         <h2 className="min-w-0 flex-1 truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-100">
@@ -94,6 +94,14 @@ export function ChatPanel({ context, defaultExpanded = false }: ChatPanelProps) 
           className="rounded p-1 text-stone-500 transition-colors hover:bg-white/5 hover:text-stone-200"
         >
           <ChevronDown size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={() => router.push('/chat')}
+          aria-label="Open full chat page"
+          className="rounded p-1 text-stone-500 transition-colors hover:bg-white/5 hover:text-stone-200"
+        >
+          <ExternalLink size={13} />
         </button>
         <button
           type="button"
