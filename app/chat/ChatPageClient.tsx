@@ -53,10 +53,21 @@ function saveSessions(sessions: StoredSession[]) {
 
 function CurrentSessionMessages({ messages, loading }: { messages: ChatMessage[]; loading: boolean }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [showLoading, setShowLoading] = useState(false);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages, loading]);
+
+  // Delay the loading indicator so brief requests don't flicker
+  useEffect(() => {
+    if (!loading) {
+      setShowLoading(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowLoading(true), 300);
+    return () => clearTimeout(timer);
+  }, [loading]);
 
   if (messages.length === 0) {
     return null;
@@ -67,9 +78,11 @@ function CurrentSessionMessages({ messages, loading }: { messages: ChatMessage[]
       {messages.map((message) => (
         <ChatMessageView key={message.id} message={message} />
       ))}
-      {loading && (
-        <div className="mr-4 rounded border border-stone-200/15 bg-stone-950/60 px-2.5 py-2 text-[11px] text-stone-400">
-          Thinking...
+      {showLoading && (
+        <div className="mr-4 flex animate-pulse items-center gap-2 rounded border border-stone-200/15 bg-stone-950/60 px-2.5 py-2 text-[11px] text-stone-400">
+          <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-amber-400/80" />
+          <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-amber-400/80 [animation-delay:0.15s]" />
+          <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-amber-400/80 [animation-delay:0.3s]" />
         </div>
       )}
       <div ref={scrollRef} />
@@ -90,18 +103,6 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
   const { t } = useI18n();
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Cmd+K / Ctrl+K keyboard shortcut to focus input
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        inputRef.current?.focus();
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
   // Sessions state
   const [sessions, setSessions] = useState<StoredSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -111,6 +112,24 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
   // Side toggles
   const [showHistory, setShowHistory] = useState(true);
   const [historyLoaded, setHistoryLoaded] = useState(false);
+
+  // Keyboard shortcuts (must be after all useState declarations)
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      // Cmd+K / Ctrl+K → focus input
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        inputRef.current?.focus();
+        return;
+      }
+      // Escape → close mobile history
+      if (e.key === 'Escape' && showHistory && typeof window !== 'undefined' && window.innerWidth < 1024) {
+        setShowHistory(false);
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showHistory]);
 
   // Load persisted history on first mount
   useEffect(() => {
@@ -252,11 +271,18 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
   return (
     <div className="flex h-[calc(100vh-var(--pm-topbar-h,48px)-40px)] gap-0 lg:gap-4">
       {/* ── History sidebar ──────────────────────────────────────────────── */}
+      {/* Overlay backdrop for mobile */}
+      {showHistory && (
+        <div
+          className="fixed inset-0 z-10 bg-black/30 lg:hidden"
+          onClick={() => setShowHistory(false)}
+        />
+      )}
       <div
         className={[
-          'flex flex-col border-stone-200/15 bg-white/[0.02] lg:flex',
+          'flex flex-col border-stone-200/15 bg-[#1a1a1a] lg:bg-white/[0.02] z-20',
           showHistory
-            ? 'w-[220px] shrink-0 border-r lg:border-r-0'
+            ? 'fixed inset-y-0 left-0 z-20 w-[260px] border-r lg:static lg:z-auto lg:w-[220px] lg:flex lg:border-r-0'
             : 'hidden',
         ].join(' ')}
       >
@@ -387,8 +413,11 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
             onSend={handleSend}
             externalRef={inputRef}
           />
-          <p className="mt-2 text-center text-[9px] tracking-[0.06em] text-stone-600/70">
-            {t.chat.enterToSend}
+          <p className="mt-2 flex items-center justify-center gap-2 text-center text-[9px] tracking-[0.06em] text-stone-600/70">
+            <span>{t.chat.enterToSend}</span>
+            <kbd className="rounded border border-stone-700/40 bg-stone-800/50 px-1 py-px font-mono text-[8px] text-stone-500">
+              {'⌘K'}
+            </kbd>
           </p>
         </div>
       </div>
