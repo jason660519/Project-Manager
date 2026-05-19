@@ -93,9 +93,11 @@ describe('ChatPanel', () => {
     renderPanel(true);
 
     fireEvent.change(screen.getByPlaceholderText(/ask me anything/i), { target: { value: 'status' } });
-    await user.click(screen.getByRole('button', { name: /send/i }));
+    const sendBtn = screen.getAllByRole('button').find((b) => !b.hasAttribute('aria-label'));
+    await user.click(sendBtn!);
 
-    expect(screen.getByRole('button', { name: /thinking/i })).toBeDisabled();
+    // Only the send button should be disabled while loading
+    expect(sendBtn).toBeDisabled();
     resolveResponse({ content: 'Done' });
     await screen.findByText('Done');
   });

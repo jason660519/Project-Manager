@@ -22,6 +22,9 @@ describe('ChatInput', () => {
 
   it('disables send while loading', () => {
     render(<ChatInput placeholder="Ask" sendLabel="Send" loadingLabel="Thinking" loading onSend={vi.fn()} />);
-    expect(screen.getByRole('button', { name: /thinking/i })).toBeDisabled();
+    // Button has no text when loading (spinner only), so check by disabled role
+    const buttons = screen.getAllByRole('button');
+    expect(buttons.length).toBe(1);
+    expect(buttons[0]).toBeDisabled();
   });
 });
