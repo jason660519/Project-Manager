@@ -22,7 +22,12 @@ import {
   providersByCategory,
   type ProviderSpec,
 } from '../../../lib/keys/registry';
+import { getSecretsStorageBackend } from '../../../lib/bridge';
 import { loadProviderSecret, saveProviderSecret } from '../../../lib/keys/keychain';
+import {
+  formatSecretsStorageLabel,
+  secretsStorageUsesDevFile,
+} from '../../../lib/keys/secretsStorageLabel';
 import { listLlmProviders } from '../../../lib/keys/llmProviders';
 import { hasProviderKey, loadProviderKey } from '../../../lib/keys/loadProviderKey';
 import {
@@ -233,6 +238,7 @@ function SectionCard({
   icon,
   subtitle,
   isTauri,
+  storageBadge,
   providers,
   onOpenOAuth,
   reloadToken,
@@ -241,6 +247,7 @@ function SectionCard({
   icon: React.ReactNode;
   subtitle: string;
   isTauri: boolean;
+  storageBadge: string;
   providers: ProviderSpec[];
   onOpenOAuth: (p: ProviderSpec) => void;
   reloadToken: number;
@@ -253,15 +260,15 @@ function SectionCard({
           <h2 className="text-sm font-medium uppercase tracking-[0.16em] text-stone-100">{title}</h2>
           <p className="mt-0.5 text-[11px] text-stone-400">{subtitle}</p>
         </div>
-        {isTauri ? (
-          <span className="ml-auto border border-emerald-200/25 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-emerald-300/80">
-            macOS Keychain
-          </span>
-        ) : (
-          <span className="ml-auto border border-stone-200/18 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-stone-500">
-            dev: localStorage
-          </span>
-        )}
+        <span
+          className={`ml-auto border px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] ${
+            isTauri
+              ? 'border-emerald-200/25 text-emerald-300/80'
+              : 'border-stone-200/18 text-stone-500'
+          }`}
+        >
+          {storageBadge}
+        </span>
       </div>
       <div>
         {providers.map((p) => (
@@ -280,6 +287,7 @@ function SectionCard({
 
 export function KeysView() {
   const [isTauri, setIsTauri] = useState(false);
+  const [secretsBackend, setSecretsBackend] = useState('localStorage');
   const [showImport, setShowImport] = useState(false);
   const [oauthProvider, setOauthProvider] = useState<ProviderSpec | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
@@ -314,8 +322,19 @@ export function KeysView() {
   const [results, setResults] = useState<Partial<Record<LlmProviderId, PlaygroundResult>>>({});
 
   useEffect(() => {
-    setIsTauri(typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window);
+    const tauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+    setIsTauri(tauri);
+    if (!tauri) {
+      setSecretsBackend('localStorage');
+      return;
+    }
+    getSecretsStorageBackend()
+      .then(setSecretsBackend)
+      .catch(() => setSecretsBackend('keychain'));
   }, []);
+
+  const storageLabel = formatSecretsStorageLabel(secretsBackend, isTauri);
+  const devFileSecrets = secretsStorageUsesDevFile(secretsBackend);
 
   useEffect(() => {
     let cancelled = false;
@@ -427,7 +446,9 @@ export function KeysView() {
   const handleImported = (count: number) => {
     setShowImport(false);
     setReloadToken((n) => n + 1);
-    setImportedFlash(`Imported ${count} key${count === 1 ? '' : 's'} into ${isTauri ? 'Keychain' : 'localStorage'}.`);
+    setImportedFlash(
+      `Imported ${count} key${count === 1 ? '' : 's'} into ${isTauri ? storageLabel : 'localStorage'}.`,
+    );
     setTimeout(() => setImportedFlash(''), 4000);
   };
 
@@ -451,7 +472,9 @@ export function KeysView() {
         <p className="mt-1 text-xs text-stone-400">
           API keys and tokens.{' '}
           {isTauri
-            ? 'All secrets are stored in the macOS Keychain — never written to disk in plaintext.'
+            ? devFileSecrets
+              ? 'Debug build: secrets are in ~/.project-manager/dev-secrets.json (no Keychain prompts). Release builds use OS Keychain.'
+              : 'All secrets are stored in the macOS Keychain — never written to disk in plaintext.'
             : 'In dev mode, stored in localStorage. In production (Tauri), stored in OS Keychain.'}
         </p>
         {importedFlash && (
@@ -466,6 +489,7 @@ export function KeysView() {
         icon={<Sparkles size={15} className="text-amber-100" />}
         subtitle="Keys used by AI adapters and the Rust call_anthropic bridge."
         isTauri={isTauri}
+        storageBadge={storageLabel}
         providers={aiProviders}
         onOpenOAuth={setOauthProvider}
         reloadToken={reloadToken}
@@ -665,6 +689,7 @@ export function KeysView() {
         icon={<Github size={15} className="text-stone-300" />}
         subtitle="Tokens for external services such as GitHub polling."
         isTauri={isTauri}
+        storageBadge={storageLabel}
         providers={integrationProviders}
         onOpenOAuth={setOauthProvider}
         reloadToken={reloadToken}
@@ -680,9 +705,21 @@ export function KeysView() {
         </div>
         <div className="space-y-2 p-4">
           {[
-            { label: 'Backend', value: isTauri ? 'OS Keychain (keyring crate)' : 'localStorage', ok: isTauri },
+            {
+              label: 'Backend',
+              value: isTauri
+                ? devFileSecrets
+                  ? 'Dev JSON file (debug build)'
+                  : 'OS Keychain (keyring crate)'
+                : 'localStorage',
+              ok: isTauri,
+            },
             { label: 'Renderer access', value: 'None — proxied via Rust bridge', ok: true },
-            { label: 'Disk plaintext', value: 'Never', ok: true },
+            {
+              label: 'Disk plaintext',
+              value: devFileSecrets ? '~/.project-manager/dev-secrets.json' : 'Never',
+              ok: !devFileSecrets,
+            },
             { label: 'Providers tracked', value: `${PROVIDERS.length}`, ok: true },
           ].map(({ label, value, ok }) => (
             <div key={label} className="flex items-center justify-between text-sm">

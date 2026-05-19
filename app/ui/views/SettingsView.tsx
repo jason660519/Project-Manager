@@ -3,15 +3,28 @@
 import { useEffect, useState } from 'react';
 import { Monitor, Server } from 'lucide-react';
 
+import { getSecretsStorageBackend } from '../../../lib/bridge';
+import { formatSecretsStorageLabel } from '../../../lib/keys/secretsStorageLabel';
 import { KeyboardShortcutsView } from './KeyboardShortcutsView';
 
 export function SettingsView() {
   const [trayEnabled, setTrayEnabled] = useState(false);
   const [isTauri, setIsTauri] = useState(false);
+  const [secretsBackend, setSecretsBackend] = useState('localStorage');
 
   useEffect(() => {
-    setIsTauri(typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window);
+    const tauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+    setIsTauri(tauri);
+    if (!tauri) {
+      setSecretsBackend('localStorage');
+      return;
+    }
+    getSecretsStorageBackend()
+      .then(setSecretsBackend)
+      .catch(() => setSecretsBackend('keychain'));
   }, []);
+
+  const secretStorageLabel = formatSecretsStorageLabel(secretsBackend, isTauri);
 
   return (
     <div className="max-w-5xl space-y-6">
@@ -67,7 +80,7 @@ export function SettingsView() {
           {[
             { label: 'Mode', value: isTauri ? 'Tauri (Live)' : 'Browser (Dry-run)', accent: isTauri },
             { label: 'AI API Route', value: 'Rust → reqwest', accent: true },
-            { label: 'Secret Storage', value: isTauri ? 'macOS Keychain' : 'localStorage', accent: isTauri },
+            { label: 'Secret Storage', value: secretStorageLabel, accent: isTauri },
             { label: 'Process Spawn', value: isTauri ? 'active' : 'disabled', accent: isTauri },
           ].map(({ label, value, accent }) => (
             <div key={label} className="flex items-center justify-between text-sm">

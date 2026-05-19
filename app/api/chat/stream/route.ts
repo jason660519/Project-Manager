@@ -11,6 +11,8 @@ interface RequestBody {
   provider?: string;
   /** Model override. Omit to use the provider's default. */
   model?: string;
+  /** Custom system prompt override. Omit to use the default. */
+  systemPrompt?: string;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -81,12 +83,13 @@ async function* streamProvider(
   provider: string,
   model: string,
   messages: ChatApiMessage[],
+  systemPrompt?: string,
 ): AsyncGenerator<string> {
   const envKey = `${provider.toUpperCase()}_API_KEY`;
   const apiKey = process.env[envKey];
   if (!apiKey) throw new Error(`${envKey} not configured`);
 
-  const sys = getSystemPrompt();
+  const sys = systemPrompt || getSystemPrompt();
 
   switch (provider) {
     case 'anthropic': {
@@ -248,10 +251,12 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  const systemPrompt = body.systemPrompt;
+
   // If the client specified a provider, try only that one
   if (body.provider) {
     const model = body.model || DEFAULT_MODELS[body.provider] || 'default';
-    const gen = streamProvider(body.provider, model, body.messages);
+    const gen = streamProvider(body.provider, model, body.messages, systemPrompt);
     // Pre-authorization check
     try {
       const iterator = gen[Symbol.asyncIterator]();
@@ -275,7 +280,7 @@ export async function POST(request: NextRequest) {
   for (const provider of FALLBACK_PROVIDERS) {
     const model = body.model || DEFAULT_MODELS[provider];
     try {
-      const gen = streamProvider(provider, model, body.messages);
+      const gen = streamProvider(provider, model, body.messages, systemPrompt);
       const iterator = gen[Symbol.asyncIterator]();
       const first = await iterator.next();
       async function* withFirst(): AsyncGenerator<string> {

@@ -66,9 +66,32 @@ Implemented the Sidebar Chatbot feature end to end.
 
 ### Shipped tests: 356 pass (F11), 301 pass (main)
 
-## 2026-05-20 09:30 +10:00 — Chat settings panel + file attachment (in progress)
+## 2026-05-20 09:30–09:40 +10:00 — Chat settings panel + file attachment + quick actions
 
-Now bringing the full-page chat (`/chat`) on par with the desktop OpenClaw-style chat:
-- Inline settings panel (collapsible) with provider selector, model picker, system prompt editor
-- File attachment button + upload
-- Plan/Debug/Ask/Image/Skills quick-action menu
+### Implementation
+
+- **ChatSettings component** (`components/chat/ChatSettings.tsx`): Collapsible settings panel with provider dropdown (reads from Keys config), model picker, and system prompt editor. Changes persist to localStorage and apply to subsequent messages.
+- **QuickActions component** (`components/chat/QuickActions.tsx`): + button dropdown with Plan, Debug, Ask, Image, Skills options. Each inserts a prompt template into the input.
+- **File attachment**: ChatInput rewritten with `AttachedFile[]` state. Supports text, markdown, JSON, YAML, and image files (up to 1MB, max 5). File content sent as context in AI messages. Image files shown as thumbnails.
+- **ChatInput refactored**: New `beforeArea`/`afterArea` slots for toolbar buttons, `onSetValueRef` for external value setting (quick actions), file chip display.
+
+### API changes
+- Both `/api/chat` and `/api/chat/stream` accept `systemPrompt` for custom system prompt override
+- Client-side provider config reads from `pm-chat-settings` localStorage (inline settings), falls back to `projectManager-llm-provider-order` (Keys view)
+- `SendChatMessageRequest` gains optional `chatSettings` field
+
+### Files changed
+- `components/chat/ChatSettings.tsx` — NEW
+- `components/chat/QuickActions.tsx` — NEW
+- `components/chat/ChatInput.tsx` — rewrite (file attach, toolbar slots, setValue ref)
+- `app/chat/ChatPageClient.tsx` — toolbar integration (settings + quick actions)
+- `app/api/chat/route.ts` — systemPrompt support
+- `app/api/chat/stream/route.ts` — systemPrompt support
+- `lib/chat/types.ts` — chatSettings field in SendChatMessageRequest
+- `lib/chat/chatAgent.ts` — loadChatProvider reads inline settings first; passes systemPrompt to API
+- `__tests__/chat.input.test.tsx` — updated for new button count + (message, files) signature
+- `__tests__/chat.panel.test.tsx` — updated send button selector
+
+### Tests
+- 44 files, 356 tests passed
+- Build: zero errors

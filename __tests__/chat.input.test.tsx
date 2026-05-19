@@ -9,7 +9,7 @@ describe('ChatInput', () => {
     const onSend = vi.fn();
     render(<ChatInput placeholder="Ask" sendLabel="Send" loadingLabel="Thinking" loading={false} onSend={onSend} />);
     await user.type(screen.getByPlaceholderText('Ask'), 'hello{Enter}');
-    expect(onSend).toHaveBeenCalledWith('hello');
+    expect(onSend).toHaveBeenCalledWith('hello', undefined);
   });
 
   it('does not send whitespace', async () => {
@@ -22,9 +22,10 @@ describe('ChatInput', () => {
 
   it('disables send while loading', () => {
     render(<ChatInput placeholder="Ask" sendLabel="Send" loadingLabel="Thinking" loading onSend={vi.fn()} />);
-    // Button has no text when loading (spinner only), so check by disabled role
+    // Now there are 2 buttons: file attach + send. Only send is disabled.
     const buttons = screen.getAllByRole('button');
-    expect(buttons.length).toBe(1);
-    expect(buttons[0]).toBeDisabled();
+    expect(buttons.length).toBe(2);
+    // The send button is the last one (disabled)
+    expect(buttons[buttons.length - 1]).toBeDisabled();
   });
 });

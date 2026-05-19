@@ -11,6 +11,8 @@ interface RequestBody {
   provider?: string;
   /** Model override. Omit to use the provider's default. */
   model?: string;
+  /** Custom system prompt override. Omit to use the default. */
+  systemPrompt?: string;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -21,11 +23,12 @@ async function callProvider(
   provider: string,
   model: string,
   messages: ChatApiMessage[],
+  systemPrompt?: string,
 ): Promise<string> {
   const apiKey = process.env[`${provider.toUpperCase()}_API_KEY`];
   if (!apiKey) throw new Error(`${provider.toUpperCase()}_API_KEY not configured`);
 
-  const sys = getSystemPrompt();
+  const sys = systemPrompt || getSystemPrompt();
 
   switch (provider) {
     case 'anthropic': {
@@ -165,11 +168,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'messages is required' }, { status: 400 });
   }
 
+  const systemPrompt = body.systemPrompt;
+
   // If the client specified a provider, try only that one
   if (body.provider) {
     const model = body.model || DEFAULT_MODELS[body.provider] || 'default';
     try {
-      const content = await callProvider(body.provider, model, body.messages);
+      const content = await callProvider(body.provider, model, body.messages, systemPrompt);
       return NextResponse.json({ content, provider: body.provider, model });
     } catch (e) {
       return NextResponse.json(
@@ -184,7 +189,7 @@ export async function POST(request: NextRequest) {
   for (const provider of FALLBACK_CHAIN) {
     try {
       const model = body.model || DEFAULT_MODELS[provider];
-      const content = await callProvider(provider, model, body.messages);
+      const content = await callProvider(provider, model, body.messages, systemPrompt);
       return NextResponse.json({ content, provider, model });
     } catch (e) {
       errors.push(`${provider}: ${(e as Error).message}`);
