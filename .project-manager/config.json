@@ -288,9 +288,9 @@
         "developmentLogSummaryFolder": ".project-manager/features/F14/"
       },
       "readmePath": ".project-manager/features/F14/README.md",
-      "notes": "Collapsible AI assistant embedded at the bottom of the sidebar with local commands, markdown responses, and agent dispatch integration.",
+      "notes": "v1 core complete. v1.5: settings panel + file attachment + quick actions",
       "createdAt": "2026-05-20T01:46:00.000+10:00",
-      "updatedAt": "2026-05-20T01:46:00.000+10:00",
+      "updatedAt": "2026-05-20T09:30:00.000+10:00",
       "updatedBy": "f14_engineer",
       "phase": "development",
       "points": 1

@@ -127,6 +127,35 @@ it('routes /go logs without spawning an agent', async () => {
 });
 ```
 
+## Suite G — Settings Panel
+
+| # | Test | Expected |
+|---|---|---|
+| G1 | Settings toggle button exists | A gear/settings button is visible in the chat toolbar |
+| G2 | Toggle opens settings panel | Clicking settings toggles a panel with provider, model, system prompt |
+| G3 | Provider selector shows options | Dropdown lists known providers |
+| G4 | Model picker shows options | Dropdown lists available models for the selected provider |
+| G5 | System prompt editor | Textarea for custom system prompt |
+| G6 | Settings persist across session | Provider/model choice persists in localStorage |
+
+## Suite H — File Attachment
+
+| # | Test | Expected |
+|---|---|---|
+| H1 | Attach button visible | Paperclip icon button is present near the input |
+| H2 | Clicking attach opens file picker | Native file input dialog opens |
+| H3 | Attaching a text file adds a chip | File chip appears above input |
+| H4 | Attached file content is included in API call | Message payload includes file context |
+| H5 | Removing a file chip detaches it | File is no longer sent |
+
+## Suite I — Quick Actions Menu
+
+| # | Test | Expected |
+|---|---|---|
+| I1 | Plus button visible | A + button is present next to the input |
+| I2 | Clicking + opens action menu | Menu shows Plan, Debug, Ask, Image, Skills |
+| I3 | Selecting an action populates input | Input is filled with a structured prompt template |
+
 ## Regression Coverage
 
 - Existing i18n completeness tests must include the new `chat.*` keys.

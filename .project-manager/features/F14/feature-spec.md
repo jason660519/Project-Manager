@@ -118,15 +118,35 @@ The v1 experience should feel like a compact agent panel living at the bottom of
 11. i18n completeness tests pass for all locale dictionaries.
 12. Existing tests and typecheck continue to pass.
 
-## Non-goals
+### Extended requirements (v1.5)
 
-- No WebSocket or streaming responses. Polling or one-shot responses are fine for v1.
-- No persistent chat history across page reloads.
-- No file upload.
+#### Inline settings panel
+- A collapsible settings panel accessible from the chat toolbar
+- Settings available: provider selector, model picker, system prompt editor
+- Provider list and model picker auto-populate from the Keys view config (localStorage)
+- Changes sync to the chat API request for subsequent messages
+
+#### File attachment
+- Attach file button opens native file picker
+- Supported: plain text, markdown, image (display thumbnail), JSON, YAML
+- Attached file content is sent as context in the next AI message
+- File list shown as chips/tags above the input area, removable
+
+#### Quick actions menu
+- Plus (+) button opens a dropdown menu with: Plan, Debug, Ask, Image, Skills
+- Each action may insert a structured prompt template or switch chat mode
+
+## Non-goals (updated)
+
 - No voice input.
-- No new backend persistence model.
+- No WebSocket (SSE streaming already implemented).
 - No sidebar width increase.
-- No replacement of `TaskDispatchModal`; the chat should integrate with or trigger existing dispatch flows.
+- No replacement of `TaskDispatchModal`.
+
+## v1.5 — Non-goals
+
+- No agent dispatch from file context.
+- No multi-turn file conversation.
 
 ## Open Questions for Implementation
 
