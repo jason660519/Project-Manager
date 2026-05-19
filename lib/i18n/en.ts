@@ -161,8 +161,11 @@ export const en: Translations = {
     mcpEmpty: 'No MCP servers configured',
     commandPreparing: 'Preparing dispatch command\u2026',
     dispatchNoAdapter: 'No adapter selected',
+    noAvailableAdapters: 'No available adapters',
+    noAvailableAdaptersHint: 'Configure an IDE or agent adapter before dispatching.',
     batchEmptyTitle: 'No features to dispatch',
     batchEmptyHint: 'Add features in Dashboard first',
+    batchNeedAgent: 'Need at least one agent',
     adapterWarningHint: 'Previously assigned adapter "{id}" is no longer configured. Using "{fallback}".',
   },
 };
