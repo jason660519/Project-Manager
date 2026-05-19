@@ -47,6 +47,8 @@ describe('ChatPageClient', () => {
       writable: true,
       configurable: true,
     });
+    // Mock scrollIntoView for jsdom
+    Element.prototype.scrollIntoView = vi.fn();
   });
 
   it('renders the empty state with quick command buttons', () => {
