@@ -330,7 +330,17 @@ export async function sendChatMessage(request: SendChatMessageRequest): Promise<
       args: result.args,
       workingDir: project.config.project.root,
     });
-    return { content: await waitForAgentOutput(pid) };
+    const agentOutput = await waitForAgentOutput(pid);
+    // If agent exited with a non-zero exit code, fall back to AI API
+    if (agentOutput.includes('Agent exited with code') && !agentOutput.includes('code 0')) {
+      try {
+        const content = await callChatApi(request.content, request.history, request.onStream);
+        return { content };
+      } catch {
+        return { content: agentOutput, error: true };
+      }
+    }
+    return { content: agentOutput };
   }
 
   // No project or no adapter configured — use the AI chat API directly
