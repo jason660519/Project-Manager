@@ -3,6 +3,7 @@
 import { Bot, ChevronDown, MessageSquareText, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useI18n } from '../../lib/i18n';
 import { ChatInput } from '../../components/chat/ChatInput';
 import { ChatMessage as ChatMessageView } from '../../components/chat/ChatMessage';
 import type { ChatMessage } from '../../lib/chat/types';
@@ -86,6 +87,20 @@ interface ChatPageClientProps {
 
 export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
   const router = useRouter();
+  const { t } = useI18n();
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Cmd+K / Ctrl+K keyboard shortcut to focus input
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Sessions state
   const [sessions, setSessions] = useState<StoredSession[]>([]);
@@ -256,7 +271,7 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
             className="flex items-center gap-1 rounded border border-amber-200/20 bg-amber-500/8 px-2 py-1 text-[10px] font-semibold text-amber-100 transition-colors hover:bg-amber-500/15"
           >
             <MessageSquareText size={11} />
-            <span>New</span>
+            <span>{t.chat.new}</span>
           </button>
         </div>
 
@@ -264,7 +279,7 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
         <div className="flex-1 overflow-y-auto">
           {sessions.length === 0 ? (
             <p className="px-3 pt-4 text-[10px] leading-relaxed text-stone-500">
-              No conversations yet. Start a new chat above.
+              {t.chat.noConversations}
             </p>
           ) : (
             <div className="space-y-0.5 p-1.5">
@@ -315,7 +330,7 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
             className="flex items-center gap-1 rounded px-1.5 py-1 text-[10px] text-stone-400 hover:text-stone-200 lg:hidden"
           >
             <ChevronDown size={11} className={`transition-transform ${showHistory ? '' : '-rotate-90'}`} />
-            <span>History</span>
+            <span>{t.chat.history}</span>
           </button>
 
           <Bot size={14} className="text-amber-200/60 shrink-0" />
@@ -330,7 +345,7 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
               className="flex items-center gap-1 rounded border border-stone-200/15 px-2 py-1 text-[10px] text-stone-400 transition-colors hover:border-amber-200/25 hover:text-amber-100"
             >
               <MessageSquareText size={11} />
-              <span>New Chat</span>
+              <span>{t.chat.newChat}</span>
             </button>
           )}
         </div>
@@ -341,12 +356,9 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-stone-200/15 bg-white/[0.03]">
               <Bot size={22} className="text-amber-200/50" />
             </div>
-            <p className="text-[13px] font-semibold text-stone-200">Project Manager Assistant</p>
+            <p className="text-[13px] font-semibold text-stone-200">{t.chat.welcomeTitle}</p>
             <p className="mt-2 max-w-sm text-[11px] leading-relaxed text-stone-400">
-              Ask me about your project, features, recent runs, or use commands like{' '}
-              <code className="rounded bg-black/30 px-1 font-mono text-[10px] text-amber-100">/status</code>,{' '}
-              <code className="rounded bg-black/30 px-1 font-mono text-[10px] text-amber-100">/help</code>,{' '}
-              <code className="rounded bg-black/30 px-1 font-mono text-[10px] text-amber-100">/go dashboard</code>.
+              {t.chat.welcome}
             </p>
             <div className="mt-6 flex flex-wrap gap-2">
               {['/status', '/help', '/go dashboard'].map((cmd) => (
@@ -368,14 +380,15 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
         {/* Input */}
         <div className="border-t border-stone-200/15 p-3 lg:p-4">
           <ChatInput
-            placeholder="Ask me anything..."
-            sendLabel="Send"
-            loadingLabel="Thinking..."
+            placeholder={t.chat.placeholder}
+            sendLabel={t.chat.send}
+            loadingLabel={t.chat.loading}
             loading={loading}
             onSend={handleSend}
+            externalRef={inputRef}
           />
           <p className="mt-2 text-center text-[9px] tracking-[0.06em] text-stone-600/70">
-            Enter to send &middot; Shift+Enter for new line
+            {t.chat.enterToSend}
           </p>
         </div>
       </div>

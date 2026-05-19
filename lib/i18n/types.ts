@@ -106,6 +106,14 @@ export interface Translations {
     send: string;
     loading: string;
     error: string;
+    history: string;
+    newChat: string;
+    new: string;
+    noConversations: string;
+    welcomeTitle: string;
+    enterToSend: string;
+    deleteSession: string;
+    openFullChat: string;
   };
   dispatch: {
     title: string;
