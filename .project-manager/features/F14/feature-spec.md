@@ -51,17 +51,31 @@ The v1 experience should feel like a compact agent panel living at the bottom of
 
 - `components/chat/ChatPanel.tsx`
   - Owns collapsed/expanded UI, message list, loading/error state, and orchestration.
+  - Integrates: streaming responses, ChatSettings, file attachment, QuickActions
 - `components/chat/ChatMessage.tsx`
   - Renders user and assistant messages.
   - Uses Markdown rendering for assistant output, including fenced code blocks.
+  - Shows timestamps, copy button, error labels.
 - `components/chat/ChatInput.tsx`
   - Owns textarea/input behavior and send button.
   - Sends on Enter, inserts newline on Shift+Enter.
   - Disables send while loading or when trimmed input is empty.
+  - Supports file attachment via AttachedFile type + file chips.
+  - Supports beforeArea/afterArea slots for toolbar components.
+- `components/chat/ChatSettings.tsx`
+  - Collapsible settings panel in the chat toolbar.
+  - Provider selector (auto-populated from Keys config).
+  - Model picker.
+  - System prompt editor.
+- `components/chat/QuickActions.tsx`
+  - Plus button dropdown with Plan/Debug/Ask/Image/Skills.
+  - Each action inserts a structured prompt template.
 - `lib/chat/types.ts`
   - Defines `ChatMessage`, `ChatRole`, `ChatContext`, `ChatCommandResult`, and request/response types.
 - `lib/chat/chatAgent.ts`
   - Owns message-to-action routing and agent dispatch.
+  - Agent exit code 2 fallback: on non-zero exit, automatically falls back to AI API proxy.
+  - Provider selection: reads from inline settings or Keys view.
 
 ### Agent and Action Execution
 
@@ -91,6 +105,14 @@ The v1 experience should feel like a compact agent panel living at the bottom of
   - `chat.send`
   - `chat.loading`
   - `chat.error`
+  - `chat.history`
+  - `chat.newChat`
+  - `chat.new`
+  - `chat.noConversations`
+  - `chat.welcomeTitle`
+  - `chat.enterToSend`
+  - `chat.deleteSession`
+  - `chat.openFullChat`
 - Keep keys present in every locale file to satisfy completeness tests.
 
 ### Routing and Navigation
@@ -118,7 +140,7 @@ The v1 experience should feel like a compact agent panel living at the bottom of
 11. i18n completeness tests pass for all locale dictionaries.
 12. Existing tests and typecheck continue to pass.
 
-### Extended requirements (v1.5)
+### v1.5 — Extended features (both full-page and per-project panels)
 
 #### Inline settings panel
 - A collapsible settings panel accessible from the chat toolbar
@@ -136,15 +158,27 @@ The v1 experience should feel like a compact agent panel living at the bottom of
 - Plus (+) button opens a dropdown menu with: Plan, Debug, Ask, Image, Skills
 - Each action may insert a structured prompt template or switch chat mode
 
+#### Streaming responses (typewriter effect)
+- All messages use SSE streaming with character-by-character typing animation
+- Typing dots indicator during loading (animated bouncing dots)
+
+#### Timestamps & copy button
+- Assistant messages show timestamps (Today/Yesterday vs date+time)
+- Hover over assistant message reveals copy-to-clipboard button
+
+#### Error handling
+- Rate limit, auth failure, and missing key errors show specific messages
+- Failed messages marked with red "Error" tag
+
+#### Agent exit code fallback
+- When agent bridge exits with non-zero code, automatically fall back to AI API proxy
+
 ## Non-goals (updated)
 
 - No voice input.
 - No WebSocket (SSE streaming already implemented).
 - No sidebar width increase.
 - No replacement of `TaskDispatchModal`.
-
-## v1.5 — Non-goals
-
 - No agent dispatch from file context.
 - No multi-turn file conversation.
 
@@ -153,4 +187,3 @@ The v1 experience should feel like a compact agent panel living at the bottom of
 1. Whether `/dispatch <feature-id>` should directly spawn an agent or open the existing `TaskDispatchModal` with a preselected feature.
 2. Which adapter should be the default for general chat: selected feature `promptConfig.agentId`, first agent adapter, project default, or a user preference.
 3. Whether the chat panel should be visible only on desktop, matching the current hidden mobile sidebar, or gain a separate mobile affordance later.
-

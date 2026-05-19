@@ -127,7 +127,7 @@ it('routes /go logs without spawning an agent', async () => {
 });
 ```
 
-## Suite G — Settings Panel
+## Suite G — Settings Panel (Full-page + Per-project)
 
 | # | Test | Expected |
 |---|---|---|
@@ -138,7 +138,7 @@ it('routes /go logs without spawning an agent', async () => {
 | G5 | System prompt editor | Textarea for custom system prompt |
 | G6 | Settings persist across session | Provider/model choice persists in localStorage |
 
-## Suite H — File Attachment
+## Suite H — File Attachment (Both Panels)
 
 | # | Test | Expected |
 |---|---|---|
@@ -148,7 +148,7 @@ it('routes /go logs without spawning an agent', async () => {
 | H4 | Attached file content is included in API call | Message payload includes file context |
 | H5 | Removing a file chip detaches it | File is no longer sent |
 
-## Suite I — Quick Actions Menu
+## Suite I — Quick Actions Menu (Both Panels)
 
 | # | Test | Expected |
 |---|---|---|
@@ -156,19 +156,30 @@ it('routes /go logs without spawning an agent', async () => {
 | I2 | Clicking + opens action menu | Menu shows Plan, Debug, Ask, Image, Skills |
 | I3 | Selecting an action populates input | Input is filled with a structured prompt template |
 
+## Suite J — Per-Project ChatPanel Advanced Features
+
+| # | Test | Expected |
+|---|---|---|
+| J1 | Streaming responses | Panel sends to SSE streaming endpoint with onStream callback |
+| J2 | ChatSettings gear in toolbar | Settings toggle is present in ChatPanel header |
+| J3 | QuickActions + button in toolbar | Plus button present in ChatPanel toolbar |
+| J4 | File attach in ChatPanel | Attach button present in ChatPanel |
+| J5 | Animated typing dots | Loading shows animated dots instead of static text |
+| J6 | Error tags on failed messages | Failed assistant messages show red "Error" badge |
+| J7 | Timestamps visible | Assistant messages show formatted timestamps |
+
 ## Regression Coverage
 
 - Existing i18n completeness tests must include the new `chat.*` keys.
 - Existing sidebar tests, if any, should be extended to assert the chat entry exists.
 - Existing dispatch tests must continue to pass; the chat agent should reuse bridge helpers without changing `TaskDispatchModal` behavior.
+- All 356 existing tests continue to pass.
 
 ## Verification Commands
 
-- `npm test -- --run components/chat lib/chat lib/i18n`
 - `npm test -- --run`
-- `npm run typecheck`
+- `npx next build`
 
 ## Expected Initial State
 
 Before implementation, Suites A-D should fail because the chat components do not exist. The i18n completeness tests should pass once the `chat` keys are present in every locale.
-
