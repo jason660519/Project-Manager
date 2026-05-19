@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Clock, Pencil, Play, Plus, Timer, Trash2, XCircle } from 'lucide-react';
 import type { CronJob, CronRun } from '../../../lib/types';
+import { useI18n } from '../../../lib/i18n';
 
 interface CronJobsViewProps {
   cronJobs: CronJob[];
@@ -18,34 +19,35 @@ const BLANK_FORM: Omit<CronJob, 'id' | 'createdAt'> = {
   action: { type: 'run-command', command: '', args: [], workingDir: '' },
 };
 
-function formatRelative(iso: string): string {
+function formatRelative(iso: string, ago: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const s = Math.floor(diff / 1000);
-  if (s < 60) return `${s}s ago`;
+  if (s < 60) return `${s}s ${ago}`;
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
+  if (m < 60) return `${m}m ${ago}`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+  if (h < 24) return `${h}h ${ago}`;
+  return `${Math.floor(h / 24)}d ${ago}`;
 }
 
-function scheduleLabel(job: CronJob): string {
-  return `Every ${job.schedule.value} ${job.schedule.unit}`;
+function scheduleLabel(job: CronJob, template: string, unit: string): string {
+  return template.replace('{value}', String(job.schedule.value)).replace('{unit}', unit);
 }
 
-function nextRunLabel(job: CronJob, nextRunMs: number | undefined): string {
+function nextRunLabel(job: CronJob, nextRunMs: number | undefined, tCron: ReturnType<typeof useI18n>['t']['cron']): string {
   if (!job.enabled) return '—';
-  if (!nextRunMs) return 'pending';
+  if (!nextRunMs) return tCron.pending;
   const diff = nextRunMs - Date.now();
-  if (diff <= 0) return 'now';
+  if (diff <= 0) return tCron.now;
   const s = Math.floor(diff / 1000);
-  if (s < 60) return `in ${s}s`;
+  if (s < 60) return tCron.inSeconds.replace('{count}', String(s));
   const m = Math.floor(s / 60);
-  if (m < 60) return `in ${m}m`;
-  return `in ${Math.floor(m / 60)}h ${m % 60}m`;
+  if (m < 60) return tCron.inMinutes.replace('{count}', String(m));
+  return tCron.inHoursMinutes.replace('{hours}', String(Math.floor(m / 60))).replace('{minutes}', String(m % 60));
 }
 
 export function CronJobsView({ cronJobs, cronHistory, onCronJobsChange }: CronJobsViewProps) {
+  const { t } = useI18n();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(BLANK_FORM);
@@ -129,10 +131,10 @@ export function CronJobsView({ cronJobs, cronHistory, onCronJobsChange }: CronJo
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">
-            Cron Jobs
+            {t.cron.title}
           </h1>
           <p className="mt-1 text-xs text-stone-400">
-            Scheduled commands that run while the app is open.
+            {t.cron.subtitle}
           </p>
         </div>
         <button
@@ -140,19 +142,19 @@ export function CronJobsView({ cronJobs, cronHistory, onCronJobsChange }: CronJo
           className="flex items-center gap-1.5 border border-emerald-400/40 px-3 py-1.5 text-xs text-emerald-300 hover:bg-emerald-950/40"
         >
           <Plus size={13} />
-          New Job
+          {t.cron.newJob}
         </button>
       </div>
 
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Enabled', value: `${enabledCount} / ${cronJobs.length}` },
-          { label: 'History', value: `${cronHistory.length} runs` },
+          { label: t.cron.enabled, value: `${enabledCount} / ${cronJobs.length}` },
+          { label: t.cron.history, value: `${cronHistory.length} ${t.cron.runs}` },
           {
-            label: 'Next Wake',
+            label: t.cron.nextWake,
             value: soonestNext
-              ? nextRunLabel({ enabled: true } as CronJob, soonestNext)
+              ? nextRunLabel({ enabled: true } as CronJob, soonestNext, t.cron)
               : '—',
           },
         ].map(({ label, value }) => (
@@ -168,12 +170,12 @@ export function CronJobsView({ cronJobs, cronHistory, onCronJobsChange }: CronJo
 
       {/* Jobs table */}
       <section>
-        <h2 className="mb-3 text-xs uppercase tracking-[0.18em] text-stone-400">Jobs</h2>
+        <h2 className="mb-3 text-xs uppercase tracking-[0.18em] text-stone-400">{t.cron.jobs}</h2>
 
         {cronJobs.length === 0 ? (
           <div className="flex flex-col items-center gap-2 border border-dashed border-stone-200/15 py-12 text-center">
             <Timer size={24} className="text-stone-600" />
-            <p className="text-xs text-stone-500">No jobs yet. Create one to get started.</p>
+            <p className="text-xs text-stone-500">{t.cron.noJobs}</p>
           </div>
         ) : (
           <div className="divide-y divide-stone-200/10 border border-stone-200/12">
@@ -191,7 +193,7 @@ export function CronJobsView({ cronJobs, cronHistory, onCronJobsChange }: CronJo
                       ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-400'
                       : 'border-stone-200/20 bg-transparent text-stone-600',
                   ].join(' ')}
-                  title={job.enabled ? 'Disable' : 'Enable'}
+                  title={job.enabled ? t.cron.disable : t.cron.enable}
                 >
                   {job.enabled && (
                     <svg viewBox="0 0 12 12" fill="none" className="h-full w-full p-[1px]">
@@ -206,7 +208,7 @@ export function CronJobsView({ cronJobs, cronHistory, onCronJobsChange }: CronJo
                     <span className="font-medium text-stone-100">{job.name}</span>
                     {!job.enabled && (
                       <span className="text-[10px] uppercase tracking-[0.12em] text-stone-600">
-                        disabled
+                        {t.cron.disabled}
                       </span>
                     )}
                   </div>
@@ -218,12 +220,12 @@ export function CronJobsView({ cronJobs, cronHistory, onCronJobsChange }: CronJo
                 {/* Schedule */}
                 <div className="flex w-28 shrink-0 items-center gap-1.5 text-xs text-stone-400">
                   <Clock size={12} className="shrink-0" />
-                  {scheduleLabel(job)}
+                  {scheduleLabel(job, t.cron.everySchedule, job.schedule.unit === 'minutes' ? t.cron.minutes : t.cron.hours)}
                 </div>
 
                 {/* Next run */}
                 <div className="w-20 shrink-0 text-right text-xs text-stone-500">
-                  {nextRunLabel(job, nextRunMap[job.id])}
+                  {nextRunLabel(job, nextRunMap[job.id], t.cron)}
                 </div>
 
                 {/* Last run */}
@@ -235,7 +237,7 @@ export function CronJobsView({ cronJobs, cronHistory, onCronJobsChange }: CronJo
                     <XCircle size={12} className="text-red-400" />
                   )}
                   <span className="text-stone-500">
-                    {job.lastRun ? formatRelative(job.lastRun) : '—'}
+                    {job.lastRun ? formatRelative(job.lastRun, t.cron.ago) : '—'}
                   </span>
                 </div>
 
@@ -264,7 +266,7 @@ export function CronJobsView({ cronJobs, cronHistory, onCronJobsChange }: CronJo
       {cronHistory.length > 0 && (
         <section>
           <h2 className="mb-3 text-xs uppercase tracking-[0.18em] text-stone-400">
-            Recent Runs
+            {t.cron.recentRuns}
           </h2>
           <div className="divide-y divide-stone-200/10 border border-stone-200/12">
             {[...cronHistory].reverse().slice(0, 20).map((run, i) => (
@@ -278,7 +280,7 @@ export function CronJobsView({ cronJobs, cronHistory, onCronJobsChange }: CronJo
                 {run.pid && (
                   <span className="font-mono text-xs text-stone-600">PID {run.pid}</span>
                 )}
-                <span className="text-xs text-stone-500">{formatRelative(run.firedAt)}</span>
+                <span className="text-xs text-stone-500">{formatRelative(run.firedAt, t.cron.ago)}</span>
               </div>
             ))}
           </div>
@@ -291,7 +293,7 @@ export function CronJobsView({ cronJobs, cronHistory, onCronJobsChange }: CronJo
           <div className="flex h-full w-[420px] flex-col border-l border-stone-200/15 bg-[rgb(var(--pm-rail))]">
             <div className="flex items-center justify-between border-b border-stone-200/15 px-5 py-4">
               <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-100">
-                {editingId ? 'Edit Job' : 'New Job'}
+                {editingId ? t.cron.editJob : t.cron.newJob}
               </h2>
               <button
                 onClick={() => setShowForm(false)}
@@ -305,26 +307,26 @@ export function CronJobsView({ cronJobs, cronHistory, onCronJobsChange }: CronJo
               {/* Basics */}
               <fieldset className="space-y-3">
                 <legend className="text-[10px] uppercase tracking-[0.16em] text-stone-500">
-                  Basics
+                  {t.cron.basics}
                 </legend>
 
                 <div>
                   <label className="mb-1 block text-[11px] text-stone-400">
-                    Name <span className="text-red-400">*</span>
+                    {t.cron.name} <span className="text-red-400">*</span>
                   </label>
                   <input
                     className="w-full border border-stone-200/15 bg-transparent px-3 py-2 text-xs text-stone-100 placeholder-stone-600 focus:border-stone-200/40 focus:outline-none"
-                    placeholder="e.g. Daily Build"
+                    placeholder={t.cron.namePlaceholder}
                     value={form.name}
                     onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   />
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-[11px] text-stone-400">Description</label>
+                  <label className="mb-1 block text-[11px] text-stone-400">{t.cron.description}</label>
                   <input
                     className="w-full border border-stone-200/15 bg-transparent px-3 py-2 text-xs text-stone-100 placeholder-stone-600 focus:border-stone-200/40 focus:outline-none"
-                    placeholder="Optional description"
+                    placeholder={t.cron.descriptionPlaceholder}
                     value={form.description}
                     onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                   />
@@ -347,20 +349,20 @@ export function CronJobsView({ cronJobs, cronHistory, onCronJobsChange }: CronJo
                       </svg>
                     )}
                   </button>
-                  <span className="text-xs text-stone-300">Enabled</span>
+                  <span className="text-xs text-stone-300">{t.cron.enabled}</span>
                 </div>
               </fieldset>
 
               {/* Schedule */}
               <fieldset className="space-y-3 border-t border-stone-200/10 pt-4">
                 <legend className="text-[10px] uppercase tracking-[0.16em] text-stone-500">
-                  Schedule
+                  {t.cron.schedule}
                 </legend>
 
                 <div className="flex gap-2">
                   <div className="flex-1">
                     <label className="mb-1 block text-[11px] text-stone-400">
-                      Every <span className="text-red-400">*</span>
+                      {t.cron.every} <span className="text-red-400">*</span>
                     </label>
                     <input
                       type="number"
@@ -376,7 +378,7 @@ export function CronJobsView({ cronJobs, cronHistory, onCronJobsChange }: CronJo
                     />
                   </div>
                   <div className="flex-1">
-                    <label className="mb-1 block text-[11px] text-stone-400">Unit</label>
+                    <label className="mb-1 block text-[11px] text-stone-400">{t.cron.unit}</label>
                     <select
                       className="w-full border border-stone-200/15 bg-[rgb(var(--pm-rail))] px-3 py-2 text-xs text-stone-100 focus:border-stone-200/40 focus:outline-none"
                       value={form.schedule.unit}
@@ -390,8 +392,8 @@ export function CronJobsView({ cronJobs, cronHistory, onCronJobsChange }: CronJo
                         }))
                       }
                     >
-                      <option value="minutes">Minutes</option>
-                      <option value="hours">Hours</option>
+                      <option value="minutes">{t.cron.minutes}</option>
+                      <option value="hours">{t.cron.hours}</option>
                     </select>
                   </div>
                 </div>
@@ -400,16 +402,16 @@ export function CronJobsView({ cronJobs, cronHistory, onCronJobsChange }: CronJo
               {/* Action */}
               <fieldset className="space-y-3 border-t border-stone-200/10 pt-4">
                 <legend className="text-[10px] uppercase tracking-[0.16em] text-stone-500">
-                  Command
+                  {t.cron.command}
                 </legend>
 
                 <div>
                   <label className="mb-1 block text-[11px] text-stone-400">
-                    Command <span className="text-red-400">*</span>
+                    {t.cron.command} <span className="text-red-400">*</span>
                   </label>
                   <input
                     className="w-full border border-stone-200/15 bg-transparent px-3 py-2 font-mono text-xs text-stone-100 placeholder-stone-600 focus:border-stone-200/40 focus:outline-none"
-                    placeholder="e.g. npm"
+                    placeholder={t.cron.commandPlaceholder}
                     value={form.action.command}
                     onChange={(e) =>
                       setForm((f) => ({
@@ -422,22 +424,22 @@ export function CronJobsView({ cronJobs, cronHistory, onCronJobsChange }: CronJo
 
                 <div>
                   <label className="mb-1 block text-[11px] text-stone-400">
-                    Args{' '}
-                    <span className="text-stone-600">(space-separated)</span>
+                    {t.cron.args}{' '}
+                    <span className="text-stone-600">{t.cron.argsHint}</span>
                   </label>
                   <input
                     className="w-full border border-stone-200/15 bg-transparent px-3 py-2 font-mono text-xs text-stone-100 placeholder-stone-600 focus:border-stone-200/40 focus:outline-none"
-                    placeholder="e.g. run build"
+                    placeholder={t.cron.argsPlaceholder}
                     value={argsRaw}
                     onChange={(e) => setArgsRaw(e.target.value)}
                   />
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-[11px] text-stone-400">Working Dir</label>
+                  <label className="mb-1 block text-[11px] text-stone-400">{t.cron.workingDir}</label>
                   <input
                     className="w-full border border-stone-200/15 bg-transparent px-3 py-2 font-mono text-xs text-stone-100 placeholder-stone-600 focus:border-stone-200/40 focus:outline-none"
-                    placeholder="/absolute/path/to/project"
+                    placeholder={t.cron.workingDirPlaceholder}
                     value={form.action.workingDir}
                     onChange={(e) =>
                       setForm((f) => ({
@@ -457,13 +459,13 @@ export function CronJobsView({ cronJobs, cronHistory, onCronJobsChange }: CronJo
                 className="flex flex-1 items-center justify-center gap-1.5 border border-emerald-400/40 py-2 text-xs text-emerald-300 hover:bg-emerald-950/40 disabled:cursor-not-allowed disabled:border-stone-200/15 disabled:text-stone-600"
               >
                 <Play size={12} />
-                {editingId ? 'Save Changes' : 'Add Job'}
+                {editingId ? t.cron.saveChanges : t.cron.addJob}
               </button>
               <button
                 onClick={() => setShowForm(false)}
                 className="border border-stone-200/20 px-4 py-2 text-xs text-stone-400 hover:bg-white/5"
               >
-                Cancel
+                {t.cron.cancel}
               </button>
             </div>
           </div>

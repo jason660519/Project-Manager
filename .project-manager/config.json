@@ -2,8 +2,8 @@
   "schemaVersion": 5,
   "id": "5b9422db-4007-48fd-b9c0-dd192299e4dd",
   "createdAt": "2026-05-19T00:46:36.208Z",
-  "updatedAt": "2026-05-19T14:14:00.000Z",
-  "updatedBy": "f03_engineer",
+  "updatedAt": "2026-05-20T02:10:00.000+10:00",
+  "updatedBy": "f02_engineer",
   "project": {
     "name": "Project Manager",
     "root": "/Volumes/KLEVV-4T-1/Project-Manager",
@@ -14,8 +14,8 @@
       "id": "F12",
       "name": "Skills Management Page",
       "category": "Execution/Engineer Tools",
-      "status": "in_progress",
-      "progress": 70,
+      "status": "done",
+      "progress": 100,
       "paths": {
         "featureFolder": ".project-manager/features/F12/",
         "spec": ".project-manager/features/F12/feature-spec.md",
@@ -25,9 +25,10 @@
       },
       "readmePath": ".project-manager/features/F12/README.md",
       "createdAt": "2026-05-19T00:30:00.000Z",
-      "updatedAt": "2026-05-19T00:30:00.000Z",
+      "updatedAt": "2026-05-20T02:10:00.000+10:00",
       "phase": "development",
-      "points": 1
+      "points": 1,
+      "updatedBy": "f12_engineer"
     },
     {
       "id": "F01",
@@ -50,18 +51,21 @@
       "id": "F02",
       "name": "Feature Filter Tabs",
       "category": "Frontend/UX",
-      "status": "in_progress",
-      "progress": 65,
+      "status": "done",
+      "progress": 100,
       "paths": {
         "featureFolder": ".project-manager/features/F02/",
+        "spec": ".project-manager/features/F02/feature-spec.md",
+        "tdd": ".project-manager/features/F02/tdd-spec.md",
         "implementation": "app/ui/DashboardClient.tsx",
-        "test": "__tests__/dashboardLayout.test.ts",
+        "test": "__tests__/dashboardClient.phaseTabs.test.tsx",
         "developmentLogSummaryFolder": ".project-manager/features/F02/"
       },
       "notes": "Display feature progress, status, and dispatch operations on the home page dashboard.",
       "readmePath": ".project-manager/features/F02/README.md",
       "createdAt": "2026-05-18T22:54:50.000Z",
-      "updatedAt": "2026-05-18T22:54:50.000Z",
+      "updatedAt": "2026-05-20T02:10:00.000+10:00",
+      "updatedBy": "f02_engineer",
       "phase": "development",
       "points": 1,
       "metadata": {
@@ -72,8 +76,8 @@
       "id": "F03",
       "name": "Live Run Inspector",
       "category": "Frontend/Monitor",
-      "status": "in_progress",
-      "progress": 80,
+      "status": "done",
+      "progress": 100,
       "paths": {
         "featureFolder": ".project-manager/features/F03/",
         "implementation": "app/ui/views/RunsView.tsx",
@@ -82,7 +86,7 @@
       },
       "readmePath": ".project-manager/features/F03/README.md",
       "createdAt": "2026-05-18T22:54:57.000Z",
-      "updatedAt": "2026-05-19T14:14:00.000Z",
+      "updatedAt": "2026-05-20T02:01:00.000Z",
       "phase": "development",
       "points": 1,
       "updatedBy": "f03_engineer"
@@ -227,8 +231,8 @@
       "id": "F11",
       "name": "i18n: Multilingual Contributor Guide",
       "category": "Documentation/i18n",
-      "status": "in_progress",
-      "progress": 40,
+      "status": "done",
+      "progress": 100,
       "paths": {
         "featureFolder": ".project-manager/features/F11/",
         "implementation": "lib/hooks/useLang.ts",
@@ -240,9 +244,10 @@
       "notes": "Browser mode uses .env environment variables (server side), Tauri mode uses macOS Keychain.",
       "readmePath": ".project-manager/features/F11/README.md",
       "createdAt": "2026-05-19T00:24:47.000Z",
-      "updatedAt": "2026-05-19T00:24:47.000Z",
+      "updatedAt": "2026-05-20T02:01:00.000+10:00",
       "phase": "development",
       "points": 1,
+      "updatedBy": "f11_i18n_engineer",
       "metadata": {
         "notesSummary": "Browser mode uses .env environment variables (server side), Tauri mode uses macOS Keychain."
       }
@@ -251,8 +256,8 @@
       "id": "F13",
       "name": "Dispatch UX Improvements & Bug Fixes",
       "category": "Frontend/Dispatch",
-      "status": "in_progress",
-      "progress": 85,
+      "status": "done",
+      "progress": 100,
       "paths": {
         "featureFolder": ".project-manager/features/F13/",
         "spec": ".project-manager/features/F13/feature-spec.md",
@@ -263,8 +268,30 @@
       "readmePath": ".project-manager/features/F13/README.md",
       "notes": "Fix missing loading/error/empty states in TaskDispatchModal and BatchDispatchModal. Add kill confirmation, adapter fallback, command availability check, and MCP validation feedback.",
       "createdAt": "2026-05-19T13:47:00.000Z",
-      "updatedAt": "2026-05-19T14:08:00.000Z",
-      "updatedBy": "openclaw/OpenClaw + f13_engineer",
+      "updatedAt": "2026-05-20T02:06:00.000+10:00",
+      "updatedBy": "openclaw/Codex",
+      "phase": "deployment",
+      "points": 1
+    },
+    {
+      "id": "F14",
+      "name": "Sidebar Chatbot",
+      "category": "Frontend/AI Assistant",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "featureFolder": ".project-manager/features/F14/",
+        "spec": ".project-manager/features/F14/feature-spec.md",
+        "tdd": ".project-manager/features/F14/tdd-spec.md",
+        "implementation": "components/chat/",
+        "unitIntegrationTest": "components/chat/",
+        "developmentLogSummaryFolder": ".project-manager/features/F14/"
+      },
+      "readmePath": ".project-manager/features/F14/README.md",
+      "notes": "Collapsible AI assistant embedded at the bottom of the sidebar with local commands, markdown responses, and agent dispatch integration.",
+      "createdAt": "2026-05-20T01:46:00.000+10:00",
+      "updatedAt": "2026-05-20T01:46:00.000+10:00",
+      "updatedBy": "f14_engineer",
       "phase": "development",
       "points": 1
     }

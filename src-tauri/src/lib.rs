@@ -828,11 +828,12 @@ async fn call_gemini(
     });
 
     let url = format!(
-        "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}",
+        "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
     );
 
     let res = client
         .post(&url)
+        .header("x-goog-api-key", &api_key)
         .header("content-type", "application/json")
         .json(&body)
         .send()

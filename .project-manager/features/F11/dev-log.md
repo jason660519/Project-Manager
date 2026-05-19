@@ -20,7 +20,23 @@
 - `{count}` template placeholder used for "X runs active" — components do `replace('{count}', n)`. No pluralisation library needed at this scale.
 - GLOSSARY.md placed at `lib/i18n/GLOSSARY.md` with a canonical 4-locale term table.
 
+## 2026-05-19 — Session 2: TDD tests + vitest integration
+
+**Goal**: Add completeness and context tests for i18n layer; integrate into vitest.
+
+**Changes**:
+- Created `lib/i18n/__tests__/completeness.test.ts` — 9 leaf-path tests (every locale has all keys, no extra keys, no empty strings)
+- Created `lib/i18n/__tests__/context.test.tsx` — 4 render tests (default locale, switch translations, localStorage persist, document.lang update)
+- Updated `vitest.config.ts` include pattern to cover `lib/**/__tests__/**/*.test.{ts,tsx}`
+- Added `/// <reference types="vitest/globals" />` to context test for typecheck
+
+**Verification**: `npm run typecheck` ✓, 35 test files, 287 tests ✓
+
+---
+
 **Files created**:
+- `lib/i18n/__tests__/completeness.test.ts`
+- `lib/i18n/__tests__/context.test.tsx`
 - `lib/i18n/types.ts`
 - `lib/i18n/en.ts`
 - `lib/i18n/zh-hant.ts`
@@ -60,3 +76,20 @@
 - `document.lang` = `zh-hant` ✓
 
 **Outcome**: `npm run typecheck` passes. TopBar language dropdown switches all UI strings in real time. All hardcoded Chinese strings eliminated from English-mode view.
+
+## 2026-05-20 — Session 3: Final view migration
+
+**Goal**: Complete the remaining F11 i18n migration from 50% to 100%.
+
+**Changes**:
+- Added typed translation sections for `sessions.*`, `logs.*`, `cron.*`, and `plugins.*`.
+- Added matching English, Traditional Chinese, Simplified Chinese, and Japanese locale entries.
+- Migrated `SessionsView.tsx`: empty states, title, count text, transcript metadata, token summary, and locale-aware date/time formatting.
+- Migrated `LogsView.tsx`: tab labels, active/history labels, empty states, kill/hide/log/waiting labels, dev-log empty/loading states, and locale-aware date/time formatting.
+- Migrated `CronJobsView.tsx`: title/subtitle, stats, schedule labels, relative-time strings, form fields, units, buttons, enabled/disabled labels, and run history.
+- Migrated `PluginsView.tsx`: header/tabs, marketplace search/categories/install labels, installed plugin controls/statuses, config forms, MCP log modal, skills directory/actions/install UI, and skill errors.
+- Updated `.project-manager/config.json` F11 status to `done` and progress to `100`.
+
+**Verification**:
+- `npm test -- --run` passes (43 files, 346 tests).
+- `npm run typecheck` passes.
