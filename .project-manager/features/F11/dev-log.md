@@ -76,3 +76,20 @@
 - `document.lang` = `zh-hant` ✓
 
 **Outcome**: `npm run typecheck` passes. TopBar language dropdown switches all UI strings in real time. All hardcoded Chinese strings eliminated from English-mode view.
+
+## 2026-05-20 — Session 3: Final view migration
+
+**Goal**: Complete the remaining F11 i18n migration from 50% to 100%.
+
+**Changes**:
+- Added typed translation sections for `sessions.*`, `logs.*`, `cron.*`, and `plugins.*`.
+- Added matching English, Traditional Chinese, Simplified Chinese, and Japanese locale entries.
+- Migrated `SessionsView.tsx`: empty states, title, count text, transcript metadata, token summary, and locale-aware date/time formatting.
+- Migrated `LogsView.tsx`: tab labels, active/history labels, empty states, kill/hide/log/waiting labels, dev-log empty/loading states, and locale-aware date/time formatting.
+- Migrated `CronJobsView.tsx`: title/subtitle, stats, schedule labels, relative-time strings, form fields, units, buttons, enabled/disabled labels, and run history.
+- Migrated `PluginsView.tsx`: header/tabs, marketplace search/categories/install labels, installed plugin controls/statuses, config forms, MCP log modal, skills directory/actions/install UI, and skill errors.
+- Updated `.project-manager/config.json` F11 status to `done` and progress to `100`.
+
+**Verification**:
+- `npm test -- --run` passes (43 files, 346 tests).
+- `npm run typecheck` passes.

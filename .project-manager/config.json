@@ -231,8 +231,8 @@
       "id": "F11",
       "name": "i18n: Multilingual Contributor Guide",
       "category": "Documentation/i18n",
-      "status": "in_progress",
-      "progress": 50,
+      "status": "done",
+      "progress": 100,
       "paths": {
         "featureFolder": ".project-manager/features/F11/",
         "implementation": "lib/hooks/useLang.ts",
@@ -244,9 +244,10 @@
       "notes": "Browser mode uses .env environment variables (server side), Tauri mode uses macOS Keychain.",
       "readmePath": ".project-manager/features/F11/README.md",
       "createdAt": "2026-05-19T00:24:47.000Z",
-      "updatedAt": "2026-05-19T00:24:47.000Z",
+      "updatedAt": "2026-05-20T02:01:00.000+10:00",
       "phase": "development",
       "points": 1,
+      "updatedBy": "f11_i18n_engineer",
       "metadata": {
         "notesSummary": "Browser mode uses .env environment variables (server side), Tauri mode uses macOS Keychain."
       }

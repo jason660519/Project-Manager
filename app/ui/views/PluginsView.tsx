@@ -58,6 +58,7 @@ import {
   skillUninstall,
 } from '../../../lib/bridge';
 import { getSkillsDir } from '../../../lib/storage/settings';
+import { useI18n } from '../../../lib/i18n';
 
 // ─── Static marketplace catalog ────────────────────────────────────────────────
 
@@ -196,14 +197,14 @@ const MARKETPLACE: MarketplacePlugin[] = [
   },
 ];
 
-const CATEGORIES: { id: 'all' | Category; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'ai', label: 'AI Providers' },
-  { id: 'dev', label: 'Dev Tools' },
-  { id: 'vcs', label: 'Version Control' },
-  { id: 'pm', label: 'Project Mgmt' },
-  { id: 'ci', label: 'Monitoring' },
-  { id: 'notify', label: 'Notifications' },
+const CATEGORIES: { id: 'all' | Category; labelKey: keyof ReturnType<typeof useI18n>['t']['plugins']['categories'] }[] = [
+  { id: 'all', labelKey: 'all' },
+  { id: 'ai', labelKey: 'ai' },
+  { id: 'dev', labelKey: 'dev' },
+  { id: 'vcs', labelKey: 'vcs' },
+  { id: 'pm', labelKey: 'pm' },
+  { id: 'ci', labelKey: 'ci' },
+  { id: 'notify', labelKey: 'notify' },
 ];
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -212,13 +213,13 @@ function getInstalledIds(catalog: PluginCatalog): Set<string> {
   return new Set(catalog.plugins.map((p) => p.id));
 }
 
-function kindLabel(kind: PluginKind) {
+function kindLabel(kind: PluginKind, tPlugins: ReturnType<typeof useI18n>['t']['plugins']) {
   switch (kind) {
-    case 'provider': return { text: 'Provider', cls: 'text-emerald-300 border-emerald-200/25' };
-    case 'cli':      return { text: 'CLI',      cls: 'text-cyan-300 border-cyan-200/25' };
-    case 'editor':   return { text: 'Editor',   cls: 'text-amber-300 border-amber-200/25' };
-    case 'mcp':      return { text: 'MCP',      cls: 'text-violet-300 border-violet-200/25' };
-    case 'skill':    return { text: 'Skill',    cls: 'text-fuchsia-300 border-fuchsia-200/25' };
+    case 'provider': return { text: tPlugins.provider, cls: 'text-emerald-300 border-emerald-200/25' };
+    case 'cli':      return { text: tPlugins.cli,      cls: 'text-cyan-300 border-cyan-200/25' };
+    case 'editor':   return { text: tPlugins.editor,   cls: 'text-amber-300 border-amber-200/25' };
+    case 'mcp':      return { text: tPlugins.mcp,      cls: 'text-violet-300 border-violet-200/25' };
+    case 'skill':    return { text: tPlugins.skill,    cls: 'text-fuchsia-300 border-fuchsia-200/25' };
   }
 }
 
@@ -254,18 +255,19 @@ function FallbackLogo({ kind, size = 'md' }: { kind: PluginKind; size?: 'sm' | '
 }
 
 function McpStatusPill({ status }: { status?: McpRunStatus }) {
+  const { t } = useI18n();
   if (!status) {
-    return <span className="border border-stone-700 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-stone-500">Idle</span>;
+    return <span className="border border-stone-700 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-stone-500">{t.plugins.idle}</span>;
   }
   if (status.phase === 'running') {
-    return <span className="border border-emerald-400/40 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-emerald-300">Running · PID {status.pid}</span>;
+    return <span className="border border-emerald-400/40 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-emerald-300">{t.plugins.runningPid.replace('{pid}', String(status.pid))}</span>;
   }
   if (status.phase === 'stopped') {
-    return <span className="border border-stone-500/40 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-stone-400">Stopped</span>;
+    return <span className="border border-stone-500/40 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-stone-400">{t.plugins.stopped}</span>;
   }
   return (
     <span title={status.message} className="border border-red-500/40 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-red-400">
-      Errored
+      {t.plugins.errored}
     </span>
   );
 }
@@ -286,6 +288,7 @@ function ProviderConfigForm({
   onSave: (p: ProviderPlugin, key: string) => void;
   onCancel: () => void;
 }) {
+  const { t } = useI18n();
   const [form, setForm] = useState({
     baseUrl: entry.baseUrl,
     defaultModel: entry.defaultModel,
@@ -302,15 +305,15 @@ function ProviderConfigForm({
     <div className="space-y-3 border-t border-stone-200/12 bg-[rgb(var(--pm-rail))]/60 p-4">
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">Base URL</label>
+          <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">{t.plugins.form.baseUrl}</label>
           <input value={form.baseUrl} onChange={set('baseUrl')} className={inputCls} />
         </div>
         <div className="space-y-1">
-          <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">Default Model</label>
+          <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">{t.plugins.form.defaultModel}</label>
           <input value={form.defaultModel} onChange={set('defaultModel')} className={inputCls} />
         </div>
         <div className="col-span-2 space-y-1">
-          <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">API Key</label>
+          <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">{t.plugins.form.apiKey}</label>
           <div className="relative">
             <input
               type={form.showKey ? 'text' : 'password'}
@@ -329,12 +332,12 @@ function ProviderConfigForm({
           </div>
         </div>
         <div className="col-span-2 space-y-1">
-          <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">Models (one per line)</label>
+          <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">{t.plugins.form.models}</label>
           <textarea rows={3} value={form.models} onChange={set('models')} className={`${inputCls} font-mono text-xs`} />
         </div>
       </div>
       <div className="flex justify-end gap-2">
-        <button onClick={onCancel} className="px-3 py-1.5 text-xs text-stone-400 hover:text-stone-100">Cancel</button>
+        <button onClick={onCancel} className="px-3 py-1.5 text-xs text-stone-400 hover:text-stone-100">{t.plugins.cancel}</button>
         <button
           onClick={() =>
             onSave(
@@ -344,7 +347,7 @@ function ProviderConfigForm({
           }
           className="bg-stone-100 px-3 py-1.5 text-xs font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100"
         >
-          Save
+          {t.plugins.save}
         </button>
       </div>
     </div>
@@ -362,6 +365,7 @@ function CliConfigForm({
   onSave: (a: CliPlugin) => void;
   onCancel: () => void;
 }) {
+  const { t } = useI18n();
   const [form, setForm] = useState({
     command: entry.command,
     argsTemplate: entry.argsTemplate.join('\n'),
@@ -376,13 +380,13 @@ function CliConfigForm({
     <div className="space-y-3 border-t border-stone-200/12 bg-[rgb(var(--pm-rail))]/60 p-4">
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">Command</label>
+          <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">{t.plugins.form.command}</label>
           <input value={form.command} onChange={set('command')} className={`${inputCls} font-mono`} />
         </div>
         <div className="space-y-1">
-          <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">Provider</label>
+          <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">{t.plugins.form.provider}</label>
           <select value={form.providerId} onChange={set('providerId')} className={inputCls}>
-            <option value="">— none —</option>
+            <option value="">{t.plugins.form.none}</option>
             {providers.map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
@@ -390,13 +394,13 @@ function CliConfigForm({
         </div>
         <div className="col-span-2 space-y-1">
           <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">
-            Args Template (one per line · use {'{prompt}'} {'{root}'} {'{featureId}'})
+            {t.plugins.form.argsTemplate}
           </label>
           <textarea rows={3} value={form.argsTemplate} onChange={set('argsTemplate')} className={`${inputCls} font-mono text-xs`} />
         </div>
       </div>
       <div className="flex justify-end gap-2">
-        <button onClick={onCancel} className="px-3 py-1.5 text-xs text-stone-400 hover:text-stone-100">Cancel</button>
+        <button onClick={onCancel} className="px-3 py-1.5 text-xs text-stone-400 hover:text-stone-100">{t.plugins.cancel}</button>
         <button
           onClick={() =>
             onSave({
@@ -408,7 +412,7 @@ function CliConfigForm({
           }
           className="bg-stone-100 px-3 py-1.5 text-xs font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100"
         >
-          Save
+          {t.plugins.save}
         </button>
       </div>
     </div>
@@ -424,20 +428,21 @@ function EditorConfigForm({
   onSave: (editor: EditorPlugin) => void;
   onCancel: () => void;
 }) {
+  const { t } = useI18n();
   const [command, setCommand] = useState(entry.command);
   return (
     <div className="space-y-3 border-t border-stone-200/12 bg-[rgb(var(--pm-rail))]/60 p-4">
       <div className="space-y-1">
-        <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">Command</label>
+        <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">{t.plugins.form.command}</label>
         <input value={command} onChange={(e) => setCommand(e.target.value)} className={`${inputCls} font-mono`} />
       </div>
       <div className="flex justify-end gap-2">
-        <button onClick={onCancel} className="px-3 py-1.5 text-xs text-stone-400 hover:text-stone-100">Cancel</button>
+        <button onClick={onCancel} className="px-3 py-1.5 text-xs text-stone-400 hover:text-stone-100">{t.plugins.cancel}</button>
         <button
           onClick={() => onSave({ ...entry, command })}
           className="bg-stone-100 px-3 py-1.5 text-xs font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100"
         >
-          Save
+          {t.plugins.save}
         </button>
       </div>
     </div>
@@ -453,6 +458,7 @@ function McpConfigForm({
   onSave: (m: McpPlugin) => void;
   onCancel: () => void;
 }) {
+  const { t } = useI18n();
   const [form, setForm] = useState({
     command: entry.command ?? '',
     args: (entry.args ?? []).join('\n'),
@@ -487,15 +493,15 @@ function McpConfigForm({
     <div className="space-y-3 border-t border-stone-200/12 bg-[rgb(var(--pm-rail))]/60 p-4">
       <div className="space-y-3">
         <div className="space-y-1">
-          <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">Command</label>
+          <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">{t.plugins.form.command}</label>
           <input value={form.command} onChange={set('command')} placeholder="npx" className={`${inputCls} font-mono`} />
         </div>
         <div className="space-y-1">
-          <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">Args (one per line)</label>
+          <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">{t.plugins.form.args}</label>
           <textarea rows={3} value={form.args} onChange={set('args')} className={`${inputCls} font-mono text-xs`} />
         </div>
         <div className="space-y-1">
-          <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">Env (KEY=VALUE per line)</label>
+          <label className="block text-[11px] uppercase tracking-[0.14em] text-stone-500">{t.plugins.form.env}</label>
           <textarea
             rows={2}
             value={form.env}
@@ -505,13 +511,13 @@ function McpConfigForm({
           />
         </div>
         <p className="text-[11px] text-stone-500">
-          Transport is fixed to <span className="font-mono">stdio</span> in this version. HTTP transport will arrive in a later phase.
+          {t.plugins.form.transportFixed}
         </p>
       </div>
       <div className="flex justify-end gap-2">
-        <button onClick={onCancel} className="px-3 py-1.5 text-xs text-stone-400 hover:text-stone-100">Cancel</button>
+        <button onClick={onCancel} className="px-3 py-1.5 text-xs text-stone-400 hover:text-stone-100">{t.plugins.cancel}</button>
         <button onClick={handleSave} className="bg-stone-100 px-3 py-1.5 text-xs font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100">
-          Save
+          {t.plugins.save}
         </button>
       </div>
     </div>
@@ -521,6 +527,7 @@ function McpConfigForm({
 // ─── MCP logs viewer ───────────────────────────────────────────────────────────
 
 function McpLogsViewer({ pluginId, onClose }: { pluginId: string; onClose: () => void }) {
+  const { t } = useI18n();
   const [lines, setLines] = useState<string[]>([]);
 
   useEffect(() => {
@@ -569,7 +576,7 @@ function McpLogsViewer({ pluginId, onClose }: { pluginId: string; onClose: () =>
       <div className="flex w-full max-w-3xl flex-col overflow-hidden border border-stone-200/18 bg-[rgb(var(--pm-panel))] shadow-2xl">
         <div className="flex items-center justify-between border-b border-stone-200/12 bg-white/[0.035] px-6 py-4">
           <div>
-            <h3 className="text-lg font-bold text-stone-50">MCP Logs</h3>
+            <h3 className="text-lg font-bold text-stone-50">{t.plugins.mcpLogs}</h3>
             <p className="font-mono text-xs text-stone-400">{pluginId}</p>
           </div>
           <button onClick={onClose} className="text-2xl leading-none text-stone-400 hover:text-stone-100">
@@ -578,7 +585,7 @@ function McpLogsViewer({ pluginId, onClose }: { pluginId: string; onClose: () =>
         </div>
         <div className="max-h-[60vh] min-h-[300px] overflow-auto bg-[rgb(var(--pm-input))] p-3 font-mono text-xs leading-5 text-stone-200">
           {lines.length === 0 ? (
-            <span className="text-stone-500">No log lines yet.</span>
+            <span className="text-stone-500">{t.plugins.noLogLines}</span>
           ) : (
             lines.map((line, i) => (
               <div key={i} className="whitespace-pre-wrap break-all">
@@ -592,10 +599,10 @@ function McpLogsViewer({ pluginId, onClose }: { pluginId: string; onClose: () =>
             onClick={handleOpenFolder}
             className="flex items-center gap-1.5 border border-stone-200/25 px-3 py-1.5 text-xs text-stone-300 hover:bg-white/5"
           >
-            <FolderOpen size={12} /> Open log folder
+            <FolderOpen size={12} /> {t.plugins.openLogFolder}
           </button>
           <button onClick={onClose} className="bg-stone-100 px-3 py-1.5 text-xs font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100">
-            Close
+            {t.plugins.close}
           </button>
         </div>
       </div>
@@ -632,6 +639,7 @@ function InstalledTab({
   onCatalogChange: (c: PluginCatalog) => void;
   onApiKeyChange: (id: string, key: string) => void;
 }) {
+  const { t } = useI18n();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const rows: InstalledRow[] = catalog.plugins.filter(isInstalledRow);
@@ -654,8 +662,8 @@ function InstalledTab({
         <div className="mb-3 text-stone-600">
           <Plus size={28} />
         </div>
-        <p className="text-sm text-stone-500">No plugins installed yet.</p>
-        <p className="mt-1 text-xs text-stone-600">Browse the Marketplace tab to add your first plugin.</p>
+        <p className="text-sm text-stone-500">{t.plugins.noPluginsInstalled}</p>
+        <p className="mt-1 text-xs text-stone-600">{t.plugins.noPluginsInstalledHint}</p>
       </div>
     );
   }
@@ -667,7 +675,7 @@ function InstalledTab({
         const mp = marketplaceFor(id);
         const isExpanded = expandedId === id;
         const enabled = row.enabled;
-        const badge = kindLabel(row.kind);
+        const badge = kindLabel(row.kind, t.plugins);
         const mcpStatus = row.kind === 'mcp' ? mcpControls.statuses.get(id) : undefined;
         const isRunning = mcpStatus?.phase === 'running';
 
@@ -685,7 +693,7 @@ function InstalledTab({
                   <span className={`text-sm font-medium ${enabled ? 'text-stone-100' : 'text-stone-500'}`}>{row.name}</span>
                   <span className={`border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] ${badge.cls}`}>{badge.text}</span>
                   {row.kind === 'provider' && apiKeys[id] && (
-                    <span className="border border-emerald-200/25 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-emerald-300/80">key set</span>
+                    <span className="border border-emerald-200/25 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-emerald-300/80">{t.plugins.keySet}</span>
                   )}
                   {row.kind === 'mcp' && <McpStatusPill status={mcpStatus} />}
                 </div>
@@ -693,7 +701,7 @@ function InstalledTab({
                   {row.kind === 'provider'
                     ? row.baseUrl
                     : row.kind === 'mcp'
-                      ? [row.command, ...(row.args ?? [])].filter(Boolean).join(' ') || '(unconfigured)'
+                      ? [row.command, ...(row.args ?? [])].filter(Boolean).join(' ') || t.plugins.unconfigured
                       : row.command}
                 </p>
               </div>
@@ -706,14 +714,14 @@ function InstalledTab({
                       <>
                         <button
                           onClick={() => mcpControls.restart(row)}
-                          title="Restart"
+                          title={t.plugins.restart}
                           className="border border-stone-200/18 px-1.5 py-1 text-stone-400 hover:border-stone-200/35 hover:text-stone-100"
                         >
                           <RotateCw size={12} />
                         </button>
                         <button
                           onClick={() => mcpControls.stop(id)}
-                          title="Stop"
+                          title={t.plugins.stop}
                           className="border border-stone-200/18 px-1.5 py-1 text-stone-400 hover:border-red-500/30 hover:text-red-400"
                         >
                           <Power size={12} />
@@ -722,7 +730,7 @@ function InstalledTab({
                     ) : (
                       <button
                         onClick={() => mcpControls.start(row)}
-                        title="Start"
+                        title={t.plugins.start}
                         className="border border-stone-200/18 px-1.5 py-1 text-stone-400 hover:border-emerald-400/40 hover:text-emerald-300"
                       >
                         <Play size={12} />
@@ -730,7 +738,7 @@ function InstalledTab({
                     )}
                     <button
                       onClick={() => mcpControls.viewLogs(id)}
-                      title="View logs"
+                      title={t.plugins.viewLogs}
                       className="border border-stone-200/18 px-1.5 py-1 text-stone-400 hover:border-stone-200/35 hover:text-stone-100"
                     >
                       <FileText size={12} />
@@ -742,7 +750,7 @@ function InstalledTab({
                 <button
                   onClick={() => toggleEnabled(id)}
                   className={`relative h-5 w-9 rounded-full transition-colors ${enabled ? 'bg-emerald-600' : 'bg-stone-700'}`}
-                  title={enabled ? 'Disable' : 'Enable'}
+                  title={enabled ? t.plugins.disable : t.plugins.enable}
                 >
                   <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                 </button>
@@ -752,7 +760,7 @@ function InstalledTab({
                   onClick={() => toggleExpand(id)}
                   className="flex items-center gap-1 border border-stone-200/18 px-2 py-1 text-xs text-stone-400 hover:border-stone-200/35 hover:text-stone-100"
                 >
-                  Configure
+                  {t.plugins.configure}
                   {isExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
                 </button>
 
@@ -827,6 +835,7 @@ function MarketplaceTab({
   onInstall: (mp: MarketplacePlugin) => void;
   onUninstall: (id: string) => void;
 }) {
+  const { t } = useI18n();
   const [activeCat, setActiveCat] = useState<'all' | Category>('all');
   const [query, setQuery] = useState('');
 
@@ -844,7 +853,7 @@ function MarketplaceTab({
       <input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search plugins…"
+        placeholder={t.plugins.searchPlaceholder}
         className="w-full border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72 px-4 py-2 text-sm text-stone-100 outline-none placeholder:text-stone-600 focus:ring-2 focus:ring-emerald-300/25"
       />
 
@@ -860,19 +869,19 @@ function MarketplaceTab({
                 : 'border border-stone-200/18 text-stone-400 hover:border-stone-200/35 hover:text-stone-200'
             }`}
           >
-            {c.label}
+            {t.plugins.categories[c.labelKey]}
           </button>
         ))}
       </div>
 
       {/* Plugin grid */}
       {filtered.length === 0 ? (
-        <p className="py-12 text-center text-sm text-stone-500">No plugins match your search.</p>
+        <p className="py-12 text-center text-sm text-stone-500">{t.plugins.noPluginsMatch}</p>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {filtered.map((mp) => {
             const installed = installedIds.has(mp.id);
-            const badge = kindLabel(mp.kind);
+            const badge = kindLabel(mp.kind, t.plugins);
             return (
               <div
                 key={mp.id}
@@ -897,7 +906,7 @@ function MarketplaceTab({
                       ? 'h-7 w-7 border border-emerald-400/30 text-emerald-400 hover:border-red-400/40 hover:text-red-400'
                       : 'h-7 w-7 border border-stone-200/25 text-stone-400 hover:border-emerald-400/40 hover:text-emerald-300'
                   }`}
-                  title={installed ? 'Uninstall' : 'Install'}
+                  title={installed ? t.plugins.uninstall : t.plugins.install}
                 >
                   {installed ? <Check size={14} /> : <Plus size={14} />}
                 </button>
@@ -913,6 +922,7 @@ function MarketplaceTab({
 // ─── Skills tab ────────────────────────────────────────────────────────────────
 
 function SkillsTab({ skillsDir }: { skillsDir: string }) {
+  const { t } = useI18n();
   const [skills, setSkills] = useState<SkillFileInfo[]>([]);
   const [installUrl, setInstallUrl] = useState('');
   const [installing, setInstalling] = useState(false);
@@ -953,7 +963,7 @@ function SkillsTab({ skillsDir }: { skillsDir: string }) {
   };
 
   const handleUninstall = async (path: string) => {
-    if (typeof window !== 'undefined' && !window.confirm(`Delete this skill?\n\n${path}`)) return;
+    if (typeof window !== 'undefined' && !window.confirm(t.plugins.deleteSkillConfirm.replace('{path}', path))) return;
     try {
       await skillUninstall(path, skillsDir);
       await rescan();
@@ -966,7 +976,7 @@ function SkillsTab({ skillsDir }: { skillsDir: string }) {
     try {
       await openPath('https://skillsmp.com');
     } catch {
-      setError('Cannot open browser (Tauri runtime required)');
+      setError(t.plugins.cannotOpenBrowser);
     }
   };
 
@@ -975,7 +985,7 @@ function SkillsTab({ skillsDir }: { skillsDir: string }) {
     try {
       await openPath(skillsDir);
     } catch {
-      setError('Cannot open folder (Tauri runtime required)');
+      setError(t.plugins.cannotOpenFolder);
     }
   };
 
@@ -989,39 +999,39 @@ function SkillsTab({ skillsDir }: { skillsDir: string }) {
       {/* Directory + actions */}
       <div className="space-y-3 border border-stone-200/12 bg-[rgb(var(--pm-rail))]/60 p-4">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.14em] text-stone-500">Skills directory</p>
+          <p className="text-[11px] uppercase tracking-[0.14em] text-stone-500">{t.plugins.skillsDirectory}</p>
           <p className="mt-0.5 break-all font-mono text-xs text-stone-300">
-            {skillsDir || '(loading…)'}
+            {skillsDir || t.plugins.skillsDirectoryLoading}
           </p>
           <p className="mt-1 text-[11px] text-stone-500">
-            Change in{' '}
+            {t.plugins.changeInSettingsPrefix}{' '}
             <Link href="/settings" className="text-emerald-300/80 hover:text-emerald-200">
-              Settings
+              {t.plugins.settings}
             </Link>
             .
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={handleBrowse} className={btnCls}>
-            <ExternalLink size={12} /> Browse on skillsmp.com
+            <ExternalLink size={12} /> {t.plugins.browseSkills}
           </button>
           <button onClick={handleOpenFolder} disabled={!skillsDir} className={btnCls}>
-            <FolderOpen size={12} /> Open folder
+            <FolderOpen size={12} /> {t.plugins.openFolder}
           </button>
           <button onClick={rescan} disabled={!skillsDir} className={btnCls}>
-            <RotateCw size={12} /> Rescan
+            <RotateCw size={12} /> {t.plugins.rescan}
           </button>
         </div>
       </div>
 
       {/* Install from URL */}
       <div className="space-y-2">
-        <label className="block text-xs font-medium text-stone-200">Install from URL</label>
+        <label className="block text-xs font-medium text-stone-200">{t.plugins.installFromUrl}</label>
         <div className="flex gap-2">
           <input
             value={installUrl}
             onChange={(e) => setInstallUrl(e.target.value)}
-            placeholder="https://example.com/my-skill.md"
+            placeholder={t.plugins.skillUrlPlaceholder}
             className={inputCls}
           />
           <button
@@ -1029,18 +1039,18 @@ function SkillsTab({ skillsDir }: { skillsDir: string }) {
             disabled={installing || !installUrl.trim() || !skillsDir}
             className={primaryCls}
           >
-            {installing ? 'Installing…' : 'Install'}
+            {installing ? t.plugins.installing : t.plugins.install}
           </button>
         </div>
         <p className="text-[11px] text-stone-500">
-          PM downloads the URL contents and saves it as a <span className="font-mono">.md</span> file.
+          {t.plugins.skillInstallHint}
         </p>
         {error && <p className="text-xs text-red-400">{error}</p>}
       </div>
 
       {/* Skills list */}
       {skills.length === 0 ? (
-        <p className="py-12 text-center text-sm text-stone-500">No skills found in this directory.</p>
+        <p className="py-12 text-center text-sm text-stone-500">{t.plugins.noSkillsFound}</p>
       ) : (
         <div className="divide-y divide-stone-200/10 border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72">
           {skills.map((s) => (
@@ -1058,14 +1068,14 @@ function SkillsTab({ skillsDir }: { skillsDir: string }) {
               </div>
               <button
                 onClick={() => void openPath(s.absPath)}
-                title="Open file"
+                title={t.plugins.openFile}
                 className="border border-stone-200/18 px-2 py-1 text-stone-400 hover:border-stone-200/35 hover:text-stone-100"
               >
                 <FileText size={12} />
               </button>
               <button
                 onClick={() => handleUninstall(s.absPath)}
-                title="Uninstall"
+                title={t.plugins.uninstall}
                 className="border border-stone-200/18 px-2 py-1 text-stone-500 hover:border-red-500/30 hover:text-red-400"
               >
                 <Trash2 size={12} />
@@ -1100,6 +1110,7 @@ function buildFromMarketplace(mp: MarketplacePlugin): AnyPlugin | null {
 }
 
 export function PluginsView() {
+  const { t } = useI18n();
   const [catalog, setCatalog] = useState<PluginCatalog>(EMPTY_CATALOG);
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<'installed' | 'marketplace' | 'skills'>('installed');
@@ -1215,9 +1226,9 @@ export function PluginsView() {
     <div className="max-w-3xl space-y-5">
       {/* Header */}
       <div>
-        <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">Plugins</h1>
+        <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">{t.plugins.title}</h1>
         <p className="mt-1 text-xs text-stone-400">
-          Connect AI providers, agent CLIs, IDEs, MCP servers, and external integrations.
+          {t.plugins.subtitle}
         </p>
       </div>
 
@@ -1231,7 +1242,7 @@ export function PluginsView() {
               : 'text-stone-500 hover:text-stone-300'
           }`}
         >
-          Installed
+          {t.plugins.installed}
           <span className="ml-2 font-mono text-xs text-stone-500">{installedCount}</span>
         </button>
         <button
@@ -1242,7 +1253,7 @@ export function PluginsView() {
               : 'text-stone-500 hover:text-stone-300'
           }`}
         >
-          Marketplace
+          {t.plugins.marketplace}
           <span className="ml-2 font-mono text-xs text-stone-500">{MARKETPLACE.length}</span>
         </button>
         <button
@@ -1253,7 +1264,7 @@ export function PluginsView() {
               : 'text-stone-500 hover:text-stone-300'
           }`}
         >
-          Skills
+          {t.plugins.skills}
         </button>
       </div>
 
