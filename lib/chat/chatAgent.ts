@@ -172,6 +172,24 @@ function buildAgentPrompt(content: string, context: ChatContext): string {
 }
 
 /**
+ * Load the user's preferred chat provider + model from their Key settings.
+ * Returns undefined if not configured (server will use default fallback chain).
+ */
+async function loadChatProvider(): Promise<{ provider: string; model?: string } | undefined> {
+  if (typeof window === 'undefined') return undefined;
+  try {
+    const raw = window.localStorage.getItem('openclaw.llmProviderOrder');
+    if (!raw) return undefined;
+    const order: { provider: string; model?: string; enabled: boolean }[] = JSON.parse(raw);
+    const first = order.find((e) => e.enabled);
+    if (!first) return undefined;
+    return { provider: first.provider, model: first.model };
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Call the server-side AI proxy with conversation history.
  * Never exposes API keys to the browser.
  * If onStream is provided, uses SSE streaming for typewriter effect.
@@ -187,12 +205,22 @@ async function callChatApi(
   }));
   messages.push({ role: 'user', content });
 
+  // Load user's preferred provider (if configured)
+  const userProvider = await loadChatProvider();
+
+  // Build the payload — include provider/model when the user has a preference
+  const chatPayload: Record<string, unknown> = { messages };
+  if (userProvider) {
+    chatPayload.provider = userProvider.provider;
+    if (userProvider.model) chatPayload.model = userProvider.model;
+  }
+
   // If streaming callback is provided, use the streaming endpoint
   if (onStream) {
     const res = await fetch('/api/chat/stream', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify(chatPayload),
     });
 
     if (!res.ok) {
@@ -247,7 +275,7 @@ async function callChatApi(
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify(chatPayload),
   });
 
   if (!res.ok) {

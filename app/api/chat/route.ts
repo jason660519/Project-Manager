@@ -6,107 +6,145 @@ interface ChatApiMessage {
 }
 
 interface RequestBody {
-  model?: string;
   messages: ChatApiMessage[];
+  /** Provider id to use (e.g. "anthropic", "openai"). Omit for default chain. */
+  provider?: string;
+  /** Model override. Omit to use the provider's default. */
+  model?: string;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Proxy chat completions through the server layer so API keys stay server-side.
-// Priority: Anthropic → OpenAI → Gemini fallback
+// Provider helpers — each returns a content string or throws.
 // ────────────────────────────────────────────────────────────────────────────
 
-async function callAnthropic(messages: ChatApiMessage[]): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
+async function callProvider(
+  provider: string,
+  model: string,
+  messages: ChatApiMessage[],
+): Promise<string> {
+  const apiKey = process.env[`${provider.toUpperCase()}_API_KEY`];
+  if (!apiKey) throw new Error(`${provider.toUpperCase()}_API_KEY not configured`);
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      system: getSystemPrompt(),
-      messages: messages.filter((m) => m.role !== 'system'),
-    }),
-  });
+  const sys = getSystemPrompt();
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Anthropic API ${res.status}: ${text.slice(0, 200)}`);
+  switch (provider) {
+    case 'anthropic': {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 4096,
+          system: sys,
+          messages: messages.filter((m) => m.role !== 'system'),
+        }),
+      });
+      if (!res.ok) throw new Error(`Anthropic ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const data = await res.json();
+      return data.content?.[0]?.text ?? '';
+    }
+
+    case 'openai': {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${apiKey}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 4096,
+          messages: [{ role: 'system', content: sys }, ...messages],
+        }),
+      });
+      if (!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const data = await res.json();
+      return data.choices?.[0]?.message?.content ?? '';
+    }
+
+    case 'gemini': {
+      const contents: { role: string; parts: { text: string }[] }[] = [];
+      for (const msg of messages) {
+        if (msg.role === 'system') continue;
+        contents.push({ role: msg.role === 'assistant' ? 'model' : 'user', parts: [{ text: msg.content }] });
+      }
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: sys }] },
+            contents,
+            generationConfig: { maxOutputTokens: 4096 },
+          }),
+        },
+      );
+      if (!res.ok) throw new Error(`Gemini ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const data = await res.json();
+      return data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    }
+
+    case 'deepseek':
+    case 'grok':
+    case 'kimi':
+    case 'openrouter':
+    case 'perplexity':
+    case 'together':
+    case 'zhipu':
+    case 'qwen': {
+      const baseUrls: Record<string, string> = {
+        deepseek: 'https://api.deepseek.com',
+        grok: 'https://api.x.ai',
+        kimi: 'https://api.moonshot.cn',
+        openrouter: 'https://openrouter.ai/api',
+        perplexity: 'https://api.perplexity.ai',
+        together: 'https://api.together.xyz',
+        zhipu: 'https://open.bigmodel.cn/api/paas/v4',
+        qwen: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      };
+      const base = baseUrls[provider];
+      if (!base) throw new Error(`Unknown provider: ${provider}`);
+      const res = await fetch(`${base}/chat/completions`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          max_tokens: 4096,
+          messages: [{ role: 'system', content: sys }, ...messages],
+        }),
+      });
+      if (!res.ok) throw new Error(`${provider} ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const data = await res.json();
+      return data.choices?.[0]?.message?.content ?? '';
+    }
+
+    default:
+      throw new Error(`Unsupported provider: ${provider}`);
   }
-
-  const data = await res.json();
-  return data.content?.[0]?.text ?? '';
 }
 
-async function callOpenAI(messages: ChatApiMessage[]): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
+/** Default model for each provider when none is specified. */
+const DEFAULT_MODELS: Record<string, string> = {
+  anthropic: 'claude-sonnet-4-6',
+  openai: 'gpt-4o',
+  gemini: 'gemini-1.5-pro-latest',
+  deepseek: 'deepseek-chat',
+  grok: 'grok-2-latest',
+  kimi: 'moonshot-v1-8k',
+  openrouter: 'anthropic/claude-3.5-sonnet',
+  perplexity: 'llama-3.1-sonar-large-128k-online',
+  together: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
+  zhipu: 'glm-4-plus',
+  qwen: 'qwen-plus',
+};
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'authorization': `Bearer ${apiKey}`,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      max_tokens: 4096,
-      messages: [
-        { role: 'system', content: getSystemPrompt() },
-        ...messages,
-      ],
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`OpenAI API ${res.status}: ${text.slice(0, 200)}`);
-  }
-
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content ?? '';
-}
-
-async function callGemini(messages: ChatApiMessage[]): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
-
-  // Convert messages to Gemini format
-  const contents: { role: string; parts: { text: string }[] }[] = [];
-  for (const msg of messages) {
-    if (msg.role === 'system') continue; // Gemini uses system_instruction
-    contents.push({
-      role: msg.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: msg.content }],
-    });
-  }
-
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: getSystemPrompt() }] },
-        contents,
-        generationConfig: { maxOutputTokens: 4096 },
-      }),
-    },
-  );
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Gemini API ${res.status}: ${text.slice(0, 200)}`);
-  }
-
-  const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-}
+/** Fallback chain when no provider is specified by the client. */
+const FALLBACK_CHAIN = ['anthropic', 'openai', 'gemini'] as const;
 
 function getSystemPrompt(): string {
   return [
@@ -127,31 +165,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'messages is required' }, { status: 400 });
   }
 
-  // Try providers in order of preference
+  // If the client specified a provider, try only that one
+  if (body.provider) {
+    const model = body.model || DEFAULT_MODELS[body.provider] || 'default';
+    try {
+      const content = await callProvider(body.provider, model, body.messages);
+      return NextResponse.json({ content, provider: body.provider, model });
+    } catch (e) {
+      return NextResponse.json(
+        { error: `${body.provider} failed`, details: (e as Error).message },
+        { status: 502 },
+      );
+    }
+  }
+
+  // No provider specified — try fallback chain
   const errors: string[] = [];
-
-  // 1. Anthropic (preferred)
-  try {
-    const content = await callAnthropic(body.messages);
-    return NextResponse.json({ content, provider: 'anthropic' });
-  } catch (e) {
-    errors.push(`Anthropic: ${(e as Error).message}`);
-  }
-
-  // 2. OpenAI fallback
-  try {
-    const content = await callOpenAI(body.messages);
-    return NextResponse.json({ content, provider: 'openai' });
-  } catch (e) {
-    errors.push(`OpenAI: ${(e as Error).message}`);
-  }
-
-  // 3. Gemini fallback
-  try {
-    const content = await callGemini(body.messages);
-    return NextResponse.json({ content, provider: 'gemini' });
-  } catch (e) {
-    errors.push(`Gemini: ${(e as Error).message}`);
+  for (const provider of FALLBACK_CHAIN) {
+    try {
+      const model = body.model || DEFAULT_MODELS[provider];
+      const content = await callProvider(provider, model, body.messages);
+      return NextResponse.json({ content, provider, model });
+    } catch (e) {
+      errors.push(`${provider}: ${(e as Error).message}`);
+    }
   }
 
   return NextResponse.json(
