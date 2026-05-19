@@ -14,8 +14,8 @@
       "id": "F12",
       "name": "Skills Management Page",
       "category": "Execution/Engineer Tools",
-      "status": "in_progress",
-      "progress": 70,
+      "status": "done",
+      "progress": 100,
       "paths": {
         "featureFolder": ".project-manager/features/F12/",
         "spec": ".project-manager/features/F12/feature-spec.md",
@@ -25,9 +25,10 @@
       },
       "readmePath": ".project-manager/features/F12/README.md",
       "createdAt": "2026-05-19T00:30:00.000Z",
-      "updatedAt": "2026-05-19T00:30:00.000Z",
+      "updatedAt": "2026-05-20T02:10:00.000+10:00",
       "phase": "development",
-      "points": 1
+      "points": 1,
+      "updatedBy": "f12_engineer"
     },
     {
       "id": "F01",
