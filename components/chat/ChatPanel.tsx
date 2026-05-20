@@ -156,8 +156,8 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen }: Chat
 
   return (
     <div className="w-[340px] max-w-[calc(100vw-24px)] rounded border border-stone-200/15 bg-stone-950/95 shadow-2xl shadow-black/40 backdrop-blur animate-in fade-in slide-in-from-bottom-2 duration-200">
-      {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div className="flex h-10 items-center gap-2 border-b border-stone-200/15 px-3">
+      {/* ── Header (drag handle) ────────────────────────────────────────── */}
+      <div data-drag-handle className="flex h-10 items-center gap-2 border-b border-stone-200/15 px-3 cursor-grab active:cursor-grabbing select-none">
         <Bot size={14} className="text-amber-200/80" />
         <h2 className="min-w-0 flex-1 truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-100">
           {t.chat.title}
