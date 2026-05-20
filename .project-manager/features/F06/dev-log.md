@@ -12,3 +12,8 @@
 - Normalized Project Progress Dashboard artifacts for schema v5.
 - Added canonical feature-local spec at `.project-manager/features/F06/feature-spec.md`.
 - Moved dashboard dev-log linkage to the feature folder while preserving the historical source log folder under `docs/dev-logs/`.
+
+## 2026-05-20
+
+- **Dev Keychain bypass:** debug `tauri dev` builds default to `~/.project-manager/dev-secrets.json` instead of macOS Keychain (`src-tauri/src/dev_secrets.rs`). Release builds still use Keychain.
+- Team notice: [`.project-manager/dev-logs/dev-keychain-bypass-2026-05-20.md`](../../dev-logs/dev-keychain-bypass-2026-05-20.md). Engineering docs updated in `docs/engineering/security-and-secrets.md` and `runtime-bridge.md`.

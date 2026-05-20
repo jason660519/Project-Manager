@@ -15,8 +15,9 @@ Debug desktop builds (`npm run tauri:dev` / `./start_project_manager.sh start`) 
 | 項目 | 完成度 | 路徑 |
 | :-- | :-- | :-- |
 | Dev-only plaintext secret backend in Rust | 100% | `src-tauri/src/dev_secrets.rs`, `src-tauri/src/lib.rs` |
-| Bridge + Settings/Keys UI labels | 100% | `lib/bridge/index.ts`, `app/ui/views/KeysView.tsx`, `app/ui/views/SettingsView.tsx` |
+| Bridge + Settings/Keys UI labels | 100% | `lib/bridge/index.ts`, `app/ui/views/KeysView.tsx`, `app/ui/views/SettingsView.tsx`, `app/ui/views/_components/OAuthDeviceModal.tsx` |
 | `.env.example` 說明 | 100% | `.env.example` |
+| 工程文件與 onboarding 通知 | 100% | `docs/engineering/security-and-secrets.md`, `docs/engineering/runtime-bridge.md`, `docs/architecture/architecture-overview.md`, `README.md`, `CLAUDE.md`, `.project-manager/features/F06/dev-log.md` |
 
 ## 給全體工程師的操作提醒（必讀）
 

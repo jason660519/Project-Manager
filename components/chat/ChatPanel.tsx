@@ -16,6 +16,8 @@ import { QuickActions } from './QuickActions';
 interface ChatPanelProps {
   context: ChatContext;
   defaultExpanded?: boolean;
+  /** When provided, the panel renders as a floating window (no self-collapse). */
+  toggleOpen?: (open: boolean) => void;
 }
 
 function makeMessage(role: ChatMessage['role'], content: string, status?: ChatMessage['status']): ChatMessage {
@@ -30,10 +32,15 @@ function makeMessage(role: ChatMessage['role'], content: string, status?: ChatMe
 
 // ────────────────────────────────────────────────────────────────────────────
 
-export function ChatPanel({ context, defaultExpanded = false }: ChatPanelProps) {
+export function ChatPanel({ context, defaultExpanded = false, toggleOpen }: ChatPanelProps) {
   const { t } = useI18n();
   const router = useRouter();
   const [expanded, setExpanded] = useState(defaultExpanded);
+
+  const closePanel = useCallback(() => {
+    setExpanded(false);
+    toggleOpen?.(false);
+  }, [toggleOpen]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -158,7 +165,7 @@ export function ChatPanel({ context, defaultExpanded = false }: ChatPanelProps) 
 
         <button
           type="button"
-          onClick={() => setExpanded(false)}
+          onClick={closePanel}
           aria-label="Collapse chat"
           className="rounded p-1 text-stone-500 transition-colors hover:bg-white/5 hover:text-stone-200"
         >
@@ -174,7 +181,7 @@ export function ChatPanel({ context, defaultExpanded = false }: ChatPanelProps) 
         </button>
         <button
           type="button"
-          onClick={() => setExpanded(false)}
+          onClick={closePanel}
           aria-label="Close chat"
           className="rounded p-1 text-stone-500 transition-colors hover:bg-white/5 hover:text-stone-200"
         >

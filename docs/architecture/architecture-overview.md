@@ -54,7 +54,7 @@ Purpose: execute OS-level commands safely outside browser limits.
 | Project scan | `ProjectsView`, `ProjectFilesView` | `scan_projects`, `list_project_files` | Browser mode shows virtual paths only. |
 | Agent execution | `TaskDispatchModal`, `BatchDispatchModal` | `spawn_agent`, `kill_process` | Tauri mode streams stdout, stderr, and exit events. |
 | AI calls | `callAnthropic` wrapper | `call_anthropic` | Browser mode uses `/api/anthropic`; shipped Tauri app uses Rust. |
-| Secrets | `KeysView`, plugin storage | `set_secret`, `get_secret` | Tauri stores secrets in OS Keychain. |
+| Secrets | `KeysView`, plugin storage | `set_secret`, `get_secret`, `secrets_storage_backend` | Tauri release: OS Keychain. Tauri debug: `~/.project-manager/dev-secrets.json` (no Keychain prompts). |
 | Sessions | `SessionsView` | `list_sessions`, `read_session`, `save_session` | Stored under project `.project-manager/sessions/`. |
 | GitHub sync | `ProjectsView`, `MainClient` | `fetch_github_repo`, `fetch_github_issues`, `start_github_poll` | Background poll emits `github-updated`. |
 
@@ -149,7 +149,7 @@ Detailed operating notes live under `docs/engineering/`:
 | 專案掃描 | `ProjectsView`, `ProjectFilesView` | `scan_projects`, `list_project_files` | Browser mode 只顯示虛擬路徑。 |
 | Agent 執行 | `TaskDispatchModal`, `BatchDispatchModal` | `spawn_agent`, `kill_process` | Tauri mode 會串流 stdout、stderr 與 exit events。 |
 | AI 呼叫 | `callAnthropic` wrapper | `call_anthropic` | Browser mode 走 `/api/anthropic`，正式 Tauri app 走 Rust。 |
-| Secrets | `KeysView`, plugin storage | `set_secret`, `get_secret` | Tauri 將 secrets 存在 OS Keychain。 |
+| Secrets | `KeysView`, plugin storage | `set_secret`, `get_secret`, `secrets_storage_backend` | Tauri release：OS Keychain。Tauri debug：`~/.project-manager/dev-secrets.json`（免 Keychain 彈窗）。 |
 | Sessions | `SessionsView` | `list_sessions`, `read_session`, `save_session` | 存在專案 `.project-manager/sessions/`。 |
 | GitHub sync | `ProjectsView`, `MainClient` | `fetch_github_repo`, `fetch_github_issues`, `start_github_poll` | 背景輪詢會發出 `github-updated`。 |
 
@@ -167,14 +167,14 @@ Tauri App Mode（tauri dev / build）
   前端 JS
     └─ Tauri IPC invoke()
          └─ Rust call_anthropic() → reqwest → Anthropic API
-              └─ API key 來自 OS Keychain（永遠不進 JS 層）
+              └─ API key 來自 Rust secret backend（release：Keychain；debug：dev 檔；永遠不進 JS 層）
 ```
 
 **關鍵差異**：
 
 | 項目 | Browser Mode | Tauri Mode |
 |---|---|---|
-| AI API Key 位置 | Next.js server env var | OS Keychain（Rust 層）|
+| AI API Key 位置 | Next.js server env var | Rust secret backend（release：Keychain；debug：dev 檔）|
 | Spawn Agent | Dry-run（`/api/bridge/execute`）| 真實子行程（Rust spawn）|
 | 適用場景 | 本機開發、E2E 測試 | Production 桌面 app |
 

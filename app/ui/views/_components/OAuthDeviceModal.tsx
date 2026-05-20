@@ -2,7 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Check, Copy, ExternalLink, Loader2, X } from 'lucide-react';
-import { githubOAuthDeviceStart, githubOAuthDevicePoll } from '../../../../lib/bridge';
+import {
+  getSecretsStorageBackend,
+  githubOAuthDevicePoll,
+  githubOAuthDeviceStart,
+} from '../../../../lib/bridge';
+import { formatSecretsStorageLabel } from '../../../../lib/keys/secretsStorageLabel';
 import { saveProviderSecret } from '../../../../lib/keys/keychain';
 import type { ProviderSpec } from '../../../../lib/keys/registry';
 
@@ -28,10 +33,19 @@ type Phase =
 export function OAuthDeviceModal({ provider, onClose, onAuthorized }: OAuthDeviceModalProps) {
   const [phase, setPhase] = useState<Phase>({ kind: 'starting' });
   const [copied, setCopied] = useState(false);
+  const [storageLabel, setStorageLabel] = useState('secure storage');
   // Hold the latest cancel signal so the polling loop can exit when the modal
   // closes mid-flight (otherwise the user could close the modal and have a
   // stale poller still write a token).
   const cancelledRef = useRef(false);
+
+  useEffect(() => {
+    getSecretsStorageBackend()
+      .then((backend) =>
+        setStorageLabel(formatSecretsStorageLabel(backend, '__TAURI_INTERNALS__' in window)),
+      )
+      .catch(() => setStorageLabel('secure storage'));
+  }, []);
 
   useEffect(() => {
     cancelledRef.current = false;
@@ -168,11 +182,11 @@ export function OAuthDeviceModal({ provider, onClose, onAuthorized }: OAuthDevic
             </div>
           )}
 
-          {phase.kind === 'saving' && <Loading text="Saving token to Keychain…" />}
+          {phase.kind === 'saving' && <Loading text={`Saving token to ${storageLabel}…`} />}
 
           {phase.kind === 'done' && (
             <div className="flex items-center gap-2 text-emerald-300">
-              <Check size={14} /> Connected. Token stored in Keychain.
+              <Check size={14} /> Connected. Token stored in {storageLabel}.
             </div>
           )}
 

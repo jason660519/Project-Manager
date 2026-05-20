@@ -1,10 +1,12 @@
 'use client';
 
-import { ChevronDown, Search, Zap } from 'lucide-react';
+import { Bot, ChevronDown, MessageSquareText, Search, X, Zap } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTheme, THEMES } from '../../lib/hooks/useTheme';
 import { useI18n } from '../../lib/i18n';
 import { ViewId } from '../../lib/types';
+import type { ChatContext } from '../../lib/chat/types';
+import { ChatPanel } from '../../components/chat/ChatPanel';
 
 const VIEW_LABELS: Record<ViewId, string> = {
   projects:            'Projects',
@@ -30,21 +32,25 @@ interface TopBarProps {
   activeRunCount: number;
   searchValue?: string;
   onSearchChange?: (value: string) => void;
+  chatContext: ChatContext;
 }
 
-export function TopBar({ currentView, activeRunCount, searchValue = '', onSearchChange }: TopBarProps) {
+export function TopBar({ currentView, activeRunCount, searchValue = '', onSearchChange, chatContext }: TopBarProps) {
   const { theme, setTheme } = useTheme();
   const { locale: lang, setLocale: setLang, langs: LANGS } = useI18n();
 
   const [themeOpen, setThemeOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const themeRef = useRef<HTMLDivElement>(null);
   const langRef = useRef<HTMLDivElement>(null);
+  const chatRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (themeRef.current && !themeRef.current.contains(e.target as Node)) setThemeOpen(false);
       if (langRef.current && !langRef.current.contains(e.target as Node)) setLangOpen(false);
+      if (chatRef.current && !chatRef.current.contains(e.target as Node)) setChatOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -69,10 +75,33 @@ export function TopBar({ currentView, activeRunCount, searchValue = '', onSearch
           </div>
         )}
 
+        {/* ── AI Assistant toggle (left of theme) ────────────────────────── */}
+        <div ref={chatRef} className="relative">
+          <button
+            onClick={() => { setChatOpen((v) => !v); setThemeOpen(false); setLangOpen(false); }}
+            className="flex items-center gap-1.5 border border-stone-200/15 px-2 py-1.5 hover:bg-white/5 transition-colors"
+            title="AI Assistant"
+          >
+            <Bot size={13} className={chatOpen ? 'text-amber-300' : 'text-stone-400'} />
+            <span className="text-[9px] font-medium uppercase tracking-[0.1em] text-stone-300/70">Assistant</span>
+            <ChevronDown size={9} className={`shrink-0 text-stone-500 transition-transform ${chatOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {chatOpen && (
+            <div className="absolute right-0 top-full mt-1 z-50">
+              <ChatPanel
+                context={chatContext}
+                defaultExpanded={true}
+                toggleOpen={setChatOpen}
+              />
+            </div>
+          )}
+        </div>
+
         {/* Theme dropdown */}
         <div ref={themeRef} className="relative">
           <button
-            onClick={() => { setThemeOpen((v) => !v); setLangOpen(false); }}
+            onClick={() => { setThemeOpen((v) => !v); setLangOpen(false); setChatOpen(false); }}
             className="flex items-center gap-1.5 border border-stone-200/15 px-2 py-1.5 hover:bg-white/5 transition-colors"
           >
             <span className="flex h-4 w-6 shrink-0 overflow-hidden border border-stone-200/20">
@@ -118,7 +147,7 @@ export function TopBar({ currentView, activeRunCount, searchValue = '', onSearch
         {/* Lang dropdown */}
         <div ref={langRef} className="relative">
           <button
-            onClick={() => { setLangOpen((v) => !v); setThemeOpen(false); }}
+            onClick={() => { setLangOpen((v) => !v); setThemeOpen(false); setChatOpen(false); }}
             className="flex items-center gap-1 border border-stone-200/15 px-2 py-1.5 hover:bg-white/5 transition-colors"
           >
             <span className="text-[12px] leading-none">{currentLang.flag}</span>

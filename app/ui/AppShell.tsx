@@ -37,7 +37,7 @@ export function AppShell({
           chatContext={chatContext}
         />
         <div className="flex min-w-0 flex-col border-l border-stone-200/15">
-          <TopBar currentView={currentView} activeRunCount={activeRunCount} />
+          <TopBar currentView={currentView} activeRunCount={activeRunCount} chatContext={chatContext} />
           <div className="flex-1 overflow-y-auto px-5 py-5">{children}</div>
         </div>
       </div>

@@ -7,7 +7,7 @@ Project Manager is a cross-project engineering dashboard that ingests heterogene
 - **Shell**: Tauri v2 (Rust)
 - **Frontend**: Next.js 16 with `output: 'export'`, React 19, TypeScript, Tailwind, TanStack Table v8
 - **Bridge**: Rust commands in `src-tauri/src/lib.rs`; TypeScript wrapper in `lib/bridge/index.ts`
-- **AI**: Anthropic API via Rust `call_anthropic` (reqwest); API key stored in OS Keychain via `keyring`
+- **AI**: Anthropic API via Rust `call_anthropic` (reqwest); release builds store keys in OS Keychain; **debug `tauri dev` defaults to `~/.project-manager/dev-secrets.json`** (see `.project-manager/dev-logs/dev-keychain-bypass-2026-05-20.md`)
 
 ## Directory Map
 
@@ -46,7 +46,7 @@ Full diagram: [`docs/architecture/architecture-overview.md`](docs/architecture/a
 - **Dashboard document links**: path columns render fixed labels only (`README.md`, `feature-spec.md`, `tdd-spec.md`, `dev-log.md`). Markdown artifacts open in the right-side document panel; raw paths belong in tooltips and config only.
 - **Static export**: Next.js produces a static bundle for Tauri. `app/api/` only runs under `next dev`. Anything that must exist in the shipped app belongs in Rust.
 - **Bridge discipline**: never call `invoke()` directly from a component. Add a typed wrapper in `lib/bridge/index.ts`.
-- **Anthropic API key never reaches the renderer** (ADR-004). Always proxy through `call_anthropic` in Rust; storage uses `keyring`.
+- **Anthropic API key never reaches the renderer** (ADR-004). Always proxy through `call_anthropic` in Rust; release storage uses `keyring` (Keychain). Debug builds may use `dev_secrets` file — never commit that file.
 - **Prompt assembly stays in TypeScript** (ADR-003). `argsTemplate` substitution is a TS concern; Rust just executes.
 - **Schema versioning** (ADR-002): bump `schemaVersion` on any breaking change to `.project-manager.json`.
 - **Dev port is 43187**, not 3000.

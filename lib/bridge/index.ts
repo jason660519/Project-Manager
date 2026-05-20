@@ -560,9 +560,10 @@ const GITHUB_TOKEN_KEY = 'github-token';
 const GITHUB_TOKEN_LS_FALLBACK = 'projectManager-github-token';
 
 /**
- * Read the user's GitHub token.  Lives in the OS Keychain under Tauri (so it
- * never reaches the renderer until requested), and falls back to localStorage
- * in `next dev` mode where Keychain isn't available.
+ * Read the user's GitHub token.  Under Tauri release builds it lives in the OS
+ * Keychain; under debug `tauri dev` it uses the same backend as other secrets
+ * (`~/.project-manager/dev-secrets.json` by default). Browser `next dev` uses
+ * localStorage.
  */
 export async function getGithubToken(): Promise<string> {
   if (isTauri()) {
