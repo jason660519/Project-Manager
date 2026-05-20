@@ -1,7 +1,7 @@
 'use client';
 
-import { Bot, ChevronDown, MessageSquareText, Search, X, Zap } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Bot, ChevronDown, Search, Zap } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTheme, THEMES } from '../../lib/hooks/useTheme';
 import { useI18n } from '../../lib/i18n';
 import { ViewId } from '../../lib/types';
@@ -35,6 +35,25 @@ interface TopBarProps {
   chatContext: ChatContext;
 }
 
+// ── Draggable panel position (persisted) ───────────────────────────────────
+
+const POSITION_KEY = 'pm-chat-position';
+
+function loadPosition(): { x: number; y: number } {
+  if (typeof window === 'undefined') return { x: 100, y: 80 };
+  try {
+    const raw = window.localStorage.getItem(POSITION_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return { x: 100, y: 80 };
+}
+
+function savePosition(pos: { x: number; y: number }) {
+  try { window.localStorage.setItem(POSITION_KEY, JSON.stringify(pos)); } catch { /* ignore */ }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+
 export function TopBar({ currentView, activeRunCount, searchValue = '', onSearchChange, chatContext }: TopBarProps) {
   const { theme, setTheme } = useTheme();
   const { locale: lang, setLocale: setLang, langs: LANGS } = useI18n();
@@ -42,19 +61,71 @@ export function TopBar({ currentView, activeRunCount, searchValue = '', onSearch
   const [themeOpen, setThemeOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [chatPos, setChatPos] = useState(loadPosition);
   const themeRef = useRef<HTMLDivElement>(null);
   const langRef = useRef<HTMLDivElement>(null);
-  const chatRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const posRef = useRef(chatPos);
+  posRef.current = chatPos;
 
+  // ── Drag logic ──────────────────────────────────────────────────────────
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (!target.closest('[data-drag-handle]')) return;
+    e.preventDefault();
+
+    const current = posRef.current;
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      origX: current.x,
+      origY: current.y,
+    };
+
+    const onMove = (ev: MouseEvent) => {
+      if (!dragRef.current) return;
+      const dx = ev.clientX - dragRef.current.startX;
+      const dy = ev.clientY - dragRef.current.startY;
+      setChatPos({
+        x: Math.max(0, dragRef.current.origX + dx),
+        y: Math.max(0, dragRef.current.origY + dy),
+      });
+    };
+
+    const onUp = () => {
+      if (!dragRef.current) return;
+      savePosition(posRef.current);
+      dragRef.current = null;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, []);
+
+  // ── Click-outside close ─────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e: MouseEvent) => {
+      if (dragRef.current) return;
       if (themeRef.current && !themeRef.current.contains(e.target as Node)) setThemeOpen(false);
       if (langRef.current && !langRef.current.contains(e.target as Node)) setLangOpen(false);
-      if (chatRef.current && !chatRef.current.contains(e.target as Node)) setChatOpen(false);
+      // For the floating panel: check if click is outside BOTH the toggle AND panel
+      // Use the root topbar container as boundary so the toggle button isn't falsely
+      // treated as outside.
+      const toggle = document.getElementById('chat-toggle-btn');
+      if (chatOpen && toggle && !toggle.contains(e.target as Node)) {
+        // Only close if also outside the panel (if panel exists)
+        if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+          setChatOpen(false);
+        }
+      }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
+    // Use mouseup to avoid race with button's onClick
+    document.addEventListener('mouseup', handler);
+    return () => document.removeEventListener('mouseup', handler);
+  }, [chatOpen]);
 
   const currentTheme = THEMES.find((t) => t.id === theme) ?? THEMES[0];
   const currentLang  = LANGS.find((l) => l.id === lang)   ?? LANGS[0];
@@ -75,33 +146,37 @@ export function TopBar({ currentView, activeRunCount, searchValue = '', onSearch
           </div>
         )}
 
-        {/* ── AI Assistant toggle (left of theme) ────────────────────────── */}
-        <div ref={chatRef} className="relative">
-          <button
-            onClick={() => { setChatOpen((v) => !v); setThemeOpen(false); setLangOpen(false); }}
-            className="flex items-center gap-1.5 border border-stone-200/15 px-2 py-1.5 hover:bg-white/5 transition-colors"
-            title="AI Assistant"
-          >
-            <Bot size={13} className={chatOpen ? 'text-amber-300' : 'text-stone-400'} />
-            <span className="text-[9px] font-medium uppercase tracking-[0.1em] text-stone-300/70">Assistant</span>
-            <ChevronDown size={9} className={`shrink-0 text-stone-500 transition-transform ${chatOpen ? 'rotate-180' : ''}`} />
-          </button>
+        {/* ── AI Assistant toggle ────────────────────────────────────────── */}
+        <button
+          id="chat-toggle-btn"
+          onClick={() => { setChatOpen((v) => !v); setThemeOpen(false); setLangOpen(false); }}
+          className="flex items-center gap-1.5 border border-stone-200/15 px-2 py-1.5 hover:bg-white/5 transition-colors"
+          title="AI Assistant"
+        >
+          <Bot size={13} className={chatOpen ? 'text-amber-300' : 'text-stone-400'} />
+          <span className="text-[9px] font-medium uppercase tracking-[0.1em] text-stone-300/70">Assistant</span>
+          <ChevronDown size={9} className={`shrink-0 text-stone-500 transition-transform ${chatOpen ? 'rotate-180' : ''}`} />
+        </button>
 
-          {chatOpen && (
-            <div className="absolute right-0 top-full mt-1 z-50">
-              <ChatPanel
-                context={chatContext}
-                defaultExpanded={true}
-                toggleOpen={setChatOpen}
-              />
-            </div>
-          )}
-        </div>
+        {/* ── Floating draggable chat panel ──────────────────────────────── */}
+        {chatOpen && (
+          <div
+            ref={panelRef}
+            onMouseDown={handleDragStart}
+            style={{ left: chatPos.x, top: chatPos.y, position: 'fixed', zIndex: 9999 }}
+          >
+            <ChatPanel
+              context={chatContext}
+              defaultExpanded={true}
+              toggleOpen={setChatOpen}
+            />
+          </div>
+        )}
 
         {/* Theme dropdown */}
         <div ref={themeRef} className="relative">
           <button
-            onClick={() => { setThemeOpen((v) => !v); setLangOpen(false); setChatOpen(false); }}
+            onClick={() => { setThemeOpen((v) => !v); setLangOpen(false); }}
             className="flex items-center gap-1.5 border border-stone-200/15 px-2 py-1.5 hover:bg-white/5 transition-colors"
           >
             <span className="flex h-4 w-6 shrink-0 overflow-hidden border border-stone-200/20">
@@ -147,7 +222,7 @@ export function TopBar({ currentView, activeRunCount, searchValue = '', onSearch
         {/* Lang dropdown */}
         <div ref={langRef} className="relative">
           <button
-            onClick={() => { setLangOpen((v) => !v); setThemeOpen(false); setChatOpen(false); }}
+            onClick={() => { setLangOpen((v) => !v); setThemeOpen(false); }}
             className="flex items-center gap-1 border border-stone-200/15 px-2 py-1.5 hover:bg-white/5 transition-colors"
           >
             <span className="text-[12px] leading-none">{currentLang.flag}</span>
