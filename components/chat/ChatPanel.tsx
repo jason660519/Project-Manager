@@ -155,7 +155,7 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen }: Chat
   }
 
   return (
-    <div className="absolute bottom-14 left-2 z-50 w-[320px] max-w-[calc(100vw-24px)] rounded border border-stone-200/15 bg-stone-950/95 shadow-2xl shadow-black/40 backdrop-blur animate-in fade-in slide-in-from-bottom-2 duration-200">
+    <div className="w-[340px] max-w-[calc(100vw-24px)] rounded border border-stone-200/15 bg-stone-950/95 shadow-2xl shadow-black/40 backdrop-blur animate-in fade-in slide-in-from-bottom-2 duration-200">
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex h-10 items-center gap-2 border-b border-stone-200/15 px-3">
         <Bot size={14} className="text-amber-200/80" />
