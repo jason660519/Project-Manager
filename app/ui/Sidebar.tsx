@@ -166,11 +166,6 @@ export function Sidebar({ currentView, bridgeStatus, activeRunCount, chatContext
         ))}
       </nav>
 
-      {/* On the /chat full page the ChatPanel is redundant — hide it. */}
-      {currentView !== 'chat' && (
-        <ChatPanel context={chatContext} />
-      )}
-
       {/* ── Bottom system block ───────────────────────────────────────────── */}
       <div className="border-t border-stone-200/15 px-4 py-3 space-y-2">
 
