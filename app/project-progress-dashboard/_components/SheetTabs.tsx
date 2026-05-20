@@ -1,22 +1,25 @@
 'use client';
 
-import { Code2, FlaskConical, Rocket, Activity } from 'lucide-react';
+import { Code2, FlaskConical, Rocket, Activity, Github } from 'lucide-react';
 import { clsx } from 'clsx';
 import type { FeaturePhase } from '../../../lib/types';
+import type { TabId } from '../types';
 import { useI18n } from '../../../lib/i18n';
 
 interface SheetTab {
-  id: FeaturePhase;
+  id: TabId;
   icon: React.ElementType;
   color: string;
   activeColor: string;
+  isPhase: boolean;
 }
 
 const SHEETS: SheetTab[] = [
-  { id: 'development', icon: Code2,         color: 'text-emerald-300',  activeColor: 'bg-emerald-600/85 text-white' },
-  { id: 'e2e_testing', icon: FlaskConical,  color: 'text-cyan-200',     activeColor: 'bg-cyan-600/85 text-white' },
-  { id: 'deployment',  icon: Rocket,        color: 'text-fuchsia-200',  activeColor: 'bg-fuchsia-600/80 text-white' },
-  { id: 'operations',  icon: Activity,      color: 'text-amber-200',    activeColor: 'bg-amber-600/85 text-white' },
+  { id: 'development', icon: Code2,         color: 'text-emerald-300',  activeColor: 'bg-emerald-600/85 text-white', isPhase: true },
+  { id: 'e2e_testing', icon: FlaskConical,  color: 'text-cyan-200',     activeColor: 'bg-cyan-600/85 text-white', isPhase: true },
+  { id: 'deployment',  icon: Rocket,        color: 'text-fuchsia-200',  activeColor: 'bg-fuchsia-600/80 text-white', isPhase: true },
+  { id: 'operations',  icon: Activity,      color: 'text-amber-200',    activeColor: 'bg-amber-600/85 text-white', isPhase: true },
+  { id: 'issues',      icon: Github,        color: 'text-sky-200',      activeColor: 'bg-sky-600/85 text-white', isPhase: false },
 ];
 
 const PHASE_LABEL_KEY: Record<FeaturePhase, keyof import('../../../lib/i18n').Translations['phases']> = {
@@ -27,25 +30,25 @@ const PHASE_LABEL_KEY: Record<FeaturePhase, keyof import('../../../lib/i18n').Tr
 };
 
 interface SheetTabsProps {
-  activePhase: FeaturePhase;
-  onPhaseChange: (phase: FeaturePhase) => void;
-  phaseCounts: Record<FeaturePhase, number>;
+  activeTab: TabId;
+  onTabChange: (tab: TabId) => void;
+  phaseCounts?: Record<FeaturePhase, number>;
 }
 
-export function SheetTabs({ activePhase, onPhaseChange, phaseCounts }: SheetTabsProps) {
+export function SheetTabs({ activeTab, onTabChange, phaseCounts }: SheetTabsProps) {
   const { t } = useI18n();
   return (
     <div className="flex items-end gap-0 border-t border-stone-200/15 bg-[rgb(var(--pm-rail))]/70 overflow-x-auto flex-none">
       {SHEETS.map((sheet) => {
-        const isActive = activePhase === sheet.id;
+        const isActive = activeTab === sheet.id;
         const Icon = sheet.icon;
-        const count = phaseCounts[sheet.id];
+        const count = sheet.isPhase ? (phaseCounts?.[sheet.id as FeaturePhase] ?? 0) : 0;
         return (
           <button
             key={sheet.id}
             type="button"
             onClick={() => {
-              onPhaseChange(sheet.id);
+              onTabChange(sheet.id);
               if (typeof window !== 'undefined') window.location.hash = sheet.id;
             }}
             className={clsx(
@@ -56,7 +59,7 @@ export function SheetTabs({ activePhase, onPhaseChange, phaseCounts }: SheetTabs
             )}
           >
             <Icon className={clsx('h-4 w-4', isActive ? 'text-current' : sheet.color)} />
-            <span>{t.phases[PHASE_LABEL_KEY[sheet.id]]}</span>
+            <span>{sheet.isPhase ? t.phases[PHASE_LABEL_KEY[sheet.id as FeaturePhase]] : t.phases.issues}</span>
             {count > 0 && (
               <span
                 className={clsx(

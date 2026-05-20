@@ -49,6 +49,7 @@ export const ja: Translations = {
     e2eTesting: 'E2Eテスト',
     deployment: 'デプロイ',
     operations: '運用',
+    issues: 'Issues',
   },
   stats: {
     overallProgress: '総合開発進捗',

@@ -52,6 +52,7 @@ export interface Translations {
     e2eTesting: string;
     deployment: string;
     operations: string;
+    issues: string;
   };
   stats: {
     overallProgress: string;

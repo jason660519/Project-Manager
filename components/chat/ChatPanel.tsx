@@ -87,8 +87,13 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen }: Chat
         : `Please analyze these files:\n\n${fileBlock}`;
     }
 
+    // Clear previous error messages
+    const cleanedMessages = messages.length > 0 && messages[messages.length - 1].status === 'error'
+      ? messages.slice(0, -1)
+      : messages;
+
     const userMessage = makeMessage('user', content);
-    const nextMessages = [...messages, userMessage];
+    const nextMessages = [...cleanedMessages, userMessage];
     setMessages(nextMessages);
     setLoading(true);
 

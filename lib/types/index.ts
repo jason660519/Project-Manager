@@ -99,6 +99,8 @@ export interface ProjectConfig {
   name: string;
   root: string;
   defaultIDE: IDEId;
+  /** GitHub repository URL, e.g. https://github.com/owner/repo */
+  githubUrl?: string;
 }
 
 export interface AdapterDescriptor {

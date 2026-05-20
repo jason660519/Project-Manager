@@ -49,6 +49,7 @@ export const zh: Translations = {
     e2eTesting: 'E2E 测试',
     deployment: '部署',
     operations: '运维',
+    issues: 'Issues',
   },
   stats: {
     overallProgress: '整体开发进度',

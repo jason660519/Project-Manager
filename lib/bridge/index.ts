@@ -474,8 +474,22 @@ export async function fetchGithubRepo(
   token: string,
   repoUrl: string,
 ): Promise<GitHubFeature[]> {
-  if (!isTauri()) throw new Error('fetchGithubRepo requires Tauri runtime');
-  return invoke<GitHubFeature[]>('fetch_github_repo', { token, repoUrl });
+  if (isTauri()) {
+    return invoke<GitHubFeature[]>('fetch_github_repo', { token, repoUrl });
+  }
+  // Browser mode fallback: proxy through the F04 repo API route (GraphQL).
+  // Note: /api/github/sync is used by F15 (Issues tab) with a different response shape.
+  const res = await fetch('/api/github/repo', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ repoUrl }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || `GitHub repo sync failed (${res.status})`);
+  }
+  const data = await res.json();
+  return data.features as GitHubFeature[];
 }
 
 export interface GithubUpdatedPayload {

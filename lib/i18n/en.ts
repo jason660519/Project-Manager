@@ -48,6 +48,7 @@ export const en: Translations = {
     e2eTesting: 'E2E Testing',
     deployment: 'Deployment',
     operations: 'Operations',
+    issues: 'Issues',
   },
   stats: {
     overallProgress: 'Overall Progress',

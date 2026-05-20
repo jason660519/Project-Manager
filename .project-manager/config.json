@@ -7,7 +7,8 @@
   "project": {
     "name": "Project Manager",
     "root": "/Volumes/KLEVV-4T-1/Project-Manager",
-    "defaultIDE": "Cursor"
+    "defaultIDE": "Cursor",
+    "githubUrl": "https://github.com/jason66x/Project-Manager"
   },
   "features": [
     {
@@ -95,19 +96,21 @@
       "id": "F04",
       "name": "Add Project by GitHub URL",
       "category": "Core/Integration",
-      "status": "on_hold",
-      "progress": 10,
+      "status": "in_progress",
+      "progress": 85,
       "paths": {
         "featureFolder": ".project-manager/features/F04/",
         "spec": ".project-manager/features/F04/feature-spec.md",
         "implementation": "app/api/anthropic/route.ts",
-        "developmentLogSummaryFolder": ".project-manager/features/F04/"
+        "developmentLogSummaryFolder": ".project-manager/features/F04/",
+        "tdd": ".project-manager/features/F04/tdd-spec.md"
       },
       "readmePath": ".project-manager/features/F04/README.md",
       "createdAt": "2026-05-18T22:55:03.000Z",
-      "updatedAt": "2026-05-18T22:55:03.000Z",
+      "updatedAt": "2026-05-20T03:48:11.846Z",
       "phase": "development",
-      "points": 1
+      "points": 1,
+      "updatedBy": "wilson"
     },
     {
       "id": "F05",
@@ -294,6 +297,26 @@
       "updatedBy": "f14_engineer",
       "phase": "development",
       "points": 1
+    },
+    {
+      "id": "F15",
+      "name": "GitHub Issues Dashboard Tab",
+      "category": "Core/Integration",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "featureFolder": ".project-manager/features/F15/",
+        "spec": ".project-manager/features/F15/feature-spec.md",
+        "tdd": ".project-manager/features/F15/tdd-spec.md",
+        "implementation": "app/project-progress-dashboard/_components/IssuesTab.tsx",
+        "developmentLogSummaryFolder": ".project-manager/features/F15/"
+      },
+      "readmePath": ".project-manager/features/F15/README.md",
+      "createdAt": "2026-05-20T03:41:11.332Z",
+      "updatedAt": "2026-05-20T03:48:11.846Z",
+      "phase": "development",
+      "points": 5,
+      "updatedBy": "subagent"
     }
   ],
   "adapters": {

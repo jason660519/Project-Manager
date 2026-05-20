@@ -49,6 +49,7 @@ export const zhHant: Translations = {
     e2eTesting: 'E2E 測試',
     deployment: '部署',
     operations: '運維',
+    issues: 'Issues',
   },
   stats: {
     overallProgress: '總體開發進度',

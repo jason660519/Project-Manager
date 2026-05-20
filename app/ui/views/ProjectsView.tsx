@@ -163,8 +163,7 @@ export function ProjectsView({
         category: f.category,
         progress: f.progress,
         notes: f.notes,
-        paths: { spec: '', tdd: '', implementation: '' },
-        adapters: [],
+        paths: { spec: '', tdd: '' },
       }));
 
       const config: ProjectManagerConfig = migrateConfig({
