@@ -2,9 +2,9 @@
 
 > **Created Date**: 2026-05-12
 > **Created By**: GitHub Copilot
-> **Last Modified**: 2026-05-19
-> **Modified By**: Codex
-> **Version**: 1.6
+> **Last Modified**: 2026-05-21
+> **Modified By**: Gemini Agent
+> **Version**: 1.8
 > **Document Type**: Technical Documentation
 > **Alignment Scope**: Company AI App Standards, Project Manager, SayDo
 
@@ -122,6 +122,7 @@ Allowed root Markdown files:
 | `README.md` | Project entry point |
 | `AGENTS.md` | AI engineer instructions |
 | `CLAUDE.md` | Claude/Codex engineer hints |
+| `GEMINI.md` | Gemini developer instructions |
 | `DESIGN.md` | UI implementation guide |
 
 Avoid adding new root docs. Put new material in the role-based `docs/` folder.
@@ -142,10 +143,22 @@ The Project Manager docs checker validates:
 - English block before Chinese block
 - mixed-language heading patterns
 
+## 11. Three-Tier Plugin and Vendor Standards
+
+All external integrations and plugins must strictly follow our Three-Tier Plugin Architecture to safeguard performance, safety, and upgradeability. Do not place packages arbitrary inside the workspace.
+
+| Integration Tier | Allowed Directory | Execution Mode | Example |
+| --- | --- | --- | --- |
+| **Tier 1**: Static UI Plugins | `/public/vendor/<plugin-name>/` | Sandboxed `<iframe>` or async script tags | `/public/vendor/mermaid/` |
+| **Tier 2**: Native Binaries / CLIs | `/.project-manager/bin/` | Spawns sidecars/child processes via Tauri's Rust core | `openclaw`, `hermes` |
+| **Tier 3**: TypeScript Adapters | `/lib/adapters/` | ES Module `import` compiled at build time | `local-ide-adapter.ts` |
+
 ## 10. Change History
 
 | Date | Version | Modified By | Changes |
 | --- | --- | --- | --- |
+| 2026-05-21 | 1.8 | Gemini Agent | Added GEMINI.md to root directory rules |
+| 2026-05-21 | 1.7 | AI Agent | Added Three-Tier Plugin and Vendor standards |
 | 2026-05-19 | 1.6 | Codex | Added Project Manager feature artifact naming rules for README, spec, TDD spec, and dev log |
 | 2026-05-15 | 1.5 | Codex | Aligned Project Manager and SayDo folder roles, archive policy, and product-doc location rules |
 | 2026-05-15 | 1.4 | Codex | Added engineering, design, and project-process folders to repo convention map |
@@ -268,6 +281,7 @@ docs/
 | `README.md` | 專案入口 |
 | `AGENTS.md` | AI engineer instructions |
 | `CLAUDE.md` | Claude/Codex engineer hints |
+| `GEMINI.md` | Gemini developer instructions |
 | `DESIGN.md` | UI implementation guide |
 
 避免新增根目錄文件。新內容應放到 role-based `docs/` 資料夾。
@@ -288,10 +302,22 @@ Project Manager docs checker 會檢查：
 - English block 是否在 Chinese block 前
 - 是否有混合語言 heading pattern
 
+## 11. 三維度外掛與第三方資源標準
+
+所有外部整合和外掛程式必須嚴格遵循我們制定的「三維度外掛架構」，以保障效能、安全隔離與升級防污染。嚴禁在工作區隨意放置安裝包或執行檔。
+
+| 整合維度 | 允許存放目錄 | 執行模式 | 範例 |
+| --- | --- | --- | --- |
+| **第一維度**：前端靜態外掛 | `/public/vendor/<plugin-name>/` | 安全沙盒 `<iframe>` 或動態 Script 標籤 | `/public/vendor/mermaid/` |
+| **第二維度**：本機執行檔 / CLIs | `/.project-manager/bin/` | 由 Tauri Rust 核心作為 Sidecar 背景呼叫與執行 | `openclaw`, `hermes` |
+| **第三維度**：TypeScript 適配器 | `/lib/adapters/` | ES 模組於主專案編譯期編譯整合並調用 | `local-ide-adapter.ts` |
+
 ## 10. 修改歷史
 
 | 日期 | 版本 | 修改者 | 變更 |
 | --- | --- | --- | --- |
+| 2026-05-21 | 1.8 | Gemini Agent | 於根目錄規則新增 GEMINI.md 規範 |
+| 2026-05-21 | 1.7 | AI Agent | 新增三維度外掛與第三方資源規範 |
 | 2026-05-19 | 1.6 | Codex | 新增 Project Manager feature artifact 命名規則，固定 README、spec、TDD spec、dev log 欄位用途 |
 | 2026-05-15 | 1.5 | Codex | 對齊 Project Manager 與 SayDo 的資料夾角色、歸檔規則與產品文件位置 |
 | 2026-05-15 | 1.4 | Codex | 新增 engineering、design、project-process 目錄慣例 |

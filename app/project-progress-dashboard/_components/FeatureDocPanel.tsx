@@ -1,53 +1,15 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ExternalLink, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import { readFile, openPath } from '../../../lib/bridge';
+import MermaidBlock from '../../../components/MermaidBlock';
 
 interface FeatureDocPanelProps {
   absPath: string | null;
   onClose: () => void;
-}
-
-// ---------------------------------------------------------------------------
-// Mermaid block — lazy-loads mermaid so it doesn't inflate the initial bundle.
-// ---------------------------------------------------------------------------
-function MermaidBlock({ code }: { code: string }) {
-  const id = useId().replace(/:/g, '');
-  const ref = useRef<HTMLDivElement>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    import('mermaid').then(({ default: mermaid }) => {
-      if (cancelled) return;
-      mermaid.initialize({
-        startOnLoad: false,
-        theme: 'dark',
-        themeVariables: { background: 'transparent', primaryColor: 'rgb(110 231 183)', lineColor: 'rgb(110 231 183)' },
-      });
-      mermaid.render(`mg-${id}`, code)
-        .then(({ svg }) => {
-          if (!cancelled && ref.current) ref.current.innerHTML = svg;
-        })
-        .catch((e: unknown) => {
-          if (!cancelled) setError(e instanceof Error ? e.message : String(e));
-        });
-    });
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code]);
-
-  if (error) {
-    return (
-      <pre className="text-[11px] text-amber-400/80 whitespace-pre-wrap break-all border border-amber-400/20 rounded p-3">
-        Mermaid error: {error}
-      </pre>
-    );
-  }
-  return <div ref={ref} className="my-3 flex justify-center overflow-x-auto" />;
 }
 
 // ---------------------------------------------------------------------------

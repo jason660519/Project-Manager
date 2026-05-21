@@ -210,6 +210,8 @@ export interface Translations {
     runningPid: string;
     stopped: string;
     errored: string;
+    systemInstalled: string;
+    systemNotInstalled: string;
     categories: {
       all: string;
       ai: string;
@@ -248,6 +250,35 @@ export interface Translations {
     deleteSkillConfirm: string;
     cannotOpenBrowser: string;
     cannotOpenFolder: string;
+  };
+  integrations: {
+    title: string;
+    subtitle: string;
+    sheetPlugins: string;
+    sheetSkills: string;
+    sheetChannels: string;
+    sheetMemory: string;
+    sheetCommands: string;
+    searchPlaceholder: string;
+    selectProjectHint: string;
+    openCommandsFolder: string;
+    openCommandFile: string;
+    channelCommandMappingHint: string;
+    filterAllCategories: string;
+    filterAllPlugins: string;
+    manualFields: string;
+    saveManual: string;
+    channelEditHint: string;
+    colCategory1: string;
+    colCategory2: string;
+    colCompany: string;
+    colScope: string;
+    colPath: string;
+    colPort: string;
+    colLicense: string;
+    colUrl: string;
+    colUpdated: string;
+    colNotes: string;
   };
   features: {
     filterAll: string;

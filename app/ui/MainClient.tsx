@@ -1058,7 +1058,9 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
           runHistory={runHistory}
         />
       )}
-      {currentView === 'plugins' && <PluginsView />}
+      {currentView === 'plugins' && (
+        <PluginsView projectRoot={selectedProject?.config.project.root ?? ''} />
+      )}
       {currentView === 'skills' && (
         <SkillsView projectRoot={selectedProject?.config.project.root ?? ''} />
       )}

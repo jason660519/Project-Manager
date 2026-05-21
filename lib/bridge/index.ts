@@ -264,6 +264,12 @@ export async function openPath(path: string): Promise<void> {
   return invoke<void>('open_path', { path });
 }
 
+/** Check if a command exists in the user's system PATH. */
+export async function checkCommandExistsTauri(command: string): Promise<boolean> {
+  if (!isTauri()) return false;
+  return invoke<boolean>('check_command_exists', { command });
+}
+
 /**
  * Discriminated result of {@link pickProjectFolders}. Callers MUST switch on
  * `status` so "user cancelled" and "non-Tauri environment" never collapse
@@ -609,7 +615,7 @@ export async function setGithubToken(value: string): Promise<void> {
 
 export interface AnthropicMessage {
   role: 'user' | 'assistant';
-  content: string;
+  content: string | any;
 }
 
 export interface AnthropicResponse {
@@ -623,6 +629,7 @@ export async function callAnthropic(opts: {
   model?: string;
   maxTokens?: number;
   messages: AnthropicMessage[];
+  temperature?: number;
   /** UUID for this conversation — if provided alongside sessionsDir, auto-saves the session. */
   sessionId?: string;
   /** Absolute path to the sessions folder, e.g. `{projectRoot}/.project-manager/sessions`. */
@@ -636,6 +643,7 @@ export async function callAnthropic(opts: {
       model: opts.model ?? 'claude-sonnet-4-6',
       maxTokens: opts.maxTokens ?? 4096,
       messages: opts.messages,
+      temperature: opts.temperature ?? null,
       sessionId: opts.sessionId ?? null,
       sessionsDir: opts.sessionsDir ?? null,
       featureId: opts.featureId ?? null,
@@ -652,6 +660,7 @@ export async function callAnthropic(opts: {
       model: opts.model ?? 'claude-sonnet-4-6',
       maxTokens: opts.maxTokens ?? 4096,
       messages: opts.messages,
+      temperature: opts.temperature,
     }),
   });
   if (!res.ok) throw new Error(await res.text());
@@ -669,6 +678,7 @@ export async function callOpenAI(opts: {
   model?: string;
   maxTokens?: number;
   messages: AnthropicMessage[];
+  temperature?: number;
 }): Promise<AnthropicResponse> {
   if (!isTauri()) throw new Error('callOpenAI requires Tauri runtime');
   return invoke<AnthropicResponse>('call_openai', {
@@ -676,6 +686,7 @@ export async function callOpenAI(opts: {
     model: opts.model ?? 'gpt-4o',
     maxTokens: opts.maxTokens ?? 4096,
     messages: opts.messages,
+    temperature: opts.temperature ?? null,
   });
 }
 
@@ -690,6 +701,7 @@ export async function callOpenAICompatible(opts: {
   model: string;
   maxTokens?: number;
   messages: AnthropicMessage[];
+  temperature?: number;
 }): Promise<AnthropicResponse> {
   if (!isTauri()) throw new Error('callOpenAICompatible requires Tauri runtime');
   return invoke<AnthropicResponse>('call_openai_compatible', {
@@ -698,6 +710,7 @@ export async function callOpenAICompatible(opts: {
     model: opts.model,
     maxTokens: opts.maxTokens ?? 4096,
     messages: opts.messages,
+    temperature: opts.temperature ?? null,
   });
 }
 
@@ -710,6 +723,7 @@ export async function callGemini(opts: {
   model?: string;
   maxTokens?: number;
   messages: AnthropicMessage[];
+  temperature?: number;
 }): Promise<AnthropicResponse> {
   if (!isTauri()) throw new Error('callGemini requires Tauri runtime');
   return invoke<AnthropicResponse>('call_gemini', {
@@ -717,6 +731,7 @@ export async function callGemini(opts: {
     model: opts.model ?? 'gemini-1.5-pro-latest',
     maxTokens: opts.maxTokens ?? 4096,
     messages: opts.messages,
+    temperature: opts.temperature ?? null,
   });
 }
 

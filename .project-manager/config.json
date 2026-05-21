@@ -317,6 +317,47 @@
       "phase": "development",
       "points": 5,
       "updatedBy": "subagent"
+    },
+    {
+      "id": "F16",
+      "name": "Keys Page Redesign (3 Sheets)",
+      "category": "System/Settings",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "featureFolder": ".project-manager/features/F16/",
+        "spec": ".project-manager/features/F16/feature-spec.md",
+        "tdd": ".project-manager/features/F16/tdd-spec.md",
+        "implementation": "app/keys/page.tsx",
+        "developmentLogSummaryFolder": ".project-manager/features/F16/"
+      },
+      "notes": "Redesign Keys page into 3 sheets: API Config, LLM Evaluation, VLM Evaluation.",
+      "readmePath": ".project-manager/features/F16/README.md",
+      "createdAt": "2026-05-20T22:34:39.843777Z",
+      "updatedAt": "2026-05-21T09:09:00.000+10:00",
+      "phase": "development",
+      "points": 5,
+      "updatedBy": "antigravity"
+    },
+    {
+      "id": "F17",
+      "name": "Decoupled Mermaid Integration",
+      "category": "Core/Architecture",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "featureFolder": ".project-manager/features/F17/",
+        "spec": ".project-manager/features/F17/feature-spec.md",
+        "tdd": ".project-manager/features/F17/tdd-spec.md",
+        "implementation": "components/chat/MermaidBlock.tsx",
+        "developmentLogSummaryFolder": ".project-manager/features/F17/"
+      },
+      "readmePath": ".project-manager/features/F17/README.md",
+      "createdAt": "2026-05-21T00:44:00.000Z",
+      "updatedAt": "2026-05-21T00:44:00.000Z",
+      "phase": "development",
+      "points": 3,
+      "updatedBy": "agent"
     }
   ],
   "adapters": {

@@ -328,7 +328,7 @@ export interface ProjectEntry {
 
 export interface AnthropicMessage {
   role: 'user' | 'assistant';
-  content: string;
+  content: string | any;
 }
 
 export interface AnthropicRequest {
