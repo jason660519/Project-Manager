@@ -1,0 +1,45 @@
+{
+  "version": "v1",
+  "default_profile": "balanced_default",
+  "profiles": {
+    "quality_first": {
+      "weights": {
+        "quality_score": 0.55,
+        "stability_score": 0.2,
+        "latency_score": 0.1,
+        "cost_score": 0.1,
+        "compliance_score": 0.05
+      },
+      "budgets": {
+        "max_cost_usd_per_run": null,
+        "max_latency_p95_ms": null
+      }
+    },
+    "balanced_default": {
+      "weights": {
+        "quality_score": 0.45,
+        "stability_score": 0.2,
+        "latency_score": 0.15,
+        "cost_score": 0.15,
+        "compliance_score": 0.05
+      },
+      "budgets": {
+        "max_cost_usd_per_run": null,
+        "max_latency_p95_ms": null
+      }
+    },
+    "cost_latency_first": {
+      "weights": {
+        "quality_score": 0.3,
+        "stability_score": 0.2,
+        "latency_score": 0.25,
+        "cost_score": 0.2,
+        "compliance_score": 0.05
+      },
+      "budgets": {
+        "max_cost_usd_per_run": null,
+        "max_latency_p95_ms": null
+      }
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "version": "v1",
+  "selection": {
+    "master_gate": {
+      "min_success_rate": 0.95,
+      "min_compliance_score_mean": 98,
+      "quality_within_top_points": 2
+    },
+    "fallback_gate": {
+      "min_success_rate": 0.9,
+      "min_compliance_score_mean": 95,
+      "require_not_more_expensive_than_master": true
+    }
+  },
+  "runtime_fallback_triggers": [
+    "timeout",
+    "schema_validation_failed",
+    "tool_call_irrecoverable_failure",
+    "budget_exceeded",
+    "safety_policy_rejected"
+  ],
+  "trial_policy": {
+    "default_trial_count": 7,
+    "promotion_trial_count": 10,
+    "retain_failed_trials": true
+  },
+  "reporting_requirements": [
+    "mean",
+    "stddev",
+    "worst",
+    "p50",
+    "p95",
+    "success_rate"
+  ]
+}

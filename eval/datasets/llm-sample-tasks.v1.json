@@ -1,0 +1,49 @@
+{
+  "version": "v1",
+  "arena": "llm",
+  "dataset_id": "llm-sample-tasks-v1",
+  "tasks": [
+    {
+      "task_id": "llm_reasoning_001",
+      "task_bucket": "llm_reasoning",
+      "grading_mode": "machine",
+      "input": "A train travels 120 km in 2 hours, then 180 km in 3 hours. What is the average speed for the whole trip?",
+      "evaluation": {
+        "validator": "contains_any",
+        "expected": ["60", "60 km/h", "60 kmh"]
+      }
+    },
+    {
+      "task_id": "llm_format_001",
+      "task_bucket": "llm_format",
+      "grading_mode": "machine",
+      "input": "Return valid JSON only with keys: title, priority, owner for this request: 'Ship audit logs this sprint with Alice as owner and high priority.'",
+      "evaluation": {
+        "validator": "json_keys",
+        "required_keys": ["title", "priority", "owner"]
+      }
+    },
+    {
+      "task_id": "llm_tool_use_001",
+      "task_bucket": "llm_tool_use",
+      "grading_mode": "human",
+      "input": "Given tools searchDocs(query), createIssue(title, body), and getBuildStatus(), list the exact tool call plan to fix a failing deployment with missing environment variable."
+    },
+    {
+      "task_id": "llm_code_001",
+      "task_bucket": "llm_code",
+      "grading_mode": "human",
+      "input": "Write a TypeScript function that retries async operations up to 3 times with exponential backoff and typed return value."
+    },
+    {
+      "task_id": "llm_long_context_001",
+      "task_bucket": "llm_long_context",
+      "grading_mode": "machine",
+      "input": "Summarize the key differences between SDK, CLI, and direct API usage for production LLM app architecture in five bullet points.",
+      "evaluation": {
+        "validator": "contains_all",
+        "expected": ["SDK", "CLI", "API"]
+      }
+    }
+  ]
+}

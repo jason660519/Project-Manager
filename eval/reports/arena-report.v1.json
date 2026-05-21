@@ -1,0 +1,169 @@
+{
+  "version": "v1",
+  "generated_at_utc": "2026-05-21T17:48:31.639Z",
+  "input_rows": 15,
+  "profile": "balanced_default",
+  "policy_version": "v1",
+  "bucket_reports": [
+    {
+      "bucket_key": "llm|llm_code",
+      "master": null,
+      "fallback": {
+        "model_id": "demo-model",
+        "interface": "wrapper",
+        "overall_score": 93.8403
+      },
+      "candidates": [
+        {
+          "arena": "llm",
+          "task_bucket": "llm_code",
+          "model_id": "demo-model",
+          "interface": "wrapper",
+          "trials": 3,
+          "success_rate": 1,
+          "quality_score_mean": 89.6667,
+          "quality_score_stddev": 1.6997,
+          "quality_score_worst": 88,
+          "compliance_score_mean": 97,
+          "latency_p50_ms": 129,
+          "latency_p95_ms": 147.9,
+          "cost_mean_usd": 0.0003,
+          "stability_score": 93.2013,
+          "latency_score": 100,
+          "cost_score": 100,
+          "overall_score": 93.8403,
+          "master_gate_pass": false,
+          "fallback_gate_pass": true
+        }
+      ]
+    },
+    {
+      "bucket_key": "llm|llm_format",
+      "master": null,
+      "fallback": {
+        "model_id": "demo-model",
+        "interface": "wrapper",
+        "overall_score": 92.2711
+      },
+      "candidates": [
+        {
+          "arena": "llm",
+          "task_bucket": "llm_format",
+          "model_id": "demo-model",
+          "interface": "wrapper",
+          "trials": 3,
+          "success_rate": 1,
+          "quality_score_mean": 87.6667,
+          "quality_score_stddev": 2.4944,
+          "quality_score_worst": 85,
+          "compliance_score_mean": 96.3333,
+          "latency_p50_ms": 101,
+          "latency_p95_ms": 108.2,
+          "cost_mean_usd": 0.000312,
+          "stability_score": 90.0222,
+          "latency_score": 100,
+          "cost_score": 100,
+          "overall_score": 92.2711,
+          "master_gate_pass": false,
+          "fallback_gate_pass": true
+        }
+      ]
+    },
+    {
+      "bucket_key": "llm|llm_long_context",
+      "master": null,
+      "fallback": {
+        "model_id": "demo-model",
+        "interface": "wrapper",
+        "overall_score": 92.5602
+      },
+      "candidates": [
+        {
+          "arena": "llm",
+          "task_bucket": "llm_long_context",
+          "model_id": "demo-model",
+          "interface": "wrapper",
+          "trials": 3,
+          "success_rate": 1,
+          "quality_score_mean": 89.6667,
+          "quality_score_stddev": 3.2998,
+          "quality_score_worst": 85,
+          "compliance_score_mean": 97,
+          "latency_p50_ms": 132,
+          "latency_p95_ms": 298.5,
+          "cost_mean_usd": 0.000304,
+          "stability_score": 86.8007,
+          "latency_score": 100,
+          "cost_score": 100,
+          "overall_score": 92.5602,
+          "master_gate_pass": false,
+          "fallback_gate_pass": true
+        }
+      ]
+    },
+    {
+      "bucket_key": "llm|llm_reasoning",
+      "master": {
+        "model_id": "demo-model",
+        "interface": "wrapper",
+        "overall_score": 92.9022
+      },
+      "fallback": null,
+      "candidates": [
+        {
+          "arena": "llm",
+          "task_bucket": "llm_reasoning",
+          "model_id": "demo-model",
+          "interface": "wrapper",
+          "trials": 3,
+          "success_rate": 1,
+          "quality_score_mean": 86.6667,
+          "quality_score_stddev": 1.2472,
+          "quality_score_worst": 85,
+          "compliance_score_mean": 98,
+          "latency_p50_ms": 251,
+          "latency_p95_ms": 296.9,
+          "cost_mean_usd": 0.000292,
+          "stability_score": 95.0111,
+          "latency_score": 100,
+          "cost_score": 100,
+          "overall_score": 92.9022,
+          "master_gate_pass": true,
+          "fallback_gate_pass": true
+        }
+      ]
+    },
+    {
+      "bucket_key": "llm|llm_tool_use",
+      "master": null,
+      "fallback": {
+        "model_id": "demo-model",
+        "interface": "wrapper",
+        "overall_score": 92.4737
+      },
+      "candidates": [
+        {
+          "arena": "llm",
+          "task_bucket": "llm_tool_use",
+          "model_id": "demo-model",
+          "interface": "wrapper",
+          "trials": 3,
+          "success_rate": 1,
+          "quality_score_mean": 88,
+          "quality_score_stddev": 2.4495,
+          "quality_score_worst": 85,
+          "compliance_score_mean": 96.6667,
+          "latency_p50_ms": 97,
+          "latency_p95_ms": 183.4,
+          "cost_mean_usd": 0.000326,
+          "stability_score": 90.202,
+          "latency_score": 100,
+          "cost_score": 100,
+          "overall_score": 92.4737,
+          "master_gate_pass": false,
+          "fallback_gate_pass": true
+        }
+      ]
+    }
+  ]
+}

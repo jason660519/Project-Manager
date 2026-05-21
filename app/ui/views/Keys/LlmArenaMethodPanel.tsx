@@ -1,15 +1,13 @@
 'use client';
 
 import React from 'react';
-import { LLM_METHOD_ROWS } from './LlmArenaTypes';
+import { openPath } from '../../../../lib/bridge';
 
 interface LlmArenaMethodPanelProps {
   systemPrompt: string;
   userPrompt: string;
-  temperature: number;
   onSystemPromptChange: (next: string) => void;
   onUserPromptChange: (next: string) => void;
-  onTemperatureChange: (next: number) => void;
   onAutoAddTopModels: () => void;
   autoAddHint?: string;
 }
@@ -17,50 +15,56 @@ interface LlmArenaMethodPanelProps {
 export function LlmArenaMethodPanel({
   systemPrompt,
   userPrompt,
-  temperature,
   onSystemPromptChange,
   onUserPromptChange,
-  onTemperatureChange,
   onAutoAddTopModels,
   autoAddHint,
 }: LlmArenaMethodPanelProps) {
+  const methodDocAbsolutePath = '/Volumes/KLEVV-4T-1/Project-Manager/docs/engineering/llm-vlm-arena-evaluation-spec-v1.md';
+  const methodDocHref = '/docs/engineering/llm-vlm-arena-evaluation-spec-v1.md';
+
+  const handleOpenMethodDoc = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    if (typeof window === 'undefined') return;
+    void openPath(methodDocAbsolutePath)
+      .then(() => {})
+      .catch(() => {
+        window.open(methodDocHref, '_blank', 'noopener,noreferrer');
+      });
+  };
+
   return (
     <section className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-      <div className="border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72 p-4 shadow-xl backdrop-blur-sm rounded-sm lg:col-span-5">
-        <h2 className="mb-3 text-sm font-medium uppercase tracking-[0.16em] text-stone-100">LLM 能力評測設定</h2>
+      <div className="border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72 p-4 shadow-xl backdrop-blur-sm rounded-sm lg:col-span-12">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-sm font-medium uppercase tracking-[0.16em] text-stone-100">LLM 能力評測設定</h2>
+          <a
+            href={methodDocHref}
+            target="_blank"
+            rel="noreferrer"
+            onClick={handleOpenMethodDoc}
+            className="shrink-0 cursor-pointer text-[11px] text-emerald-300 hover:text-emerald-200"
+          >
+            查看評測方法文件 ↗
+          </a>
+        </div>
         <div className="space-y-3">
-          <div>
-            <p className="mb-1 text-[10px] uppercase tracking-[0.14em] text-stone-400">System Prompt</p>
-            <textarea
-              value={systemPrompt}
-              onChange={(e) => onSystemPromptChange(e.target.value)}
-              className="h-24 w-full resize-none border border-stone-200/15 bg-[rgb(var(--pm-input))] p-2 font-mono text-[11px] leading-relaxed text-stone-100 outline-none focus:ring-1 focus:ring-emerald-400/50"
-            />
-          </div>
-          <div>
-            <p className="mb-1 text-[10px] uppercase tracking-[0.14em] text-stone-400">User Prompt</p>
-            <textarea
-              value={userPrompt}
-              onChange={(e) => onUserPromptChange(e.target.value)}
-              className="h-28 w-full resize-none border border-stone-200/15 bg-[rgb(var(--pm-input))] p-2 font-mono text-[11px] leading-relaxed text-stone-100 outline-none focus:ring-1 focus:ring-emerald-400/50"
-            />
-          </div>
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-            <label className="text-[10px] uppercase tracking-[0.14em] text-stone-400">
-              Temperature
-              <input
-                type="number"
-                min={0}
-                max={2}
-                step={0.1}
-                value={temperature}
-                onChange={(e) => onTemperatureChange(Number(e.target.value))}
-                className="mt-1 w-full border border-stone-200/15 bg-[rgb(var(--pm-input))] px-2 py-1 text-xs text-stone-100 outline-none"
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <div>
+              <p className="mb-1 text-[10px] uppercase tracking-[0.14em] text-stone-400">System Prompt</p>
+              <textarea
+                value={systemPrompt}
+                onChange={(e) => onSystemPromptChange(e.target.value)}
+                className="h-24 w-full resize-none border border-stone-200/15 bg-[rgb(var(--pm-input))] p-2 font-mono text-[11px] leading-relaxed text-stone-100 outline-none focus:ring-1 focus:ring-emerald-400/50"
               />
-            </label>
-            <div className="rounded-sm border border-stone-200/12 bg-black/20 px-2 py-1.5 text-[11px] text-stone-300">
-              <p className="text-[10px] uppercase tracking-[0.14em] text-stone-400">評測說明</p>
-              <p className="mt-1">同一組 Prompt 同步比對多模型，觀察品質、延遲、token 與可用性。</p>
+            </div>
+            <div>
+              <p className="mb-1 text-[10px] uppercase tracking-[0.14em] text-stone-400">User Prompt</p>
+              <textarea
+                value={userPrompt}
+                onChange={(e) => onUserPromptChange(e.target.value)}
+                className="h-28 w-full resize-none border border-stone-200/15 bg-[rgb(var(--pm-input))] p-2 font-mono text-[11px] leading-relaxed text-stone-100 outline-none focus:ring-1 focus:ring-emerald-400/50"
+              />
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -73,30 +77,6 @@ export function LlmArenaMethodPanel({
             </button>
             {autoAddHint ? <span className="text-[11px] text-stone-400">{autoAddHint}</span> : null}
           </div>
-        </div>
-      </div>
-
-      <div className="border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72 p-4 shadow-xl backdrop-blur-sm rounded-sm lg:col-span-7">
-        <h2 className="mb-3 text-sm font-medium uppercase tracking-[0.16em] text-stone-100">LLM 能力評測方法</h2>
-        <div className="overflow-x-auto border border-stone-200/12 bg-black/10">
-          <table className="min-w-full border-collapse text-left">
-            <thead className="border-b border-stone-200/15 bg-white/[0.035]">
-              <tr>
-                <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">評測維度</th>
-                <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">觀測方式</th>
-                <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">通過標準</th>
-              </tr>
-            </thead>
-            <tbody>
-              {LLM_METHOD_ROWS.map((row) => (
-                <tr key={row.dimension} className="border-b border-stone-200/10 last:border-b-0">
-                  <td className="px-3 py-2 text-xs text-stone-200">{row.dimension}</td>
-                  <td className="px-3 py-2 text-xs text-stone-300">{row.observe}</td>
-                  <td className="px-3 py-2 text-xs text-stone-300">{row.passRule}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </div>
     </section>

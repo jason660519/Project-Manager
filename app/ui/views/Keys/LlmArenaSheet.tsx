@@ -131,7 +131,6 @@ export function LlmArenaSheet() {
       models: [spec],
       systemPrompt: llmState.systemPrompt,
       userPrompt: llmState.userPrompt,
-      temperature: llmState.temperature,
     });
   };
 
@@ -235,15 +234,8 @@ export function LlmArenaSheet() {
       <LlmArenaMethodPanel
         systemPrompt={llmState.systemPrompt}
         userPrompt={llmState.userPrompt}
-        temperature={llmState.temperature}
         onSystemPromptChange={(next) => setLlmState((s) => ({ ...s, systemPrompt: next }))}
         onUserPromptChange={(next) => setLlmState((s) => ({ ...s, userPrompt: next }))}
-        onTemperatureChange={(next) =>
-          setLlmState((s) => ({
-            ...s,
-            temperature: Number.isFinite(next) ? next : s.temperature,
-          }))
-        }
         onAutoAddTopModels={() => void handleAutoAddTopModels()}
         autoAddHint={autoAddHint}
       />
