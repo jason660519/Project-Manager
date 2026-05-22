@@ -68,31 +68,31 @@ export function LlmArenaDetailSheet({
             </div>
             <div className="max-h-72 overflow-auto border border-stone-200/12">
               <table className="w-full border-collapse text-left">
-                <thead className="sticky top-0 bg-stone-900/95">
+                <thead className="sticky top-0 z-10 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
                   <tr>
-                    <th className="px-2 py-1.5 text-[10px] uppercase tracking-[0.14em] text-stone-400">時間</th>
-                    <th className="px-2 py-1.5 text-[10px] uppercase tracking-[0.14em] text-stone-400">摘要</th>
-                    <th className="px-2 py-1.5 text-[10px] uppercase tracking-[0.14em] text-stone-400">Latency</th>
-                    <th className="px-2 py-1.5 text-[10px] uppercase tracking-[0.14em] text-stone-400">Token</th>
+                    <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">時間</th>
+                    <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">摘要</th>
+                    <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">Latency</th>
+                    <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">Token</th>
                   </tr>
                 </thead>
                 <tbody>
                   {selectedHistory.length > 0 ? (
                     selectedHistory.map((entry) => (
-                      <tr key={entry.timestamp} className="border-t border-stone-200/10 align-top">
-                        <td className="px-2 py-1.5 text-[11px] text-stone-400 whitespace-nowrap">
+                      <tr key={entry.timestamp} className="border-b border-stone-200/10 align-top hover:bg-white/[0.045]">
+                        <td className="whitespace-nowrap px-3 py-3 text-xs text-stone-400">
                           {new Date(entry.timestamp).toLocaleString()}
                         </td>
-                        <td className="px-2 py-1.5 text-[11px] text-stone-200">{entry.summary}</td>
-                        <td className="px-2 py-1.5 text-[11px] font-mono text-stone-400">{entry.latencyMs}ms</td>
-                        <td className="px-2 py-1.5 text-[11px] font-mono text-stone-400">
+                        <td className="px-3 py-3 text-xs text-stone-200">{entry.summary}</td>
+                        <td className="px-3 py-3 text-xs font-mono text-stone-400">{entry.latencyMs}ms</td>
+                        <td className="px-3 py-3 text-xs font-mono text-stone-400">
                           {entry.inputTokens}↓ {entry.outputTokens}↑
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={4} className="px-2 py-4 text-center text-xs text-stone-500">
+                      <td colSpan={4} className="px-4 py-8 text-center text-xs text-stone-500">
                         尚無歷史紀錄
                       </td>
                     </tr>

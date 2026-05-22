@@ -32,10 +32,14 @@ const DEFAULT_VISIBILITY: ColumnVisibility = {
 
 const columnHelper = createColumnHelper<IntegrationRow>();
 
+function emptyCell() {
+  return <span className="text-xs text-stone-500">—</span>;
+}
+
 function truncateCell(value: string, max = 28) {
-  if (!value) return <span className="text-stone-600">—</span>;
+  if (!value) return emptyCell();
   return (
-    <span className="block max-w-[180px] truncate font-mono text-[11px] text-stone-400" title={value}>
+    <span className="block max-w-[200px] truncate font-mono text-xs text-stone-300" title={value}>
       {value.length > max ? `${value.slice(0, max)}…` : value}
     </span>
   );
@@ -103,9 +107,7 @@ export function IntegrationsTable({
       columnHelper.accessor('category2', {
         id: 'col-cat2',
         header: 'Cat.2',
-        cell: (info) => (
-          <span className="whitespace-nowrap text-[11px] text-stone-500">{info.getValue() || '—'}</span>
-        ),
+        cell: (info) => <span className="whitespace-nowrap text-xs text-stone-400">{info.getValue() || '—'}</span>,
       }),
       ...(columnVisibility.githubUrl
         ? [
@@ -119,9 +121,7 @@ export function IntegrationsTable({
       columnHelper.accessor('company', {
         id: 'col-company',
         header: 'Company',
-        cell: (info) => (
-          <span className="whitespace-nowrap text-xs text-stone-400">{info.getValue() || '—'}</span>
-        ),
+        cell: (info) => <span className="whitespace-nowrap text-xs text-stone-300">{info.getValue() || '—'}</span>,
       }),
       columnHelper.accessor('name', {
         id: 'col-name',
@@ -133,9 +133,7 @@ export function IntegrationsTable({
       columnHelper.accessor('version', {
         id: 'col-version',
         header: 'Ver.',
-        cell: (info) => (
-          <span className="font-mono text-[11px] text-stone-500">{info.getValue() || '—'}</span>
-        ),
+        cell: (info) => <span className="font-mono text-xs text-stone-400">{info.getValue() || '—'}</span>,
         size: 64,
       }),
       ...(columnVisibility.license
@@ -143,9 +141,7 @@ export function IntegrationsTable({
             columnHelper.accessor('license', {
               id: 'col-license',
               header: 'License',
-              cell: (info) => (
-                <span className="text-[11px] text-stone-500">{info.getValue() || '—'}</span>
-              ),
+              cell: (info) => <span className="text-xs text-stone-400">{info.getValue() || '—'}</span>,
             }),
           ]
         : []),
@@ -153,7 +149,7 @@ export function IntegrationsTable({
         id: 'col-scope',
         header: 'Scope',
         cell: (info) => (
-          <span className="text-[10px] uppercase tracking-[0.06em] text-stone-500">
+          <span className="text-[10px] uppercase tracking-[0.08em] text-stone-400">
             {info.getValue() || '—'}
           </span>
         ),
@@ -163,9 +159,7 @@ export function IntegrationsTable({
             columnHelper.accessor('port', {
               id: 'col-port',
               header: 'Port',
-              cell: (info) => (
-                <span className="font-mono text-[11px] text-stone-500">{info.getValue() || '—'}</span>
-              ),
+              cell: (info) => <span className="font-mono text-xs text-stone-400">{info.getValue() || '—'}</span>,
             }),
           ]
         : []),
@@ -187,7 +181,7 @@ export function IntegrationsTable({
             {row.original.badges.slice(0, 2).map((b) => (
               <span
                 key={b}
-                className="border border-stone-600/40 px-1 py-0.5 text-[9px] text-stone-500"
+                className="border border-stone-300/20 bg-stone-200/5 px-1 py-0.5 text-[9px] text-stone-300"
               >
                 {b}
               </span>
@@ -198,9 +192,7 @@ export function IntegrationsTable({
       columnHelper.accessor('lastUpdated', {
         id: 'col-updated',
         header: 'Updated',
-        cell: (info) => (
-          <span className="font-mono text-[10px] text-stone-600">{info.getValue() || '—'}</span>
-        ),
+        cell: (info) => <span className="font-mono text-[10px] text-stone-400">{info.getValue() || '—'}</span>,
         size: 88,
       }),
       ...(columnVisibility.notes
@@ -239,24 +231,28 @@ export function IntegrationsTable({
     getFilteredRowModel: getFilteredRowModel(),
   });
 
-  if (rows.length === 0) {
-    return (
-      <p className="py-12 text-center text-sm text-stone-500">No rows match the current filters.</p>
-    );
-  }
-
   return (
-    <div className="overflow-x-auto border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72">
+    <div className="overflow-x-auto border border-stone-200/12 bg-[rgb(var(--pm-panel))]/72">
       <table className="w-full min-w-[960px] border-collapse text-left text-sm">
-        <thead>
+        <thead className="sticky top-0 z-10 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
           {table.getHeaderGroups().map((hg) => (
-            <tr key={hg.id} className="border-b border-stone-200/15 bg-white/[0.03]">
+            <tr key={hg.id}>
               {hg.headers.map((h) => (
                 <th
                   key={h.id}
-                  className="px-3 py-2 text-[10px] font-medium uppercase tracking-[0.12em] text-stone-500"
+                  onClick={h.column.getCanSort() ? h.column.getToggleSortingHandler() : undefined}
+                  className={`select-none px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400 ${
+                    h.column.getCanSort() ? 'cursor-pointer' : ''
+                  }`}
                 >
-                  {flexRender(h.column.columnDef.header, h.getContext())}
+                  <div className="inline-flex items-center gap-1">
+                    {flexRender(h.column.columnDef.header, h.getContext())}
+                    {h.column.getCanSort() && (
+                      <span className="text-[10px] text-stone-500">
+                        {h.column.getIsSorted() === 'asc' ? '↑' : h.column.getIsSorted() === 'desc' ? '↓' : '↕'}
+                      </span>
+                    )}
+                  </div>
                 </th>
               ))}
             </tr>
@@ -269,18 +265,28 @@ export function IntegrationsTable({
               <tr
                 key={row.id}
                 onClick={() => onRowClick(row.original)}
-                className={`cursor-pointer border-b border-stone-200/8 transition-colors ${
-                  active ? 'bg-emerald-950/35' : 'hover:bg-white/[0.04]'
+                className={`cursor-pointer border-b border-stone-200/10 transition-colors ${
+                  active ? 'bg-emerald-950/20' : 'hover:bg-white/[0.045]'
                 }`}
               >
                 {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="px-3 py-2 align-middle">
+                  <td key={cell.id} className="px-3 py-3 align-middle text-sm text-stone-300">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}
               </tr>
             );
           })}
+          {table.getRowModel().rows.length === 0 && (
+            <tr>
+              <td
+                colSpan={table.getVisibleLeafColumns().length}
+                className="px-4 py-8 text-center text-xs text-stone-500"
+              >
+                No rows match the current filters.
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>

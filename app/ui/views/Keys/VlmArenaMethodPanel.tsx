@@ -71,19 +71,19 @@ export function VlmArenaMethodPanel({
         </h2>
         <div className="overflow-x-auto border border-stone-200/12 bg-black/10">
           <table className="min-w-full border-collapse text-left">
-            <thead className="border-b border-stone-200/15 bg-white/[0.035]">
+            <thead className="sticky top-0 z-10 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
               <tr>
-                <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">評測維度</th>
-                <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">觀測方式</th>
-                <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">通過標準</th>
+                <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">評測維度</th>
+                <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">觀測方式</th>
+                <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">通過標準</th>
               </tr>
             </thead>
             <tbody>
               {METHOD_ROWS.map((row) => (
-                <tr key={row.dimension} className="border-b border-stone-200/10 last:border-b-0">
-                  <td className="px-3 py-2 text-xs text-stone-200">{row.dimension}</td>
-                  <td className="px-3 py-2 text-xs text-stone-300">{row.observe}</td>
-                  <td className="px-3 py-2 text-xs text-stone-300">{row.passRule}</td>
+                <tr key={row.dimension} className="border-b border-stone-200/10 last:border-b-0 hover:bg-white/[0.045]">
+                  <td className="px-3 py-3 text-xs text-stone-200">{row.dimension}</td>
+                  <td className="px-3 py-3 text-xs text-stone-300">{row.observe}</td>
+                  <td className="px-3 py-3 text-xs text-stone-300">{row.passRule}</td>
                 </tr>
               ))}
             </tbody>

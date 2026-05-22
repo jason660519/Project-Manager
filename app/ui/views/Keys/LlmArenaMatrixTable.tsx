@@ -204,10 +204,11 @@ export function LlmArenaMatrixTable({
           <button
             onClick={() => onRunSingleRow(row.original.index)}
             disabled={isRunning || !userPrompt.trim()}
-            className="inline-flex h-7 w-7 items-center justify-center rounded border border-stone-200/20 bg-black/20 text-emerald-300 hover:bg-black/35 disabled:opacity-40"
+            className="inline-flex h-7 items-center gap-1 rounded border border-emerald-200/25 bg-emerald-100/10 px-2 text-[11px] font-medium text-emerald-100 hover:bg-emerald-100/18 disabled:opacity-40"
             title="執行單列評測"
           >
             {isRunning ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
+            Run
           </button>
         ),
       }),
@@ -339,17 +340,19 @@ export function LlmArenaMatrixTable({
           <div className="flex items-center gap-1">
             <button
               onClick={() => onOpenDetail(row.original.index)}
-              className="text-stone-500 hover:text-emerald-300"
+              className="inline-flex items-center gap-1 rounded border border-stone-300/20 bg-stone-200/5 px-2 py-1 text-[11px] text-stone-200 hover:bg-stone-200/10"
               title="查看詳情"
             >
               <Eye size={13} />
+              View
             </button>
             <button
               onClick={() => onRemoveModel(row.original.index)}
-              className="text-stone-500 hover:text-red-400"
+              className="inline-flex items-center gap-1 rounded border border-red-400/25 bg-red-500/10 px-2 py-1 text-[11px] text-red-200 hover:bg-red-500/20"
               title="刪除列"
             >
               <Trash2 size={13} />
+              Delete
             </button>
           </div>
         ),

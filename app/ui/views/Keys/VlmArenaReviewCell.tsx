@@ -57,7 +57,7 @@ export function VlmArenaReviewCell({
       <td className="px-3 py-2 text-xs text-stone-300">
         <button
           onClick={onOpenDetail}
-          className="inline-flex items-center gap-1 border border-stone-200/20 px-2 py-1 hover:bg-white/[0.04]"
+          className="inline-flex items-center gap-1 rounded border border-stone-300/20 bg-stone-200/5 px-2 py-1 text-[11px] text-stone-200 hover:bg-stone-200/10"
         >
           <History size={12} />
           {historyCount}
@@ -67,13 +67,19 @@ export function VlmArenaReviewCell({
         <div className="flex items-center gap-1">
           <button
             onClick={onOpenDetail}
-            className="text-stone-500 hover:text-emerald-300"
+            className="inline-flex items-center gap-1 rounded border border-stone-300/20 bg-stone-200/5 px-2 py-1 text-[11px] text-stone-200 hover:bg-stone-200/10"
             title="查看詳情"
           >
             <Eye size={13} />
+            View
           </button>
-          <button onClick={onRemove} className="text-stone-500 hover:text-red-400" title="刪除列">
+          <button
+            onClick={onRemove}
+            className="inline-flex items-center gap-1 rounded border border-red-400/25 bg-red-500/10 px-2 py-1 text-[11px] text-red-200 hover:bg-red-500/20"
+            title="刪除列"
+          >
             <Trash2 size={13} />
+            Delete
           </button>
         </div>
       </td>

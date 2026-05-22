@@ -50,10 +50,11 @@ export function VlmArenaExecutionCell({
         <button
           onClick={onRunSingle}
           disabled={isRunning || !imageDataUrl || !hasUserPrompt}
-          className="inline-flex h-7 w-7 items-center justify-center rounded border border-stone-200/20 bg-black/20 text-emerald-300 hover:bg-black/35 disabled:opacity-40"
+          className="inline-flex h-7 items-center gap-1 rounded border border-emerald-200/25 bg-emerald-100/10 px-2 text-[11px] font-medium text-emerald-100 hover:bg-emerald-100/18 disabled:opacity-40"
           title="執行單列評測"
         >
           {isRunning ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
+          Run
         </button>
       </td>
       <td className="px-3 py-2">

@@ -3,14 +3,14 @@
 import type { IntegrationStatus } from '../../../../../lib/integrations/types';
 
 const STATUS_STYLES: Record<IntegrationStatus, string> = {
-  installed: 'border-emerald-400/35 text-emerald-300 bg-emerald-950/30',
-  connected: 'border-sky-400/35 text-sky-300 bg-sky-950/30',
-  running: 'border-emerald-400/40 text-emerald-200 bg-emerald-900/40',
-  stopped: 'border-stone-500/40 text-stone-400 bg-stone-900/40',
-  warning: 'border-amber-400/40 text-amber-200 bg-amber-950/30',
-  unavailable: 'border-stone-600/50 text-stone-500 bg-stone-900/50',
-  not_installed: 'border-stone-500/30 text-stone-400 bg-stone-900/30',
-  idle: 'border-stone-600/40 text-stone-500 bg-stone-900/30',
+  installed: 'border-emerald-200/25 bg-emerald-100/12 text-emerald-100',
+  connected: 'border-cyan-200/25 bg-cyan-100/12 text-cyan-100',
+  running: 'border-emerald-200/25 bg-emerald-100/12 text-emerald-100',
+  stopped: 'border-stone-300/25 bg-stone-200/10 text-stone-200',
+  warning: 'border-amber-300/30 bg-amber-400/12 text-amber-100',
+  unavailable: 'border-red-400/30 bg-red-500/15 text-red-200',
+  not_installed: 'border-stone-300/25 bg-stone-200/10 text-stone-200',
+  idle: 'border-stone-300/25 bg-stone-200/10 text-stone-200',
 };
 
 export function StatusBadge({
@@ -22,7 +22,7 @@ export function StatusBadge({
 }) {
   return (
     <span
-      className={`inline-flex border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.08em] ${STATUS_STYLES[status] ?? STATUS_STYLES.idle}`}
+      className={`inline-flex border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] ${STATUS_STYLES[status] ?? STATUS_STYLES.idle}`}
     >
       {label}
     </span>

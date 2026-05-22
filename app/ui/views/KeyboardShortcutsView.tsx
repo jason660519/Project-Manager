@@ -109,17 +109,17 @@ export function KeyboardShortcutsView() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[520px] border-collapse text-left text-xs">
-                <thead className="border-b border-stone-200/10 text-[10px] uppercase tracking-[0.14em] text-stone-500">
+                <thead className="sticky top-0 z-10 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))] text-xs uppercase tracking-[0.12em] text-stone-400">
                   <tr>
-                    <th className="px-4 py-2 font-medium">Keys</th>
-                    <th className="px-4 py-2 font-medium">Action</th>
-                    <th className="px-4 py-2 font-medium">Scope</th>
-                    <th className="px-4 py-2 text-right font-medium">Status</th>
+                    <th className="px-4 py-3 font-semibold">Keys</th>
+                    <th className="px-4 py-3 font-semibold">Action</th>
+                    <th className="px-4 py-3 font-semibold">Scope</th>
+                    <th className="px-4 py-3 text-right font-semibold">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-stone-200/8">
+                <tbody className="divide-y divide-stone-200/10">
                   {group.rows.map((row) => (
-                    <tr key={`${group.title}-${row.action}`} className="hover:bg-white/3">
+                    <tr key={`${group.title}-${row.action}`} className="hover:bg-white/[0.045]">
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center gap-1.5">
                           {row.keys.map((key, index) => (
