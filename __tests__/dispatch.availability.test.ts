@@ -1,49 +1,52 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { execFile } from 'child_process';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { invoke } from '@tauri-apps/api/core';
 import { checkCommandExists, clearCommandExistsCache } from '../lib/adapters/availability';
 
-vi.mock('child_process', () => ({
-  execFile: vi.fn(),
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: vi.fn(),
 }));
 
-const execFileMock = vi.mocked(execFile);
+const invokeMock = vi.mocked(invoke);
 
-function mockCommandLookup(error: Error | null) {
-  execFileMock.mockImplementationOnce(((_file: string, _args: readonly string[], callback: unknown) => {
-    (callback as (error: Error | null, stdout: string, stderr: string) => void)(error, '', '');
-    return {} as ReturnType<typeof execFile>;
-  }) as typeof execFile);
+function setTauriRuntime() {
+  Object.defineProperty(window, '__TAURI_INTERNALS__', {
+    configurable: true,
+    value: {},
+  });
 }
 
 describe('checkCommandExists', () => {
   beforeEach(() => {
     clearCommandExistsCache();
     vi.clearAllMocks();
+    delete (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
   });
 
-  it('returns true when the command is installed', async () => {
-    mockCommandLookup(null);
-
+  it('returns true in browser mode because local CLI availability cannot be checked', async () => {
     await expect(checkCommandExists('cursor')).resolves.toBe(true);
+    expect(invokeMock).not.toHaveBeenCalled();
   });
 
-  it('returns false when the command is missing', async () => {
-    mockCommandLookup(new Error('not found'));
+  it('uses the Tauri bridge when running inside Tauri', async () => {
+    setTauriRuntime();
+    invokeMock.mockResolvedValueOnce(false);
 
     await expect(checkCommandExists('nonexistent-tool')).resolves.toBe(false);
+    expect(invokeMock).toHaveBeenCalledWith('check_command_exists', { command: 'nonexistent-tool' });
   });
 
-  it('caches results', async () => {
-    mockCommandLookup(null);
+  it('caches Tauri bridge results', async () => {
+    setTauriRuntime();
+    invokeMock.mockResolvedValueOnce(true);
 
     await expect(checkCommandExists('cursor')).resolves.toBe(true);
     await expect(checkCommandExists('cursor')).resolves.toBe(true);
-    expect(execFileMock).toHaveBeenCalledTimes(1);
+    expect(invokeMock).toHaveBeenCalledTimes(1);
   });
 
   it('returns false for an empty command', async () => {
     await expect(checkCommandExists('')).resolves.toBe(false);
-    expect(execFileMock).not.toHaveBeenCalled();
+    expect(invokeMock).not.toHaveBeenCalled();
   });
 
   it('falls back safely when no adapters are available', () => {

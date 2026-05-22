@@ -93,9 +93,10 @@ describe('ChatPageClient', () => {
 
     expect(localStorageMock.setItem).toHaveBeenCalled();
     const setCall = localStorageMock.setItem.mock.calls.find(
-      ([key]: [string]) => key === 'projectManager:chat-sessions',
+      ([key]) => key === 'projectManager:chat-sessions',
     );
     expect(setCall).toBeTruthy();
+    if (!setCall) throw new Error('Expected chat sessions to be saved');
     const stored = JSON.parse(setCall[1]);
     expect(stored.length).toBeGreaterThanOrEqual(1);
     expect(stored[0].messages[0].content).toBe('Hello!');

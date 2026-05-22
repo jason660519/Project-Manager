@@ -1,4 +1,4 @@
-import { callAnthropic, callGemini, callOpenAICompatible } from '../bridge';
+import { callAnthropic, callGemini, callOpenAICompatible, type AnthropicMessage } from '../bridge';
 import { getLlmProvider } from '../keys/llmProviders';
 import { hasProviderKey, loadProviderKey } from '../keys/loadProviderKey';
 import {
