@@ -439,7 +439,7 @@ function adapterToIDE(adapter: AnyAdapterConfig): IDEId | undefined {
   return IDE_IDS.find((id) => id === adapter.name);
 }
 
-type TargetPreflightStatus = 'checking' | 'available' | 'missing' | 'unknown';
+type TargetPreflightStatus = 'checking' | 'available' | 'missing' | 'blocked' | 'unknown';
 
 interface TargetPreflight {
   status: TargetPreflightStatus;
@@ -484,6 +484,17 @@ function describeTargetPreflight(
       status: 'missing',
       label: d.targetStatusMissing,
       description: d.targetStatusMissingHint.replace('{command}', adapter.command),
+      commandLabel,
+      managementLabel,
+      canRun: false,
+    };
+  }
+
+  if (availability.status === 'blocked') {
+    return {
+      status: 'blocked',
+      label: d.targetStatusBlocked,
+      description: d.targetStatusBlockedHint.replace('{command}', adapter.command),
       commandLabel,
       managementLabel,
       canRun: false,
@@ -1265,7 +1276,7 @@ export function TaskDispatchModal({
                         const statusMarker =
                           preflight?.status === 'available'
                             ? '✓'
-                            : preflight?.status === 'missing'
+                            : preflight?.status === 'missing' || preflight?.status === 'blocked'
                               ? '⚠'
                               : '?';
                         return (
@@ -1283,7 +1294,7 @@ export function TaskDispatchModal({
                       'mt-2 border px-3 py-2 text-[11px]',
                       selectedPreflight.status === 'available'
                         ? 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100'
-                        : selectedPreflight.status === 'missing'
+                        : selectedPreflight.status === 'missing' || selectedPreflight.status === 'blocked'
                           ? 'border-red-400/35 bg-red-500/10 text-red-100'
                           : selectedPreflight.status === 'checking'
                             ? 'border-stone-300/20 bg-white/[0.035] text-stone-300'

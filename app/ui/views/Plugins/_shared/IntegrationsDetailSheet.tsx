@@ -421,6 +421,19 @@ export function IntegrationsDetailSheet({
               <p className="text-[11px] text-stone-500">{t.integrations.channelCommandMappingHint}</p>
             </section>
           )}
+
+          {row.sourceKind === 'system-cli' && onOpenPath && (
+            <section className="border-t border-stone-200/12 pt-4 space-y-2">
+              <p className="text-xs text-stone-400">{t.integrations.systemCliDetectedHint}</p>
+              <button
+                type="button"
+                onClick={() => onOpenPath(row.installPath)}
+                className="flex items-center gap-1 border border-stone-200/20 px-2 py-1 text-xs text-stone-300"
+              >
+                <ExternalLink size={12} /> {t.integrations.systemCliRevealBinary}
+              </button>
+            </section>
+          )}
         </div>
       </aside>
     </>

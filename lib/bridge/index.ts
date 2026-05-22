@@ -8,6 +8,7 @@
 
 import { migrateConfig } from '../storage';
 import type { ProjectManagerConfig } from '../types';
+import { KEY_PERSONAL_SYSTEM_CLI_EXPOSURE } from '../storage/keys';
 
 // ── Tauri detection ───────────────────────────────────────────────────────────
 
@@ -17,6 +18,44 @@ const isTauri = (): boolean =>
 async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   const { invoke: tauriInvoke } = await import('@tauri-apps/api/core');
   return tauriInvoke<T>(command, args);
+}
+
+function commandBasename(command: string): string {
+  const trimmed = command.trim();
+  if (!trimmed) return '';
+  const parts = trimmed.split(/[\\/]/);
+  return parts[parts.length - 1] ?? trimmed;
+}
+
+function loadSystemCliExposureMapForPolicy(): Record<string, boolean> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(KEY_PERSONAL_SYSTEM_CLI_EXPOSURE);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object') return {};
+    const out: Record<string, boolean> = {};
+    for (const [name, exposed] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof name === 'string' && typeof exposed === 'boolean') out[name] = exposed;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+async function assertCommandPolicyAllows(command: string): Promise<void> {
+  if (!isTauri()) return;
+  const base = commandBasename(command);
+  if (!base) return;
+  const inventory = await listGlobalCliInventory();
+  const isSystemCli = inventory.some((entry) => entry.command === base);
+  if (!isSystemCli) return;
+  const exposure = loadSystemCliExposureMapForPolicy();
+  if (exposure[base] === true) return;
+  throw new Error(
+    `Command "${base}" is blocked by System CLI policy. Enable it in Plugins > Commands (Global CLI Inventory) before dispatch.`,
+  );
 }
 
 // ── Config operations ─────────────────────────────────────────────────────────
@@ -118,6 +157,7 @@ export interface SpawnAgentOptions {
  */
 export async function spawnAgent(opts: SpawnAgentOptions): Promise<number> {
   if (isTauri()) {
+    await assertCommandPolicyAllows(opts.command);
     return invoke<number>('spawn_agent', {
       command: opts.command,
       args: opts.args,
@@ -164,6 +204,7 @@ export interface SpawnTerminalOptions {
  */
 export async function spawnTerminal(opts: SpawnTerminalOptions): Promise<void> {
   if (!isTauri()) throw new Error('spawnTerminal requires Tauri runtime');
+  await assertCommandPolicyAllows(opts.command);
   return invoke<void>('spawn_terminal', {
     command: opts.command,
     args: opts.args,
@@ -268,6 +309,19 @@ export async function openPath(path: string): Promise<void> {
 export async function checkCommandExistsTauri(command: string): Promise<boolean> {
   if (!isTauri()) return false;
   return invoke<boolean>('check_command_exists', { command });
+}
+
+export interface GlobalCliInventoryEntry {
+  command: string;
+  path: string;
+  source: string;
+  scope: 'user' | 'system';
+}
+
+/** Enumerate executable CLI binaries visible on current PATH. */
+export async function listGlobalCliInventory(): Promise<GlobalCliInventoryEntry[]> {
+  if (!isTauri()) return [];
+  return invoke<GlobalCliInventoryEntry[]>('list_global_cli_inventory');
 }
 
 /**

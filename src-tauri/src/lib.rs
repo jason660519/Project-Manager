@@ -2,6 +2,8 @@ mod dev_secrets;
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
@@ -2146,6 +2148,116 @@ async fn check_command_exists(command: String) -> Result<bool, String> {
     Ok(false)
 }
 
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct GlobalCliEntry {
+    command: String,
+    path: String,
+    source: String,
+    scope: String,
+}
+
+fn is_likely_executable(_path: &Path, metadata: &std::fs::Metadata) -> bool {
+    if !metadata.is_file() {
+        return false;
+    }
+
+    #[cfg(unix)]
+    {
+        return metadata.permissions().mode() & 0o111 != 0;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let ext = _path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_ascii_lowercase())
+            .unwrap_or_default();
+        return matches!(ext.as_str(), "exe" | "cmd" | "bat" | "com");
+    }
+
+    #[cfg(not(any(unix, target_os = "windows")))]
+    {
+        true
+    }
+}
+
+fn classify_cli_path(path: &str) -> (String, String) {
+    let lower = path.to_ascii_lowercase();
+    let home = std::env::var("HOME").unwrap_or_default().to_ascii_lowercase();
+    let is_user = !home.is_empty() && lower.starts_with(&home);
+
+    let source = if lower.contains("node_modules") {
+        "npm-global"
+    } else if lower.contains(".cargo/bin") {
+        "cargo"
+    } else if lower.contains("homebrew") || lower.contains("/brew/") {
+        "homebrew"
+    } else if lower.contains(".local/bin") {
+        "user-local"
+    } else if is_user {
+        "user-path"
+    } else {
+        "system-path"
+    };
+
+    let scope = if is_user { "user" } else { "system" };
+    (source.to_string(), scope.to_string())
+}
+
+#[tauri::command]
+async fn list_global_cli_inventory() -> Result<Vec<GlobalCliEntry>, String> {
+    let path_var = match std::env::var_os("PATH") {
+        Some(path) => path,
+        None => return Ok(vec![]),
+    };
+
+    let mut by_command: HashMap<String, GlobalCliEntry> = HashMap::new();
+    for dir in std::env::split_paths(&path_var) {
+        let mut entries = match tokio::fs::read_dir(&dir).await {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            let full_path = entry.path();
+            let file_name = match full_path.file_name().and_then(|v| v.to_str()) {
+                Some(name) if !name.is_empty() => name.to_string(),
+                _ => continue,
+            };
+
+            if by_command.contains_key(&file_name) {
+                continue;
+            }
+
+            let metadata = match entry.metadata().await {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            if !is_likely_executable(&full_path, &metadata) {
+                continue;
+            }
+
+            let path_string = full_path.to_string_lossy().to_string();
+            let (source, scope) = classify_cli_path(&path_string);
+            by_command.insert(
+                file_name.clone(),
+                GlobalCliEntry {
+                    command: file_name,
+                    path: path_string,
+                    source,
+                    scope,
+                },
+            );
+        }
+    }
+
+    let mut rows: Vec<GlobalCliEntry> = by_command.into_values().collect();
+    rows.sort_by(|a, b| a.command.to_ascii_lowercase().cmp(&b.command.to_ascii_lowercase()));
+    Ok(rows)
+}
+
 /// Open a file or directory in the OS handler. Markdown files on macOS use
 /// TextEdit so Project Manager never triggers a paid default Markdown app.
 /// Generic helper — also used by future Skills UI to reveal the skills dir.
@@ -3175,6 +3287,7 @@ pub fn run() {
             write_mcp_config,
             open_path,
             check_command_exists,
+            list_global_cli_inventory,
             skill_default_dir,
             skill_list,
             skill_save,

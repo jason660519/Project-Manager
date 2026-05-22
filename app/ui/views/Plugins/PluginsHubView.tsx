@@ -8,6 +8,7 @@ import { mergeAllManual } from '../../../../lib/integrations/manual-metadata';
 import { mapInstalledPlugins, mapMarketplaceRow } from '../../../../lib/integrations/mappers/plugins';
 import { mapSkillRow } from '../../../../lib/integrations/mappers/skills';
 import { mapChannelRow, mapCommandMappingRow } from '../../../../lib/integrations/mappers/channels';
+import { mapSystemCliRow } from '../../../../lib/integrations/mappers/system-cli';
 import { loadMemoryRows, loadSlashCommandRows } from '../../../../lib/integrations/load-project-inventory';
 import { MARKETPLACE, buildFromMarketplace } from '../../../../lib/integrations/marketplace-catalog';
 import type { PluginCatalog, McpPlugin } from '../../../../lib/types/plugins';
@@ -23,6 +24,12 @@ import {
   togglePluginEnabled,
 } from '../../../../lib/storage/plugins';
 import {
+  getAiCliPresetAllowlist,
+  loadSystemCliExposureMap,
+  setSystemCliExposed,
+  setSystemCliExposureMany,
+} from '../../../../lib/storage/system-cli';
+import {
   getChannelSecret,
   loadChannelCatalog,
   saveChannelCatalog,
@@ -36,6 +43,7 @@ import {
   onMcpStatus,
   openPath,
   readFile,
+  listGlobalCliInventory,
   skillInstallFromUrl,
   skillList,
   skillUninstall,
@@ -95,6 +103,7 @@ export function PluginsHubView({ projectRoot = '' }: PluginsHubViewProps) {
   const [skillRows, setSkillRows] = useState<IntegrationRow[]>([]);
   const [memoryRows, setMemoryRows] = useState<IntegrationRow[]>([]);
   const [commandRows, setCommandRows] = useState<IntegrationRow[]>([]);
+  const [systemCliExposure, setSystemCliExposure] = useState<Record<string, boolean>>({});
   const [systemCommandStatus, setSystemCommandStatus] = useState<Record<string, boolean>>({});
   const [logsForId, setLogsForId] = useState<string | null>(null);
   const [skillsInstallUrl, setSkillsInstallUrl] = useState('');
@@ -108,6 +117,7 @@ export function PluginsHubView({ projectRoot = '' }: PluginsHubViewProps) {
     void loadAllApiKeys(selectProviders(c)).then(setApiKeys);
     void getSkillsDir().then(setSkillsDir);
     setChannelCatalog(loadChannelCatalog());
+    setSystemCliExposure(loadSystemCliExposureMap());
   }, []);
 
   const loadSkills = useCallback(async () => {
@@ -179,7 +189,16 @@ export function PluginsHubView({ projectRoot = '' }: PluginsHubViewProps) {
   const loadCommands = useCallback(async () => {
     const slash = await loadSlashCommandRows(projectRoot);
     const mappings = channelCatalog.commandMappings.map(mapCommandMappingRow);
-    setCommandRows([...slash, ...mappings]);
+    const exposure = loadSystemCliExposureMap();
+    setSystemCliExposure(exposure);
+    let systemCli: IntegrationRow[] = [];
+    try {
+      const inventory = await listGlobalCliInventory();
+      systemCli = inventory.map((entry) => mapSystemCliRow(entry, exposure[entry.command] === true));
+    } catch {
+      systemCli = [];
+    }
+    setCommandRows([...slash, ...mappings, ...systemCli]);
   }, [projectRoot, channelCatalog.commandMappings]);
 
   useEffect(() => {
@@ -297,6 +316,34 @@ export function PluginsHubView({ projectRoot = '' }: PluginsHubViewProps) {
   const skillsRowsMerged = useMemo(() => mergeAllManual(skillRows), [skillRows, manualVersion]);
   const memoryRowsMerged = useMemo(() => mergeAllManual(memoryRows), [memoryRows, manualVersion]);
   const commandRowsMerged = useMemo(() => mergeAllManual(commandRows), [commandRows, manualVersion]);
+  const systemCliRows = useMemo(
+    () => commandRowsMerged.filter((row) => row.sourceKind === 'system-cli'),
+    [commandRowsMerged],
+  );
+  const exposedSystemCliCount = useMemo(
+    () => systemCliRows.filter((row) => row.enabled).length,
+    [systemCliRows],
+  );
+  const exposedSystemCliConfigured = useMemo(
+    () => Object.values(systemCliExposure).filter(Boolean).length,
+    [systemCliExposure],
+  );
+  const applySystemCliPolicyPreset = useCallback(
+    (preset: 'allow-all' | 'block-all' | 'ai-defaults') => {
+      if (systemCliRows.length === 0) return;
+      const updates: Record<string, boolean> = {};
+      const presetAllowlist = new Set(getAiCliPresetAllowlist());
+      for (const row of systemCliRows) {
+        if (preset === 'allow-all') updates[row.sourceId] = true;
+        else if (preset === 'block-all') updates[row.sourceId] = false;
+        else updates[row.sourceId] = presetAllowlist.has(row.sourceId);
+      }
+      setSystemCliExposureMany(updates);
+      setSystemCliExposure((prev) => ({ ...prev, ...updates }));
+      void loadCommands();
+    },
+    [loadCommands, systemCliRows],
+  );
 
   const activeRows = useMemo(() => {
     let rows =
@@ -429,7 +476,7 @@ export function PluginsHubView({ projectRoot = '' }: PluginsHubViewProps) {
         ))}
       </div>
 
-      {!projectRoot && (activeSheet === 'memory' || activeSheet === 'commands') && (
+      {!projectRoot && activeSheet === 'memory' && (
         <p className="border border-amber-400/25 bg-amber-950/25 px-3 py-2 text-xs text-amber-200/90">
           {t.integrations.selectProjectHint}
         </p>
@@ -478,7 +525,7 @@ export function PluginsHubView({ projectRoot = '' }: PluginsHubViewProps) {
             </Link>
           </>
         )}
-        {(activeSheet === 'memory' || activeSheet === 'commands') && projectRoot && (
+        {(activeSheet === 'memory' || activeSheet === 'commands') && (activeSheet !== 'memory' || projectRoot) && (
           <button
             type="button"
             onClick={() => {
@@ -498,6 +545,31 @@ export function PluginsHubView({ projectRoot = '' }: PluginsHubViewProps) {
           >
             {t.integrations.openCommandsFolder}
           </button>
+        )}
+        {activeSheet === 'commands' && (
+          <>
+            <button
+              type="button"
+              onClick={() => applySystemCliPolicyPreset('allow-all')}
+              className="border border-emerald-400/30 bg-emerald-950/20 px-2 py-2 text-xs text-emerald-300"
+            >
+              {t.integrations.commandsAllowAllSystemCli}
+            </button>
+            <button
+              type="button"
+              onClick={() => applySystemCliPolicyPreset('block-all')}
+              className="border border-red-400/30 bg-red-950/20 px-2 py-2 text-xs text-red-300"
+            >
+              {t.integrations.commandsBlockAllSystemCli}
+            </button>
+            <button
+              type="button"
+              onClick={() => applySystemCliPolicyPreset('ai-defaults')}
+              className="border border-cyan-400/30 bg-cyan-950/20 px-2 py-2 text-xs text-cyan-200"
+            >
+              {t.integrations.commandsAiDefaultsPreset}
+            </button>
+          </>
         )}
         {activeSheet === 'channels' && (
           <div className="flex flex-wrap gap-1">
@@ -547,6 +619,15 @@ export function PluginsHubView({ projectRoot = '' }: PluginsHubViewProps) {
         </label>
       </div>
 
+      {activeSheet === 'commands' && (
+        <div className="border border-cyan-400/20 bg-cyan-950/20 px-3 py-2 text-xs text-cyan-100/90">
+          {t.integrations.commandsInventorySummary
+            .replace('{detected}', String(systemCliRows.length))
+            .replace('{exposed}', String(exposedSystemCliCount))
+            .replace('{whitelisted}', String(exposedSystemCliConfigured))}
+        </div>
+      )}
+
       <IntegrationsTable
         rows={activeRows}
         selectedRowKey={selectedRow?.rowKey ?? null}
@@ -572,13 +653,19 @@ export function PluginsHubView({ projectRoot = '' }: PluginsHubViewProps) {
                 }
               : activeSheet === 'commands'
                 ? (row, enabled) => {
-                    if (row.sourceKind !== 'command-mapping') return;
-                    updateChannels({
-                      ...channelCatalog,
-                      commandMappings: channelCatalog.commandMappings.map((m) =>
-                        m.id === row.sourceId ? { ...m, enabled } : m,
-                      ),
-                    });
+                    if (row.sourceKind === 'command-mapping') {
+                      updateChannels({
+                        ...channelCatalog,
+                        commandMappings: channelCatalog.commandMappings.map((m) =>
+                          m.id === row.sourceId ? { ...m, enabled } : m,
+                        ),
+                      });
+                    } else if (row.sourceKind === 'system-cli') {
+                      setSystemCliExposed(row.sourceId, enabled);
+                      setSystemCliExposure((prev) => ({ ...prev, [row.sourceId]: enabled }));
+                    } else {
+                      return;
+                    }
                     void loadCommands();
                   }
                 : undefined

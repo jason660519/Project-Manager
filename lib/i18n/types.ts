@@ -36,6 +36,35 @@ export interface Translations {
     /** "{count} run(s) active" — component substitutes {count} */
     runsActive: string;
   };
+  settingsView: {
+    title: string;
+    subtitle: string;
+    systemTrayTitle: string;
+    systemTrayHint: string;
+    enableOnLaunch: string;
+    requiresTauri: string;
+    runtimeBridgeTitle: string;
+    runtimeModeLabel: string;
+    runtimeModeTauri: string;
+    runtimeModeBrowser: string;
+    runtimeAiRouteLabel: string;
+    runtimeAiRouteValue: string;
+    runtimeSecretStorageLabel: string;
+    runtimeProcessSpawnLabel: string;
+    runtimeProcessSpawnActive: string;
+    runtimeProcessSpawnDisabled: string;
+    systemCliPresetTitle: string;
+    systemCliPresetHint: string;
+    systemCliPresetEntries: string;
+    exportJson: string;
+    importJson: string;
+    resetRecommended: string;
+    savePreset: string;
+    presetCopied: string;
+    copyPresetPrompt: string;
+    importPresetPrompt: string;
+    importPresetInvalid: string;
+  };
   common: {
     search: string;
     selectAll: string;
@@ -263,7 +292,14 @@ export interface Translations {
     selectProjectHint: string;
     openCommandsFolder: string;
     openCommandFile: string;
+    commandsAllowAllSystemCli: string;
+    commandsBlockAllSystemCli: string;
+    commandsAiDefaultsPreset: string;
+    /** Uses {detected}, {exposed}, {whitelisted} placeholders */
+    commandsInventorySummary: string;
     channelCommandMappingHint: string;
+    systemCliDetectedHint: string;
+    systemCliRevealBinary: string;
     filterAllCategories: string;
     filterAllPlugins: string;
     manualFields: string;
@@ -348,6 +384,9 @@ export interface Translations {
     targetStatusMissing: string;
     /** Uses {command} placeholder */
     targetStatusMissingHint: string;
+    targetStatusBlocked: string;
+    /** Uses {command} placeholder */
+    targetStatusBlockedHint: string;
     targetStatusUnknown: string;
     targetStatusUnknownHint: string;
     targetStatusManual: string;

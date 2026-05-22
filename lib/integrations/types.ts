@@ -12,7 +12,7 @@ export type IntegrationStatus =
   | 'not_installed'
   | 'idle';
 
-export type IntegrationScope = 'user' | 'project' | 'network' | 'intranet' | '';
+export type IntegrationScope = 'user' | 'system' | 'project' | 'network' | 'intranet' | '';
 
 /** Discriminant for detail panel actions */
 export type IntegrationSourceKind =
@@ -22,7 +22,8 @@ export type IntegrationSourceKind =
   | 'channel'
   | 'command-mapping'
   | 'memory'
-  | 'slash-command';
+  | 'slash-command'
+  | 'system-cli';
 
 export interface IntegrationManualFields {
   lv?: number;
