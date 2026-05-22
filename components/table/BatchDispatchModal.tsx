@@ -104,6 +104,7 @@ export function BatchDispatchModal({
   const d = t.dispatch;
   const agentAdapters = adapters.filter((a) => a.type === 'agent');
   const emptyState = features.length === 0;
+  const noAgentAdapters = !emptyState && agentAdapters.length === 0;
 
   const [selectedAdapterId, setSelectedAdapterId] = useState(agentAdapters[0]?.id ?? '');
   const [selectedTemplate, setSelectedTemplate] = useState(0);
@@ -283,7 +284,14 @@ export function BatchDispatchModal({
             </div>
           )}
 
-          {!emptyState && batchPhase === 'idle' && (
+          {noAgentAdapters && batchPhase === 'idle' && (
+            <div className="flex flex-col items-center justify-center border border-stone-200/12 bg-[rgb(var(--pm-input))]/50 px-4 py-8 text-center">
+              <p className="text-sm font-medium text-stone-200">{d.batchNeedAgent}</p>
+              <p className="mt-1 text-xs text-stone-500">{d.noAvailableAdaptersHint}</p>
+            </div>
+          )}
+
+          {!emptyState && !noAgentAdapters && batchPhase === 'idle' && (
             <>
               {/* Agent selector (only shown when multiple agents exist) */}
               {agentAdapters.length > 1 && (
@@ -470,8 +478,8 @@ export function BatchDispatchModal({
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 border-t border-stone-200/12 bg-white/[0.035] px-6 py-4">
-          {!emptyState && batchPhase === 'idle' && agentAdapters.length === 0 && (
-            <p className="mr-auto text-xs text-stone-500">批次派遣需要至少一個 Agent 適配器</p>
+          {noAgentAdapters && batchPhase === 'idle' && (
+            <p className="mr-auto text-xs text-stone-500">{d.batchNeedAgent}</p>
           )}
           <button
             onClick={onClose}

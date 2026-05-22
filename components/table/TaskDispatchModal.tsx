@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   augmentArgsWithMcp,
   killProcess,
@@ -20,6 +20,7 @@ import {
   createRuntimeAdapterFromConfig,
   getAdapterExecutionKind,
 } from '../../lib/adapters/registry';
+import { checkCommandExists } from '../../lib/adapters/availability';
 import { listLlmProviders, type LlmProviderId } from '../../lib/keys/llmProviders';
 import { collectEnabledMcpServers } from '../../lib/storage/plugins';
 import { useI18n } from '../../lib/i18n';
@@ -493,7 +494,7 @@ interface TaskDispatchModalProps {
   onFeatureUpdate?: (featureId: string, update: DispatchFeatureUpdate) => void;
 }
 
-type Phase = 'idle' | 'running' | 'done' | 'error';
+type Phase = 'idle' | 'pending' | 'running' | 'done' | 'error';
 
 export function TaskDispatchModal({
   feature,
@@ -563,35 +564,19 @@ export function TaskDispatchModal({
   const unlistenRefs = useRef<Array<() => void>>([]);
   const activePidRef = useRef<number | null>(null);
 
-  // ── Command availability check ─────────────────────────────────────────────
-  const checkCommand = useCallback(async (cmd: string): Promise<boolean> => {
-    if (!cmd) return false;
-    try {
-      const proc = await import('child_process');
-      return new Promise((resolve) => {
-        proc.exec(`which "${cmd.replace(/"/g, '\\"')}"`, (error) => {
-          resolve(!error);
-        });
-      });
-    } catch {
-      // In browser/serverless environments, `which` is unavailable; assume present.
-      return true;
-    }
-  }, []);
-
   // Check availability of all adapters on mount
   useEffect(() => {
     let cancelled = false;
     const checkAll = async () => {
       const result: Record<string, boolean> = {};
       for (const adapter of adapters) {
-        result[adapter.id] = await checkCommand(adapter.command);
+        result[adapter.id] = await checkCommandExists(adapter.command);
       }
       if (!cancelled) setCommandExists(result);
     };
     checkAll();
     return () => { cancelled = true; };
-  }, [adapters, checkCommand]);
+  }, [adapters]);
 
   // Adapter fallback warning
   useEffect(() => {
@@ -822,7 +807,7 @@ export function TaskDispatchModal({
       return;
     }
 
-    setPhase('running');
+    setPhase('pending');
     setLogs([]);
     setDispatchError(null);
     setCommandLoading(true);
@@ -856,6 +841,7 @@ export function TaskDispatchModal({
       const pid = await spawnAgent({ command, args, workingDir: projectRoot });
       setActivePid(pid);
       activePidRef.current = pid;
+      setPhase('running');
       onRunStart?.(pid, feature.id, feature.name, command, args);
 
       onExecuted({
@@ -940,6 +926,7 @@ export function TaskDispatchModal({
     setKillConfirmPid(null);
   };
 
+  const isPending = phase === 'pending';
   const isRunning = phase === 'running';
   const isAssignedBlocked =
     phase === 'idle' &&
@@ -986,6 +973,13 @@ export function TaskDispatchModal({
 
         {/* Body */}
         <div className="space-y-4 p-6">
+          {phase === 'idle' && adapters.length === 0 && (
+            <div className="flex flex-col items-center justify-center border border-stone-200/12 bg-[rgb(var(--pm-input))]/50 px-4 py-8 text-center">
+              <p className="text-sm font-medium text-stone-200">{d.noAvailableAdapters}</p>
+              <p className="mt-1 text-xs text-stone-500">{d.noAvailableAdaptersHint}</p>
+            </div>
+          )}
+
           {adapterWarning && (
             <div className="flex items-start gap-3 border border-amber-400/30 bg-amber-500/10 px-4 py-3">
               <div className="min-w-0">
@@ -1021,7 +1015,7 @@ export function TaskDispatchModal({
             </div>
           )}
 
-        {phase === 'idle' && (
+        {phase === 'idle' && adapters.length > 0 && (
             <>
               <div>
                 <label className="mb-1 block text-sm font-medium text-stone-200">
@@ -1262,6 +1256,7 @@ export function TaskDispatchModal({
                       rows={7}
                       value={prompt}
                       onChange={(e) => setPrompt(e.target.value)}
+                      disabled={specLoading}
                       className="w-full border border-stone-200/20 bg-[rgb(var(--pm-input))] px-3 py-2 font-mono text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
                     />
                   </div>
@@ -1354,32 +1349,34 @@ export function TaskDispatchModal({
             <div>
               <div className="mb-1 flex items-center justify-between">
                 <label className="text-sm font-medium text-stone-200">
-                  {isRunning ? d.liveOutput : d.executionLog}
+                  {isPending ? d.commandPreparing : isRunning ? d.liveOutput : d.executionLog}
                 </label>
                 {activePid != null && (
                   <span className="text-xs text-stone-400">PID {activePid}</span>
                 )}
               </div>
-              {/* Command loading spinner */}
-              {commandLoading && (
+              {/* Pending covers command construction, MCP augmentation, and spawn before a PID exists. */}
+              {isPending && (
                 <div className="mb-2 flex items-center gap-2 text-xs text-stone-400">
                   <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-stone-400 border-t-transparent" />
                   {d.commandPreparing}
                 </div>
               )}
 
-              <div className="max-h-64 overflow-auto border border-stone-200/12 bg-[rgb(var(--pm-input))] p-3 font-mono text-xs leading-5 text-stone-200">
-                {logs.length === 0 && !commandLoading ? (
-                  <span className="animate-pulse text-stone-500">{d.waitingOutput}</span>
-                ) : (
-                  logs.map((line, i) => (
-                    <div key={i} className="whitespace-pre-wrap break-all">
-                      {line}
-                    </div>
-                  ))
-                )}
-                <div ref={logEndRef} />
-              </div>
+              {!isPending && (
+                <div className="max-h-64 overflow-auto border border-stone-200/12 bg-[rgb(var(--pm-input))] p-3 font-mono text-xs leading-5 text-stone-200">
+                  {logs.length === 0 ? (
+                    <span className="animate-pulse text-stone-500">{d.waitingOutput}</span>
+                  ) : (
+                    logs.map((line, i) => (
+                      <div key={i} className="whitespace-pre-wrap break-all">
+                        {line}
+                      </div>
+                    ))
+                  )}
+                  <div ref={logEndRef} />
+                </div>
+              )}
 
               {/* Post-run error banner */}
               {phase === 'error' && dispatchError && (
@@ -1416,7 +1413,7 @@ export function TaskDispatchModal({
               {d.openTerminalBtn}
             </button>
           )}
-          {phase === 'idle' && (
+          {phase === 'idle' && adapters.length > 0 && (
             <button
               onClick={isAgentCli ? handleExecute : handleOpenExternalTarget}
               disabled={specLoading || isAssignedBlocked}

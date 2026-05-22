@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "next typegen && tsc --noEmit",
+    "bridge:typecheck": "tsc --noEmit --project ../shared-bridge/tsconfig.json",
     "standards:check": "/Volumes/KLEVV-4T-1/Company-AI-App-Standards/scripts/company-standards.sh check .",
     "standards:fix": "/Volumes/KLEVV-4T-1/Company-AI-App-Standards/scripts/company-standards.sh fix .",
     "standards:doctor": "/Volumes/KLEVV-4T-1/Company-AI-App-Standards/scripts/company-standards.sh doctor .",
@@ -35,6 +36,7 @@
     "tauri:icon": "tauri icon"
   },
   "dependencies": {
+    "@jason66/shared-bridge": "file:../shared-bridge",
     "@tanstack/react-table": "^8.20.5",
     "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-dialog": "^2.7.1",

@@ -14,8 +14,8 @@
       "id": "F12",
       "name": "Skills Management Page",
       "category": "Execution/Engineer Tools",
-      "status": "in_progress",
-      "progress": 70,
+      "status": "done",
+      "progress": 100,
       "paths": {
         "featureFolder": ".project-manager/features/F12/",
         "spec": ".project-manager/features/F12/feature-spec.md",
@@ -25,9 +25,10 @@
       },
       "readmePath": ".project-manager/features/F12/README.md",
       "createdAt": "2026-05-19T00:30:00.000Z",
-      "updatedAt": "2026-05-19T00:30:00.000Z",
+      "updatedAt": "2026-05-20T02:10:00.000+10:00",
       "phase": "development",
-      "points": 1
+      "points": 1,
+      "updatedBy": "f12_engineer"
     },
     {
       "id": "F01",
@@ -54,6 +55,8 @@
       "progress": 100,
       "paths": {
         "featureFolder": ".project-manager/features/F02/",
+        "spec": ".project-manager/features/F02/feature-spec.md",
+        "tdd": ".project-manager/features/F02/tdd-spec.md",
         "implementation": "app/ui/DashboardClient.tsx",
         "test": "__tests__/dashboardClient.phaseTabs.test.tsx",
         "developmentLogSummaryFolder": ".project-manager/features/F02/",
@@ -75,8 +78,8 @@
       "id": "F03",
       "name": "Live Run Inspector",
       "category": "Frontend/Monitor",
-      "status": "in_progress",
-      "progress": 80,
+      "status": "done",
+      "progress": 100,
       "paths": {
         "featureFolder": ".project-manager/features/F03/",
         "implementation": "app/ui/views/RunsView.tsx",
@@ -85,7 +88,7 @@
       },
       "readmePath": ".project-manager/features/F03/README.md",
       "createdAt": "2026-05-18T22:54:57.000Z",
-      "updatedAt": "2026-05-19T14:14:00.000Z",
+      "updatedAt": "2026-05-20T02:01:00.000Z",
       "phase": "development",
       "points": 1,
       "updatedBy": "f03_engineer"
@@ -231,7 +234,7 @@
       "name": "i18n: Multilingual Contributor Guide",
       "category": "Documentation/i18n",
       "status": "in_progress",
-      "progress": 40,
+      "progress": 50,
       "paths": {
         "featureFolder": ".project-manager/features/F11/",
         "implementation": "lib/hooks/useLang.ts",
@@ -254,8 +257,8 @@
       "id": "F13",
       "name": "Dispatch UX Improvements & Bug Fixes",
       "category": "Frontend/Dispatch",
-      "status": "in_progress",
-      "progress": 85,
+      "status": "done",
+      "progress": 100,
       "paths": {
         "featureFolder": ".project-manager/features/F13/",
         "spec": ".project-manager/features/F13/feature-spec.md",
@@ -266,9 +269,9 @@
       "readmePath": ".project-manager/features/F13/README.md",
       "notes": "Fix missing loading/error/empty states in TaskDispatchModal and BatchDispatchModal. Add kill confirmation, adapter fallback, command availability check, and MCP validation feedback.",
       "createdAt": "2026-05-19T13:47:00.000Z",
-      "updatedAt": "2026-05-19T14:08:00.000Z",
-      "updatedBy": "openclaw/OpenClaw + f13_engineer",
-      "phase": "development",
+      "updatedAt": "2026-05-20T02:06:00.000+10:00",
+      "updatedBy": "openclaw/Codex",
+      "phase": "deployment",
       "points": 1
     },
     {

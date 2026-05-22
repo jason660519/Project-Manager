@@ -18,6 +18,9 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/',
 }));
 
+// jsdom doesn't implement scrollIntoView — add a no-op stub.
+Element.prototype.scrollIntoView = vi.fn();
+
 // jsdom's Storage implementation can be unreliable — use a clean in-memory mock.
 const makeLocalStorage = () => {
   let store: Record<string, string> = {};

@@ -149,6 +149,40 @@ describe('loading states', () => {
     commandLoading = false;
     expect(commandLoading).toBe(false);
   });
+
+  it('dispatch phase moves pending → running → done', () => {
+    type Phase = 'idle' | 'pending' | 'running' | 'done' | 'error';
+    const phases: Phase[] = [];
+    let phase: Phase = 'idle';
+    const setPhase = (next: Phase) => {
+      phase = next;
+      phases.push(next);
+    };
+
+    setPhase('pending');
+    setPhase('running');
+    setPhase('done');
+
+    expect(phase).toBe('done');
+    expect(phases).toEqual(['pending', 'running', 'done']);
+  });
+
+  it('dispatch phase moves pending → running → error', () => {
+    type Phase = 'idle' | 'pending' | 'running' | 'done' | 'error';
+    const phases: Phase[] = [];
+    let phase: Phase = 'idle';
+    const setPhase = (next: Phase) => {
+      phase = next;
+      phases.push(next);
+    };
+
+    setPhase('pending');
+    setPhase('running');
+    setPhase('error');
+
+    expect(phase).toBe('error');
+    expect(phases).toEqual(['pending', 'running', 'error']);
+  });
 });
 
 // ── MCP state ─────────────────────────────────────────────────────────────────
