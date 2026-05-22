@@ -600,6 +600,112 @@ export async function fetchGithubIssues(
   return invoke<GithubIssuePayload[]>('fetch_github_issues', { token, repoUrl });
 }
 
+export interface CreateGithubIssueInput {
+  repoUrl: string;
+  title: string;
+  body?: string;
+}
+
+export interface UpdateGithubIssueInput {
+  repoUrl: string;
+  issueNumber: number;
+  title?: string;
+  body?: string;
+}
+
+export interface CommentGithubIssueInput {
+  repoUrl: string;
+  issueNumber: number;
+  comment: string;
+}
+
+export interface CloseGithubIssueInput {
+  repoUrl: string;
+  issueNumber: number;
+  comment?: string;
+}
+
+async function browserIssueMutation<T>(
+  action: 'create' | 'update' | 'comment' | 'close_with_comment',
+  payload: object,
+): Promise<T> {
+  const res = await fetch('/api/github/issues', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...payload }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || `GitHub issue action failed (${res.status})`);
+  }
+  return res.json() as Promise<T>;
+}
+
+/** Create a GitHub issue. Uses Tauri command in desktop; Next API route in browser dev. */
+export async function createGithubIssue(
+  token: string,
+  input: CreateGithubIssueInput,
+): Promise<GithubIssuePayload> {
+  if (isTauri()) {
+    return invoke<GithubIssuePayload>('create_github_issue', {
+      token,
+      repoUrl: input.repoUrl,
+      title: input.title,
+      body: input.body ?? null,
+    });
+  }
+  return browserIssueMutation<GithubIssuePayload>('create', input);
+}
+
+/** Update issue title/body. Leaves unspecified fields unchanged. */
+export async function updateGithubIssue(
+  token: string,
+  input: UpdateGithubIssueInput,
+): Promise<GithubIssuePayload> {
+  if (isTauri()) {
+    return invoke<GithubIssuePayload>('update_github_issue', {
+      token,
+      repoUrl: input.repoUrl,
+      issueNumber: input.issueNumber,
+      title: input.title ?? null,
+      body: input.body ?? null,
+    });
+  }
+  return browserIssueMutation<GithubIssuePayload>('update', input);
+}
+
+/** Add a review/update comment to an issue. */
+export async function commentGithubIssue(
+  token: string,
+  input: CommentGithubIssueInput,
+): Promise<GithubIssuePayload> {
+  if (isTauri()) {
+    return invoke<GithubIssuePayload>('comment_github_issue', {
+      token,
+      repoUrl: input.repoUrl,
+      issueNumber: input.issueNumber,
+      comment: input.comment,
+    });
+  }
+  return browserIssueMutation<GithubIssuePayload>('comment', input);
+}
+
+/** Close an issue and optionally append a closing comment. */
+export async function closeGithubIssueWithComment(
+  token: string,
+  input: CloseGithubIssueInput,
+): Promise<GithubIssuePayload> {
+  if (isTauri()) {
+    return invoke<GithubIssuePayload>('close_github_issue_with_comment', {
+      token,
+      repoUrl: input.repoUrl,
+      issueNumber: input.issueNumber,
+      comment: input.comment ?? null,
+    });
+  }
+  return browserIssueMutation<GithubIssuePayload>('close_with_comment', input);
+}
+
 // ── OS Keychain / dev plaintext file ──────────────────────────────────────────
 
 /** Label for the active secret backend (`keychain` vs dev file). Tauri only. */

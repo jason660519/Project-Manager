@@ -4,7 +4,8 @@
 #   ./start_project_manager.sh           show interactive menu
 #   ./start_project_manager.sh start     start the Tauri desktop app
 #   ./start_project_manager.sh web       start Next.js web server only (no Tauri)
-#   ./start_project_manager.sh all       start PM + Hermes + OpenClaw and open auxiliary pages
+#   ./start_project_manager.sh all       start PM + Hermes + OpenClaw and open all auxiliary pages
+#   ./start_project_manager.sh core      start PM + Hermes + OpenClaw only (essential pages)
 #   ./start_project_manager.sh aux       open auxiliary software pages only
 #   ./start_project_manager.sh install   force full install check
 #   ./start_project_manager.sh update    update npm deps + rebuild Rust
@@ -38,6 +39,7 @@ RESET="\033[0m"
 
 FORCE_OPEN=0
 FORCE_RESTART=0
+OPENED_URLS_SESSION=$'\n'
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -94,23 +96,54 @@ should_force_open_browser() {
   [[ "${PROJECT_MANAGER_FORCE_OPEN:-0}" == "1" || "$FORCE_OPEN" == "1" ]]
 }
 
+session_has_url_opened() {
+  local normalized_url
+  normalized_url="$(normalize_browser_url "$1")"
+  [[ "$OPENED_URLS_SESSION" == *$'\n'"$normalized_url"$'\n'* ]]
+}
+
+remember_session_opened_url() {
+  local normalized_url
+  normalized_url="$(normalize_browser_url "$1")"
+  if [[ "$OPENED_URLS_SESSION" != *$'\n'"$normalized_url"$'\n'* ]]; then
+    OPENED_URLS_SESSION+="${normalized_url}"$'\n'
+  fi
+}
+
 open_local_url() {
   local url="$1"
+  local target_url
+  target_url="$(normalize_browser_url "$url")"
+
   if [[ "${PROJECT_MANAGER_NO_OPEN:-0}" == "1" ]]; then
     success "Browser auto-open skipped: $(safe_url_for_display "$url")"
     return 0
   fi
 
+  if ! should_force_open_browser && session_has_url_opened "$target_url"; then
+    success "Browser tab already handled in this run: $(safe_url_for_display "$url")"
+    return 0
+  fi
+
   if ! should_force_open_browser && browser_has_url_open "$url"; then
+    remember_session_opened_url "$target_url"
     success "Browser tab already open: $(safe_url_for_display "$url")"
     return 0
   fi
 
   if [[ "$PLATFORM" == "macOS" ]]; then
-    open "$url" >/dev/null 2>&1 || warn "Could not open browser automatically: $url"
+    if open "$url" >/dev/null 2>&1; then
+      remember_session_opened_url "$target_url"
+    else
+      warn "Could not open browser automatically: $url"
+    fi
   else
     if command -v xdg-open >/dev/null 2>&1; then
-      xdg-open "$url" >/dev/null 2>&1 || warn "Could not open browser automatically: $url"
+      if xdg-open "$url" >/dev/null 2>&1; then
+        remember_session_opened_url "$target_url"
+      else
+        warn "Could not open browser automatically: $url"
+      fi
     else
       warn "Open this URL manually: $url"
     fi
@@ -735,6 +768,12 @@ cmd_update() {
 
 cmd_start() {
   header "Project Manager — Start"
+  local pm_url="http://localhost:${DEV_PORT}/"
+  local dev_server_running=0
+
+  if is_port_listening "$DEV_PORT"; then
+    dev_server_running=1
+  fi
 
   # Ensure cargo is in PATH
   if [[ -f "$HOME/.cargo/env" ]]; then
@@ -749,6 +788,7 @@ cmd_start() {
 
   cd "$SCRIPT_DIR"
   ensure_dev_port_available
+  maybe_open_local_url "$pm_url" "$dev_server_running"
   echo -e "${CYAN}Launching Project Manager desktop app…${RESET}"
   echo -e "${CYAN}(Next.js will start on port ${DEV_PORT}, Tauri window will open shortly)${RESET}"
   echo ""
@@ -757,6 +797,7 @@ cmd_start() {
 
 cmd_web() {
   header "Project Manager — Web Server (Next.js only)"
+  local pm_url="http://localhost:${DEV_PORT}/"
 
   if ! is_installed; then
     warn "First run detected — running install first…"
@@ -771,10 +812,12 @@ cmd_web() {
   existing_pid="$(lsof -nP -iTCP:"$DEV_PORT" -sTCP:LISTEN -t 2>/dev/null | head -1 || true)"
   if [[ -n "$existing_pid" ]] && is_next_process "$existing_pid"; then
     success "Next.js dev server already running — http://localhost:${DEV_PORT}  (PID ${existing_pid})"
+    maybe_open_local_url "$pm_url" "1"
     return 0
   fi
 
   ensure_dev_port_available
+  maybe_open_local_url "$pm_url" "0"
 
   info "Starting Next.js dev server on http://localhost:${DEV_PORT}…"
   echo -e "${CYAN}(Ctrl-C to stop)${RESET}"
@@ -917,6 +960,34 @@ cmd_all() {
   cmd_start
 }
 
+cmd_core() {
+  header "Project Manager — Core Stack (PM + Hermes + OpenClaw)"
+
+  if [[ "$FORCE_RESTART" == "1" ]]; then
+    stop_listeners_on_port "$HERMES_PORT" "Hermes Dashboard"
+    stop_listeners_on_port "$OPENCLAW_PORT" "OpenClaw Gateway"
+  fi
+
+  if ! is_installed; then
+    cmd_install
+  fi
+
+  cmd_hermes
+  cmd_openclaw
+
+  header "Launch Summary"
+  success "Core apps are ready"
+  echo "  Project Manager Desktop: starting next (Next.js dev port $DEV_PORT)"
+  echo "  Project Manager Web App: http://localhost:${DEV_PORT}/"
+  echo "  Hermes Agent Dashboard:  http://127.0.0.1:${HERMES_PORT}"
+  echo "  OpenClaw Dashboard:      http://127.0.0.1:${OPENCLAW_PORT}/"
+  echo "  Logs:                    .project-manager/dev-logs/"
+  echo ""
+
+  # Finally start PM
+  cmd_start
+}
+
 cmd_stop() {
   header "Project Manager — Stopping Services"
   
@@ -942,30 +1013,32 @@ show_menu() {
   echo -e "${BLUE}══════════════════════════════════════════════════════════════${RESET}"
   echo -e "${BLUE}   Project Manager - 統一啟動選單 (Project Manager Menu) ${RESET}"
   echo -e "${BLUE}══════════════════════════════════════════════════════════════${RESET}"
-  echo -e " 1) 🚀 啟動完整環境 (PM + Hermes + OpenClaw + 輔助頁面)"
-  echo -e " 2) 🖥️  啟動 PM 桌面端 (Tauri App)"
-  echo -e " 3) 🌐 啟動 PM 網頁端 (Next.js Only)"
-  echo -e " 4) 🤖 啟動 Hermes Agent Dashboard (Port: $HERMES_PORT)"
-  echo -e " 5) 🕹️  啟動 OpenClaw Dashboard (Port: $OPENCLAW_PORT)"
-  echo -e " 6) 🧩 開啟 Hermes / OpenClaw / Ollama / Open WebUI / ComfyUI 頁面"
+  echo -e " 1) 🚀 啟動全部 (PM + Hermes + OpenClaw + 輔助頁面)"
+  echo -e " 2) ⚡ 只開必要頁面 (PM Web + PM Desktop + Hermes + OpenClaw)"
+  echo -e " 3) 🖥️  啟動 PM 桌面端 (Tauri App)"
+  echo -e " 4) 🌐 啟動 PM 網頁端 (Next.js Only)"
+  echo -e " 5) 🤖 啟動 Hermes Agent Dashboard (Port: $HERMES_PORT)"
+  echo -e " 6) 🕹️  啟動 OpenClaw Dashboard (Port: $OPENCLAW_PORT)"
+  echo -e " 7) 🧩 開啟 Hermes / OpenClaw / Ollama / Open WebUI / ComfyUI 頁面"
   echo -e " ─── 管理功能 ───"
-  echo -e " 7) 📥 執行完整安裝 (Full Install)"
-  echo -e " 8) 🔄 更新相依性與 Rust 編譯 (Update)"
-  echo -e " 9) 🛑 停止所有相關服務"
+  echo -e " 8) 📥 執行完整安裝 (Full Install)"
+  echo -e " 9) 🔄 更新相依性與 Rust 編譯 (Update)"
+  echo -e "10) 🛑 停止所有相關服務"
   echo -e " 0) 🚪 離開 (Exit)"
   echo ""
   read -p "請輸入選項 (Enter choice): " choice
 
   case $choice in
     1) cmd_all ;;
-    2) cmd_start ;;
-    3) cmd_web ;;
-    4) cmd_hermes ;;
-    5) cmd_openclaw ;;
-    6) cmd_aux ;;
-    7) cmd_install ;;
-    8) cmd_update ;;
-    9) cmd_stop ;;
+    2) cmd_core ;;
+    3) cmd_start ;;
+    4) cmd_web ;;
+    5) cmd_hermes ;;
+    6) cmd_openclaw ;;
+    7) cmd_aux ;;
+    8) cmd_install ;;
+    9) cmd_update ;;
+    10) cmd_stop ;;
     0) exit 0 ;;
     *) warn "無效選項 (Invalid choice)"; sleep 1; show_menu ;;
   esac
@@ -1030,6 +1103,7 @@ case "$COMMAND" in
   start)    cmd_start   ;;
   web)      cmd_web     ;;
   all)      cmd_all     ;;
+  core)     cmd_core    ;;
   aux)      cmd_aux     ;;
   stop)     cmd_stop    ;;
   hermes)   cmd_hermes  ;;
@@ -1038,7 +1112,7 @@ case "$COMMAND" in
   auto)     cmd_auto    ;;
   *)
     error "Unknown command: $COMMAND"
-    echo "Usage: $0 [--force-open|--open] [--restart] [install|update|start|web|all|aux|stop|hermes|openclaw|menu]"
+    echo "Usage: $0 [--force-open|--open] [--restart] [install|update|start|web|all|core|aux|stop|hermes|openclaw|menu]"
     exit 1
     ;;
 esac

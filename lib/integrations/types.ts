@@ -1,6 +1,12 @@
 /** Unified integration inventory row — shared across Integrations Hub sheets. */
 
-export type IntegrationSheet = 'plugins' | 'skills' | 'channels' | 'memory' | 'commands';
+export type IntegrationSheet =
+  | 'plugins'
+  | 'skills'
+  | 'channels'
+  | 'memory'
+  | 'commands'
+  | 'company_standards';
 
 export type IntegrationStatus =
   | 'installed'
@@ -23,7 +29,8 @@ export type IntegrationSourceKind =
   | 'command-mapping'
   | 'memory'
   | 'slash-command'
-  | 'system-cli';
+  | 'system-cli'
+  | 'standards-provider';
 
 export interface IntegrationManualFields {
   lv?: number;

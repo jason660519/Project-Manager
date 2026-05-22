@@ -1193,6 +1193,76 @@ fn extract_labels(nodes: &serde_json::Value) -> Vec<String> {
         .unwrap_or_default()
 }
 
+fn parse_github_owner_repo(repo_url: &str) -> Result<(String, String), String> {
+    let parts: Vec<&str> = repo_url.trim_end_matches('/').split('/').collect();
+    if parts.len() < 2 {
+        return Err("Invalid GitHub URL — expected https://github.com/owner/repo".to_string());
+    }
+    Ok((
+        parts[parts.len() - 2].to_string(),
+        parts[parts.len() - 1].to_string(),
+    ))
+}
+
+fn map_graphql_issue(issue_data: &serde_json::Value) -> GithubIssue {
+    let number = issue_data["number"].as_u64().unwrap_or(0);
+    let title = issue_data["title"].as_str().unwrap_or("").to_string();
+    let body = issue_data["body"].as_str().map(String::from);
+    let state = issue_data["state"].as_str().unwrap_or("OPEN").to_string().to_lowercase();
+    let created_at = issue_data["createdAt"].as_str().unwrap_or("").to_string();
+    let updated_at = issue_data["updatedAt"].as_str().unwrap_or("").to_string();
+    let url = issue_data["url"].as_str().unwrap_or("").to_string();
+    let user = issue_data["author"]["login"].as_str().map(String::from);
+    let labels = issue_data["labels"]["nodes"]
+        .as_array()
+        .map(|arr| arr.iter().filter_map(|l| l["name"].as_str().map(String::from)).collect())
+        .unwrap_or_default();
+
+    GithubIssue {
+        id: number,
+        number,
+        title,
+        body,
+        state,
+        labels,
+        created_at,
+        updated_at,
+        url,
+        user,
+    }
+}
+
+fn map_rest_issue(issue_data: &serde_json::Value) -> Result<GithubIssue, String> {
+    let number = issue_data["number"]
+        .as_u64()
+        .ok_or_else(|| "GitHub REST payload missing issue number".to_string())?;
+    let id = issue_data["id"].as_u64().unwrap_or(number);
+    let title = issue_data["title"].as_str().unwrap_or("").to_string();
+    let body = issue_data["body"].as_str().map(String::from);
+    let state = issue_data["state"].as_str().unwrap_or("open").to_string();
+    let created_at = issue_data["created_at"].as_str().unwrap_or("").to_string();
+    let updated_at = issue_data["updated_at"].as_str().unwrap_or("").to_string();
+    let url = issue_data["html_url"].as_str().unwrap_or("").to_string();
+    let user = issue_data["user"]["login"].as_str().map(String::from);
+    let labels = issue_data["labels"]
+        .as_array()
+        .map(|arr| arr.iter().filter_map(|l| l["name"].as_str().map(String::from)).collect())
+        .unwrap_or_default();
+
+    Ok(GithubIssue {
+        id,
+        number,
+        title,
+        body,
+        state,
+        labels,
+        created_at,
+        updated_at,
+        url,
+        user,
+    })
+}
+
 /// Shared implementation for fetching PRs + issues from GitHub GraphQL API.
 /// Called both from the `fetch_github_repo` command and the `start_github_poll` loop.
 async fn fetch_github_repo_inner(token: &str, repo_url: &str) -> Result<Vec<GitHubFeature>, String> {
@@ -1338,12 +1408,7 @@ async fn fetch_github_repo(token: String, repo_url: String) -> Result<Vec<GitHub
 /// Fetch all GitHub issues (open and closed) from a repository.
 #[tauri::command]
 async fn fetch_github_issues(token: String, repo_url: String) -> Result<Vec<GithubIssue>, String> {
-    let parts: Vec<&str> = repo_url.trim_end_matches('/').split('/').collect();
-    if parts.len() < 2 {
-        return Err("Invalid GitHub URL — expected https://github.com/owner/repo".to_string());
-    }
-    let owner = parts[parts.len() - 2];
-    let repo = parts[parts.len() - 1];
+    let (owner, repo) = parse_github_owner_repo(&repo_url)?;
 
     let body = serde_json::json!({
         "query": "query($owner:String!,$repo:String!){ repository(owner:$owner,name:$repo){ issues(first:50,orderBy:{field:UPDATED_AT,direction:DESC}){ nodes{ id number title body state createdAt updatedAt url author{login} labels(first:10){ nodes{ name } } } } } }",
@@ -1377,38 +1442,176 @@ async fn fetch_github_issues(token: String, repo_url: String) -> Result<Vec<Gith
 
     if let Some(issue_nodes) = data["data"]["repository"]["issues"]["nodes"].as_array() {
         for issue_data in issue_nodes {
-            // GitHub GraphQL "node id" is base64-encoded and not surfaced to the UI;
-            // PM keys issues by the numeric `number` field below.
-            let number = issue_data["number"].as_u64().unwrap_or(0);
-            let title = issue_data["title"].as_str().unwrap_or("").to_string();
-            let body = issue_data["body"].as_str().map(String::from);
-            let state = issue_data["state"].as_str().unwrap_or("OPEN").to_string().to_lowercase();
-            let created_at = issue_data["createdAt"].as_str().unwrap_or("").to_string();
-            let updated_at = issue_data["updatedAt"].as_str().unwrap_or("").to_string();
-            let url = issue_data["url"].as_str().unwrap_or("").to_string();
-            let user = issue_data["author"]["login"].as_str().map(String::from);
-
-            let labels = issue_data["labels"]["nodes"]
-                .as_array()
-                .map(|arr| arr.iter().filter_map(|l| l["name"].as_str().map(String::from)).collect())
-                .unwrap_or_default();
-
-            issues.push(GithubIssue {
-                id: number,
-                number,
-                title,
-                body,
-                state,
-                labels,
-                created_at,
-                updated_at,
-                url,
-                user,
-            });
+            // GitHub GraphQL "node id" is base64-encoded and not surfaced to the UI.
+            issues.push(map_graphql_issue(issue_data));
         }
     }
 
     Ok(issues)
+}
+
+#[tauri::command]
+async fn create_github_issue(
+    token: String,
+    repo_url: String,
+    title: String,
+    body: Option<String>,
+) -> Result<GithubIssue, String> {
+    let (owner, repo) = parse_github_owner_repo(&repo_url)?;
+    let url = format!("https://api.github.com/repos/{owner}/{repo}/issues");
+    let payload = serde_json::json!({
+        "title": title,
+        "body": body.unwrap_or_default(),
+    });
+
+    let client = reqwest::Client::new();
+    let res = client
+        .post(url)
+        .header("Authorization", format!("Bearer {token}"))
+        .header("User-Agent", "ProjectManager/0.1.0")
+        .header("Accept", "application/vnd.github+json")
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {e}"))?;
+    if !res.status().is_success() {
+        let status = res.status();
+        let text = res.text().await.unwrap_or_default();
+        return Err(format!("GitHub API {status}: {text}"));
+    }
+
+    let data: serde_json::Value = res.json().await.map_err(|e| format!("JSON parse: {e}"))?;
+    map_rest_issue(&data)
+}
+
+#[tauri::command]
+async fn update_github_issue(
+    token: String,
+    repo_url: String,
+    issue_number: u64,
+    title: Option<String>,
+    body: Option<String>,
+) -> Result<GithubIssue, String> {
+    let (owner, repo) = parse_github_owner_repo(&repo_url)?;
+    let url = format!("https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}");
+    let payload = serde_json::json!({
+        "title": title,
+        "body": body,
+    });
+
+    let client = reqwest::Client::new();
+    let res = client
+        .patch(url)
+        .header("Authorization", format!("Bearer {token}"))
+        .header("User-Agent", "ProjectManager/0.1.0")
+        .header("Accept", "application/vnd.github+json")
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {e}"))?;
+    if !res.status().is_success() {
+        let status = res.status();
+        let text = res.text().await.unwrap_or_default();
+        return Err(format!("GitHub API {status}: {text}"));
+    }
+
+    let data: serde_json::Value = res.json().await.map_err(|e| format!("JSON parse: {e}"))?;
+    map_rest_issue(&data)
+}
+
+#[tauri::command]
+async fn comment_github_issue(
+    token: String,
+    repo_url: String,
+    issue_number: u64,
+    comment: String,
+) -> Result<GithubIssue, String> {
+    let (owner, repo) = parse_github_owner_repo(&repo_url)?;
+    let comments_url = format!("https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}/comments");
+    let issue_url = format!("https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}");
+    let payload = serde_json::json!({ "body": comment });
+
+    let client = reqwest::Client::new();
+    let comment_res = client
+        .post(comments_url)
+        .header("Authorization", format!("Bearer {token}"))
+        .header("User-Agent", "ProjectManager/0.1.0")
+        .header("Accept", "application/vnd.github+json")
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {e}"))?;
+    if !comment_res.status().is_success() {
+        let status = comment_res.status();
+        let text = comment_res.text().await.unwrap_or_default();
+        return Err(format!("GitHub API {status}: {text}"));
+    }
+
+    let issue_res = client
+        .get(issue_url)
+        .header("Authorization", format!("Bearer {token}"))
+        .header("User-Agent", "ProjectManager/0.1.0")
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {e}"))?;
+    if !issue_res.status().is_success() {
+        let status = issue_res.status();
+        let text = issue_res.text().await.unwrap_or_default();
+        return Err(format!("GitHub API {status}: {text}"));
+    }
+    let data: serde_json::Value = issue_res.json().await.map_err(|e| format!("JSON parse: {e}"))?;
+    map_rest_issue(&data)
+}
+
+#[tauri::command]
+async fn close_github_issue_with_comment(
+    token: String,
+    repo_url: String,
+    issue_number: u64,
+    comment: Option<String>,
+) -> Result<GithubIssue, String> {
+    let (owner, repo) = parse_github_owner_repo(&repo_url)?;
+    let issue_url = format!("https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}");
+    let client = reqwest::Client::new();
+
+    if let Some(comment_body) = comment {
+        if !comment_body.trim().is_empty() {
+            let comments_url =
+                format!("https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}/comments");
+            let comment_res = client
+                .post(comments_url)
+                .header("Authorization", format!("Bearer {token}"))
+                .header("User-Agent", "ProjectManager/0.1.0")
+                .header("Accept", "application/vnd.github+json")
+                .json(&serde_json::json!({ "body": comment_body }))
+                .send()
+                .await
+                .map_err(|e| format!("Network error: {e}"))?;
+            if !comment_res.status().is_success() {
+                let status = comment_res.status();
+                let text = comment_res.text().await.unwrap_or_default();
+                return Err(format!("GitHub API {status}: {text}"));
+            }
+        }
+    }
+
+    let close_res = client
+        .patch(issue_url)
+        .header("Authorization", format!("Bearer {token}"))
+        .header("User-Agent", "ProjectManager/0.1.0")
+        .header("Accept", "application/vnd.github+json")
+        .json(&serde_json::json!({ "state": "closed" }))
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {e}"))?;
+    if !close_res.status().is_success() {
+        let status = close_res.status();
+        let text = close_res.text().await.unwrap_or_default();
+        return Err(format!("GitHub API {status}: {text}"));
+    }
+    let data: serde_json::Value = close_res.json().await.map_err(|e| format!("JSON parse: {e}"))?;
+    map_rest_issue(&data)
 }
 
 // ── GitHub polling ────────────────────────────────────────────────────────────
@@ -3267,6 +3470,10 @@ pub fn run() {
             watch_config,
             fetch_github_repo,
             fetch_github_issues,
+            create_github_issue,
+            update_github_issue,
+            comment_github_issue,
+            close_github_issue_with_comment,
             set_secret,
             get_secret,
             secrets_storage_backend,

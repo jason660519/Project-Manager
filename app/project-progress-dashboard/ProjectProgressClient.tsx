@@ -199,6 +199,8 @@ export function ProjectProgressClient({
           ) : (
             <IssuesTab
               projectName={project.name}
+              selectedProjectNames={dashboardProjectNames}
+              repoUrl={project.githubUrl}
               projectRoot={projectRoot}
               storyPoints={features.reduce((s, f) => s + (f.points ?? 1), 0)}
               adapters={adapters}

@@ -8,14 +8,16 @@ Before implementation, read:
 
 1. `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/ai-engineer-workflow.md`
 2. `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/ui-design-system.md`
-3. `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/file-naming-standards.md`
-4. `./docs/file-naming-standards.md`
-5. `./DESIGN.md`
-6. `./docs/design/shared-ai-desktop-style.md`
-7. `./README.md`
-8. `./CLAUDE.md`
-9. `./docs/architecture/architecture-overview.md`
-10. `./docs/architecture/README.md`
+3. `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/patterns/table-governance.md`
+4. `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/file-naming-standards.md`
+5. `./docs/file-naming-standards.md`
+6. `./docs/engineering/table-standards.md`
+7. `./DESIGN.md`
+8. `./docs/design/shared-ai-desktop-style.md`
+9. `./README.md`
+10. `./CLAUDE.md`
+11. `./docs/architecture/architecture-overview.md`
+12. `./docs/architecture/README.md`
 
 ## Project Overrides
 

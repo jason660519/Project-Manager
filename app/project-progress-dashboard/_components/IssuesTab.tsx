@@ -1,16 +1,35 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, CheckCircle, ExternalLink, GitPullRequest, RefreshCw, Search, X } from 'lucide-react';
+import {
+  AlertCircle,
+  CheckCircle,
+  ExternalLink,
+  GitPullRequest,
+  MessageSquarePlus,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  X,
+} from 'lucide-react';
 import { clsx } from 'clsx';
 import type { AnyAdapterConfig, EngineerRole, GithubIssue, IDEId } from '../../../lib/types';
-import { fetchGithubIssues, getGithubToken } from '../../../lib/bridge';
-import { useI18n } from '../../../lib/i18n';
+import {
+  closeGithubIssueWithComment,
+  commentGithubIssue,
+  createGithubIssue,
+  fetchGithubIssues,
+  getGithubToken,
+  updateGithubIssue,
+} from '../../../lib/bridge';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface IssuesTabProps {
   projectName: string;
+  selectedProjectNames: string[];
+  repoUrl?: string;
   projectRoot: string;
   storyPoints: number;
   adapters: AnyAdapterConfig[];
@@ -115,11 +134,9 @@ async function browserSyncIssues(repoUrl: string): Promise<GithubIssue[]> {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function IssuesTab({
-  projectName, projectRoot, storyPoints,
+  projectName, selectedProjectNames, repoUrl, projectRoot, storyPoints,
   adapters, engineerRoles, defaultIDE, onDispatchIssue,
 }: IssuesTabProps) {
-  const { t } = useI18n();
-
   const [issues, setIssues] = useState<GithubIssue[]>([]);
   const [detailIssue, setDetailIssue] = useState<DetailIssue | null>(null);
   const [syncedAt, setSyncedAt] = useState<number | null>(null);
@@ -128,8 +145,17 @@ export function IssuesTab({
   const [hasToken, setHasToken] = useState<boolean | null>(null); // null = unknown
   const [filter, setFilter] = useState<FilterState>({ state: 'all', label: null, search: '' });
   const [dispatching, setDispatching] = useState(false);
+  const [mutating, setMutating] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createTitle, setCreateTitle] = useState('');
+  const [createBody, setCreateBody] = useState('');
+  const [editTitle, setEditTitle] = useState('');
+  const [editBody, setEditBody] = useState('');
+  const [commentDraft, setCommentDraft] = useState('');
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   const initialized = useRef(false);
+  const effectiveRepoUrl = (repoUrl ?? '').trim() || 'https://github.com/jason66x/Project-Manager';
 
   // On mount: load from cache, check token.
   useEffect(() => {
@@ -158,7 +184,7 @@ export function IssuesTab({
     setLoading(true);
     setError(null);
     try {
-      const repoUrl = `https://github.com/jason66x/Project-Manager`;
+      const syncRepoUrl = effectiveRepoUrl;
       let fetched: GithubIssue[];
 
       if (isTauri()) {
@@ -167,10 +193,10 @@ export function IssuesTab({
           setHasToken(false);
           throw new Error('GitHub token not configured');
         }
-        fetched = await fetchGithubIssues(token, repoUrl);
+        fetched = await fetchGithubIssues(token, syncRepoUrl);
       } else {
         // Browser mode — proxy through Next.js API route
-        fetched = await browserSyncIssues(repoUrl);
+        fetched = await browserSyncIssues(syncRepoUrl);
       }
 
       // Map from bridge payload (id is number) to GithubIssue type
@@ -195,7 +221,7 @@ export function IssuesTab({
     } finally {
       setLoading(false);
     }
-  }, [projectName]);
+  }, [effectiveRepoUrl, projectName]);
 
   // Filtered issues
   const filteredIssues = useMemo(() => {
@@ -219,12 +245,49 @@ export function IssuesTab({
   }, [issues, filter]);
 
   const allLabels = useMemo(() => extractAllLabels(issues), [issues]);
+  const openCount = useMemo(() => issues.filter((issue) => issue.state === 'open').length, [issues]);
+  const closedCount = useMemo(() => issues.filter((issue) => issue.state === 'closed').length, [issues]);
+  const selectedProjectsCount = selectedProjectNames.length > 0 ? selectedProjectNames.length : 1;
 
   const handleRowClick = useCallback((issue: GithubIssue) => {
     setDetailIssue((prev) =>
       prev?.number === issue.number ? null : issue,
     );
   }, []);
+
+  useEffect(() => {
+    if (!detailIssue) return;
+    setEditTitle(detailIssue.title);
+    setEditBody(detailIssue.body ?? '');
+    setCommentDraft('');
+  }, [detailIssue]);
+
+  const applyIssueUpdate = useCallback((updated: GithubIssue) => {
+    setIssues((prev) => {
+      const next = prev.some((item) => item.number === updated.number)
+        ? prev.map((item) => (item.number === updated.number ? updated : item))
+        : [updated, ...prev];
+      writeCache(projectName, next);
+      return next;
+    });
+    setDetailIssue((prev) => (prev?.number === updated.number ? updated : prev));
+    setSyncedAt(Date.now());
+  }, [projectName]);
+
+  const runIssueMutation = useCallback(async <T,>(runner: (token: string) => Promise<T>): Promise<T> => {
+    if (!effectiveRepoUrl) {
+      throw new Error('Missing GitHub repository URL');
+    }
+    if (isTauri()) {
+      const token = await getGithubToken();
+      if (!token) {
+        setHasToken(false);
+        throw new Error('GitHub token not configured');
+      }
+      return runner(token);
+    }
+    return runner('');
+  }, [effectiveRepoUrl]);
 
   const handleDispatch = useCallback((issue: GithubIssue) => {
     setDispatching(true);
@@ -233,12 +296,161 @@ export function IssuesTab({
     setTimeout(() => setDispatching(false), 100);
   }, [onDispatchIssue]);
 
+  const handleCreateIssue = useCallback(async () => {
+    const title = createTitle.trim();
+    if (!title) return;
+    setMutating(true);
+    setError(null);
+    setActionNotice(null);
+    try {
+      const created = await runIssueMutation((token) => createGithubIssue(token, {
+        repoUrl: effectiveRepoUrl,
+        title,
+        body: createBody.trim() || undefined,
+      }));
+      applyIssueUpdate(created);
+      setCreateTitle('');
+      setCreateBody('');
+      setCreateOpen(false);
+      setActionNotice(`Created issue #${created.number}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Create issue failed');
+    } finally {
+      setMutating(false);
+    }
+  }, [applyIssueUpdate, createBody, createTitle, effectiveRepoUrl, runIssueMutation]);
+
+  const handleUpdateIssue = useCallback(async () => {
+    if (!detailIssue) return;
+    setMutating(true);
+    setError(null);
+    setActionNotice(null);
+    try {
+      const updated = await runIssueMutation((token) => updateGithubIssue(token, {
+        repoUrl: effectiveRepoUrl,
+        issueNumber: detailIssue.number,
+        title: editTitle.trim() || detailIssue.title,
+        body: editBody,
+      }));
+      applyIssueUpdate(updated);
+      setActionNotice(`Updated issue #${updated.number}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Update issue failed');
+    } finally {
+      setMutating(false);
+    }
+  }, [applyIssueUpdate, detailIssue, editBody, editTitle, effectiveRepoUrl, runIssueMutation]);
+
+  const handleCommentIssue = useCallback(async () => {
+    if (!detailIssue) return;
+    const comment = commentDraft.trim();
+    if (!comment) return;
+    setMutating(true);
+    setError(null);
+    setActionNotice(null);
+    try {
+      const updated = await runIssueMutation((token) => commentGithubIssue(token, {
+        repoUrl: effectiveRepoUrl,
+        issueNumber: detailIssue.number,
+        comment,
+      }));
+      applyIssueUpdate(updated);
+      setCommentDraft('');
+      setActionNotice(`Comment added to #${updated.number}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Add comment failed');
+    } finally {
+      setMutating(false);
+    }
+  }, [applyIssueUpdate, commentDraft, detailIssue, effectiveRepoUrl, runIssueMutation]);
+
+  const handleCloseWithComment = useCallback(async () => {
+    if (!detailIssue) return;
+    setMutating(true);
+    setError(null);
+    setActionNotice(null);
+    try {
+      const updated = await runIssueMutation((token) => closeGithubIssueWithComment(token, {
+        repoUrl: effectiveRepoUrl,
+        issueNumber: detailIssue.number,
+        comment: commentDraft.trim() || undefined,
+      }));
+      applyIssueUpdate(updated);
+      setCommentDraft('');
+      setActionNotice(`Closed issue #${updated.number}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Close issue failed');
+    } finally {
+      setMutating(false);
+    }
+  }, [applyIssueUpdate, commentDraft, detailIssue, effectiveRepoUrl, runIssueMutation]);
+
   // ── Render ───────────────────────────────────────────────────────────
 
   const syncDisabled = loading || hasToken === false;
 
   return (
     <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <MiniStat title="Selected Projects" value={selectedProjectsCount} tone="sky" />
+        <MiniStat title="Open Issues" value={openCount} tone="emerald" />
+        <MiniStat title="Closed Issues" value={closedCount} tone="stone" />
+        <MiniStat title="Total Issues" value={issues.length} tone="amber" />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 rounded border border-stone-200/15 bg-[rgb(var(--pm-card))]/60 px-3 py-2">
+        <p className="text-xs text-stone-300">
+          Repo: <span className="text-stone-100">{effectiveRepoUrl}</span>
+        </p>
+        <div className="flex-1" />
+        <button
+          type="button"
+          onClick={() => setCreateOpen((v) => !v)}
+          className="flex items-center gap-1 rounded bg-emerald-600/25 px-2.5 py-1.5 text-[11px] text-emerald-100 hover:bg-emerald-600/35"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Create Issue
+        </button>
+      </div>
+
+      {createOpen && (
+        <div className="rounded border border-stone-200/15 bg-[rgb(var(--pm-card))]/70 p-3">
+          <div className="grid gap-2">
+            <input
+              type="text"
+              value={createTitle}
+              placeholder="New issue title"
+              onChange={(e) => setCreateTitle(e.target.value)}
+              className="rounded border border-stone-200/15 bg-transparent px-2.5 py-1.5 text-xs text-stone-100 placeholder:text-stone-400 focus:outline-none focus:border-stone-200/40"
+            />
+            <textarea
+              value={createBody}
+              placeholder="Issue description (optional)"
+              onChange={(e) => setCreateBody(e.target.value)}
+              rows={4}
+              className="rounded border border-stone-200/15 bg-transparent px-2.5 py-1.5 text-xs text-stone-100 placeholder:text-stone-400 focus:outline-none focus:border-stone-200/40"
+            />
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCreateOpen(false)}
+                className="rounded px-2.5 py-1.5 text-[11px] text-stone-300 hover:text-stone-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={mutating || !createTitle.trim()}
+                onClick={handleCreateIssue}
+                className="rounded bg-emerald-600/30 px-2.5 py-1.5 text-[11px] text-emerald-100 hover:bg-emerald-600/40 disabled:opacity-50"
+              >
+                {mutating ? 'Creating…' : 'Create and Sync'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 rounded border border-stone-200/15 bg-[rgb(var(--pm-card))]/70 px-3 py-2">
         {/* Search */}
@@ -346,6 +558,13 @@ export function IssuesTab({
         </div>
       )}
 
+      {actionNotice && !error && (
+        <div className="flex items-center gap-2 rounded border border-emerald-200/20 bg-emerald-500/10 px-3 py-2">
+          <CheckCircle className="h-4 w-4 text-emerald-300 flex-shrink-0" />
+          <p className="text-xs text-emerald-100">{actionNotice}</p>
+        </div>
+      )}
+
       {/* Sync info */}
       {syncedAt && !loading && (
         <p className="text-[10px] text-stone-400">
@@ -435,7 +654,63 @@ export function IssuesTab({
               </p>
             </div>
 
-            {/* Actions */}
+            <div className="mb-3 space-y-2 rounded border border-stone-200/10 bg-black/10 p-2">
+              <div className="flex items-center gap-1 text-[10px] uppercase tracking-[0.08em] text-stone-400">
+                <Pencil className="h-3 w-3" /> Update Issue
+              </div>
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="w-full rounded border border-stone-200/15 bg-transparent px-2 py-1.5 text-[11px] text-stone-100 focus:outline-none focus:border-stone-200/40"
+              />
+              <textarea
+                rows={4}
+                value={editBody}
+                onChange={(e) => setEditBody(e.target.value)}
+                className="w-full rounded border border-stone-200/15 bg-transparent px-2 py-1.5 text-[11px] text-stone-100 focus:outline-none focus:border-stone-200/40"
+              />
+              <button
+                type="button"
+                disabled={mutating}
+                onClick={handleUpdateIssue}
+                className="w-full rounded bg-cyan-600/25 px-2.5 py-1.5 text-[11px] text-cyan-100 hover:bg-cyan-600/35 disabled:opacity-50"
+              >
+                Save Update to GitHub
+              </button>
+            </div>
+
+            <div className="mb-3 space-y-2 rounded border border-stone-200/10 bg-black/10 p-2">
+              <div className="flex items-center gap-1 text-[10px] uppercase tracking-[0.08em] text-stone-400">
+                <MessageSquarePlus className="h-3 w-3" /> Review / Close Comment
+              </div>
+              <textarea
+                rows={3}
+                value={commentDraft}
+                placeholder="Add review feedback or close note"
+                onChange={(e) => setCommentDraft(e.target.value)}
+                className="w-full rounded border border-stone-200/15 bg-transparent px-2 py-1.5 text-[11px] text-stone-100 focus:outline-none focus:border-stone-200/40"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={mutating || !commentDraft.trim()}
+                  onClick={handleCommentIssue}
+                  className="flex-1 rounded bg-violet-600/25 px-2 py-1.5 text-[11px] text-violet-100 hover:bg-violet-600/35 disabled:opacity-50"
+                >
+                  Add Comment
+                </button>
+                <button
+                  type="button"
+                  disabled={mutating}
+                  onClick={handleCloseWithComment}
+                  className="flex-1 rounded bg-amber-600/25 px-2 py-1.5 text-[11px] text-amber-100 hover:bg-amber-600/35 disabled:opacity-50"
+                >
+                  Close with Comment
+                </button>
+              </div>
+            </div>
+
             <div className="flex gap-2">
               <a
                 href={detailIssue.url}
@@ -461,6 +736,29 @@ export function IssuesTab({
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
+
+function MiniStat({
+  title,
+  value,
+  tone,
+}: {
+  title: string;
+  value: number;
+  tone: 'sky' | 'emerald' | 'amber' | 'stone';
+}) {
+  const toneClass = {
+    sky: 'text-sky-100 bg-sky-600/15 border-sky-400/20',
+    emerald: 'text-emerald-100 bg-emerald-600/15 border-emerald-400/20',
+    amber: 'text-amber-100 bg-amber-600/15 border-amber-400/20',
+    stone: 'text-stone-100 bg-stone-600/15 border-stone-400/20',
+  }[tone];
+  return (
+    <div className={clsx('rounded border px-3 py-2', toneClass)}>
+      <p className="text-[10px] uppercase tracking-[0.08em] opacity-80">{title}</p>
+      <p className="text-base font-semibold leading-tight">{value}</p>
+    </div>
+  );
+}
 
 function StatusBadge({ state }: { state: 'open' | 'closed' }) {
   return (

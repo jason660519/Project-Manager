@@ -27,3 +27,8 @@ OpenClaw can dispatch agent tasks, relay cross-app events, and report app health
 - Verification path.
 
 Avoid direct coupling to another app's local database or private settings. Use a documented API, file handoff, or event contract.
+
+## Company Standards Provider
+
+Project-Manager can optionally consume standards profiles/checks from the Company-AI-App-Standards app.  
+Draft contract: [company-standards-plugin-contract.md](./company-standards-plugin-contract.md)

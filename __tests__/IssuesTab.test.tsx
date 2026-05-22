@@ -66,6 +66,8 @@ const MOCK_ISSUES = [OPEN_ISSUE, CLOSED_ISSUE, ANOTHER_OPEN_ISSUE];
 
 const defaultProps = {
   projectName: 'Test Project',
+  selectedProjectNames: ['Test Project'],
+  repoUrl: 'https://github.com/owner/repo',
   projectRoot: '/test/project',
   storyPoints: 42,
   adapters: [{ id: 'claude-code', name: 'Claude Code', type: 'agent' as const, command: 'claude', argsTemplate: [] }],
@@ -115,6 +117,16 @@ describe('IssuesTab', () => {
     await waitFor(() => {
       expect(screen.getByText('#1')).toBeInTheDocument();
       expect(screen.getByText('Fix login')).toBeInTheDocument();
+    });
+  });
+
+  it('shows selected/open/closed issue counters', async () => {
+    seedCache(MOCK_ISSUES);
+    renderIssuesTab({ selectedProjectNames: ['A', 'B'] });
+    await waitFor(() => {
+      expect(screen.getByText('Selected Projects')).toBeInTheDocument();
+      expect(screen.getByText('Open Issues')).toBeInTheDocument();
+      expect(screen.getByText('Closed Issues')).toBeInTheDocument();
     });
   });
 
@@ -227,7 +239,7 @@ describe('IssuesTab', () => {
 
     // Detail should show issue body
     await waitFor(() => {
-      expect(screen.getByText(/The login page is broken/)).toBeInTheDocument();
+      expect(screen.getAllByText(/The login page is broken/).length).toBeGreaterThan(0);
     });
   });
 });
