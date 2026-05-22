@@ -137,6 +137,30 @@ export async function scanProjects(root: string): Promise<string[]> {
   return invoke<string[]>('scan_projects', { root });
 }
 
+// ── Project registry — desktop ↔ web sync ────────────────────────────────────
+
+export interface RegistryEntry {
+  configPath: string;
+}
+
+/** Returns all entries in the shared project registry (~/.project-manager/registry.json). */
+export async function listRegistry(): Promise<RegistryEntry[]> {
+  if (!isTauri()) return [];
+  return invoke<RegistryEntry[]>('list_registry');
+}
+
+/** Appends configPath to the registry if not already present. No-op in browser. */
+export async function addToRegistry(configPath: string): Promise<void> {
+  if (!isTauri()) return;
+  return invoke<void>('add_to_registry', { configPath });
+}
+
+/** Removes configPath from the registry. No-op in browser. */
+export async function removeFromRegistry(configPath: string): Promise<void> {
+  if (!isTauri()) return;
+  return invoke<void>('remove_from_registry', { configPath });
+}
+
 // ── Agent process management ──────────────────────────────────────────────────
 
 export interface SpawnAgentOptions {

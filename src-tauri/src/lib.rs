@@ -323,6 +323,74 @@ async fn delete_config(path: String) -> Result<(), String> {
     }
 }
 
+// ── Project registry — shared source of truth for desktop ↔ web sync ─────────
+
+#[derive(Serialize, Deserialize, Clone)]
+struct RegistryEntry {
+    #[serde(rename = "configPath")]
+    config_path: String,
+}
+
+fn registry_file_path() -> PathBuf {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    PathBuf::from(home)
+        .join(".project-manager")
+        .join("registry.json")
+}
+
+#[tauri::command]
+async fn list_registry() -> Vec<RegistryEntry> {
+    let path = registry_file_path();
+    let content = match tokio::fs::read_to_string(&path).await {
+        Ok(s) => s,
+        Err(_) => return vec![],
+    };
+    serde_json::from_str::<Vec<RegistryEntry>>(&content).unwrap_or_default()
+}
+
+#[tauri::command]
+async fn add_to_registry(config_path: String) -> Result<(), String> {
+    let path = registry_file_path();
+    let mut entries: Vec<RegistryEntry> = if path.exists() {
+        let content = tokio::fs::read_to_string(&path)
+            .await
+            .map_err(|e| e.to_string())?;
+        serde_json::from_str(&content).unwrap_or_default()
+    } else {
+        vec![]
+    };
+    if !entries.iter().any(|e| e.config_path == config_path) {
+        entries.push(RegistryEntry { config_path });
+        if let Some(parent) = path.parent() {
+            tokio::fs::create_dir_all(parent)
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+        let content = serde_json::to_string_pretty(&entries).map_err(|e| e.to_string())?;
+        tokio::fs::write(&path, content)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn remove_from_registry(config_path: String) -> Result<(), String> {
+    let path = registry_file_path();
+    if !path.exists() {
+        return Ok(());
+    }
+    let content = tokio::fs::read_to_string(&path)
+        .await
+        .map_err(|e| e.to_string())?;
+    let mut entries: Vec<RegistryEntry> = serde_json::from_str(&content).unwrap_or_default();
+    entries.retain(|e| e.config_path != config_path);
+    let content = serde_json::to_string_pretty(&entries).map_err(|e| e.to_string())?;
+    tokio::fs::write(&path, content)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Read a plain-text file and return its content as a string.
 #[tauri::command]
 async fn read_file(path: String) -> Result<String, String> {
@@ -3576,6 +3644,9 @@ pub fn run() {
             initialize_project,
             migrate_project_layout,
             delete_config,
+            list_registry,
+            add_to_registry,
+            remove_from_registry,
             scan_projects,
             spawn_agent,
             spawn_terminal,

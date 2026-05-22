@@ -372,6 +372,57 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional one-shot per session
   }, [isTauri, storageInitialized]);
 
+  // Web dev mode: poll the dev-only registry route so projects added from the
+  // Tauri desktop app appear here automatically without a manual refresh.
+  useEffect(() => {
+    if (isTauri || !storageInitialized) return;
+
+    let cancelled = false;
+    let inFlight = false;
+
+    async function syncFromRegistry(entries: Array<{ configPath: string }>) {
+      const { buildProjectEntryFromPath } = await import('../../lib/storage');
+      for (const entry of entries) {
+        if (cancelled) return;
+        try {
+          const built = await buildProjectEntryFromPath(entry.configPath, { isTauri: false });
+          setProjects((prev) =>
+            prev.some((p) => p.configPath === entry.configPath) ? prev : [...prev, built],
+          );
+        } catch {
+          /* skip unreadable paths */
+        }
+      }
+    }
+
+    async function pollRegistry() {
+      if (inFlight || cancelled) return;
+      inFlight = true;
+      try {
+        const res = await fetch('/api/registry', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'list' }),
+        });
+        if (!res.ok) return;
+        const entries = (await res.json()) as Array<{ configPath: string }>;
+        await syncFromRegistry(entries);
+      } catch {
+        /* dev-only sync is best-effort */
+      } finally {
+        inFlight = false;
+      }
+    }
+
+    void pollRegistry();
+    const interval = window.setInterval(() => void pollRegistry(), 2000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [isTauri, storageInitialized]);
+
   // Persist projects and selected project across route changes/reloads.
   useEffect(() => {
     if (!storageInitialized) return;
@@ -634,6 +685,11 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
       if (!isTauri) return;
       const root = entry.config.project.root;
       if (!root || root.startsWith('https://')) return;
+      // Write to shared registry so the web dev server can sync by polling.
+      void (async () => {
+        const { addToRegistry } = await import('../../lib/bridge');
+        await addToRegistry(entry.configPath).catch(() => {});
+      })();
       // Pre-flight scan so we only open the modal when there's actually
       // something worth importing. Anything that fails (no .env, parse error,
       // no provider match) silently drops the prompt.
@@ -667,16 +723,22 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
       const target = projects.find((p) => p.id === id);
       if (!target) return;
 
-      if (deleteConfigFile && isTauri && !target.configPath.startsWith('https://')) {
-        try {
-          const { deleteConfig } = await import('../../lib/bridge');
-          await deleteConfig(target.configPath);
-        } catch (e) {
-          // Surface the error but still drop the PM reference — the user's
-          // primary intent ("remove from PM") shouldn't be blocked by a
-          // disk-side failure (file already gone, permission denied, …).
-          console.error('Failed to delete config file:', e);
+      if (isTauri && !target.configPath.startsWith('https://')) {
+        if (deleteConfigFile) {
+          try {
+            const { deleteConfig } = await import('../../lib/bridge');
+            await deleteConfig(target.configPath);
+          } catch (e) {
+            // Surface the error but still drop the PM reference — the user's
+            // primary intent ("remove from PM") shouldn't be blocked by a
+            // disk-side failure (file already gone, permission denied, …).
+            console.error('Failed to delete config file:', e);
+          }
         }
+        void (async () => {
+          const { removeFromRegistry } = await import('../../lib/bridge');
+          await removeFromRegistry(target.configPath).catch(() => {});
+        })();
       }
 
       setProjects((prev) => prev.filter((p) => p.id !== id));
