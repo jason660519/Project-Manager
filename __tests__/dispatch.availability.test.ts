@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
-import { checkCommandExists, clearCommandExistsCache } from '../lib/adapters/availability';
+import {
+  checkCommandAvailability,
+  checkCommandExists,
+  clearCommandExistsCache,
+} from '../lib/adapters/availability';
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
@@ -27,12 +31,31 @@ describe('checkCommandExists', () => {
     expect(invokeMock).not.toHaveBeenCalled();
   });
 
+  it('returns unknown preflight status in browser mode', async () => {
+    await expect(checkCommandAvailability('cursor')).resolves.toEqual({
+      status: 'unknown',
+      canVerify: false,
+    });
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
   it('uses the Tauri bridge when running inside Tauri', async () => {
     setTauriRuntime();
     invokeMock.mockResolvedValueOnce(false);
 
     await expect(checkCommandExists('nonexistent-tool')).resolves.toBe(false);
     expect(invokeMock).toHaveBeenCalledWith('check_command_exists', { command: 'nonexistent-tool' });
+  });
+
+  it('returns available or missing preflight status in Tauri', async () => {
+    setTauriRuntime();
+    invokeMock.mockResolvedValueOnce(true);
+
+    await expect(checkCommandAvailability('codex')).resolves.toEqual({
+      status: 'available',
+      canVerify: true,
+    });
+    expect(invokeMock).toHaveBeenCalledWith('check_command_exists', { command: 'codex' });
   });
 
   it('caches Tauri bridge results', async () => {

@@ -48,6 +48,10 @@ vi.mock('../lib/storage/plugins', () => ({
   collectEnabledMcpServers: vi.fn().mockReturnValue({}),
 }));
 
+vi.mock('../lib/adapters/availability', () => ({
+  checkCommandAvailability: vi.fn().mockResolvedValue({ status: 'available', canVerify: true }),
+}));
+
 // We only test TaskDispatchModal — import after mocks
 const { TaskDispatchModal } = await import('../components/table/TaskDispatchModal');
 
@@ -128,6 +132,15 @@ describe('TaskDispatchModal [render]', () => {
     // Should show the runtime label
     expect(screen.getByText('Execution Target')).toBeInTheDocument();
   });
+
+  it('renders selected target preflight status', async () => {
+    render(
+      <I18nProvider>
+        <TaskDispatchModal {...baseProps} />
+      </I18nProvider>,
+    );
+
+    expect(await screen.findByText('Target available')).toBeInTheDocument();
+    expect(screen.getByText(/External IDE/)).toBeInTheDocument();
+  });
 });
-
-

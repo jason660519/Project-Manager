@@ -20,7 +20,10 @@ import {
   createRuntimeAdapterFromConfig,
   getAdapterExecutionKind,
 } from '../../lib/adapters/registry';
-import { checkCommandExists } from '../../lib/adapters/availability';
+import {
+  checkCommandAvailability,
+  type CommandAvailability,
+} from '../../lib/adapters/availability';
 import { listLlmProviders, type LlmProviderId } from '../../lib/keys/llmProviders';
 import { collectEnabledMcpServers } from '../../lib/storage/plugins';
 import { useI18n } from '../../lib/i18n';
@@ -436,6 +439,80 @@ function adapterToIDE(adapter: AnyAdapterConfig): IDEId | undefined {
   return IDE_IDS.find((id) => id === adapter.name);
 }
 
+type TargetPreflightStatus = 'checking' | 'available' | 'missing' | 'unknown';
+
+interface TargetPreflight {
+  status: TargetPreflightStatus;
+  label: string;
+  description: string;
+  commandLabel: string;
+  managementLabel: string;
+  canRun: boolean;
+}
+
+function describeTargetPreflight(
+  adapter: AnyAdapterConfig | undefined,
+  availability: CommandAvailability | undefined,
+  d: DispatchT,
+): TargetPreflight | null {
+  if (!adapter) return null;
+
+  const targetKind = getAdapterExecutionKind(adapter);
+  const commandLabel = [adapter.command, ...('argsTemplate' in adapter ? adapter.argsTemplate : [])]
+    .filter(Boolean)
+    .join(' ');
+  const managementLabel =
+    targetKind === 'agent-cli'
+      ? d.targetManagedByPm
+      : targetKind === 'ide'
+        ? d.targetManagedExternalIde
+        : d.targetManagedExternalApp;
+
+  if (!availability) {
+    return {
+      status: 'checking',
+      label: d.targetStatusChecking,
+      description: d.targetStatusCheckingHint,
+      commandLabel,
+      managementLabel,
+      canRun: false,
+    };
+  }
+
+  if (availability.status === 'missing') {
+    return {
+      status: 'missing',
+      label: d.targetStatusMissing,
+      description: d.targetStatusMissingHint.replace('{command}', adapter.command),
+      commandLabel,
+      managementLabel,
+      canRun: false,
+    };
+  }
+
+  if (availability.status === 'unknown' || targetKind === 'agent-app') {
+    return {
+      status: 'unknown',
+      label: targetKind === 'agent-app' ? d.targetStatusManual : d.targetStatusUnknown,
+      description: targetKind === 'agent-app'
+        ? d.targetStatusManualHint
+        : d.targetStatusUnknownHint,
+      commandLabel,
+      managementLabel,
+      canRun: true,
+    };
+  }
+
+  return {
+    status: 'available',
+    label: d.targetStatusAvailable,
+    description: d.targetStatusAvailableHint,
+    commandLabel,
+    managementLabel,
+    canRun: true,
+  };
+}
+
 function resolveInitialAdapterId(
   feature: Feature,
   adapters: AnyAdapterConfig[],
@@ -558,21 +635,21 @@ export function TaskDispatchModal({
   const [adapterWarning, setAdapterWarning] = useState<string | null>(null);
   const [dispatchError, setDispatchError] = useState<string | null>(null);
   const [mcpInjection, setMcpInjection] = useState<{ count: number; flag: string } | null>(null);
-  const [commandExists, setCommandExists] = useState<Record<string, boolean>>({});
+  const [commandAvailability, setCommandAvailability] = useState<Record<string, CommandAvailability>>({});
 
   const logEndRef = useRef<HTMLDivElement>(null);
   const unlistenRefs = useRef<Array<() => void>>([]);
   const activePidRef = useRef<number | null>(null);
 
-  // Check availability of all adapters on mount
+  // Check availability of all adapters on mount.
   useEffect(() => {
     let cancelled = false;
     const checkAll = async () => {
-      const result: Record<string, boolean> = {};
+      const result: Record<string, CommandAvailability> = {};
       for (const adapter of adapters) {
-        result[adapter.id] = await checkCommandExists(adapter.command);
+        result[adapter.id] = await checkCommandAvailability(adapter.command);
       }
-      if (!cancelled) setCommandExists(result);
+      if (!cancelled) setCommandAvailability(result);
     };
     checkAll();
     return () => { cancelled = true; };
@@ -593,6 +670,12 @@ export function TaskDispatchModal({
   const isIDE = selectedTargetKind === 'ide';
   const isAgentCli = selectedTargetKind === 'agent-cli';
   const isAgentApp = selectedTargetKind === 'agent-app';
+  const selectedPreflight = describeTargetPreflight(
+    selectedAdapter,
+    selectedAdapter ? commandAvailability[selectedAdapter.id] : undefined,
+    d,
+  );
+  const isSelectedTargetBlocked = selectedPreflight?.canRun === false;
   const selectedRole = engineerRoles.find((r) => r.id === selectedRoleId) ?? null;
   const selectedWorkflow = selectedWorkflowId ? getAgentWorkflowById(selectedWorkflowId) ?? null : null;
   const selectedModelProvider =
@@ -1178,17 +1261,45 @@ export function TaskDispatchModal({
                   {executionTargetGroups.map((group) => (
                     <optgroup key={group.label} label={group.label}>
                       {group.adapters.map((a) => {
-                        const cmdAvailable = commandExists[a.id] !== false;
+                        const preflight = describeTargetPreflight(a, commandAvailability[a.id], d);
+                        const statusMarker =
+                          preflight?.status === 'available'
+                            ? '✓'
+                            : preflight?.status === 'missing'
+                              ? '⚠'
+                              : '?';
                         return (
                           <option key={a.id} value={a.id}>
-                            {a.name}{' '}
-                            {!cmdAvailable ? `⚠ ${d.adapterNotFound}` : ''}
+                            {statusMarker} {a.name}
                           </option>
                         );
                       })}
                     </optgroup>
                   ))}
                 </select>
+                {selectedPreflight && (
+                  <div
+                    className={[
+                      'mt-2 border px-3 py-2 text-[11px]',
+                      selectedPreflight.status === 'available'
+                        ? 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100'
+                        : selectedPreflight.status === 'missing'
+                          ? 'border-red-400/35 bg-red-500/10 text-red-100'
+                          : selectedPreflight.status === 'checking'
+                            ? 'border-stone-300/20 bg-white/[0.035] text-stone-300'
+                            : 'border-amber-300/30 bg-amber-500/10 text-amber-100',
+                    ].join(' ')}
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold">{selectedPreflight.label}</span>
+                      <span className="text-stone-400">{selectedPreflight.managementLabel}</span>
+                    </div>
+                    <p className="mt-1 text-stone-300/85">{selectedPreflight.description}</p>
+                    <p className="mt-1 break-all font-mono text-[10px] text-stone-400">
+                      {d.targetCommandLabel}: {selectedPreflight.commandLabel}
+                    </p>
+                  </div>
+                )}
                 {mcpLoading && (
                   <div className="mt-1.5 flex items-center gap-2 text-[11px] text-stone-400">
                     <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-stone-400 border-t-transparent" />
@@ -1407,7 +1518,7 @@ export function TaskDispatchModal({
           {phase === 'idle' && isAgentCli && (
             <button
               onClick={handleOpenInTerminal}
-              disabled={specLoading || isAssignedBlocked}
+              disabled={specLoading || isAssignedBlocked || isSelectedTargetBlocked}
               className="border border-stone-200/25 px-4 py-2 text-sm font-medium text-stone-200 hover:bg-white/5 disabled:opacity-50"
             >
               {d.openTerminalBtn}
@@ -1416,7 +1527,7 @@ export function TaskDispatchModal({
           {phase === 'idle' && adapters.length > 0 && (
             <button
               onClick={isAgentCli ? handleExecute : handleOpenExternalTarget}
-              disabled={specLoading || isAssignedBlocked}
+              disabled={specLoading || isAssignedBlocked || isSelectedTargetBlocked}
               className="bg-stone-100 px-4 py-2 text-sm font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100 disabled:opacity-50"
             >
               {isIDE ? d.openIDEBtn : isAgentApp ? d.openAppBtn : d.runInPMBtn}

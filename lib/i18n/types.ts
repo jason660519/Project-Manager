@@ -341,6 +341,21 @@ export interface Translations {
     targetGroupCli: string;
     targetGroupApp: string;
     appTargetHint: string;
+    targetStatusChecking: string;
+    targetStatusCheckingHint: string;
+    targetStatusAvailable: string;
+    targetStatusAvailableHint: string;
+    targetStatusMissing: string;
+    /** Uses {command} placeholder */
+    targetStatusMissingHint: string;
+    targetStatusUnknown: string;
+    targetStatusUnknownHint: string;
+    targetStatusManual: string;
+    targetStatusManualHint: string;
+    targetManagedByPm: string;
+    targetManagedExternalIde: string;
+    targetManagedExternalApp: string;
+    targetCommandLabel: string;
     liveOutput: string;
     executionLog: string;
     waitingOutput: string;
