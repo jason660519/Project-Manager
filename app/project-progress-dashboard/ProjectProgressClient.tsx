@@ -6,7 +6,7 @@ import type {
   ActiveRun, AnyAdapterConfig, CompletedRun, CronJob, EngineerRole,
   Feature, FeaturePhase, FeaturePromptConfig, ProjectConfig,
 } from '../../lib/types';
-import { PHASE_IDS } from './types';
+import type { TabId } from './types';
 import type { CustomProjectProgressRow } from './types';
 import { usePhasePreferences } from './_lib/usePhasePreferences';
 import { computePhaseCounts, type PhaseRow } from './_lib/phaseRows';
@@ -16,6 +16,7 @@ import { AgentOpsPanel } from './_components/AgentOpsPanel';
 import { CronControlPanel } from './_components/CronControlPanel';
 import { ExportProgressDialog } from './_components/ExportProgressDialog';
 import { PhaseTabContent } from './_components/PhaseTabContent';
+import { IssuesTab } from './_components/IssuesTab';
 import { TaskDispatchModal } from '../../components/table/TaskDispatchModal';
 
 interface ProjectProgressClientProps {
@@ -45,26 +46,31 @@ interface ProjectProgressClientProps {
   onRunEnd?: (pid: number, exitCode: number) => void;
 }
 
+const PHASE_IDS_ARRAY: FeaturePhase[] = ['development', 'e2e_testing', 'deployment', 'operations'];
+
 /** Legacy URL hash from before the testing tab was renamed to E2E. */
 const LEGACY_PHASE_HASH: Record<string, FeaturePhase> = {
   testing: 'e2e_testing',
 };
 
-function resolvePhaseHash(hash: string): FeaturePhase | null {
+function resolveHashToTab(hash: string): TabId | null {
   const lowered = hash.toLowerCase();
   const resolved = LEGACY_PHASE_HASH[lowered] ?? lowered;
-  if ((PHASE_IDS as string[]).includes(resolved)) return resolved as FeaturePhase;
+  const validTabs: string[] = [...PHASE_IDS_ARRAY, 'issues'];
+  if (validTabs.includes(resolved)) {
+    return resolved as TabId;
+  }
   return null;
 }
 
-function readInitialPhase(): FeaturePhase {
+function readInitialTab(): TabId {
   if (typeof window === 'undefined') return 'development';
   const hash = window.location.hash.slice(1);
-  const phase = resolvePhaseHash(hash);
-  if (phase && typeof window !== 'undefined' && hash.toLowerCase() === 'testing') {
-    window.location.replace(`#${phase}`);
+  const tab = resolveHashToTab(hash);
+  if (tab && hash.toLowerCase() === 'testing') {
+    window.location.replace(`#${tab}`);
   }
-  return phase ?? 'development';
+  return tab ?? 'development';
 }
 
 export function ProjectProgressClient({
@@ -72,18 +78,22 @@ export function ProjectProgressClient({
   dashboardProjectNames, onCronJobsChange, onFeaturePatch, onFeaturePromptSave, onRunCronJob,
   onRunStart, onRunLog, onRunEnd,
 }: ProjectProgressClientProps) {
-  const [activePhase, setActivePhase] = useState<FeaturePhase>(() => readInitialPhase());
+  const [activeTab, setActiveTab] = useState<TabId>(() => readInitialTab());
   const [exportOpen, setExportOpen] = useState(false);
   const [dispatchRow, setDispatchRow] = useState<PhaseRow | null>(null);
+  const [dispatchIssue, setDispatchIssue] = useState<{ title: string } | null>(null);
+
+  const isPhaseTab = activeTab !== 'issues';
+  const activePhase = isPhaseTab ? activeTab : 'development';
 
   // Sync URL hash both ways.
   useEffect(() => {
     const onHash = () => {
       const hash = window.location.hash.slice(1);
-      const phase = resolvePhaseHash(hash);
-      if (phase) {
-        setActivePhase(phase);
-        if (hash.toLowerCase() === 'testing') window.location.replace(`#${phase}`);
+      const tab = resolveHashToTab(hash);
+      if (tab) {
+        setActiveTab(tab);
+        if (hash.toLowerCase() === 'testing') window.location.replace(`#${tab}`);
       }
     };
     window.addEventListener('hashchange', onHash);
@@ -121,9 +131,9 @@ export function ProjectProgressClient({
   // Header summary uses features (for development, weighted by SP) of the current phase.
   const headerFeatures = activePhase === 'development' ? features : phaseFeatures;
 
-  const onChangePhase = useCallback((p: FeaturePhase) => {
-    setActivePhase(p);
-    if (typeof window !== 'undefined') window.location.hash = p;
+  const onChangeTab = useCallback((tab: TabId) => {
+    setActiveTab(tab);
+    if (typeof window !== 'undefined') window.location.hash = tab;
   }, []);
 
   return (
@@ -151,12 +161,14 @@ export function ProjectProgressClient({
           >
             <Upload size={14} /> Export
           </button>
-          <SharedStatsCards phase={activePhase} features={headerFeatures} compact />
+          {isPhaseTab && (
+            <SharedStatsCards phase={activePhase} features={headerFeatures} compact />
+          )}
         </div>
       </div>
 
-      {/* Paperclip-style ops panels on development phase */}
-      {activePhase === 'development' && (
+      {/* Paperclip-style ops panels on development phase (only when not in Issues tab) */}
+      {isPhaseTab && activePhase === 'development' && (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <AgentOpsPanel adapters={adapters} activeRuns={activeRuns} />
           <CronControlPanel
@@ -167,24 +179,36 @@ export function ProjectProgressClient({
         </div>
       )}
 
-      {/* Active phase table area */}
+      {/* Active tab content area */}
       <div className="flex-1 min-h-0 flex flex-col">
         <div className="flex-1 min-h-0">
-          <PhaseTabContent
-            phase={activePhase}
-            projectName={project.name}
-            projectNames={dashboardProjectNames}
-            projectRoot={projectRoot}
-            features={phaseFeatures}
-            prefs={activePhasePrefs.prefs}
-            patch={activePhasePrefs.patch}
-            reset={activePhasePrefs.reset}
-            onFeaturePromptSave={onFeaturePromptSave}
-            onFeaturePatch={onFeaturePatch}
-            onDispatchRow={(row) => row.source === 'feature' && setDispatchRow(row)}
-          />
+          {isPhaseTab ? (
+            <PhaseTabContent
+              phase={activePhase}
+              projectName={project.name}
+              projectNames={dashboardProjectNames}
+              projectRoot={projectRoot}
+              features={phaseFeatures}
+              prefs={activePhasePrefs.prefs}
+              patch={activePhasePrefs.patch}
+              reset={activePhasePrefs.reset}
+              onFeaturePromptSave={onFeaturePromptSave}
+              onFeaturePatch={onFeaturePatch}
+              onDispatchRow={(row) => row.source === 'feature' && setDispatchRow(row)}
+            />
+          ) : (
+            <IssuesTab
+              projectName={project.name}
+              projectRoot={projectRoot}
+              storyPoints={features.reduce((s, f) => s + (f.points ?? 1), 0)}
+              adapters={adapters}
+              engineerRoles={engineerRoles}
+              defaultIDE={project.defaultIDE}
+              onDispatchIssue={(issue) => setDispatchIssue(issue)}
+            />
+          )}
         </div>
-        <SheetTabs activePhase={activePhase} onPhaseChange={onChangePhase} phaseCounts={phaseCounts} />
+        <SheetTabs activeTab={activeTab} onTabChange={onChangeTab} phaseCounts={phaseCounts} />
       </div>
 
       <ExportProgressDialog
@@ -205,6 +229,29 @@ export function ProjectProgressClient({
           onClose={() => setDispatchRow(null)}
           onExecuted={() => {}}
           onFeatureUpdate={(featureId, update) => onFeaturePatch(featureId, update)}
+          onRunStart={onRunStart}
+          onRunLog={onRunLog}
+          onRunEnd={onRunEnd}
+        />
+      )}
+
+      {dispatchIssue && adapters.length > 0 && (
+        <TaskDispatchModal
+          feature={{
+            id: 'github-issue',
+            name: dispatchIssue.title,
+            category: 'GitHub Issues',
+            status: 'todo',
+            progress: 0,
+            paths: {},
+          }}
+          adapters={adapters}
+          projectRoot={projectRoot}
+          engineerRoles={engineerRoles}
+          defaultIDE={project.defaultIDE}
+          onClose={() => setDispatchIssue(null)}
+          onExecuted={() => {}}
+          onFeatureUpdate={() => {}}
           onRunStart={onRunStart}
           onRunLog={onRunLog}
           onRunEnd={onRunEnd}

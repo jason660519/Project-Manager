@@ -99,6 +99,8 @@ export interface ProjectConfig {
   name: string;
   root: string;
   defaultIDE: IDEId;
+  /** GitHub repository URL, e.g. https://github.com/owner/repo */
+  githubUrl?: string;
 }
 
 export interface AdapterDescriptor {
@@ -326,7 +328,7 @@ export interface ProjectEntry {
 
 export interface AnthropicMessage {
   role: 'user' | 'assistant';
-  content: string;
+  content: string | any;
 }
 
 export interface AnthropicRequest {

@@ -613,6 +613,7 @@ async fn call_anthropic(
     model: String,
     max_tokens: u32,
     messages: Vec<AnthropicMessage>,
+    temperature: Option<f32>,
     session_id: Option<String>,
     sessions_dir: Option<String>,
     feature_id: Option<String>,
@@ -620,11 +621,16 @@ async fn call_anthropic(
 ) -> Result<AnthropicResponse, String> {
     let client = reqwest::Client::new();
 
-    let body = serde_json::json!({
+    let mut body = serde_json::json!({
         "model": model,
         "max_tokens": max_tokens,
         "messages": messages,
     });
+    if let Some(temp) = temperature {
+        if let Some(obj) = body.as_object_mut() {
+            obj.insert("temperature".to_string(), serde_json::json!(temp));
+        }
+    }
 
     let res = client
         .post("https://api.anthropic.com/v1/messages")
@@ -657,8 +663,12 @@ async fn call_anthropic(
         let title = messages
             .first()
             .map(|m| {
-                let truncated: String = m.content.chars().take(60).collect();
-                if m.content.len() > 60 { format!("{truncated}…") } else { truncated }
+                let text = match &m.content {
+                    serde_json::Value::String(s) => s.clone(),
+                    _ => m.content.to_string(),
+                };
+                let truncated: String = text.chars().take(60).collect();
+                if text.len() > 60 { format!("{truncated}…") } else { text }
             })
             .unwrap_or_else(|| "Untitled Session".to_string());
 
@@ -666,7 +676,10 @@ async fn call_anthropic(
             .iter()
             .map(|m| SessionMessage {
                 role: m.role.clone(),
-                content: m.content.clone(),
+                content: match &m.content {
+                    serde_json::Value::String(s) => s.clone(),
+                    _ => m.content.to_string(),
+                },
                 timestamp: now.clone(),
                 input_tokens: None,
                 output_tokens: None,
@@ -705,10 +718,10 @@ async fn call_anthropic(
     Ok(AnthropicResponse { content, input_tokens, output_tokens })
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 struct AnthropicMessage {
     role: String,
-    content: String,
+    content: serde_json::Value,
 }
 
 #[derive(Serialize)]
@@ -737,14 +750,20 @@ async fn call_openai_compatible(
     model: String,
     max_tokens: u32,
     messages: Vec<AnthropicMessage>,
+    temperature: Option<f32>,
 ) -> Result<AnthropicResponse, String> {
     let client = reqwest::Client::new();
 
-    let body = serde_json::json!({
+    let mut body = serde_json::json!({
         "model": model,
         "max_tokens": max_tokens,
         "messages": messages,
     });
+    if let Some(temp) = temperature {
+        if let Some(obj) = body.as_object_mut() {
+            obj.insert("temperature".to_string(), serde_json::json!(temp));
+        }
+    }
 
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
 
@@ -782,6 +801,7 @@ async fn call_openai(
     model: String,
     max_tokens: u32,
     messages: Vec<AnthropicMessage>,
+    temperature: Option<f32>,
 ) -> Result<AnthropicResponse, String> {
     call_openai_compatible(
         api_key,
@@ -789,6 +809,7 @@ async fn call_openai(
         model,
         max_tokens,
         messages,
+        temperature,
     )
     .await
 }
@@ -804,6 +825,7 @@ async fn call_gemini(
     model: String,
     max_tokens: u32,
     messages: Vec<AnthropicMessage>,
+    temperature: Option<f32>,
 ) -> Result<AnthropicResponse, String> {
     let client = reqwest::Client::new();
 
@@ -814,27 +836,38 @@ async fn call_gemini(
         .iter()
         .map(|m| {
             let role = if m.role == "assistant" { "model" } else { &m.role };
+            let parts = if m.content.is_array() {
+                m.content.clone()
+            } else {
+                let text = match &m.content {
+                    serde_json::Value::String(s) => s.clone(),
+                    _ => m.content.to_string(),
+                };
+                serde_json::json!([{ "text": text }])
+            };
             serde_json::json!({
                 "role": role,
-                "parts": [{ "text": m.content }],
+                "parts": parts,
             })
         })
         .collect();
 
+    let temp = temperature.unwrap_or(0.2);
     let body = serde_json::json!({
         "contents": contents,
         "generationConfig": {
             "maxOutputTokens": max_tokens,
-            "temperature": 0.2,
+            "temperature": temp,
         },
     });
 
     let url = format!(
-        "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}",
+        "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
     );
 
     let res = client
         .post(&url)
+        .header("x-goog-api-key", &api_key)
         .header("content-type", "application/json")
         .json(&body)
         .send()
@@ -1352,7 +1385,7 @@ async fn fetch_github_issues(token: String, repo_url: String) -> Result<Vec<Gith
             let updated_at = issue_data["updatedAt"].as_str().unwrap_or("").to_string();
             let url = issue_data["url"].as_str().unwrap_or("").to_string();
             let user = issue_data["author"]["login"].as_str().map(String::from);
-            
+
             let labels = issue_data["labels"]["nodes"]
                 .as_array()
                 .map(|arr| arr.iter().filter_map(|l| l["name"].as_str().map(String::from)).collect())
@@ -2064,6 +2097,53 @@ fn is_markdown_path(path: &str) -> bool {
         .and_then(|ext| ext.to_str())
         .map(|ext| matches!(ext.to_ascii_lowercase().as_str(), "md" | "markdown"))
         .unwrap_or(false)
+}
+
+#[tauri::command]
+async fn check_command_exists(command: String) -> Result<bool, String> {
+    let command = command.trim();
+    if command.is_empty() {
+        return Ok(false);
+    }
+
+    // Split PATH by the platform separator
+    let path_var = match std::env::var_os("PATH") {
+        Some(path) => path,
+        None => return Ok(false),
+    };
+
+    let paths = std::env::split_paths(&path_var);
+
+    for path in paths {
+        let exe_path = path.join(command);
+        if exe_path.is_file() {
+            return Ok(true);
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            let exe_path_with_ext = path.join(format!("{}.exe", command));
+            if exe_path_with_ext.is_file() {
+                return Ok(true);
+            }
+            let cmd_path_with_ext = path.join(format!("{}.cmd", command));
+            if cmd_path_with_ext.is_file() {
+                return Ok(true);
+            }
+            let bat_path_with_ext = path.join(format!("{}.bat", command));
+            if bat_path_with_ext.is_file() {
+                return Ok(true);
+            }
+        }
+    }
+
+    // Fallback: if it's an absolute path, check if that file exists
+    let abs_path = std::path::Path::new(command);
+    if abs_path.is_absolute() && abs_path.is_file() {
+        return Ok(true);
+    }
+
+    Ok(false)
 }
 
 /// Open a file or directory in the OS handler. Markdown files on macOS use
@@ -3094,6 +3174,7 @@ pub fn run() {
             mcp_logs_dir,
             write_mcp_config,
             open_path,
+            check_command_exists,
             skill_default_dir,
             skill_list,
             skill_save,

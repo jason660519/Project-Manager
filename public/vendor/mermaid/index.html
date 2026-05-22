@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mermaid Standalone Renderer</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      overflow: hidden;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    }
+    #container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    #container svg {
+      max-width: 100%;
+      height: auto !important;
+    }
+  </style>
+  <script src="./mermaid.min.js"></script>
+</head>
+<body>
+  <div id="container"></div>
+
+  <script>
+    // Initialize Mermaid with dark theme configurations to match Project Manager's design
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'dark',
+      themeVariables: {
+        background: 'transparent',
+        primaryColor: 'rgb(110 231 183)',
+        lineColor: 'rgb(110 231 183)'
+      },
+      // Suppress default console errors / alert boxes
+      suppressConsoleErrors: true
+    });
+
+    window.addEventListener('message', async (event) => {
+      const { type, code, id } = event.data || {};
+      if (type !== 'render') return;
+
+      const container = document.getElementById('container');
+      container.innerHTML = '';
+
+      try {
+        // Render the diagram to SVG string.
+        // In Mermaid, the first argument to render must be a unique ID starting with a letter.
+        const { svg } = await mermaid.render(`mg-${id}`, code);
+        
+        container.innerHTML = svg;
+
+        // Measure the container's height after insertion
+        // Since max-width: 100% may scale the SVG, let's use getBoundingClientRect for absolute precision.
+        setTimeout(() => {
+          const rect = container.getBoundingClientRect();
+          const height = Math.ceil(rect.height);
+          window.parent.postMessage({ type: 'resize', height, id }, '*');
+        }, 50); // Small timeout to ensure browser paints and layout settles
+      } catch (err) {
+        // Extract a clean error string
+        let errorMsg = err.message || String(err);
+        
+        // Remove internal Mermaid technical stack trace lines if possible for a cleaner UI error
+        if (errorMsg.includes('Parse error')) {
+          errorMsg = errorMsg.split('\n')[0];
+        }
+
+        window.parent.postMessage({ type: 'error', error: errorMsg, id }, '*');
+      }
+    });
+
+    // Notify parent that the iframe is loaded and ready to accept render requests
+    window.parent.postMessage({ type: 'ready' }, '*');
+  </script>
+</body>
+</html>

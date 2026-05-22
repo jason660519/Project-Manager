@@ -36,7 +36,7 @@ const DEFAULT_MODELS: Record<string, string> = {
 };
 
 /** Fallback chain when no provider is specified by the client. */
-const FALLBACK_PROVIDERS = ['anthropic', 'openai', 'gemini'];
+const FALLBACK_PROVIDERS = ['deepseek', 'anthropic', 'openai', 'gemini', 'grok'];
 
 function getSystemPrompt(): string {
   return [

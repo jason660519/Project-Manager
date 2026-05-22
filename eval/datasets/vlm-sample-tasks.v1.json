@@ -1,0 +1,42 @@
+{
+  "version": "v1",
+  "arena": "vlm",
+  "dataset_id": "vlm-sample-tasks-v1",
+  "tasks": [
+    {
+      "task_id": "vlm_ocr_001",
+      "task_bucket": "vlm_ocr",
+      "grading_mode": "machine",
+      "input": "Extract all visible text from the invoice image and return as plain text.",
+      "image_refs": ["samples/invoice-001.png"]
+    },
+    {
+      "task_id": "vlm_chart_001",
+      "task_bucket": "vlm_chart",
+      "grading_mode": "machine",
+      "input": "Read the chart and report the top 3 categories by value.",
+      "image_refs": ["samples/chart-001.png"]
+    },
+    {
+      "task_id": "vlm_ui_001",
+      "task_bucket": "vlm_ui",
+      "grading_mode": "human",
+      "input": "Inspect this UI screenshot and identify any accessibility issues.",
+      "image_refs": ["samples/ui-001.png"]
+    },
+    {
+      "task_id": "vlm_multi_image_001",
+      "task_bucket": "vlm_multi_image",
+      "grading_mode": "human",
+      "input": "Compare these two product photos and list all visual differences.",
+      "image_refs": ["samples/product-a.png", "samples/product-b.png"]
+    },
+    {
+      "task_id": "vlm_chart_002",
+      "task_bucket": "vlm_chart",
+      "grading_mode": "machine",
+      "input": "From the table screenshot, calculate total revenue across all rows.",
+      "image_refs": ["samples/table-001.png"]
+    }
+  ]
+}

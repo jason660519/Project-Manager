@@ -211,6 +211,8 @@ async function callChatApi(
   content: string,
   history: ChatMessage[],
   onStream?: (chunk: string) => void,
+  /** Explicit provider/model override from chat settings (takes priority over localStorage). */
+  chatSettingsOverride?: { provider: string; model: string; systemPrompt: string },
 ): Promise<string> {
   const messages = history.map((m) => ({
     role: m.role === 'user' ? 'user' as const : 'assistant' as const,
@@ -218,18 +220,32 @@ async function callChatApi(
   }));
   messages.push({ role: 'user', content });
 
-  // Load user's preferred provider (if configured)
-  const userProvider = await loadChatProvider();
+  // Determine provider config: explicit override > localStorage > none (server fallback chain)
+  let providerConfig: { provider?: string; model?: string; systemPrompt?: string } = {};
+
+  if (chatSettingsOverride?.provider && chatSettingsOverride.provider !== 'auto') {
+    providerConfig = {
+      provider: chatSettingsOverride.provider,
+      model: chatSettingsOverride.model || undefined,
+      systemPrompt: chatSettingsOverride.systemPrompt || undefined,
+    };
+  } else {
+    const userProvider = await loadChatProvider();
+    if (userProvider) {
+      providerConfig = userProvider;
+    }
+  }
 
   // Build the payload — include provider/model/systemPrompt when the user has a preference
   const chatPayload: Record<string, unknown> = { messages };
-  if (userProvider) {
-    chatPayload.provider = userProvider.provider;
-    if (userProvider.model) chatPayload.model = userProvider.model;
+  if (providerConfig.provider) {
+    chatPayload.provider = providerConfig.provider;
   }
-  // Include custom system prompt if set
-  if (userProvider?.systemPrompt) {
-    chatPayload.systemPrompt = userProvider.systemPrompt;
+  if (providerConfig.model) {
+    chatPayload.model = providerConfig.model;
+  }
+  if (providerConfig.systemPrompt) {
+    chatPayload.systemPrompt = providerConfig.systemPrompt;
   }
 
   // If streaming callback is provided, use the streaming endpoint
@@ -351,6 +367,7 @@ export async function sendChatMessage(request: SendChatMessageRequest): Promise<
 
   // If we have both a project and an agent adapter, dispatch through the agent bridge.
   // This gives the agent access to file context, project files, etc.
+  // If the agent fails to prepare or exits with non-zero, fall back to AI API.
   if (project && adapter) {
     const runtime = createRuntimeAdapterFromConfig(adapter);
     const prompt = buildAgentPrompt(request.content, request.context);
@@ -363,8 +380,8 @@ export async function sendChatMessage(request: SendChatMessageRequest): Promise<
     if (!result.success || !result.command || !result.args) {
       // Fallback to API chat if agent command preparation fails
       try {
-        const content = await callChatApi(request.content, request.history, request.onStream);
-        return { content };
+        const apiContent = await callChatApi(request.content, request.history, request.onStream, request.chatSettings);
+        return { content: apiContent };
       } catch {
         return { content: result.message || 'The agent command could not be prepared.', error: true };
       }
@@ -379,8 +396,8 @@ export async function sendChatMessage(request: SendChatMessageRequest): Promise<
     // If agent exited with a non-zero exit code, fall back to AI API
     if (agentOutput.includes('Agent exited with code') && !agentOutput.includes('code 0')) {
       try {
-        const content = await callChatApi(request.content, request.history, request.onStream);
-        return { content };
+        const apiContent = await callChatApi(request.content, request.history, request.onStream, request.chatSettings);
+        return { content: apiContent };
       } catch {
         return { content: agentOutput, error: true };
       }
@@ -390,11 +407,11 @@ export async function sendChatMessage(request: SendChatMessageRequest): Promise<
 
   // No project or no adapter configured — use the AI chat API directly
   try {
-    const content = await callChatApi(request.content, request.history, request.onStream);
+    const content = await callChatApi(request.content, request.history, request.onStream, request.chatSettings);
     return { content };
   } catch (e) {
     const err = e as Error;
-    if (err.message.includes('ANTHROPIC_API_KEY') || err.message.includes('OPENAI_API_KEY') || err.message.includes('GEMINI_API_KEY')) {
+    if (err.message.includes('ANTHROPIC_API_KEY') || err.message.includes('OPENAI_API_KEY') || err.message.includes('GEMINI_API_KEY') || err.message.includes('DEEPSEEK_API_KEY')) {
       return { content: 'The AI assistant cannot respond because no API keys are configured. Please add an API key in Settings or Keys.', error: true };
     }
     if (err.message.includes('429') || err.message.includes('rate limit')) {

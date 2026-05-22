@@ -7,7 +7,8 @@
   "project": {
     "name": "Project Manager",
     "root": "/Volumes/KLEVV-4T-1/Project-Manager",
-    "defaultIDE": "Cursor"
+    "defaultIDE": "Cursor",
+    "githubUrl": "https://github.com/jason66x/Project-Manager"
   },
   "features": [
     {
@@ -95,19 +96,21 @@
       "id": "F04",
       "name": "Add Project by GitHub URL",
       "category": "Core/Integration",
-      "status": "on_hold",
-      "progress": 10,
+      "status": "in_progress",
+      "progress": 85,
       "paths": {
         "featureFolder": ".project-manager/features/F04/",
         "spec": ".project-manager/features/F04/feature-spec.md",
         "implementation": "app/api/anthropic/route.ts",
-        "developmentLogSummaryFolder": ".project-manager/features/F04/"
+        "developmentLogSummaryFolder": ".project-manager/features/F04/",
+        "tdd": ".project-manager/features/F04/tdd-spec.md"
       },
       "readmePath": ".project-manager/features/F04/README.md",
       "createdAt": "2026-05-18T22:55:03.000Z",
-      "updatedAt": "2026-05-18T22:55:03.000Z",
+      "updatedAt": "2026-05-20T03:48:11.846Z",
       "phase": "development",
-      "points": 1
+      "points": 1,
+      "updatedBy": "wilson"
     },
     {
       "id": "F05",
@@ -231,8 +234,8 @@
       "id": "F11",
       "name": "i18n: Multilingual Contributor Guide",
       "category": "Documentation/i18n",
-      "status": "in_progress",
-      "progress": 50,
+      "status": "done",
+      "progress": 100,
       "paths": {
         "featureFolder": ".project-manager/features/F11/",
         "implementation": "lib/hooks/useLang.ts",
@@ -244,9 +247,10 @@
       "notes": "Browser mode uses .env environment variables (server side), Tauri mode uses macOS Keychain.",
       "readmePath": ".project-manager/features/F11/README.md",
       "createdAt": "2026-05-19T00:24:47.000Z",
-      "updatedAt": "2026-05-19T00:24:47.000Z",
+      "updatedAt": "2026-05-20T02:01:00.000+10:00",
       "phase": "development",
       "points": 1,
+      "updatedBy": "f11_i18n_engineer",
       "metadata": {
         "notesSummary": "Browser mode uses .env environment variables (server side), Tauri mode uses macOS Keychain."
       }
@@ -287,12 +291,73 @@
         "developmentLogSummaryFolder": ".project-manager/features/F14/"
       },
       "readmePath": ".project-manager/features/F14/README.md",
-      "notes": "Collapsible AI assistant embedded at the bottom of the sidebar with local commands, markdown responses, and agent dispatch integration.",
+      "notes": "v1 core complete. v1.5: settings panel + file attachment + quick actions",
       "createdAt": "2026-05-20T01:46:00.000+10:00",
-      "updatedAt": "2026-05-20T01:46:00.000+10:00",
+      "updatedAt": "2026-05-20T09:30:00.000+10:00",
       "updatedBy": "f14_engineer",
       "phase": "development",
       "points": 1
+    },
+    {
+      "id": "F15",
+      "name": "GitHub Issues Dashboard Tab",
+      "category": "Core/Integration",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "featureFolder": ".project-manager/features/F15/",
+        "spec": ".project-manager/features/F15/feature-spec.md",
+        "tdd": ".project-manager/features/F15/tdd-spec.md",
+        "implementation": "app/project-progress-dashboard/_components/IssuesTab.tsx",
+        "developmentLogSummaryFolder": ".project-manager/features/F15/"
+      },
+      "readmePath": ".project-manager/features/F15/README.md",
+      "createdAt": "2026-05-20T03:41:11.332Z",
+      "updatedAt": "2026-05-20T03:48:11.846Z",
+      "phase": "development",
+      "points": 5,
+      "updatedBy": "subagent"
+    },
+    {
+      "id": "F16",
+      "name": "Keys Page Redesign (3 Sheets)",
+      "category": "System/Settings",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "featureFolder": ".project-manager/features/F16/",
+        "spec": ".project-manager/features/F16/feature-spec.md",
+        "tdd": ".project-manager/features/F16/tdd-spec.md",
+        "implementation": "app/keys/page.tsx",
+        "developmentLogSummaryFolder": ".project-manager/features/F16/"
+      },
+      "notes": "Redesign Keys page into 3 sheets: API Config, LLM Evaluation, VLM Evaluation.",
+      "readmePath": ".project-manager/features/F16/README.md",
+      "createdAt": "2026-05-20T22:34:39.843777Z",
+      "updatedAt": "2026-05-21T09:09:00.000+10:00",
+      "phase": "development",
+      "points": 5,
+      "updatedBy": "antigravity"
+    },
+    {
+      "id": "F17",
+      "name": "Decoupled Mermaid Integration",
+      "category": "Core/Architecture",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "featureFolder": ".project-manager/features/F17/",
+        "spec": ".project-manager/features/F17/feature-spec.md",
+        "tdd": ".project-manager/features/F17/tdd-spec.md",
+        "implementation": "components/chat/MermaidBlock.tsx",
+        "developmentLogSummaryFolder": ".project-manager/features/F17/"
+      },
+      "readmePath": ".project-manager/features/F17/README.md",
+      "createdAt": "2026-05-21T00:44:00.000Z",
+      "updatedAt": "2026-05-21T00:44:00.000Z",
+      "phase": "development",
+      "points": 3,
+      "updatedBy": "agent"
     }
   ],
   "adapters": {

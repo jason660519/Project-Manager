@@ -53,19 +53,24 @@ function classifyProviderError(raw: string): 'retryable' | 'fatal' {
 export async function callSingleProvider(
   provider: LlmProviderId,
   apiKey: string,
-  fullPrompt: string,
+  fullPrompt: string | AnthropicMessage[],
   modelOverride?: string,
+  temperature?: number,
+  maxTokens?: number,
 ): Promise<{ content: string; inputTokens: number; outputTokens: number; model: string }> {
   const spec = getLlmProvider(provider);
   if (!spec) throw new Error(`Unknown provider: ${provider}`);
   const model = modelOverride ?? spec.defaultModel;
-  const messages = [{ role: 'user' as const, content: fullPrompt }];
+  const messages = typeof fullPrompt === 'string'
+    ? [{ role: 'user' as const, content: fullPrompt }]
+    : fullPrompt;
+  const maxTok = maxTokens ?? 4096;
   if (spec.apiKind === 'anthropic') {
-    const r = await callAnthropic({ apiKey, model, maxTokens: 4096, messages });
+    const r = await callAnthropic({ apiKey, model, maxTokens: maxTok, messages, temperature });
     return { content: r.content, inputTokens: r.inputTokens, outputTokens: r.outputTokens, model };
   }
   if (spec.apiKind === 'gemini') {
-    const r = await callGemini({ apiKey, model, maxTokens: 4096, messages });
+    const r = await callGemini({ apiKey, model, maxTokens: maxTok, messages, temperature });
     return { content: r.content, inputTokens: r.inputTokens, outputTokens: r.outputTokens, model };
   }
   // openai-compatible: routes to OpenAI / DeepSeek / Grok / Kimi / OpenRouter
@@ -78,8 +83,9 @@ export async function callSingleProvider(
     apiKey,
     baseUrl: spec.baseUrl,
     model,
-    maxTokens: 4096,
+    maxTokens: maxTok,
     messages,
+    temperature,
   });
   return { content: r.content, inputTokens: r.inputTokens, outputTokens: r.outputTokens, model };
 }

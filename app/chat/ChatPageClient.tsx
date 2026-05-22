@@ -195,8 +195,13 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
         : `Please analyze these files:\n\n${fileBlock}`;
     }
 
+    // If the last message is an error, remove it — new message starts fresh
+    const cleanedMessages = messages.length > 0 && messages[messages.length - 1].status === 'error'
+      ? messages.slice(0, -1)
+      : messages;
+
     const userMessage = makeMessage('user', content);
-    const nextMessages = [...messages, userMessage];
+    const nextMessages = [...cleanedMessages, userMessage];
     setMessages(nextMessages);
     setLoading(true);
 

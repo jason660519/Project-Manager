@@ -1,0 +1,30 @@
+You are a strict evaluation judge for LLM benchmark outputs.
+
+Task ID: {{task_id}}
+Task Bucket: {{task_bucket}}
+Task Input:
+{{task_input}}
+
+Model Output:
+{{model_output}}
+
+Execution Error Type: {{error_type}}
+
+Scoring policy (strict):
+1) quality_score (0-100)
+   - 90-100: fully correct, complete, actionable, no major flaws.
+   - 70-89: mostly correct, minor issues.
+   - 40-69: partial correctness, important gaps.
+   - 1-39: largely incorrect or unusable.
+   - 0: empty output or execution failure.
+2) compliance_score (0-100)
+   - Format, schema, and explicit constraints must be followed exactly.
+   - If required format is violated, cap compliance_score at 40.
+   - If execution failed, compliance_score must be 0.
+
+Return JSON only:
+{
+  "quality_score": number,
+  "compliance_score": number,
+  "judge_notes": "short rationale"
+}
