@@ -4,7 +4,8 @@
 #   ./start_project_manager.sh           show interactive menu
 #   ./start_project_manager.sh start     start the Tauri desktop app
 #   ./start_project_manager.sh web       start Next.js web server only (no Tauri)
-#   ./start_project_manager.sh all       start PM + Hermes + OpenClaw
+#   ./start_project_manager.sh all       start PM + Hermes + OpenClaw and open auxiliary pages
+#   ./start_project_manager.sh aux       open auxiliary software pages only
 #   ./start_project_manager.sh install   force full install check
 #   ./start_project_manager.sh update    update npm deps + rebuild Rust
 #   ./start_project_manager.sh stop      stop all services
@@ -24,6 +25,9 @@ MIN_NODE=18
 DEV_PORT=43187
 HERMES_PORT=9119
 OPENCLAW_PORT=18790
+OLLAMA_URL="${PROJECT_MANAGER_OLLAMA_URL:-http://192.168.1.6:11434/}"
+OPENWEBUI_URL="${PROJECT_MANAGER_OPENWEBUI_URL:-http://192.168.1.6:38457/}"
+COMFYUI_URL="${PROJECT_MANAGER_COMFYUI_URL:-http://192.168.1.6:30000/}"
 BOLD="\033[1m"
 GREEN="\033[32m"
 YELLOW="\033[33m"
@@ -97,6 +101,11 @@ open_local_url() {
     return 0
   fi
 
+  if ! should_force_open_browser && browser_has_url_open "$url"; then
+    success "Browser tab already open: $(safe_url_for_display "$url")"
+    return 0
+  fi
+
   if [[ "$PLATFORM" == "macOS" ]]; then
     open "$url" >/dev/null 2>&1 || warn "Could not open browser automatically: $url"
   else
@@ -108,7 +117,8 @@ open_local_url() {
   fi
 }
 
-# Skip browser when the service was already running unless --force-open / PROJECT_MANAGER_FORCE_OPEN=1.
+# Open the browser even when the service was already running; open_local_url
+# handles duplicate-tab prevention when the URL is already open.
 maybe_open_local_url() {
   local url="$1"
   local service_was_running="${2:-0}"
@@ -118,11 +128,8 @@ maybe_open_local_url() {
     return 0
   fi
 
-  if [[ "$service_was_running" == "1" ]] && ! should_force_open_browser; then
-    info "Browser auto-open skipped (service already running)."
-    echo "  URL:  $(safe_url_for_display "$url")"
-    echo "  Tip:  PROJECT_MANAGER_FORCE_OPEN=1 $0 …  or  --force-open"
-    return 0
+  if [[ "$service_was_running" == "1" ]]; then
+    info "Service already running; checking browser tab for $(safe_url_for_display "$url")"
   fi
 
   open_local_url "$url"
@@ -147,6 +154,78 @@ stop_listeners_on_port() {
 safe_url_for_display() {
   local url="$1"
   printf '%s\n' "${url%%#token=*}"
+}
+
+normalize_browser_url() {
+  local url="$1"
+  url="${url%%#*}"
+  url="${url%%\?*}"
+  while [[ "$url" == */ && ${#url} -gt 8 ]]; do
+    url="${url%/}"
+  done
+  printf '%s\n' "$url"
+}
+
+browser_has_url_open() {
+  local url="$1"
+
+  if [[ "${PROJECT_MANAGER_BROWSER_DEDUP:-1}" == "0" ]]; then
+    return 1
+  fi
+  if [[ "$PLATFORM" != "macOS" ]] || ! command -v osascript >/dev/null 2>&1; then
+    return 1
+  fi
+
+  local target_url
+  target_url="$(normalize_browser_url "$url")"
+
+  local result
+  result="$(osascript - 2>/dev/null <<'APPLESCRIPT' || true
+on appendTabsForApp(appName, existingText)
+  set outputText to existingText
+  tell application appName
+    repeat with browserWindow in windows
+      repeat with browserTab in tabs of browserWindow
+        try
+          set tabUrl to URL of browserTab as text
+          if tabUrl is not "" then set outputText to outputText & tabUrl & linefeed
+        end try
+      end repeat
+    end repeat
+  end tell
+  return outputText
+end appendTabsForApp
+
+on run
+  set outputText to ""
+  set browserNames to {"Google Chrome", "Microsoft Edge", "Brave Browser", "Safari"}
+  tell application "System Events"
+    set runningNames to name of application processes
+  end tell
+
+  repeat with browserName in browserNames
+    set appName to browserName as text
+    if runningNames contains appName then
+      try
+        set outputText to my appendTabsForApp(appName, outputText)
+      end try
+    end if
+  end repeat
+
+  return outputText
+end run
+APPLESCRIPT
+)"
+
+  local open_url
+  while IFS= read -r open_url; do
+    [[ -n "$open_url" ]] || continue
+    if [[ "$(normalize_browser_url "$open_url")" == "$target_url" ]]; then
+      return 0
+    fi
+  done <<< "$result"
+
+  return 1
 }
 
 start_background_service() {
@@ -184,6 +263,33 @@ print_app_failure() {
   if [[ -n "$log_file" ]]; then
     echo "  Log: $log_file"
   fi
+}
+
+open_auxiliary_app_pages() {
+  header "Auxiliary Software Pages"
+
+  if [[ "${PROJECT_MANAGER_SKIP_AUX_OPEN:-0}" == "1" ]]; then
+    warn "Auxiliary page auto-open skipped by PROJECT_MANAGER_SKIP_AUX_OPEN=1"
+    return 0
+  fi
+
+  local pages=(
+    "Hermes Agent Dashboard|http://127.0.0.1:${HERMES_PORT}"
+    "OpenClaw Dashboard|http://127.0.0.1:${OPENCLAW_PORT}/"
+    "Ollama API|$OLLAMA_URL"
+    "Open WebUI|$OPENWEBUI_URL"
+    "ComfyUI|$COMFYUI_URL"
+  )
+
+  local page name url
+  for page in "${pages[@]}"; do
+    name="${page%%|*}"
+    url="${page#*|}"
+    info "Opening $name: $(safe_url_for_display "$url")"
+    open_local_url "$url"
+  done
+
+  success "Auxiliary software pages handled"
 }
 
 read_openclaw_gateway_token() {
@@ -776,8 +882,12 @@ cmd_openclaw() {
   print_app_success "OpenClaw Dashboard" "$OPENCLAW_PORT" "http://127.0.0.1:${OPENCLAW_PORT}/" "$log_file"
 }
 
+cmd_aux() {
+  open_auxiliary_app_pages
+}
+
 cmd_all() {
-  header "Project Manager — Full Stack (PM + Hermes + OpenClaw)"
+  header "Project Manager — Full Stack (PM + Hermes + OpenClaw + Aux Pages)"
 
   if [[ "$FORCE_RESTART" == "1" ]]; then
     stop_listeners_on_port "$HERMES_PORT" "Hermes Dashboard"
@@ -790,12 +900,16 @@ cmd_all() {
 
   cmd_hermes
   cmd_openclaw
+  cmd_aux
 
   header "Launch Summary"
   success "Project-scoped apps are ready"
   echo "  Project Manager Desktop: starting next (Next.js dev port $DEV_PORT)"
   echo "  Hermes Agent Dashboard:  http://127.0.0.1:${HERMES_PORT}"
   echo "  OpenClaw Dashboard:      http://127.0.0.1:${OPENCLAW_PORT}/"
+  echo "  Ollama API:              $OLLAMA_URL"
+  echo "  Open WebUI:              $OPENWEBUI_URL"
+  echo "  ComfyUI:                 $COMFYUI_URL"
   echo "  Logs:                    .project-manager/dev-logs/"
   echo ""
 
@@ -828,15 +942,16 @@ show_menu() {
   echo -e "${BLUE}══════════════════════════════════════════════════════════════${RESET}"
   echo -e "${BLUE}   Project Manager - 統一啟動選單 (Project Manager Menu) ${RESET}"
   echo -e "${BLUE}══════════════════════════════════════════════════════════════${RESET}"
-  echo -e " 1) 🚀 啟動完整環境 (PM + Hermes + OpenClaw)"
+  echo -e " 1) 🚀 啟動完整環境 (PM + Hermes + OpenClaw + 輔助頁面)"
   echo -e " 2) 🖥️  啟動 PM 桌面端 (Tauri App)"
   echo -e " 3) 🌐 啟動 PM 網頁端 (Next.js Only)"
   echo -e " 4) 🤖 啟動 Hermes Agent Dashboard (Port: $HERMES_PORT)"
   echo -e " 5) 🕹️  啟動 OpenClaw Dashboard (Port: $OPENCLAW_PORT)"
+  echo -e " 6) 🧩 開啟 Hermes / OpenClaw / Ollama / Open WebUI / ComfyUI 頁面"
   echo -e " ─── 管理功能 ───"
-  echo -e " 6) 📥 執行完整安裝 (Full Install)"
-  echo -e " 7) 🔄 更新相依性與 Rust 編譯 (Update)"
-  echo -e " 8) 🛑 停止所有相關服務"
+  echo -e " 7) 📥 執行完整安裝 (Full Install)"
+  echo -e " 8) 🔄 更新相依性與 Rust 編譯 (Update)"
+  echo -e " 9) 🛑 停止所有相關服務"
   echo -e " 0) 🚪 離開 (Exit)"
   echo ""
   read -p "請輸入選項 (Enter choice): " choice
@@ -847,9 +962,10 @@ show_menu() {
     3) cmd_web ;;
     4) cmd_hermes ;;
     5) cmd_openclaw ;;
-    6) cmd_install ;;
-    7) cmd_update ;;
-    8) cmd_stop ;;
+    6) cmd_aux ;;
+    7) cmd_install ;;
+    8) cmd_update ;;
+    9) cmd_stop ;;
     0) exit 0 ;;
     *) warn "無效選項 (Invalid choice)"; sleep 1; show_menu ;;
   esac
@@ -914,6 +1030,7 @@ case "$COMMAND" in
   start)    cmd_start   ;;
   web)      cmd_web     ;;
   all)      cmd_all     ;;
+  aux)      cmd_aux     ;;
   stop)     cmd_stop    ;;
   hermes)   cmd_hermes  ;;
   openclaw) cmd_openclaw ;;
@@ -921,7 +1038,7 @@ case "$COMMAND" in
   auto)     cmd_auto    ;;
   *)
     error "Unknown command: $COMMAND"
-    echo "Usage: $0 [--force-open|--open] [--restart] [install|update|start|web|all|stop|hermes|openclaw|menu]"
+    echo "Usage: $0 [--force-open|--open] [--restart] [install|update|start|web|all|aux|stop|hermes|openclaw|menu]"
     exit 1
     ;;
 esac
