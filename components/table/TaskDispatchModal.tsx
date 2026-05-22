@@ -734,7 +734,7 @@ export function TaskDispatchModal({
   }, [selectedAdapter, selectedTargetKind, projectRoot]);
 
   useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    logEndRef.current?.scrollIntoView?.({ behavior: 'smooth' });
   }, [logs]);
 
   useEffect(() => {

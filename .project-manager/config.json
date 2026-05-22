@@ -59,9 +59,7 @@
         "tdd": ".project-manager/features/F02/tdd-spec.md",
         "implementation": "app/ui/DashboardClient.tsx",
         "test": "__tests__/dashboardClient.phaseTabs.test.tsx",
-        "developmentLogSummaryFolder": ".project-manager/features/F02/",
-        "spec": ".project-manager/features/F02/feature-spec.md",
-        "tdd": ".project-manager/features/F02/tdd-spec.md"
+        "developmentLogSummaryFolder": ".project-manager/features/F02/"
       },
       "notes": "Display feature progress, status, and dispatch operations on the home page dashboard.",
       "readmePath": ".project-manager/features/F02/README.md",
