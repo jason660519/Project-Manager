@@ -60,3 +60,22 @@
 ### Verification
 - `npm test -- --run` — 43 files, 346 tests passed.
 - `npm run typecheck` — Next typegen and `tsc --noEmit` passed.
+
+## 2026-05-22
+
+### Completed
+- Added richer execution-target preflight state through `checkCommandAvailability`.
+- Browser mode now reports target availability as `unknown` instead of pretending a local CLI was verified.
+- Tauri mode still uses the Rust `check_command_exists` bridge and reports `available` or `missing`.
+- Task Dispatch now shows a selected-target preflight panel with status, management boundary, and command preview.
+- Missing targets block dispatch/open buttons before Project Manager tries to spawn the command.
+- Agent app targets remain launchable but are labelled as manual checks because Project Manager cannot verify the desktop app install or own the process.
+- Synced stale feature README status/progress metadata for F03, F04, F11, F12, F13, and F15 with `.project-manager/config.json`.
+
+### Verification
+- `npm run test -- __tests__/dispatch.availability.test.ts __tests__/dispatch.component.render.test.tsx lib/i18n/__tests__/completeness.test.ts` — 3 files, 22 tests passed.
+- `npm run typecheck` — Next typegen and `tsc --noEmit` passed.
+
+### Remaining
+- Confirm real app/deep-link contracts for Codex App and Anthropic App in Tauri/manual QA.
+- Add lifecycle UI actions for Hermes/OpenClaw install, update, rollback, status, and doctor output.

@@ -1,6 +1,6 @@
 # F12 — Skills Management Page
 
-**Status**: in_progress | **Progress**: 70%
+**Status**: done | **Progress**: 100%
 **Category**: Execution / Engineer Tools
 **Owner**: PM Team
 
@@ -9,6 +9,8 @@
 A full-featured Skills management page under the Execution section of the sidebar.
 Engineers can browse, create, edit, and delete Skill documents (SKILL.md) that
 guide AI agents during task execution.
+
+The current implementation is complete for the v1 management workflow.
 
 ## Key Screens
 

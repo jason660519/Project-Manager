@@ -1,6 +1,6 @@
 # F11 — i18n: Multilingual Contributor Guide
 
-**Status**: in_progress | **Progress**: 40%  
+**Status**: done | **Progress**: 100%  
 **Category**: Documentation/i18n  
 **Implementation**: `lib/hooks/useLang.ts`, `lib/i18n/`
 
@@ -43,6 +43,8 @@ export function MyComponent() {
 | `app/project-progress-dashboard/_components/AddRowModal.tsx` | ✅ done | `common` |
 | `app/project-progress-dashboard/_components/CategoryColumnFilter.tsx` | ✅ done | `common` |
 | `components/table/TaskDispatchModal.tsx` | ✅ done | `dispatch`, `phases` |
+
+The core multilingual contributor guide and typed translation framework are complete for the current Project Manager surface. Future components must continue the same `useI18n()` pattern.
 
 ### Adding a new section to `Translations`
 

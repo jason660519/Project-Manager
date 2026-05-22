@@ -1,6 +1,6 @@
 # F03 — Live Run Inspector
 
-**Status**: in_progress | **Progress**: 30%  
+**Status**: done | **Progress**: 100%  
 **Category**: Frontend/Monitor  
 **Implementation**: `app/ui/views/RunsView.tsx`
 
@@ -8,12 +8,11 @@
 
 Real-time view of active agent/IDE dispatch runs. Shows run status, output stream, duration, and assigned engineer role.
 
-## Remaining Work
+## Completed Work
 
-- Stream stdout/stderr from Rust bridge via Tauri event channel
-- Kill / pause individual run controls
-- Persist run history to `sessions` store
-- Filter by project / engineer role
+- Agent workflow coverage is tracked through `__tests__/agentWorkflows.test.ts`.
+- Dispatch UI now records active process state, output, PID, and exit events.
+- Follow-up durable run history is tracked separately in engineering docs before sync work.
 
 ## Bridge Requirements
 

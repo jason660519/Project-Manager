@@ -1,6 +1,6 @@
 # F04 — Add Project by GitHub URL
 
-**Status**: on_hold | **Progress**: 10%  
+**Status**: in_progress | **Progress**: 85%  
 **Category**: Core/Integration
 
 ## Summary
@@ -17,10 +17,11 @@ Allow users to add a project to the dashboard by pasting a GitHub repository URL
 - Repository cloning runs in Rust to avoid blocking the UI thread
 - Ingestion pipeline (F05) handles spec extraction after clone
 
-## Blocked By
+## Remaining Work
 
-- GitHub OAuth flow not yet designed
-- Ingestion pipeline (F05) still at 0%
+- Finalize GitHub token/cache/error policy.
+- Confirm bridge boundaries for repository fetch and issue sync.
+- Add/refresh regression coverage for GitHub URL add and issue import flows.
 
 ## Related Files
 

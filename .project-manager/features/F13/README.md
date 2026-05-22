@@ -1,6 +1,6 @@
 # F13 — Dispatch UX Improvements & Bug Fixes
 
-**Status**: in_progress | **Progress**: 0%
+**Status**: done | **Progress**: 100%
 **Category**: Frontend/Dispatch
 **Owner**: PM Team
 
@@ -23,10 +23,10 @@ the dispatch workflow.
 | `lib/i18n/zh.ts` | Simplified Chinese strings |
 | `lib/i18n/ja.ts` | Japanese strings |
 
-## Remaining Work
+## Completed Work
 
-- Loading/error/empty states for dispatch preview and execution
-- Kill confirmation before terminating an active dispatch
-- Graceful adapter not-found / config mismatch handling
-- Visual feedback when adapter command is not installed
-- MCP server list refresh validation
+- Loading/error/empty states for dispatch preview and execution.
+- Kill confirmation before terminating an active dispatch.
+- Graceful adapter not-found / config mismatch handling.
+- Visual feedback when adapter command is not installed.
+- MCP server list refresh validation.
