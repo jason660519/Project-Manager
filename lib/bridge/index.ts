@@ -794,7 +794,8 @@ export async function getSecret(service: string, key: string): Promise<string | 
 
 const GITHUB_TOKEN_SERVICE = 'projectmanager';
 const GITHUB_TOKEN_KEY = 'github-token';
-const GITHUB_TOKEN_LS_FALLBACK = 'projectManager-github-token';
+const GITHUB_TOKEN_LS_FALLBACK = 'projectManager-key:github';
+const GITHUB_TOKEN_LS_LEGACY = 'projectManager-github-token';
 
 /**
  * Read the user's GitHub token.  Under Tauri release builds it lives in the OS
@@ -809,7 +810,11 @@ export async function getGithubToken(): Promise<string> {
   }
   if (typeof window === 'undefined') return '';
   try {
-    return window.localStorage.getItem(GITHUB_TOKEN_LS_FALLBACK) ?? '';
+    return (
+      window.localStorage.getItem(GITHUB_TOKEN_LS_FALLBACK)
+      ?? window.localStorage.getItem(GITHUB_TOKEN_LS_LEGACY)
+      ?? ''
+    );
   } catch {
     return '';
   }
@@ -822,7 +827,12 @@ export async function setGithubToken(value: string): Promise<void> {
   }
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(GITHUB_TOKEN_LS_FALLBACK, value);
+    if (value) {
+      window.localStorage.setItem(GITHUB_TOKEN_LS_FALLBACK, value);
+    } else {
+      window.localStorage.removeItem(GITHUB_TOKEN_LS_FALLBACK);
+    }
+    window.localStorage.removeItem(GITHUB_TOKEN_LS_LEGACY);
   } catch {
     /* ignore */
   }

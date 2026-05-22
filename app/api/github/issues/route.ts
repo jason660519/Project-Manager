@@ -54,8 +54,9 @@ interface IssueCommentPayload {
 }
 
 function parseOwnerRepo(repoUrl: string): { owner: string; repo: string } {
-  const parts = repoUrl.trim().replace(/\/+$/, '').split('/');
-  if (parts.length < 2) {
+  const normalizedRepoUrl = repoUrl.trim().replace(/\/+$/, '').replace(/\.git$/, '');
+  const parts = normalizedRepoUrl.split('/');
+  if (parts.length < 2 || !normalizedRepoUrl.includes('github.com')) {
     throw new Error(`Invalid GitHub URL: ${repoUrl}`);
   }
   return { owner: parts[parts.length - 2]!, repo: parts[parts.length - 1]! };

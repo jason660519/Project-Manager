@@ -1206,14 +1206,18 @@ fn extract_labels(nodes: &serde_json::Value) -> Vec<String> {
 }
 
 fn parse_github_owner_repo(repo_url: &str) -> Result<(String, String), String> {
-    let parts: Vec<&str> = repo_url.trim_end_matches('/').split('/').collect();
-    if parts.len() < 2 {
+    let trimmed = repo_url.trim().trim_end_matches('/');
+    let without_git = trimmed.strip_suffix(".git").unwrap_or(trimmed);
+    let parts: Vec<&str> = without_git.split('/').collect();
+    if parts.len() < 2 || !without_git.contains("github.com") {
         return Err("Invalid GitHub URL — expected https://github.com/owner/repo".to_string());
     }
-    Ok((
-        parts[parts.len() - 2].to_string(),
-        parts[parts.len() - 1].to_string(),
-    ))
+    let owner = parts[parts.len() - 2].trim();
+    let repo = parts[parts.len() - 1].trim();
+    if owner.is_empty() || repo.is_empty() {
+        return Err("Invalid GitHub URL — expected https://github.com/owner/repo".to_string());
+    }
+    Ok((owner.to_string(), repo.to_string()))
 }
 
 fn map_graphql_issue(issue_data: &serde_json::Value) -> GithubIssue {
@@ -1298,12 +1302,7 @@ fn map_rest_issue_comment(comment_data: &serde_json::Value) -> Result<GithubIssu
 /// Shared implementation for fetching PRs + issues from GitHub GraphQL API.
 /// Called both from the `fetch_github_repo` command and the `start_github_poll` loop.
 async fn fetch_github_repo_inner(token: &str, repo_url: &str) -> Result<Vec<GitHubFeature>, String> {
-    let parts: Vec<&str> = repo_url.trim_end_matches('/').split('/').collect();
-    if parts.len() < 2 {
-        return Err("Invalid GitHub URL — expected https://github.com/owner/repo".to_string());
-    }
-    let owner = parts[parts.len() - 2];
-    let repo = parts[parts.len() - 1];
+    let (owner, repo) = parse_github_owner_repo(repo_url)?;
 
     let body = serde_json::json!({
         "query": "query($owner:String!,$repo:String!){ repository(owner:$owner,name:$repo){ pullRequests(states:[OPEN],first:20,orderBy:{field:UPDATED_AT,direction:ASC}){ nodes{ number title updatedAt isDraft labels(first:5){ nodes{ name } } } } issues(states:[OPEN],first:30){ nodes{ number title labels(first:5){ nodes{ name } } } } } }",
@@ -1443,7 +1442,7 @@ async fn fetch_github_issues(token: String, repo_url: String) -> Result<Vec<Gith
     let (owner, repo) = parse_github_owner_repo(&repo_url)?;
 
     let body = serde_json::json!({
-        "query": "query($owner:String!,$repo:String!){ repository(owner:$owner,name:$repo){ issues(first:50,orderBy:{field:UPDATED_AT,direction:DESC}){ nodes{ id number title body state createdAt updatedAt url author{login} labels(first:10){ nodes{ name } } } } } }",
+        "query": "query($owner:String!,$repo:String!){ repository(owner:$owner,name:$repo){ issues(first:50,states:[OPEN,CLOSED],orderBy:{field:UPDATED_AT,direction:DESC}){ nodes{ id number title body state createdAt updatedAt url author{login} labels(first:10){ nodes{ name } } } } } }",
         "variables": { "owner": owner, "repo": repo }
     });
 

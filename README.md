@@ -100,6 +100,7 @@ npm run tauri build           # 打包成 .app / .exe
 - `npm run typecheck`
 - `npm run build`
 - `npm run docs:check`
+- `npm run docs:site:check`
 - `npm run standards:check`
 - `npm audit --omit=dev`
 
@@ -109,6 +110,8 @@ npm run tauri build           # 打包成 .app / .exe
 - [File Naming Standards](./docs/file-naming-standards.md): Project Manager/SayDo 對齊後的檔案命名與歸檔規則。
 - [Product Docs](./docs/product/README.md): 產品文件入口。
 - [Engineering Docs](./docs/engineering/README.md): runtime bridge、storage/schema、ingestion、security、verification runbooks。
+- [Document Classification Standard](./docs/engineering/document-classification-standard.md): public/internal/restricted 文件分類與對外發布 gate。
+- [Documentation Site Sync](./docs/engineering/documentation-site-sync.md): `/documentation` 靜態網站如何從 `docs/` 產生 folder/document pages。
 - [Technical Documentation Audit](./docs/engineering/technical-documentation-audit.md): 目前文件缺口、已補文件與下一批建議。
 - [ADR Index](./docs/architecture/README.md): 已接受的架構決策。
 

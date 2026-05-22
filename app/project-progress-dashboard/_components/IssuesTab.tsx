@@ -6,6 +6,7 @@ import {
   CheckCircle,
   ExternalLink,
   GitPullRequest,
+  KeyRound,
   MessageSquarePlus,
   Pencil,
   Plus,
@@ -26,6 +27,8 @@ import {
   updateGithubIssue,
   type GithubIssueCommentPayload,
 } from '../../../lib/bridge';
+import { PROVIDERS } from '../../../lib/keys/registry';
+import { OAuthDeviceModal } from '../../ui/views/_components/OAuthDeviceModal';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -79,6 +82,7 @@ interface RepoSyncState {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const CACHE_PREFIX = 'pm-issues-';
+const GITHUB_PROVIDER = PROVIDERS.find((provider) => provider.id === 'github') ?? null;
 
 function isTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -139,6 +143,38 @@ function extractAllLabels(issues: GithubIssue[]): string[] {
   return Array.from(set).sort();
 }
 
+function describeGithubIssueError(reason: string, repoName?: string): string {
+  const target = repoName ? `${repoName}: ` : '';
+  const low = reason.toLowerCase();
+
+  if (low.includes('github token not configured') || low.includes('authorization is required')) {
+    return `${target}GitHub authorization is required before Project Manager can sync issues.`;
+  }
+  if (
+    low.includes('could not resolve to a repository')
+    || low.includes('not found')
+    || low.includes('github api 404')
+  ) {
+    return `${target}Repository could not be reached. Check the project GitHub URL, or authorize a GitHub account that can access this repository.`;
+  }
+  if (low.includes('bad credentials') || low.includes('unauthorized') || low.includes('github api 401')) {
+    return `${target}GitHub authorization is invalid or expired. Re-authorize GitHub, then sync again.`;
+  }
+  if (
+    low.includes('resource not accessible')
+    || low.includes('insufficient')
+    || low.includes('scope')
+    || low.includes('github api 403')
+  ) {
+    return `${target}GitHub authorization does not have enough repository or issue permission. Re-authorize with repo access, then sync again.`;
+  }
+  if (low.includes('rate limit')) {
+    return `${target}GitHub rate limit was reached. Wait before syncing again, or use a token with a higher allowance.`;
+  }
+
+  return `${target}${reason}`;
+}
+
 // ── Browser mode sync (proxies through Next.js API route) ─────────────────────
 
 async function browserSyncIssues(repoUrl: string): Promise<GithubIssue[]> {
@@ -184,15 +220,16 @@ export function IssuesTab({
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsError, setCommentsError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [oauthOpen, setOauthOpen] = useState(false);
 
   const initialized = useRef(false);
-  const effectiveRepoUrl = (repoUrl ?? '').trim() || 'https://github.com/jason66x/Project-Manager';
+  const effectiveRepoUrl = (repoUrl ?? '').trim();
   const repoTargets = useMemo<RepoTarget[]>(() => {
     const fromSelected = selectedProjects
       .map((project) => {
         const url = (project.repoUrl ?? '').trim();
         if (!url) return null;
-        const segments = url.replace(/\/+$/, '').split('/');
+        const segments = url.replace(/\/+$/, '').replace(/\.git$/, '').split('/');
         return {
           repoUrl: url,
           projectName: project.name,
@@ -209,7 +246,9 @@ export function IssuesTab({
       return Array.from(byRepo.values());
     }
 
-    const fallbackSegments = effectiveRepoUrl.replace(/\/+$/, '').split('/');
+    if (!effectiveRepoUrl) return [];
+
+    const fallbackSegments = effectiveRepoUrl.replace(/\/+$/, '').replace(/\.git$/, '').split('/');
     return [{
       repoUrl: effectiveRepoUrl,
       projectName,
@@ -265,6 +304,9 @@ export function IssuesTab({
     setLoading(true);
     setError(null);
     try {
+      if (repoTargets.length === 0) {
+        throw new Error('No GitHub repository URL is configured for the selected project.');
+      }
       let token = '';
       if (isTauri()) {
         token = await getGithubToken();
@@ -323,12 +365,13 @@ export function IssuesTab({
           const reason = result.reason instanceof Error ? result.reason.message : String(result.reason);
           const failedRepo = repoTargets[idx];
           if (failedRepo) {
+            const friendlyReason = describeGithubIssueError(reason, failedRepo.repoName);
             nextRepoState[failedRepo.repoUrl] = {
               loading: false,
-              error: reason,
+              error: friendlyReason,
               syncedAt: repoSyncState[failedRepo.repoUrl]?.syncedAt ?? null,
             };
-            errors.push(`${failedRepo.repoName}: ${reason}`);
+            errors.push(friendlyReason);
           }
         }
       });
@@ -341,13 +384,14 @@ export function IssuesTab({
         setError(`Some repositories failed to sync. ${errors.join(' | ')}`);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Sync failed');
+      const reason = e instanceof Error ? e.message : 'Sync failed';
+      setError(describeGithubIssueError(reason));
       setRepoSyncState((prev) => {
         const next = { ...prev };
         repoTargets.forEach((repo) => {
           next[repo.repoUrl] = {
             loading: false,
-            error: e instanceof Error ? e.message : 'Sync failed',
+            error: describeGithubIssueError(reason, repo.repoName),
             syncedAt: prev[repo.repoUrl]?.syncedAt ?? null,
           };
         });
@@ -404,9 +448,28 @@ export function IssuesTab({
 
   const handleRowClick = useCallback((issue: DetailIssue) => {
     setDetailIssue((prev) =>
-      prev?.number === issue.number ? null : issue,
+      prev?.number === issue.number && prev.repoUrl === issue.repoUrl ? null : issue,
     );
   }, []);
+
+  const handleOAuthAuthorized = useCallback(() => {
+    setOauthOpen(false);
+    setHasToken(true);
+    setError(null);
+    setActionNotice('GitHub authorized. Sync issues to refresh repository state.');
+  }, []);
+
+  const handleSyncAction = useCallback(() => {
+    if (hasToken === false) {
+      if (isTauri() && GITHUB_PROVIDER) {
+        setOauthOpen(true);
+      } else {
+        setError('GitHub token not configured. Add GITHUB_TOKEN in browser development mode, or use the desktop app to authorize GitHub.');
+      }
+      return;
+    }
+    void onSync();
+  }, [hasToken, onSync]);
 
   useEffect(() => {
     if (!detailIssue) return;
@@ -486,6 +549,10 @@ export function IssuesTab({
     const title = createTitle.trim();
     if (!title) return;
     const targetRepo = createRepoUrl || repoTargets[0]?.repoUrl || effectiveRepoUrl;
+    if (!targetRepo) {
+      setError('No GitHub repository URL is configured for the selected project.');
+      return;
+    }
     setMutating(true);
     setError(null);
     setActionNotice(null);
@@ -661,7 +728,8 @@ export function IssuesTab({
 
   // ── Render ───────────────────────────────────────────────────────────
 
-  const syncDisabled = loading || hasToken === false;
+  const syncDisabled = loading || repoTargets.length === 0;
+  const syncLabel = hasToken === false ? 'Authorize GitHub' : loading ? 'Syncing...' : 'Sync Issues from GitHub';
 
   return (
     <div className="flex flex-col gap-3">
@@ -694,13 +762,23 @@ export function IssuesTab({
         })}
       </div>
 
+      {repoTargets.length === 0 && (
+        <div className="flex items-center gap-2 rounded border border-amber-200/20 bg-amber-500/10 px-3 py-2">
+          <AlertCircle className="h-4 w-4 flex-shrink-0 text-amber-300" />
+          <p className="text-xs text-amber-100">
+            No GitHub repository URL is configured for the selected project. Add the repo URL in Projects before syncing issues.
+          </p>
+        </div>
+      )}
+
       <div className="rounded border border-stone-200/15 bg-[rgb(var(--pm-card))]/70 p-3">
         <div className="mb-2 flex items-center justify-between gap-2">
           <p className="text-xs font-medium uppercase tracking-[0.08em] text-stone-300">Issue Actions</p>
           <button
             type="button"
             onClick={() => setCreateOpen((v) => !v)}
-            className="flex items-center gap-1 rounded bg-emerald-600/25 px-2.5 py-1.5 text-[11px] text-emerald-100 hover:bg-emerald-600/35"
+            disabled={repoTargets.length === 0}
+            className="flex items-center gap-1 rounded bg-emerald-600/25 px-2.5 py-1.5 text-[11px] text-emerald-100 hover:bg-emerald-600/35 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Plus className="h-3.5 w-3.5" />
             {createOpen ? 'Hide Create' : 'Create Issue'}
@@ -863,9 +941,9 @@ export function IssuesTab({
         {/* Sync button */}
         <button
           type="button"
-          onClick={onSync}
+          onClick={handleSyncAction}
           disabled={syncDisabled}
-          title={hasToken === false ? 'Configure GitHub token in Keys view → Sync Issues' : 'Sync Issues from GitHub'}
+          title={hasToken === false ? 'Authorize GitHub before syncing issues' : 'Sync Issues from GitHub'}
           className={clsx(
             'flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition-colors',
             syncDisabled
@@ -873,18 +951,31 @@ export function IssuesTab({
               : 'bg-sky-600/30 text-sky-100 hover:bg-sky-600/40',
           )}
         >
-          <RefreshCw className={clsx('h-3.5 w-3.5', loading && 'animate-spin')} />
-          {loading ? 'Syncing…' : 'Sync Issues from GitHub'}
+          {hasToken === false ? (
+            <KeyRound className="h-3.5 w-3.5" />
+          ) : (
+            <RefreshCw className={clsx('h-3.5 w-3.5', loading && 'animate-spin')} />
+          )}
+          {syncLabel}
         </button>
       </div>
 
       {/* No-token guidance */}
-      {hasToken === false && issues.length === 0 && (
+      {hasToken === false && (
         <div className="flex items-center gap-2 rounded border border-amber-200/20 bg-amber-500/10 px-3 py-2">
-          <AlertCircle className="h-4 w-4 text-amber-300 flex-shrink-0" />
+          <KeyRound className="h-4 w-4 flex-shrink-0 text-amber-300" />
           <p className="text-xs text-amber-100">
-            Configure GitHub token in Keys view → Sync Issues.
+            Authorize GitHub before syncing. Project Manager needs repo access to read issues, and issue write access when you create comments or close issues.
           </p>
+          {isTauri() && GITHUB_PROVIDER && (
+            <button
+              type="button"
+              onClick={() => setOauthOpen(true)}
+              className="ml-auto rounded border border-amber-200/25 px-2 py-1 text-[11px] text-amber-100 hover:bg-amber-200/10"
+            >
+              Authorize
+            </button>
+          )}
         </div>
       )}
 
@@ -919,15 +1010,15 @@ export function IssuesTab({
       )}
 
       {/* Content area: table + detail panel */}
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-3 xl:flex-row">
         {/* Issues table */}
-        <div className={clsx('min-w-0', detailIssue ? 'flex-1' : 'w-full')}>
+        <div className={clsx('min-w-0', detailIssue ? 'w-full xl:flex-1' : 'w-full')}>
           {issues.length === 0 && !loading ? (
             <div className="flex flex-col items-center justify-center rounded border border-dashed border-stone-200/15 py-12">
               <GitPullRequest className="h-8 w-8 text-stone-400 mb-2" />
               <p className="text-sm text-stone-400">
                 {hasToken === false
-                  ? 'Configure your GitHub token to sync issues'
+                  ? 'Authorize GitHub to sync issues'
                   : 'No issues synced yet. Click "Sync Issues from GitHub" to begin.'}
               </p>
             </div>
@@ -951,7 +1042,7 @@ export function IssuesTab({
 
         {/* Detail panel */}
         {detailIssue && (
-          <div className="w-80 flex-shrink-0 rounded border border-stone-200/15 bg-[rgb(var(--pm-card))]/70 p-3 overflow-y-auto max-h-[60vh]">
+          <div className="w-full flex-shrink-0 rounded border border-stone-200/15 bg-[rgb(var(--pm-card))]/70 p-3 max-h-[50vh] overflow-y-auto xl:w-[24rem] xl:max-h-[60vh]">
             <div className="flex items-start justify-between mb-2">
               <div className="flex items-center gap-1.5">
                 <StatusBadge state={detailIssue.state} />
@@ -1110,6 +1201,13 @@ export function IssuesTab({
           </div>
         )}
       </div>
+      {oauthOpen && GITHUB_PROVIDER && (
+        <OAuthDeviceModal
+          provider={GITHUB_PROVIDER}
+          onClose={() => setOauthOpen(false)}
+          onAuthorized={handleOAuthAuthorized}
+        />
+      )}
     </div>
   );
 }
@@ -1182,7 +1280,7 @@ function IssuesTable({
 }: IssuesTableProps) {
   return (
     <div className="relative max-h-[55vh] overflow-auto border border-stone-200/15 bg-[rgb(var(--pm-rail))]/70">
-      <table className="w-full border-collapse text-left">
+      <table className="min-w-[820px] w-full border-collapse text-left">
         <thead className="sticky top-0 z-10 bg-[rgb(var(--pm-rail))]">
           <tr>
             <TH className="w-10">Sel</TH>
@@ -1210,6 +1308,7 @@ function IssuesTable({
               <TD>
                 <input
                   type="checkbox"
+                  aria-label={`Select issue #${issue.number}`}
                   checked={selectedIssueKeys.includes(`${issue.repoUrl}#${issue.number}`)}
                   onChange={(e) => {
                     e.stopPropagation();

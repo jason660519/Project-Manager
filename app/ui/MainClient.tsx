@@ -44,7 +44,6 @@ import { EnvImportModal } from './views/_components/EnvImportModal';
 import { parseEnvText } from '../../lib/keys/envParser';
 import { detectProviders } from '../../lib/keys/detectProviders';
 import { SettingsView } from './views/SettingsView';
-import { DocumentationView } from './views/DocumentationView';
 import { ChatPageClient } from '../chat/ChatPageClient';
 
 type BridgeFileNode = {
@@ -1088,7 +1087,6 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
       )}
       {currentView === 'keys' && <KeysView />}
       {currentView === 'settings' && <SettingsView />}
-      {currentView === 'documentation' && <DocumentationView />}
       {currentView === 'chat' && (
         <ChatPageClient
           initialChatContext={{

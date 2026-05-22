@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 43187",
+    "prebuild": "npm run docs:site:sync",
     "build": "next build",
     "start": "next start",
     "typecheck": "next typegen && tsc --noEmit",
@@ -15,6 +16,9 @@
     "docs:check": "./scripts/docs-governance-check.sh",
     "docs:fix": "./scripts/docs-governance-fix.sh",
     "docs:archive": "bash -lc './scripts/docs-governance-fix.sh . archive \"$npm_config_file\"'",
+    "docs:site:sync": "node scripts/sync-documentation-site.mjs",
+    "docs:site:check": "node scripts/sync-documentation-site.mjs --check",
+    "docs:site:watch": "node scripts/sync-documentation-site.mjs --watch",
     "hermes": "bash scripts/hermes-agent.sh",
     "hermes:install": "bash scripts/install-hermes-agent.sh",
     "hermes:doctor": "bash scripts/hermes-agent.sh doctor",

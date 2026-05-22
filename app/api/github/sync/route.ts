@@ -49,7 +49,8 @@ export async function POST(request: NextRequest) {
   }
 
   // Parse owner/repo from the URL
-  const parts = body.repoUrl.replace(/\/+$/, '').split('/');
+  const normalizedRepoUrl = body.repoUrl.trim().replace(/\/+$/, '').replace(/\.git$/, '');
+  const parts = normalizedRepoUrl.split('/');
   if (parts.length < 2) {
     return NextResponse.json(
       { error: `Invalid GitHub URL: ${body.repoUrl}` },

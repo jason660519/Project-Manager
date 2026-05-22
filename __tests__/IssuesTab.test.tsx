@@ -6,15 +6,37 @@ import type { GithubIssue } from '../lib/types';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-// Mock `__TAURI_INTERNALS__` to be absent so we're in browser mode for tests
-vi.stubGlobal('__TAURI_INTERNALS__', undefined);
+// Keep a stubbed Tauri global so command-path code can be tested consistently.
+vi.stubGlobal('__TAURI_INTERNALS__', {});
 
 const mockGetGithubToken = vi.fn().mockResolvedValue('');
 const mockFetchGithubIssues = vi.fn();
+const mockFetchGithubIssueComments = vi.fn().mockResolvedValue([]);
+const mockCommentGithubIssue = vi.fn();
+const mockCloseGithubIssueWithComment = vi.fn();
+const mockReopenGithubIssueWithComment = vi.fn();
+const mockCreateGithubIssue = vi.fn();
+const mockUpdateGithubIssue = vi.fn();
+const mockGithubOAuthDeviceStart = vi.fn();
+const mockGithubOAuthDevicePoll = vi.fn();
+const mockGetSecretsStorageBackend = vi.fn();
+const mockGetSecret = vi.fn();
+const mockSetSecret = vi.fn();
 
 vi.mock('../lib/bridge', () => ({
   getGithubToken: (...args: any[]) => mockGetGithubToken(...args),
   fetchGithubIssues: (...args: any[]) => mockFetchGithubIssues(...args),
+  fetchGithubIssueComments: (...args: any[]) => mockFetchGithubIssueComments(...args),
+  commentGithubIssue: (...args: any[]) => mockCommentGithubIssue(...args),
+  closeGithubIssueWithComment: (...args: any[]) => mockCloseGithubIssueWithComment(...args),
+  reopenGithubIssueWithComment: (...args: any[]) => mockReopenGithubIssueWithComment(...args),
+  createGithubIssue: (...args: any[]) => mockCreateGithubIssue(...args),
+  updateGithubIssue: (...args: any[]) => mockUpdateGithubIssue(...args),
+  githubOAuthDeviceStart: (...args: any[]) => mockGithubOAuthDeviceStart(...args),
+  githubOAuthDevicePoll: (...args: any[]) => mockGithubOAuthDevicePoll(...args),
+  getSecretsStorageBackend: (...args: any[]) => mockGetSecretsStorageBackend(...args),
+  getSecret: (...args: any[]) => mockGetSecret(...args),
+  setSecret: (...args: any[]) => mockSetSecret(...args),
 }));
 
 // Mock global fetch for browser-mode API calls
@@ -92,14 +114,47 @@ function seedCache(issues: GithubIssue[], projectName = 'Test Project'): void {
   window.localStorage.setItem(key, JSON.stringify({ issues, syncedAt: Date.now() }));
 }
 
+function mockSyncIssue(issue: GithubIssue): any {
+  return {
+    id: issue.id,
+    number: issue.number,
+    title: issue.title,
+    body: issue.body,
+    state: issue.state,
+    labels: issue.labels,
+    createdAt: issue.createdAt,
+    updatedAt: issue.updatedAt,
+    url: issue.url,
+    user: issue.user,
+  };
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('IssuesTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
-    mockGetGithubToken.mockResolvedValue('');
+    mockGetGithubToken.mockResolvedValue('test-token');
     mockFetch.mockReset();
+    mockFetchGithubIssues.mockReset();
+    mockFetchGithubIssueComments.mockResolvedValue([]);
+    mockCommentGithubIssue.mockResolvedValue(OPEN_ISSUE);
+    mockCloseGithubIssueWithComment.mockResolvedValue({ ...OPEN_ISSUE, state: 'closed' });
+    mockReopenGithubIssueWithComment.mockResolvedValue({ ...CLOSED_ISSUE, state: 'open' });
+    mockCreateGithubIssue.mockResolvedValue({ ...OPEN_ISSUE, number: 99, id: 99 });
+    mockUpdateGithubIssue.mockResolvedValue(OPEN_ISSUE);
+    mockGithubOAuthDeviceStart.mockResolvedValue({
+      deviceCode: 'device-1',
+      userCode: 'ABCD-1234',
+      verificationUri: 'https://github.com/login/device',
+      expiresIn: 900,
+      interval: 30,
+    });
+    mockGithubOAuthDevicePoll.mockResolvedValue({ status: 'pending' });
+    mockGetSecretsStorageBackend.mockResolvedValue('dev-file');
+    mockGetSecret.mockResolvedValue(null);
+    mockSetSecret.mockResolvedValue(undefined);
   });
 
   // T1 — IssuesTab renders sync button when no cached issues
@@ -218,12 +273,24 @@ describe('IssuesTab', () => {
     renderIssuesTab();
 
     await waitFor(() => {
-      expect(screen.getByText(/Configure GitHub token/)).toBeInTheDocument();
+      expect(screen.getByText(/Authorize GitHub before syncing/)).toBeInTheDocument();
     });
 
-    // Sync button should be rendered. It may be disabled due to no token.
-    const syncButton = screen.getByText('Sync Issues from GitHub');
+    const syncButton = screen.getByText('Authorize GitHub');
     expect(syncButton).toBeInTheDocument();
+  });
+
+  it('opens GitHub authorization when sync is clicked without a token', async () => {
+    mockGetGithubToken.mockResolvedValue('');
+    renderIssuesTab();
+
+    await waitFor(() => expect(screen.getByText('Authorize GitHub')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('Authorize GitHub'));
+
+    await waitFor(() => {
+      expect(mockGithubOAuthDeviceStart).toHaveBeenCalledWith(['repo', 'read:user']);
+      expect(screen.getByText(/Sign in to GitHub Personal Access Token/)).toBeInTheDocument();
+    });
   });
 
   // T8 — Row click opens detail panel
@@ -241,6 +308,115 @@ describe('IssuesTab', () => {
     // Detail should show issue body
     await waitFor(() => {
       expect(screen.getAllByText(/The login page is broken/).length).toBeGreaterThan(0);
+    });
+  });
+
+  it('syncs selected repositories and shows per-project counts', async () => {
+    mockFetchGithubIssues
+      .mockResolvedValueOnce([mockSyncIssue(OPEN_ISSUE)])
+      .mockResolvedValueOnce([mockSyncIssue(CLOSED_ISSUE)]);
+
+    renderIssuesTab({
+      selectedProjects: [
+        { id: 'p1', name: 'Alpha', repoUrl: 'https://github.com/org/repo-one' },
+        { id: 'p2', name: 'Beta', repoUrl: 'https://github.com/org/repo-two' },
+      ],
+      selectedProjectNames: ['Alpha', 'Beta'],
+    });
+
+    fireEvent.click(screen.getByText('Sync Issues from GitHub'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Open 1 · Closed 0 · Total 1')).toBeInTheDocument();
+      expect(screen.getByText('Open 0 · Closed 1 · Total 1')).toBeInTheDocument();
+      expect(screen.getByText('Fix login')).toBeInTheDocument();
+      expect(screen.getByText('Add dark mode')).toBeInTheDocument();
+    });
+  });
+
+  it('explains repository lookup failures as URL or authorization problems', async () => {
+    mockFetchGithubIssues.mockRejectedValueOnce(
+      new Error("GitHub GraphQL: Could not resolve to a Repository with the name 'owner/repo'."),
+    );
+
+    renderIssuesTab();
+    fireEvent.click(screen.getByText('Sync Issues from GitHub'));
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Repository could not be reached/).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/Check the project GitHub URL/).length).toBeGreaterThan(0);
+    });
+  });
+
+  it('blocks sync when the selected project has no GitHub repository URL', async () => {
+    renderIssuesTab({
+      selectedProjectNames: [],
+      selectedProjects: [],
+      repoUrl: undefined,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/No GitHub repository URL is configured/)).toBeInTheDocument();
+    });
+    expect(screen.getByText('Sync Issues from GitHub')).toBeDisabled();
+  });
+
+  it('bulk comment applies to selected visible issues', async () => {
+    seedCache([OPEN_ISSUE, ANOTHER_OPEN_ISSUE]);
+    renderIssuesTab();
+
+    await waitFor(() => expect(screen.getByText('#1')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('Select visible'));
+    fireEvent.change(screen.getByPlaceholderText('Bulk comment for selected issues'), {
+      target: { value: 'batch review note' },
+    });
+    await waitFor(() => expect(screen.getByText(/Selected issues:/).textContent).toContain('2'));
+    fireEvent.click(screen.getByText('Add Comment to Selected'));
+
+    await waitFor(() => {
+      expect(mockCommentGithubIssue).toHaveBeenCalledTimes(2);
+      expect(screen.getByText('Added comment to 2 issue(s).')).toBeInTheDocument();
+    });
+  });
+
+  it('reopen button is enabled for closed issue in detail', async () => {
+    seedCache([CLOSED_ISSUE]);
+    renderIssuesTab();
+
+    await waitFor(() => expect(screen.getByText('#2')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('#2'));
+
+    await waitFor(() => {
+      const reopenButton = screen.getByText('Reopen');
+      const closeButton = screen.getByText('Close with Comment');
+      expect(reopenButton).not.toBeDisabled();
+      expect(closeButton).toBeDisabled();
+    });
+  });
+
+  it('loads and displays review timeline comments for selected issue', async () => {
+    mockFetchGithubIssueComments.mockResolvedValueOnce([
+      {
+        id: 999,
+        body: 'Looks good, ship it.',
+        createdAt: new Date(Date.now() - 5000).toISOString(),
+        updatedAt: new Date(Date.now() - 2000).toISOString(),
+        url: 'https://github.com/owner/repo/issues/1#issuecomment-999',
+        user: 'reviewer-bot',
+      },
+    ]);
+
+    seedCache([OPEN_ISSUE]);
+    renderIssuesTab();
+
+    await waitFor(() => expect(screen.getByText('#1')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('#1'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Review Timeline')).toBeInTheDocument();
+      expect(screen.getByText(/Looks good, ship it/)).toBeInTheDocument();
+      expect(screen.getByText(/reviewer-bot/)).toBeInTheDocument();
     });
   });
 });

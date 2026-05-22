@@ -35,6 +35,99 @@
 
 任何**缺少 feature ID 對齊**的 dev log 在 dashboard 上會變成「孤兒」，無法被自動 reflect。**寫日誌時請先決定 affected feature IDs。**
 
+## Artifact 標準格式
+
+每個 feature folder（`.project-manager/features/<ID>/`）包含四個標準文件。建立新 feature 或更新既有 artifact 時，遵循以下格式。
+
+### README.md
+
+```
+# F0X — Feature Name
+
+**Status**: todo | in_progress | done | on_hold  | **Progress**: 0–100%
+**Category**: 簡短分類（例：Frontend/UX、Backend/API、Infra）
+**Phase**: development | e2e_testing | deployment | operations
+
+## Summary
+
+2–3 句話說明這個 feature 的目標與範圍。
+
+## Completed Work
+
+- 條列已完成的具體工作（未開始時省略此段）
+
+## Related Files
+
+- `path/to/file` — 用途說明
+```
+
+Status 必填；Phase 若未設定預設 `development`。
+
+---
+
+### feature-spec.md
+
+必須包含以下段落（順序可調，但不得省略）：
+
+| 段落 | 說明 |
+|---|---|
+| `## Summary` | 一段話說清楚這個 feature 解決什麼問題、為誰解決 |
+| `## User Stories` | 表格格式：`\| ID \| Story \|`；以「As a user, I want… so that…」寫；每個核心使用場景一行 |
+| `## UI Mockup / Structure` | ASCII wireframe 或結構描述；哪怕簡單的 box diagram 也必須有 |
+| `## Acceptance Criteria` | 每條 `### AC-XX: 標題`，內含 `- [ ]` checkboxes，描述可在 UI 驗證的行為 |
+| `## Dependencies` | 受影響的 files、types、external systems；若無則寫「None」 |
+| `## Out of Scope` | 明確排除哪些需求，防止 scope creep |
+
+AC checkboxes 是「做完」的定義：某條 AC 的所有 checkboxes 打勾 → 該 AC 完成。
+
+---
+
+### tdd-spec.md
+
+必須包含以下段落：
+
+| 段落 | 說明 |
+|---|---|
+| `## Test Target` | 主要被測的 component 或 module（含路徑） |
+| `## Testing Stack` | 例：`Vitest + React Testing Library + @testing-library/user-event`；明確列出，不假設 |
+| `## Shared Fixtures` | 最小可用的測試資料集；每個 fixture 說明它代表哪種場景（正常路徑、邊界、空值） |
+| `## Suite A / Suite B / …` | 按功能或 AC 分 suite；每個 case 有編號（`A1`、`A2`）並以 prose 描述 setup → action → assert |
+| `## Required Verification` | 通過的指令，例：`npm test -- --run`、`npm run typecheck` |
+
+Suites 盡量對應 feature-spec 的 AC：AC-01 → Suite A，AC-02 → Suite B，以此類推。
+
+---
+
+### dev-log.md（feature-level）
+
+此檔為累積施工記錄，**每次有實質更新時 append**，不覆寫歷史。
+
+檔頭放 `## Current State` 段落，每次更新後同步刷新；其餘用日期 block append：
+
+```markdown
+## Current State
+
+（目前整體狀態一段話，每次更新後刷新）
+
+## YYYY-MM-DD
+
+- 完成事項（條列，含檔案路徑）
+- 技術決策（有 ADR 則加連結）
+- 驗證結果：`npm test -- --run ✓` / `npm run typecheck ✓`
+```
+
+---
+
+### notes.md
+
+自由格式 Markdown，無結構限制、無長度限制。用於任何不適合放進其他 artifact 的備忘、觀察、設計考量或待辦碎片。
+
+- 可以是條列、段落、表格，任何 Markdown 語法均可
+- `config.json` 的 `notes` 欄位指向此檔路徑：`.project-manager/features/<ID>/notes.md`
+- 若該 feature 暫無需要記錄的內容，可省略此檔（`notes` 欄位留空字串）
+
+---
+
 ## 完整流程（依序執行）
 
 ### 步驟一：掃描今日工作內容
@@ -75,7 +168,7 @@ Project Manager dashboard 顯示優先序：
 | `readmePath` | `.project-manager/features/<ID>/README.md`，dashboard README 欄位的唯一標準指標 |
 | `paths.developmentLogSummaryFolder` | `.project-manager/features/<ID>/`，dashboard 會固定連到該資料夾下的 `dev-log.md` |
 | `paths.spec` / `tdd` / `implementation` | 對應交付物路徑；標準檔名優先用 `feature-spec.md` / `tdd-spec.md` |
-| `notes` | 今日完成摘要（一句話）；不可存 README 或其他檔案路徑 |
+| `notes` | `.project-manager/features/<ID>/notes.md` 的路徑；內容為自由格式 Markdown，無長度限制 |
 | `updatedAt` | 今日 ISO 8601 timestamp（schema v2，ADR-006） |
 | `updatedBy` | 執行者標識（預設 `claude`） |
 

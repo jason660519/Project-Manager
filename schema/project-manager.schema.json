@@ -193,7 +193,7 @@
             "implementation": { "type": "string", "description": "Implementation code path" }
           }
         },
-        "notes": { "type": "string", "description": "Short human-authored note or summary. Do not store file paths here." },
+        "notes": { "type": "string", "description": "Path to .project-manager/features/<ID>/notes.md. Free-form markdown; leave as empty string if no notes file exists." },
         "readmePath": { "type": "string", "description": "Relative path to the feature overview README (e.g. .project-manager/features/F01/README.md)." },
         "createdAt": {
           "type": "string",

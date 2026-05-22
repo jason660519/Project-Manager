@@ -43,8 +43,8 @@ Full diagram: [`docs/architecture/architecture-overview.md`](docs/architecture/a
 
 - **Design system**: read [`DESIGN.md`](DESIGN.md) and [`docs/design/shared-ai-desktop-style.md`](docs/design/shared-ai-desktop-style.md) before UI changes. Keep the PM rail, dense dashboard layout, semantic status badges, and guarded-execution UX intact.
 - **Table governance**: read [`docs/engineering/table-standards.md`](docs/engineering/table-standards.md) before creating or changing any data-heavy view.
-- **Feature folders**: every feature has a canonical folder at `.project-manager/features/<ID>/`. `readmePath` points to that folder's `README.md`; `notes` is short human text only and must never be a path. Use `feature-spec.md`, `tdd-spec.md`, and `dev-log.md` for the standard dashboard artifacts.
-- **Dashboard document links**: path columns render fixed labels only (`README.md`, `feature-spec.md`, `tdd-spec.md`, `dev-log.md`). Markdown artifacts open in the right-side document panel; raw paths belong in tooltips and config only.
+- **Feature folders**: every feature has a canonical folder at `.project-manager/features/<ID>/`. `readmePath` points to that folder's `README.md`; `notes` in config.json is a path to that folder's `notes.md` (free-form markdown, no length restriction). Standard dashboard artifacts: `README.md`, `feature-spec.md`, `tdd-spec.md`, `dev-log.md`, `notes.md`.
+- **Dashboard document links**: path columns render fixed labels only (`README.md`, `feature-spec.md`, `tdd-spec.md`, `dev-log.md`, `notes.md`). Markdown artifacts open in the right-side document panel; raw paths belong in tooltips and config only.
 - **Static export**: Next.js produces a static bundle for Tauri. `app/api/` only runs under `next dev`. Anything that must exist in the shipped app belongs in Rust.
 - **Bridge discipline**: never call `invoke()` directly from a component. Add a typed wrapper in `lib/bridge/index.ts`.
 - **Anthropic API key never reaches the renderer** (ADR-004). Always proxy through `call_anthropic` in Rust; release storage uses `keyring` (Keychain). Debug builds may use `dev_secrets` file — never commit that file.

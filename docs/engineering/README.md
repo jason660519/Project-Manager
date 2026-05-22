@@ -20,9 +20,11 @@ This folder contains operational engineering documentation for Project Manager. 
 4. [ingestion-pipeline.md](./ingestion-pipeline.md)
 5. [security-and-secrets.md](./security-and-secrets.md)
 6. [table-standards.md](./table-standards.md)
-7. [hermes-agent-plugin.md](./hermes-agent-plugin.md)
-8. [openclaw-plugin.md](./openclaw-plugin.md)
-9. [verification-runbook.md](./verification-runbook.md)
+7. [document-classification-standard.md](./document-classification-standard.md)
+8. [documentation-site-sync.md](./documentation-site-sync.md)
+9. [hermes-agent-plugin.md](./hermes-agent-plugin.md)
+10. [openclaw-plugin.md](./openclaw-plugin.md)
+11. [verification-runbook.md](./verification-runbook.md)
 
 ## 3. Ownership Map
 
@@ -33,6 +35,8 @@ This folder contains operational engineering documentation for Project Manager. 
 | Markdown import and AI-assisted spec import | `lib/ingestion/*`, `app/ui/views/IngestionView.tsx` | [ingestion-pipeline.md](./ingestion-pipeline.md) |
 | API keys, provider keys, GitHub token, API call boundary | `lib/storage/plugins.ts`, `lib/bridge/index.ts`, `src-tauri/src/lib.rs`, `app/api/anthropic/route.ts` | [security-and-secrets.md](./security-and-secrets.md) |
 | Table interaction, label contracts, sorting behavior, dashboard document-link cells, workstation viewport rules | `app/project-progress-dashboard/_components/PhaseTable.tsx`, `app/project-progress-dashboard/_lib/columns.tsx`, `app/project-progress-dashboard/_lib/pathLinks.tsx`, `app/ui/views/Plugins/PluginsHubView.tsx`, `app/ui/views/Plugins/_shared/IntegrationsTable.tsx`, `components/table/TableCore.tsx` | [table-standards.md](./table-standards.md) |
+| Document classification, public/internal/restricted gates, and public publish policy | `scripts/sync-documentation-site.mjs`, `docs/**/*.md` frontmatter | [document-classification-standard.md](./document-classification-standard.md) |
+| Static documentation website sync, generated routes, and publication classification metadata | `scripts/sync-documentation-site.mjs`, `lib/generated/documentation-site-internal.ts`, `lib/generated/documentation-site-public.ts`, `app/documentation/[[...slug]]/page.tsx`, `app/ui/views/DocumentationView.tsx` | [documentation-site-sync.md](./documentation-site-sync.md) |
 | Project-scoped Hermes Agent install and plugin toggle | `scripts/install-hermes-agent.sh`, `scripts/hermes-agent.sh`, `.project-manager/vendor/hermes-agent/`, `lib/storage/plugins.ts` | [hermes-agent-plugin.md](./hermes-agent-plugin.md) |
 | Project-scoped OpenClaw install, gateway, update, rollback, and plugin toggle | `scripts/install-openclaw.sh`, `scripts/openclaw.sh`, `scripts/update-openclaw.sh`, `scripts/rollback-openclaw.sh`, `.project-manager/vendor/openclaw/`, `lib/storage/plugins.ts` | [openclaw-plugin.md](./openclaw-plugin.md) |
 | Pre-handoff checks and release verification | `package.json`, `scripts/*`, `src-tauri/Cargo.toml` | [verification-runbook.md](./verification-runbook.md) |
@@ -57,9 +61,11 @@ Update the relevant document whenever an implementation change changes a command
 4. [ingestion-pipeline.md](./ingestion-pipeline.md)
 5. [security-and-secrets.md](./security-and-secrets.md)
 6. [table-standards.md](./table-standards.md)
-7. [hermes-agent-plugin.md](./hermes-agent-plugin.md)
-8. [openclaw-plugin.md](./openclaw-plugin.md)
-9. [verification-runbook.md](./verification-runbook.md)
+7. [document-classification-standard.md](./document-classification-standard.md)
+8. [documentation-site-sync.md](./documentation-site-sync.md)
+9. [hermes-agent-plugin.md](./hermes-agent-plugin.md)
+10. [openclaw-plugin.md](./openclaw-plugin.md)
+11. [verification-runbook.md](./verification-runbook.md)
 
 ## 3. 責任對照
 
@@ -70,6 +76,8 @@ Update the relevant document whenever an implementation change changes a command
 | Markdown import 與 AI-assisted spec import | `lib/ingestion/*`, `app/ui/views/IngestionView.tsx` | [ingestion-pipeline.md](./ingestion-pipeline.md) |
 | API keys、provider keys、GitHub token、API call boundary | `lib/storage/plugins.ts`, `lib/bridge/index.ts`, `src-tauri/src/lib.rs`, `app/api/anthropic/route.ts` | [security-and-secrets.md](./security-and-secrets.md) |
 | Table 互動、label contracts、排序行為、dashboard 文件連結欄位與 workstation 視窗版面規則 | `app/project-progress-dashboard/_components/PhaseTable.tsx`, `app/project-progress-dashboard/_lib/columns.tsx`, `app/project-progress-dashboard/_lib/pathLinks.tsx`, `app/ui/views/Plugins/PluginsHubView.tsx`, `app/ui/views/Plugins/_shared/IntegrationsTable.tsx`, `components/table/TableCore.tsx` | [table-standards.md](./table-standards.md) |
+| 文件分類、public/internal/restricted gates 與 public publish policy | `scripts/sync-documentation-site.mjs`, `docs/**/*.md` frontmatter | [document-classification-standard.md](./document-classification-standard.md) |
+| 靜態 Documentation website sync、generated routes 與 publication classification metadata | `scripts/sync-documentation-site.mjs`, `lib/generated/documentation-site-internal.ts`, `lib/generated/documentation-site-public.ts`, `app/documentation/[[...slug]]/page.tsx`, `app/ui/views/DocumentationView.tsx` | [documentation-site-sync.md](./documentation-site-sync.md) |
 | Project-scoped Hermes Agent 安裝與 plugin toggle | `scripts/install-hermes-agent.sh`, `scripts/hermes-agent.sh`, `.project-manager/vendor/hermes-agent/`, `lib/storage/plugins.ts` | [hermes-agent-plugin.md](./hermes-agent-plugin.md) |
 | Project-scoped OpenClaw 安裝、gateway、更新、回滾與 plugin toggle | `scripts/install-openclaw.sh`, `scripts/openclaw.sh`, `scripts/update-openclaw.sh`, `scripts/rollback-openclaw.sh`, `.project-manager/vendor/openclaw/`, `lib/storage/plugins.ts` | [openclaw-plugin.md](./openclaw-plugin.md) |
 | 交付前檢查與 release verification | `package.json`, `scripts/*`, `src-tauri/Cargo.toml` | [verification-runbook.md](./verification-runbook.md) |

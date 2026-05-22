@@ -16,7 +16,7 @@ export interface RawGitHubFeature {
 
 /** Parse a GitHub URL into owner/repo tuple. */
 export function parseGithubUrl(url: string): { owner: string; repo: string } {
-  const trimmed = url.trim().replace(/\/$/, '');
+  const trimmed = url.trim().replace(/\/$/, '').replace(/\.git$/, '');
   const match = trimmed.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)$/);
   if (!match) {
     throw new Error(

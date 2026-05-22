@@ -2,8 +2,8 @@
   "schemaVersion": 5,
   "id": "22222222-2222-4222-8222-222222222222",
   "createdAt": "2026-05-12T00:00:00.000Z",
-  "updatedAt": "2026-05-12T00:00:00.000Z",
-  "updatedBy": "claude",
+  "updatedAt": "2026-05-23T08:15:00.000+10:00",
+  "updatedBy": "codex",
   "project": {
     "name": "Project Manager",
     "root": "/Volumes/KLEVV-4T-1/Project-Manager",
@@ -41,7 +41,7 @@
       "status": "on_hold",
       "progress": 10,
       "paths": { "spec": "docs/01-user-scenarios.md" },
-      "notes": "需要 GitHub token 設定與 Rust bridge 整合"
+      "notes": ".project-manager/features/F04/notes.md"
     },
     {
       "id": "F05",
@@ -62,10 +62,32 @@
         "implementation": "lib/storage/",
         "developmentLogSummaryFolder": "docs/dev-logs/"
       },
-      "notes": "Async ProjectsRepository + namespaced localStorage keys + GitHub token to OS Keychain + schema v1→v2 (id/createdAt/updatedAt/updatedBy) + ADR-006",
+      "notes": ".project-manager/features/F06/notes.md",
       "createdAt": "2026-05-12T00:00:00.000Z",
       "updatedAt": "2026-05-12T00:00:00.000Z",
       "updatedBy": "claude"
+    },
+    {
+      "id": "F18",
+      "name": "Documentation Site Publishing & Classification",
+      "category": "Documentation/Publishing",
+      "status": "done",
+      "progress": 100,
+      "paths": {
+        "featureFolder": ".project-manager/features/F18/",
+        "spec": ".project-manager/features/F18/feature-spec.md",
+        "tdd": ".project-manager/features/F18/tdd-spec.md",
+        "implementation": "app/documentation/[[...slug]]/page.tsx",
+        "unitIntegrationTest": "__tests__/documentationSiteManifest.test.ts",
+        "developmentLogSummaryFolder": ".project-manager/features/F18/"
+      },
+      "readmePath": ".project-manager/features/F18/README.md",
+      "notes": ".project-manager/features/F18/notes.md",
+      "createdAt": "2026-05-23T08:15:00.000+10:00",
+      "updatedAt": "2026-05-23T08:15:00.000+10:00",
+      "updatedBy": "codex",
+      "phase": "development",
+      "points": 3
     }
   ],
   "engineerRoles": [
