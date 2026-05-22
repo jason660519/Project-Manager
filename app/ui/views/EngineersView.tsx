@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { FolderLock, Loader2, Play, Plus, RefreshCw, Sparkles, Trash2, Users2, Workflow, X } from 'lucide-react';
-import { DEFAULT_AGENT_WORKFLOWS } from '../../../lib/agent-workflows';
+import { FolderLock, Loader2, Play, Plus, RefreshCw, Sparkles, Trash2, Users2, X } from 'lucide-react';
 import { DEFAULT_ENGINEER_ROLES } from '../../../lib/defaults/engineerRoles';
 import { listLlmProviders, type LlmProviderId } from '../../../lib/keys/llmProviders';
 import { hasProviderKey, loadProviderKey } from '../../../lib/keys/loadProviderKey';
@@ -33,18 +32,6 @@ const SLUG_COLORS: Record<string, string> = {
 
 function slugColor(slug: string): string {
   return SLUG_COLORS[slug] ?? 'border-stone-300/35 text-stone-300/80';
-}
-
-const MODE_COLORS: Record<string, string> = {
-  'plan-only': 'border-sky-300/30 text-sky-200/80',
-  'review-only': 'border-amber-300/30 text-amber-200/80',
-  'guarded-execution': 'border-emerald-300/30 text-emerald-200/80',
-  'ship-readiness': 'border-blue-300/30 text-blue-200/80',
-  learning: 'border-stone-300/30 text-stone-200/75',
-};
-
-function modeColor(mode: string): string {
-  return MODE_COLORS[mode] ?? 'border-stone-300/30 text-stone-200/75';
 }
 
 // ── Form state ────────────────────────────────────────────────────────────────
@@ -699,35 +686,6 @@ export function EngineersView({ roles, agents, onRolesChange }: EngineersViewPro
           Configure engineer role presets and workflow playbooks for this project. Roles and
           selected workflows are injected into AI dispatches as explicit operating context.
         </p>
-      </div>
-
-      <div className="mb-4 border border-stone-200/12 bg-[rgb(var(--pm-panel))]/72 p-3">
-        <div className="mb-2 flex items-center gap-2">
-          <Workflow size={13} className="text-stone-400" />
-          <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">
-            Workflow Catalog
-          </span>
-          <span className="font-mono text-[10px] text-stone-600">
-            {DEFAULT_AGENT_WORKFLOWS.length}
-          </span>
-        </div>
-        <div className="grid gap-2 md:grid-cols-3">
-          {DEFAULT_AGENT_WORKFLOWS.map((workflow) => (
-            <div key={workflow.id} className="border border-stone-200/10 bg-[rgb(var(--pm-input))]/50 p-2">
-              <div className="flex items-center gap-2">
-                <span className="truncate text-xs font-medium text-stone-200">
-                  {workflow.name}
-                </span>
-                <span className={`ml-auto shrink-0 border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] ${modeColor(workflow.mode)}`}>
-                  {workflow.mode}
-                </span>
-              </div>
-              <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-stone-500">
-                {workflow.summary}
-              </p>
-            </div>
-          ))}
-        </div>
       </div>
 
       {/* Master-detail layout — fixed viewport height so both panels scroll independently */}

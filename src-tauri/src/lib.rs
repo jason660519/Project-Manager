@@ -1167,6 +1167,18 @@ struct GithubIssue {
     user: Option<String>,
 }
 
+#[derive(Serialize, Clone)]
+struct GithubIssueComment {
+    id: u64,
+    body: String,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+    #[serde(rename = "updatedAt")]
+    updated_at: String,
+    url: String,
+    user: Option<String>,
+}
+
 /// Convert an ISO 8601 date prefix ("YYYY-MM-DD…") to days since Unix epoch.
 fn parse_iso_days(s: &str) -> Option<u64> {
     let b = s.as_bytes();
@@ -1256,6 +1268,26 @@ fn map_rest_issue(issue_data: &serde_json::Value) -> Result<GithubIssue, String>
         body,
         state,
         labels,
+        created_at,
+        updated_at,
+        url,
+        user,
+    })
+}
+
+fn map_rest_issue_comment(comment_data: &serde_json::Value) -> Result<GithubIssueComment, String> {
+    let id = comment_data["id"]
+        .as_u64()
+        .ok_or_else(|| "GitHub REST payload missing comment id".to_string())?;
+    let body = comment_data["body"].as_str().unwrap_or("").to_string();
+    let created_at = comment_data["created_at"].as_str().unwrap_or("").to_string();
+    let updated_at = comment_data["updated_at"].as_str().unwrap_or("").to_string();
+    let url = comment_data["html_url"].as_str().unwrap_or("").to_string();
+    let user = comment_data["user"]["login"].as_str().map(String::from);
+
+    Ok(GithubIssueComment {
+        id,
+        body,
         created_at,
         updated_at,
         url,
@@ -1612,6 +1644,92 @@ async fn close_github_issue_with_comment(
     }
     let data: serde_json::Value = close_res.json().await.map_err(|e| format!("JSON parse: {e}"))?;
     map_rest_issue(&data)
+}
+
+#[tauri::command]
+async fn reopen_github_issue_with_comment(
+    token: String,
+    repo_url: String,
+    issue_number: u64,
+    comment: Option<String>,
+) -> Result<GithubIssue, String> {
+    let (owner, repo) = parse_github_owner_repo(&repo_url)?;
+    let issue_url = format!("https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}");
+    let client = reqwest::Client::new();
+
+    if let Some(comment_body) = comment {
+        if !comment_body.trim().is_empty() {
+            let comments_url =
+                format!("https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}/comments");
+            let comment_res = client
+                .post(comments_url)
+                .header("Authorization", format!("Bearer {token}"))
+                .header("User-Agent", "ProjectManager/0.1.0")
+                .header("Accept", "application/vnd.github+json")
+                .json(&serde_json::json!({ "body": comment_body }))
+                .send()
+                .await
+                .map_err(|e| format!("Network error: {e}"))?;
+            if !comment_res.status().is_success() {
+                let status = comment_res.status();
+                let text = comment_res.text().await.unwrap_or_default();
+                return Err(format!("GitHub API {status}: {text}"));
+            }
+        }
+    }
+
+    let reopen_res = client
+        .patch(issue_url)
+        .header("Authorization", format!("Bearer {token}"))
+        .header("User-Agent", "ProjectManager/0.1.0")
+        .header("Accept", "application/vnd.github+json")
+        .json(&serde_json::json!({ "state": "open" }))
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {e}"))?;
+    if !reopen_res.status().is_success() {
+        let status = reopen_res.status();
+        let text = reopen_res.text().await.unwrap_or_default();
+        return Err(format!("GitHub API {status}: {text}"));
+    }
+    let data: serde_json::Value = reopen_res.json().await.map_err(|e| format!("JSON parse: {e}"))?;
+    map_rest_issue(&data)
+}
+
+#[tauri::command]
+async fn fetch_github_issue_comments(
+    token: String,
+    repo_url: String,
+    issue_number: u64,
+) -> Result<Vec<GithubIssueComment>, String> {
+    let (owner, repo) = parse_github_owner_repo(&repo_url)?;
+    let comments_url =
+        format!("https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}/comments?per_page=30");
+    let client = reqwest::Client::new();
+    let comments_res = client
+        .get(comments_url)
+        .header("Authorization", format!("Bearer {token}"))
+        .header("User-Agent", "ProjectManager/0.1.0")
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {e}"))?;
+    if !comments_res.status().is_success() {
+        let status = comments_res.status();
+        let text = comments_res.text().await.unwrap_or_default();
+        return Err(format!("GitHub API {status}: {text}"));
+    }
+
+    let data: serde_json::Value = comments_res.json().await.map_err(|e| format!("JSON parse: {e}"))?;
+    let mut comments: Vec<GithubIssueComment> = Vec::new();
+    if let Some(comment_nodes) = data.as_array() {
+        for comment_data in comment_nodes {
+            comments.push(map_rest_issue_comment(comment_data)?);
+        }
+    }
+
+    comments.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    Ok(comments)
 }
 
 // ── GitHub polling ────────────────────────────────────────────────────────────
@@ -3474,6 +3592,8 @@ pub fn run() {
             update_github_issue,
             comment_github_issue,
             close_github_issue_with_comment,
+            reopen_github_issue_with_comment,
+            fetch_github_issue_comments,
             set_secret,
             get_secret,
             secrets_storage_backend,

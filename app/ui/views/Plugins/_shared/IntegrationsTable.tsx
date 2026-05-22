@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   createColumnHelper,
   flexRender,
@@ -52,6 +52,10 @@ interface IntegrationsTableProps {
   onToggleEnabled?: (row: IntegrationRow, enabled: boolean) => void;
   globalFilter: string;
   columnVisibility?: ColumnVisibility;
+  isLoading?: boolean;
+  errorMessage?: string | null;
+  frozenDataColCount?: number;
+  rowDensity?: 'compact' | 'comfortable';
 }
 
 export function IntegrationsTable({
@@ -61,7 +65,12 @@ export function IntegrationsTable({
   onToggleEnabled,
   globalFilter,
   columnVisibility = DEFAULT_VISIBILITY,
+  isLoading = false,
+  errorMessage = null,
+  frozenDataColCount = 0,
+  rowDensity = 'comfortable',
 }: IntegrationsTableProps) {
+  const [columnSizing, setColumnSizing] = useState<Record<string, number>>({});
   const columns = useMemo(
     () => [
       ...(onToggleEnabled
@@ -130,6 +139,23 @@ export function IntegrationsTable({
           <span className="font-medium text-stone-100">{info.getValue()}</span>
         ),
       }),
+      columnHelper.display({
+        id: 'col-status',
+        header: 'Status',
+        cell: ({ row }) => (
+          <div className="flex flex-wrap items-center gap-1">
+            <StatusBadge status={row.original.status} label={row.original.statusLabel} />
+            {row.original.badges.slice(0, 2).map((b) => (
+              <span
+                key={b}
+                className="border border-stone-300/20 bg-stone-200/5 px-1 py-0.5 text-[9px] text-stone-300"
+              >
+                {b}
+              </span>
+            ))}
+          </div>
+        ),
+      }),
       columnHelper.accessor('version', {
         id: 'col-version',
         header: 'Ver.',
@@ -172,23 +198,6 @@ export function IntegrationsTable({
             }),
           ]
         : []),
-      columnHelper.display({
-        id: 'col-status',
-        header: 'Status',
-        cell: ({ row }) => (
-          <div className="flex flex-wrap items-center gap-1">
-            <StatusBadge status={row.original.status} label={row.original.statusLabel} />
-            {row.original.badges.slice(0, 2).map((b) => (
-              <span
-                key={b}
-                className="border border-stone-300/20 bg-stone-200/5 px-1 py-0.5 text-[9px] text-stone-300"
-              >
-                {b}
-              </span>
-            ))}
-          </div>
-        ),
-      }),
       columnHelper.accessor('lastUpdated', {
         id: 'col-updated',
         header: 'Updated',
@@ -211,7 +220,11 @@ export function IntegrationsTable({
   const table = useReactTable({
     data: rows,
     columns,
-    state: { globalFilter },
+    state: { globalFilter, columnSizing },
+    onColumnSizingChange: setColumnSizing,
+    enableColumnResizing: true,
+    columnResizeMode: 'onChange',
+    defaultColumn: { minSize: 56, size: 150, maxSize: 480 },
     onGlobalFilterChange: () => {},
     globalFilterFn: (row, _columnId, filterValue) => {
       const q = String(filterValue).toLowerCase();
@@ -231,6 +244,37 @@ export function IntegrationsTable({
     getFilteredRowModel: getFilteredRowModel(),
   });
 
+  const leafColumns = table.getVisibleLeafColumns();
+  const clampedFrozenCols = Math.max(0, Math.min(frozenDataColCount, leafColumns.length));
+  const frozenLeftOffsets = useMemo(() => {
+    const offsets: number[] = [];
+    let acc = 0;
+    leafColumns.forEach((col, idx) => {
+      offsets[idx] = acc;
+      if (idx < clampedFrozenCols) {
+        acc += col.getSize();
+      }
+    });
+    return offsets;
+  }, [leafColumns, clampedFrozenCols, columnSizing]);
+  const rowPaddingClass = rowDensity === 'compact' ? 'py-2' : 'py-3';
+
+  if (isLoading) {
+    return (
+      <div className="border border-stone-200/12 bg-[rgb(var(--pm-panel))]/72 px-4 py-8 text-center">
+        <p className="text-xs text-stone-400">Loading table data...</p>
+      </div>
+    );
+  }
+
+  if (errorMessage) {
+    return (
+      <div className="border border-red-400/20 bg-red-950/20 px-4 py-6">
+        <p className="text-xs text-red-200">Failed to load table data: {errorMessage}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-x-auto border border-stone-200/12 bg-[rgb(var(--pm-panel))]/72">
       <table className="w-full min-w-[960px] border-collapse text-left text-sm">
@@ -241,9 +285,20 @@ export function IntegrationsTable({
                 <th
                   key={h.id}
                   onClick={h.column.getCanSort() ? h.column.getToggleSortingHandler() : undefined}
-                  className={`select-none px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400 ${
+                  className={`relative select-none px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400 ${
                     h.column.getCanSort() ? 'cursor-pointer' : ''
                   }`}
+                  style={{
+                    width: h.column.getSize(),
+                    minWidth: h.column.getSize(),
+                    left: h.column.getIndex() < clampedFrozenCols ? frozenLeftOffsets[h.column.getIndex()] : undefined,
+                    position: h.column.getIndex() < clampedFrozenCols ? 'sticky' : undefined,
+                    zIndex: h.column.getIndex() < clampedFrozenCols ? 30 : undefined,
+                    background:
+                      h.column.getIndex() < clampedFrozenCols
+                        ? 'rgb(var(--pm-panel))'
+                        : undefined,
+                  }}
                 >
                   <div className="inline-flex items-center gap-1">
                     {flexRender(h.column.columnDef.header, h.getContext())}
@@ -253,6 +308,14 @@ export function IntegrationsTable({
                       </span>
                     )}
                   </div>
+                  {h.column.getCanResize() && (
+                    <span
+                      onMouseDown={h.getResizeHandler()}
+                      onTouchStart={h.getResizeHandler()}
+                      className="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none border-r border-stone-200/0 hover:border-emerald-300/60"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  )}
                 </th>
               ))}
             </tr>
@@ -270,7 +333,26 @@ export function IntegrationsTable({
                 }`}
               >
                 {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="px-3 py-3 align-middle text-sm text-stone-300">
+                  <td
+                    key={cell.id}
+                    className={`px-3 ${rowPaddingClass} align-middle text-sm text-stone-300`}
+                    style={{
+                      width: cell.column.getSize(),
+                      minWidth: cell.column.getSize(),
+                      left:
+                        cell.column.getIndex() < clampedFrozenCols
+                          ? frozenLeftOffsets[cell.column.getIndex()]
+                          : undefined,
+                      position: cell.column.getIndex() < clampedFrozenCols ? 'sticky' : undefined,
+                      zIndex: cell.column.getIndex() < clampedFrozenCols ? 20 : undefined,
+                      background:
+                        cell.column.getIndex() < clampedFrozenCols
+                          ? active
+                            ? 'rgba(6, 78, 59, 0.45)'
+                            : 'rgb(var(--pm-panel))'
+                          : undefined,
+                    }}
+                  >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}

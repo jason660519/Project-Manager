@@ -625,8 +625,23 @@ export interface CloseGithubIssueInput {
   comment?: string;
 }
 
+export interface ReopenGithubIssueInput {
+  repoUrl: string;
+  issueNumber: number;
+  comment?: string;
+}
+
+export interface GithubIssueCommentPayload {
+  id: number;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+  url: string;
+  user?: string;
+}
+
 async function browserIssueMutation<T>(
-  action: 'create' | 'update' | 'comment' | 'close_with_comment',
+  action: 'create' | 'update' | 'comment' | 'close_with_comment' | 'reopen_with_comment',
   payload: object,
 ): Promise<T> {
   const res = await fetch('/api/github/issues', {
@@ -704,6 +719,48 @@ export async function closeGithubIssueWithComment(
     });
   }
   return browserIssueMutation<GithubIssuePayload>('close_with_comment', input);
+}
+
+/** Reopen an issue and optionally append a reopening comment. */
+export async function reopenGithubIssueWithComment(
+  token: string,
+  input: ReopenGithubIssueInput,
+): Promise<GithubIssuePayload> {
+  if (isTauri()) {
+    return invoke<GithubIssuePayload>('reopen_github_issue_with_comment', {
+      token,
+      repoUrl: input.repoUrl,
+      issueNumber: input.issueNumber,
+      comment: input.comment ?? null,
+    });
+  }
+  return browserIssueMutation<GithubIssuePayload>('reopen_with_comment', input);
+}
+
+/** Fetch issue comments ordered by newest first. */
+export async function fetchGithubIssueComments(
+  token: string,
+  repoUrl: string,
+  issueNumber: number,
+): Promise<GithubIssueCommentPayload[]> {
+  if (isTauri()) {
+    return invoke<GithubIssueCommentPayload[]>('fetch_github_issue_comments', {
+      token,
+      repoUrl,
+      issueNumber,
+    });
+  }
+
+  const res = await fetch('/api/github/issues', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'fetch_comments', repoUrl, issueNumber }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || `GitHub issue comments failed (${res.status})`);
+  }
+  return res.json() as Promise<GithubIssueCommentPayload[]>;
 }
 
 // ── OS Keychain / dev plaintext file ──────────────────────────────────────────

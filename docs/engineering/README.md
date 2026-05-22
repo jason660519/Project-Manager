@@ -1,7 +1,7 @@
 # Project Manager Engineering Documentation
 
 > Status: Active  
-> Last updated: 2026-05-15  
+> Last updated: 2026-05-23  
 > Audience: AI engineers and maintainers
 
 ---
@@ -32,7 +32,7 @@ This folder contains operational engineering documentation for Project Manager. 
 | Project list, selected project, schema migration | `lib/storage/*`, `schema/project-manager.schema.json`, `config/samples/*` | [storage-and-schema.md](./storage-and-schema.md) |
 | Markdown import and AI-assisted spec import | `lib/ingestion/*`, `app/ui/views/IngestionView.tsx` | [ingestion-pipeline.md](./ingestion-pipeline.md) |
 | API keys, provider keys, GitHub token, API call boundary | `lib/storage/plugins.ts`, `lib/bridge/index.ts`, `src-tauri/src/lib.rs`, `app/api/anthropic/route.ts` | [security-and-secrets.md](./security-and-secrets.md) |
-| Table interaction, label contracts, sorting behavior, dashboard document-link cells | `app/project-progress-dashboard/_components/PhaseTable.tsx`, `app/project-progress-dashboard/_lib/columns.tsx`, `app/project-progress-dashboard/_lib/pathLinks.tsx`, `components/table/TableCore.tsx` | [table-standards.md](./table-standards.md) |
+| Table interaction, label contracts, sorting behavior, dashboard document-link cells, workstation viewport rules | `app/project-progress-dashboard/_components/PhaseTable.tsx`, `app/project-progress-dashboard/_lib/columns.tsx`, `app/project-progress-dashboard/_lib/pathLinks.tsx`, `app/ui/views/Plugins/PluginsHubView.tsx`, `app/ui/views/Plugins/_shared/IntegrationsTable.tsx`, `components/table/TableCore.tsx` | [table-standards.md](./table-standards.md) |
 | Project-scoped Hermes Agent install and plugin toggle | `scripts/install-hermes-agent.sh`, `scripts/hermes-agent.sh`, `.project-manager/vendor/hermes-agent/`, `lib/storage/plugins.ts` | [hermes-agent-plugin.md](./hermes-agent-plugin.md) |
 | Project-scoped OpenClaw install, gateway, update, rollback, and plugin toggle | `scripts/install-openclaw.sh`, `scripts/openclaw.sh`, `scripts/update-openclaw.sh`, `scripts/rollback-openclaw.sh`, `.project-manager/vendor/openclaw/`, `lib/storage/plugins.ts` | [openclaw-plugin.md](./openclaw-plugin.md) |
 | Pre-handoff checks and release verification | `package.json`, `scripts/*`, `src-tauri/Cargo.toml` | [verification-runbook.md](./verification-runbook.md) |
@@ -69,7 +69,7 @@ Update the relevant document whenever an implementation change changes a command
 | Project list、selected project、schema migration | `lib/storage/*`, `schema/project-manager.schema.json`, `config/samples/*` | [storage-and-schema.md](./storage-and-schema.md) |
 | Markdown import 與 AI-assisted spec import | `lib/ingestion/*`, `app/ui/views/IngestionView.tsx` | [ingestion-pipeline.md](./ingestion-pipeline.md) |
 | API keys、provider keys、GitHub token、API call boundary | `lib/storage/plugins.ts`, `lib/bridge/index.ts`, `src-tauri/src/lib.rs`, `app/api/anthropic/route.ts` | [security-and-secrets.md](./security-and-secrets.md) |
-| Table 互動、label contracts、排序行為、dashboard 文件連結欄位 | `app/project-progress-dashboard/_components/PhaseTable.tsx`, `app/project-progress-dashboard/_lib/columns.tsx`, `app/project-progress-dashboard/_lib/pathLinks.tsx`, `components/table/TableCore.tsx` | [table-standards.md](./table-standards.md) |
+| Table 互動、label contracts、排序行為、dashboard 文件連結欄位與 workstation 視窗版面規則 | `app/project-progress-dashboard/_components/PhaseTable.tsx`, `app/project-progress-dashboard/_lib/columns.tsx`, `app/project-progress-dashboard/_lib/pathLinks.tsx`, `app/ui/views/Plugins/PluginsHubView.tsx`, `app/ui/views/Plugins/_shared/IntegrationsTable.tsx`, `components/table/TableCore.tsx` | [table-standards.md](./table-standards.md) |
 | Project-scoped Hermes Agent 安裝與 plugin toggle | `scripts/install-hermes-agent.sh`, `scripts/hermes-agent.sh`, `.project-manager/vendor/hermes-agent/`, `lib/storage/plugins.ts` | [hermes-agent-plugin.md](./hermes-agent-plugin.md) |
 | Project-scoped OpenClaw 安裝、gateway、更新、回滾與 plugin toggle | `scripts/install-openclaw.sh`, `scripts/openclaw.sh`, `scripts/update-openclaw.sh`, `scripts/rollback-openclaw.sh`, `.project-manager/vendor/openclaw/`, `lib/storage/plugins.ts` | [openclaw-plugin.md](./openclaw-plugin.md) |
 | 交付前檢查與 release verification | `package.json`, `scripts/*`, `src-tauri/Cargo.toml` | [verification-runbook.md](./verification-runbook.md) |

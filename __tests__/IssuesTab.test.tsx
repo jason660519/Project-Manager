@@ -67,6 +67,7 @@ const MOCK_ISSUES = [OPEN_ISSUE, CLOSED_ISSUE, ANOTHER_OPEN_ISSUE];
 const defaultProps = {
   projectName: 'Test Project',
   selectedProjectNames: ['Test Project'],
+  selectedProjects: [{ id: 'p1', name: 'Test Project', repoUrl: 'https://github.com/owner/repo' }],
   repoUrl: 'https://github.com/owner/repo',
   projectRoot: '/test/project',
   storyPoints: 42,

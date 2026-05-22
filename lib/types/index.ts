@@ -209,7 +209,7 @@ export interface EngineerRole {
   testPrompt?: string;
 }
 
-export type ViewId = 'dashboard' | 'features' | 'projects' | 'project-files' | 'plugins' | 'settings' | 'engineers' | 'channels' | 'sessions' | 'cron-jobs' | 'logs' | 'keys' | 'documentation' | 'skills' | 'chat' | 'keyboard-shortcuts';
+export type ViewId = 'dashboard' | 'features' | 'projects' | 'project-files' | 'plugins' | 'settings' | 'engineers' | 'channels' | 'sessions' | 'cron-jobs' | 'logs' | 'keys' | 'documentation' | 'chat' | 'keyboard-shortcuts';
 
 export type IssueState = 'open' | 'closed';
 

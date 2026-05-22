@@ -79,7 +79,6 @@ const GROUPS_CONFIG: { key: string; label: string; match: (p: string) => boolean
   { key: 'oauth', label: 'OAuth Providers', match: (p) => p.startsWith('/api/providers') },
   { key: 'logs', label: 'Logs', match: (p) => p.startsWith('/api/logs') },
   { key: 'cron', label: 'Cron Jobs', match: (p) => p.startsWith('/api/cron') },
-  { key: 'skills', label: 'Skills', match: (p) => p.startsWith('/api/skills') },
   { key: 'tools', label: 'Tools', match: (p) => p.startsWith('/api/tools') },
   { key: 'analytics', label: 'Analytics', match: (p) => p.startsWith('/api/analytics') },
   {

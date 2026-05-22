@@ -45,7 +45,6 @@ import { parseEnvText } from '../../lib/keys/envParser';
 import { detectProviders } from '../../lib/keys/detectProviders';
 import { SettingsView } from './views/SettingsView';
 import { DocumentationView } from './views/DocumentationView';
-import { SkillsView } from './views/SkillsView';
 import { ChatPageClient } from '../chat/ChatPageClient';
 
 type BridgeFileNode = {
@@ -1022,6 +1021,11 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
           activeRuns={activeRuns}
           runHistory={runHistory}
           dashboardProjectNames={effectiveDashboardProjects.map((p) => p.config.project.name)}
+          dashboardProjects={effectiveDashboardProjects.map((p) => ({
+            id: p.id,
+            name: p.config.project.name,
+            repoUrl: p.config.project.githubUrl,
+          }))}
           onCronJobsChange={handleCronJobsUpdate}
           onFeaturePatch={handleFeaturePatch}
           onFeaturePromptSave={handleFeaturePromptSave}
@@ -1060,9 +1064,6 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
       )}
       {currentView === 'plugins' && (
         <PluginsView projectRoot={selectedProject?.config.project.root ?? ''} />
-      )}
-      {currentView === 'skills' && (
-        <SkillsView projectRoot={selectedProject?.config.project.root ?? ''} />
       )}
       {currentView === 'channels' && <ChannelsView />}
       {currentView === 'sessions' && selectedProject && (

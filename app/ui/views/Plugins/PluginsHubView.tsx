@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ExternalLink, FileText, RotateCw } from 'lucide-react';
+import { ExternalLink, FileText, RotateCw, Snowflake } from 'lucide-react';
 import type { IntegrationRow, IntegrationSheet } from '../../../../lib/integrations/types';
 import { mergeAllManual } from '../../../../lib/integrations/manual-metadata';
 import { mapInstalledPlugins, mapMarketplaceRow } from '../../../../lib/integrations/mappers/plugins';
@@ -79,6 +79,7 @@ const CHANNEL_QUICK_ADD: { platform: ChannelPlatform; label: string }[] = [
 ];
 
 type PluginsFilter = 'all' | 'installed' | 'marketplace';
+type PluginsRowDensity = 'compact' | 'comfortable';
 
 export interface PluginsHubViewProps {
   projectRoot?: string;
@@ -103,11 +104,19 @@ export function PluginsHubView({ projectRoot = '' }: PluginsHubViewProps) {
   const [skillRows, setSkillRows] = useState<IntegrationRow[]>([]);
   const [memoryRows, setMemoryRows] = useState<IntegrationRow[]>([]);
   const [commandRows, setCommandRows] = useState<IntegrationRow[]>([]);
+  const [skillsLoading, setSkillsLoading] = useState(false);
+  const [memoryLoading, setMemoryLoading] = useState(false);
+  const [commandsLoading, setCommandsLoading] = useState(false);
+  const [skillsError, setSkillsError] = useState<string | null>(null);
+  const [memoryError, setMemoryError] = useState<string | null>(null);
+  const [commandsError, setCommandsError] = useState<string | null>(null);
   const [systemCliExposure, setSystemCliExposure] = useState<Record<string, boolean>>({});
   const [systemCommandStatus, setSystemCommandStatus] = useState<Record<string, boolean>>({});
   const [logsForId, setLogsForId] = useState<string | null>(null);
   const [skillsInstallUrl, setSkillsInstallUrl] = useState('');
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [frozenDataColCount, setFrozenDataColCount] = useState(0);
+  const [rowDensity, setRowDensity] = useState<PluginsRowDensity>('comfortable');
 
   const refreshManual = () => setManualVersion((v) => v + 1);
 
@@ -121,8 +130,11 @@ export function PluginsHubView({ projectRoot = '' }: PluginsHubViewProps) {
   }, []);
 
   const loadSkills = useCallback(async () => {
+    setSkillsLoading(true);
+    setSkillsError(null);
     if (!skillsDir) {
       setSkillRows([]);
+      setSkillsLoading(false);
       return;
     }
     try {
@@ -172,8 +184,11 @@ export function PluginsHubView({ projectRoot = '' }: PluginsHubViewProps) {
         }),
       );
       setSkillRows(parsed);
-    } catch {
+    } catch (error) {
       setSkillRows([]);
+      setSkillsError(error instanceof Error ? error.message : 'Unknown skills load error');
+    } finally {
+      setSkillsLoading(false);
     }
   }, [skillsDir]);
 
@@ -182,23 +197,41 @@ export function PluginsHubView({ projectRoot = '' }: PluginsHubViewProps) {
   }, [loadSkills]);
 
   const loadMemory = useCallback(async () => {
-    const rows = await loadMemoryRows(projectRoot);
-    setMemoryRows(rows);
+    setMemoryLoading(true);
+    setMemoryError(null);
+    try {
+      const rows = await loadMemoryRows(projectRoot);
+      setMemoryRows(rows);
+    } catch (error) {
+      setMemoryRows([]);
+      setMemoryError(error instanceof Error ? error.message : 'Unknown memory load error');
+    } finally {
+      setMemoryLoading(false);
+    }
   }, [projectRoot]);
 
   const loadCommands = useCallback(async () => {
-    const slash = await loadSlashCommandRows(projectRoot);
-    const mappings = channelCatalog.commandMappings.map(mapCommandMappingRow);
-    const exposure = loadSystemCliExposureMap();
-    setSystemCliExposure(exposure);
-    let systemCli: IntegrationRow[] = [];
+    setCommandsLoading(true);
+    setCommandsError(null);
     try {
-      const inventory = await listGlobalCliInventory();
-      systemCli = inventory.map((entry) => mapSystemCliRow(entry, exposure[entry.command] === true));
-    } catch {
-      systemCli = [];
+      const slash = await loadSlashCommandRows(projectRoot);
+      const mappings = channelCatalog.commandMappings.map(mapCommandMappingRow);
+      const exposure = loadSystemCliExposureMap();
+      setSystemCliExposure(exposure);
+      let systemCli: IntegrationRow[] = [];
+      try {
+        const inventory = await listGlobalCliInventory();
+        systemCli = inventory.map((entry) => mapSystemCliRow(entry, exposure[entry.command] === true));
+      } catch {
+        systemCli = [];
+      }
+      setCommandRows([...slash, ...mappings, ...systemCli]);
+    } catch (error) {
+      setCommandRows([]);
+      setCommandsError(error instanceof Error ? error.message : 'Unknown commands load error');
+    } finally {
+      setCommandsLoading(false);
     }
-    setCommandRows([...slash, ...mappings, ...systemCli]);
   }, [projectRoot, channelCatalog.commandMappings]);
 
   useEffect(() => {
@@ -485,9 +518,27 @@ export function PluginsHubView({ projectRoot = '' }: PluginsHubViewProps) {
     },
   ];
 
+  const activeSheetLoading =
+    activeSheet === 'skills'
+      ? skillsLoading
+      : activeSheet === 'memory'
+        ? memoryLoading
+        : activeSheet === 'commands'
+          ? commandsLoading
+          : false;
+
+  const activeSheetError =
+    activeSheet === 'skills'
+      ? skillsError
+      : activeSheet === 'memory'
+        ? memoryError
+        : activeSheet === 'commands'
+          ? commandsError
+          : null;
+
   return (
-    <div className="mx-auto max-w-[1400px] space-y-4">
-      <div className="flex flex-col gap-3 border-b border-stone-200/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="mx-auto flex h-[calc(100vh-8rem)] min-h-0 max-w-[1400px] flex-col gap-3 overflow-hidden">
+      <div className="shrink-0 flex flex-col gap-3 border-b border-stone-200/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">
             {t.integrations.title}
@@ -509,35 +560,14 @@ export function PluginsHubView({ projectRoot = '' }: PluginsHubViewProps) {
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-1 border border-stone-200/12 bg-stone-900/40 p-1">
-        {sheets.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => {
-              setActiveSheet(s.id);
-              setSelectedRow(null);
-              setCategoryFilter('all');
-            }}
-            className={`px-3 py-1.5 text-xs font-medium uppercase tracking-[0.08em] ${
-              activeSheet === s.id
-                ? 'bg-stone-800 text-emerald-400'
-                : 'text-stone-400 hover:text-stone-200'
-            }`}
-          >
-            {s.label}
-            <span className="ml-1.5 font-mono text-[10px] opacity-80">({s.count})</span>
-          </button>
-        ))}
-      </div>
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
+        {!projectRoot && activeSheet === 'memory' && (
+          <p className="border border-amber-400/25 bg-amber-950/25 px-3 py-2 text-xs text-amber-200/90">
+            {t.integrations.selectProjectHint}
+          </p>
+        )}
 
-      {!projectRoot && activeSheet === 'memory' && (
-        <p className="border border-amber-400/25 bg-amber-950/25 px-3 py-2 text-xs text-amber-200/90">
-          {t.integrations.selectProjectHint}
-        </p>
-      )}
-
-      <div className="flex flex-wrap items-center gap-2">
+        <div className="shrink-0 flex flex-wrap items-center gap-2 border-b border-stone-200/10 pb-2">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -672,60 +702,117 @@ export function PluginsHubView({ projectRoot = '' }: PluginsHubViewProps) {
           />
           Notes
         </label>
-      </div>
-
-      {activeSheet === 'commands' && (
-        <div className="border border-cyan-400/20 bg-cyan-950/20 px-3 py-2 text-xs text-cyan-100/90">
-          {t.integrations.commandsInventorySummary
-            .replace('{detected}', String(systemCliRows.length))
-            .replace('{exposed}', String(exposedSystemCliCount))
-            .replace('{whitelisted}', String(exposedSystemCliConfigured))}
+          <div className="ml-2 flex items-center gap-1 border-l border-stone-200/15 pl-2">
+            <Snowflake size={12} className="text-cyan-300" />
+            <label className="text-[10px] text-stone-400">Freeze cols</label>
+            <input
+              type="number"
+              min={0}
+              max={4}
+              value={frozenDataColCount}
+              onChange={(e) => setFrozenDataColCount(Math.max(0, Math.min(4, Number(e.target.value) || 0)))}
+              className="h-7 w-12 rounded border border-stone-200/18 bg-[rgb(var(--pm-panel))] px-1 text-center text-xs text-stone-100"
+            />
+          </div>
+          <select
+            value={rowDensity}
+            onChange={(e) => setRowDensity(e.target.value as PluginsRowDensity)}
+            className="border border-stone-200/18 bg-[rgb(var(--pm-panel))] px-2 py-2 text-xs text-stone-200"
+            title="Row density"
+          >
+            <option value="compact">Compact Rows</option>
+            <option value="comfortable">Comfortable Rows</option>
+          </select>
         </div>
-      )}
 
-      <IntegrationsTable
-        rows={activeRows}
-        selectedRowKey={selectedRow?.rowKey ?? null}
-        onRowClick={setSelectedRow}
-        globalFilter={search}
-        columnVisibility={columnVisibility}
-        onToggleEnabled={
-          activeSheet === 'plugins'
-            ? (row, _enabled) => {
-                if (row.sourceKind === 'plugin-installed') {
-                  updateCatalog(togglePluginEnabled(catalog, row.sourceId));
-                }
-              }
-            : activeSheet === 'channels'
-              ? (row, enabled) => {
-                  if (row.sourceKind !== 'channel') return;
-                  updateChannels({
-                    ...channelCatalog,
-                    channels: channelCatalog.channels.map((c) =>
-                      c.id === row.sourceId ? { ...c, enabled } : c,
-                    ),
-                  });
-                }
-              : activeSheet === 'commands'
-                ? (row, enabled) => {
-                    if (row.sourceKind === 'command-mapping') {
+        {activeSheet === 'commands' && (
+          <div className="border border-cyan-400/20 bg-cyan-950/20 px-3 py-2 text-xs text-cyan-100/90">
+            {t.integrations.commandsInventorySummary
+              .replace('{detected}', String(systemCliRows.length))
+              .replace('{exposed}', String(exposedSystemCliCount))
+              .replace('{whitelisted}', String(exposedSystemCliConfigured))}
+          </div>
+        )}
+
+        <div className="min-h-0 flex-1 overflow-auto">
+          <IntegrationsTable
+            rows={activeRows}
+            selectedRowKey={selectedRow?.rowKey ?? null}
+            onRowClick={setSelectedRow}
+            globalFilter={search}
+            columnVisibility={columnVisibility}
+            isLoading={activeSheetLoading}
+            errorMessage={activeSheetError}
+            frozenDataColCount={frozenDataColCount}
+            rowDensity={rowDensity}
+            onToggleEnabled={
+              activeSheet === 'plugins'
+                ? (row, _enabled) => {
+                    if (row.sourceKind === 'plugin-installed') {
+                      updateCatalog(togglePluginEnabled(catalog, row.sourceId));
+                    }
+                  }
+                : activeSheet === 'channels'
+                  ? (row, enabled) => {
+                      if (row.sourceKind !== 'channel') return;
                       updateChannels({
                         ...channelCatalog,
-                        commandMappings: channelCatalog.commandMappings.map((m) =>
-                          m.id === row.sourceId ? { ...m, enabled } : m,
+                        channels: channelCatalog.channels.map((c) =>
+                          c.id === row.sourceId ? { ...c, enabled } : c,
                         ),
                       });
-                    } else if (row.sourceKind === 'system-cli') {
-                      setSystemCliExposed(row.sourceId, enabled);
-                      setSystemCliExposure((prev) => ({ ...prev, [row.sourceId]: enabled }));
-                    } else {
-                      return;
                     }
-                    void loadCommands();
-                  }
-                : undefined
-        }
-      />
+                  : activeSheet === 'commands'
+                    ? (row, enabled) => {
+                        if (row.sourceKind === 'command-mapping') {
+                          updateChannels({
+                            ...channelCatalog,
+                            commandMappings: channelCatalog.commandMappings.map((m) =>
+                              m.id === row.sourceId ? { ...m, enabled } : m,
+                            ),
+                          });
+                        } else if (row.sourceKind === 'system-cli') {
+                          setSystemCliExposed(row.sourceId, enabled);
+                          setSystemCliExposure((prev) => ({ ...prev, [row.sourceId]: enabled }));
+                        } else {
+                          return;
+                        }
+                        void loadCommands();
+                      }
+                    : undefined
+            }
+          />
+        </div>
+
+        <div className="shrink-0 flex items-end gap-0 overflow-x-auto border-t border-stone-200/15 bg-[rgb(var(--pm-rail))]/70">
+          {sheets.map((s) => {
+            const isActive = activeSheet === s.id;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => {
+                  setActiveSheet(s.id);
+                  setSelectedRow(null);
+                  setCategoryFilter('all');
+                }}
+                className={`relative flex items-center gap-1.5 border-r border-stone-200/15 px-4 py-2.5 text-xs font-medium uppercase tracking-[0.08em] ${
+                  isActive
+                    ? 'bg-emerald-600/85 text-white shadow-sm'
+                    : 'text-stone-300/85 hover:bg-white/5 hover:text-stone-100'
+                }`}
+              >
+                <span>{s.label}</span>
+                <span className={`rounded px-1.5 py-0.5 text-[10px] ${isActive ? 'bg-white/25' : 'bg-stone-200/15'}`}>
+                  {s.count}
+                </span>
+                {isActive && <span className="absolute left-0 right-0 top-0 h-0.5 bg-white/60" />}
+              </button>
+            );
+          })}
+          <div className="min-w-[20px] flex-1" />
+        </div>
+      </div>
 
       <IntegrationsDetailSheet
         row={selectedRow}

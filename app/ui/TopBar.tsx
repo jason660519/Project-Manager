@@ -17,7 +17,6 @@ const VIEW_LABELS: Record<ViewId, string> = {
   sessions:            'Sessions',
   channels:            'Channels',
   'cron-jobs':         'Cron Jobs',
-  skills:              'Skills',
   logs:                'Logs',
   documentation:       'Documentation',
   keys:                'Keys',

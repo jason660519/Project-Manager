@@ -31,6 +31,11 @@ interface ProjectProgressClientProps {
   activeRuns: ActiveRun[];
   runHistory?: CompletedRun[];
   dashboardProjectNames: string[];
+  dashboardProjects: Array<{
+    id: string;
+    name: string;
+    repoUrl?: string;
+  }>;
   onCronJobsChange: (jobs: CronJob[]) => void;
   onFeaturePatch: (namespacedFeatureId: string, patch: Partial<Feature>) => void;
   onFeaturePromptSave: (featureId: string, config: FeaturePromptConfig) => void;
@@ -75,7 +80,7 @@ function readInitialTab(): TabId {
 
 export function ProjectProgressClient({
   project, projectRoot, features, adapters, engineerRoles, cronJobs, activeRuns,
-  dashboardProjectNames, onCronJobsChange, onFeaturePatch, onFeaturePromptSave, onRunCronJob,
+  dashboardProjectNames, dashboardProjects, onCronJobsChange, onFeaturePatch, onFeaturePromptSave, onRunCronJob,
   onRunStart, onRunLog, onRunEnd,
 }: ProjectProgressClientProps) {
   const [activeTab, setActiveTab] = useState<TabId>(() => readInitialTab());
@@ -200,6 +205,7 @@ export function ProjectProgressClient({
             <IssuesTab
               projectName={project.name}
               selectedProjectNames={dashboardProjectNames}
+              selectedProjects={dashboardProjects}
               repoUrl={project.githubUrl}
               projectRoot={projectRoot}
               storyPoints={features.reduce((s, f) => s + (f.points ?? 1), 0)}

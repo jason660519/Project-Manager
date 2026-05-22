@@ -27,12 +27,30 @@ interface GitHubApiIssue {
 }
 
 interface IssueActionBody {
-  action: 'create' | 'update' | 'comment' | 'close_with_comment';
+  action: 'create' | 'update' | 'comment' | 'close_with_comment' | 'reopen_with_comment' | 'fetch_comments';
   repoUrl: string;
   issueNumber?: number;
   title?: string;
   body?: string;
   comment?: string;
+}
+
+interface GitHubApiComment {
+  id: number;
+  body: string;
+  created_at: string;
+  updated_at: string;
+  html_url: string;
+  user: { login: string } | null;
+}
+
+interface IssueCommentPayload {
+  id: number;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+  url: string;
+  user?: string;
 }
 
 function parseOwnerRepo(repoUrl: string): { owner: string; repo: string } {
@@ -55,6 +73,17 @@ function toIssuePayload(issue: GitHubApiIssue): IssuePayload {
     updatedAt: issue.updated_at,
     url: issue.html_url,
     user: issue.user?.login ?? undefined,
+  };
+}
+
+function toIssueCommentPayload(comment: GitHubApiComment): IssueCommentPayload {
+  return {
+    id: comment.id,
+    body: comment.body ?? '',
+    createdAt: comment.created_at,
+    updatedAt: comment.updated_at,
+    url: comment.html_url,
+    user: comment.user?.login ?? undefined,
   };
 }
 
@@ -106,6 +135,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'issueNumber is required' }, { status: 400 });
     }
 
+    if (body.action === 'fetch_comments') {
+      const comments = await githubRequest<GitHubApiComment[]>(
+        token,
+        `${baseIssueUrl}/${body.issueNumber}/comments?per_page=30&sort=updated&direction=desc`,
+        { method: 'GET' },
+      );
+      return NextResponse.json(comments.map(toIssueCommentPayload));
+    }
+
     if (body.action === 'update') {
       const updated = await githubRequest<GitHubApiIssue>(token, `${baseIssueUrl}/${body.issueNumber}`, {
         method: 'PATCH',
@@ -144,6 +182,22 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({ state: 'closed' }),
       });
       return NextResponse.json(toIssuePayload(closed));
+    }
+
+    if (body.action === 'reopen_with_comment') {
+      if (body.comment?.trim()) {
+        await githubRequest(token, `${baseIssueUrl}/${body.issueNumber}/comments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ body: body.comment.trim() }),
+        });
+      }
+      const reopened = await githubRequest<GitHubApiIssue>(token, `${baseIssueUrl}/${body.issueNumber}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'open' }),
+      });
+      return NextResponse.json(toIssuePayload(reopened));
     }
 
     return NextResponse.json({ error: `Unsupported action: ${body.action}` }, { status: 400 });

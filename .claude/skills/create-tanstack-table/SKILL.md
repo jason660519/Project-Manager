@@ -244,6 +244,30 @@ Apply `sticky top-0 z-10` to the `<thead>` (or its wrapper), **not** to individu
 
 If the parent layout (`AppShell`, `MainClient`, a view component) already has `overflow-y-auto`, do **not** add another `overflow-y-auto` inside the table container. One scroll region should own the vertical flow.
 
+### Workstation viewport contract (critical)
+
+For dashboard-like pages where toolbar + table + bottom sheets must stay in one visible frame, use a fixed-height workspace and a single inner scroll pane:
+
+```tsx
+<div className="flex h-[calc(100vh-8rem)] min-h-0 flex-col overflow-hidden">
+  <div className="shrink-0">{/* header */}</div>
+  <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="shrink-0">{/* toolbar */}</div>
+    <div className="min-h-0 flex-1 overflow-auto">
+      {/* table container (may include overflow-x-auto internally) */}
+    </div>
+    <div className="shrink-0">{/* bottom sheet tabs */}</div>
+  </div>
+</div>
+```
+
+**Common pitfall:** using `min-h-[calc(100vh-8rem)]` instead of `h-[calc(100vh-8rem)]` allows content growth, which pushes bottom sheet tabs below the viewport.
+
+### Overflow-hidden usage rule (clarified)
+
+- Allowed on **layout wrappers** to keep the workstation in one frame.
+- Not allowed on the **same element** that owns table scrolling (`overflow-x-auto` / `overflow-auto`).
+
 ### Table in flex layout (fill remaining height)
 
 ```tsx
@@ -292,6 +316,7 @@ Always handle zero rows explicitly:
 - [ ] Numeric columns store `number | null`, units in header
 - [ ] Action buttons call `e.stopPropagation()`
 - [ ] Cells > 30 lines extracted to `*Cell.tsx`
-- [ ] No `overflow-hidden` on scroll container
+- [ ] Table scroll container does not mix with `overflow-hidden`
+- [ ] Dashboard-like views use fixed-height workstation contract (`h-[calc(100vh-8rem)]` + `shrink-0` header/toolbar/sheets)
 - [ ] Empty state row present
 - [ ] Colours use stone/emerald token palette (no hardcoded `gray-*`)
