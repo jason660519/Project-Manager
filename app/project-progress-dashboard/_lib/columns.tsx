@@ -495,6 +495,14 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
             {r.assignedTo}
           </span>
         )}
+        {r.lastDispatchModel && (
+          <span
+            className="inline-block max-w-[140px] truncate rounded-sm border border-stone-400/20 bg-stone-500/10 px-1.5 py-0.5 text-[10px] leading-tight text-stone-400"
+            title={`Last dispatch: ${r.lastDispatchModel}`}
+          >
+            {r.lastDispatchModel}
+          </span>
+        )}
       </div>
     )},
     { id: 'page', header: 'Located Page', accessor: (r) => r.locatedPage ?? '', cell: (r, h) => (

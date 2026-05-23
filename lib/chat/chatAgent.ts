@@ -13,7 +13,8 @@ import type { Feature } from '../types';
 import type { ChatContext, ChatMessage, SendChatMessageRequest, SendChatMessageResult } from './types';
 
 const ROUTES: Record<string, string> = {
-  projects: '/projects',
+  projects: '/project-progress-dashboard#projects',
+  project: '/project-progress-dashboard#projects',
   dashboard: '/project-progress-dashboard',
   features: '/features',
   files: '/project-files',
@@ -60,7 +61,7 @@ function findFeature(context: ChatContext, featureId: string): Feature | undefin
 
 function summarizeStatus(context: ChatContext): string {
   const project = context.selectedProject;
-  if (!project) return 'No project is selected. Add or select a project from the Projects view first.';
+  if (!project) return 'No project is selected. Add or select a project from the Dashboard Projects sheet first.';
 
   const features = project.config.features;
   const counts = features.reduce<Record<string, number>>((acc, feature) => {

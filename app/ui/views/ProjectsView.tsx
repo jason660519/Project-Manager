@@ -12,6 +12,7 @@ import {
   KeyRound,
   Loader2,
   Plus,
+  RefreshCw,
   Trash2,
   X,
 } from 'lucide-react';
@@ -44,6 +45,7 @@ interface ProjectsViewProps {
   onAddProject: (entry: ProjectEntry) => void;
   onUpdateProject: (entry: ProjectEntry) => void;
   onRemoveProject: (id: string, deleteConfigFile: boolean) => Promise<void> | void;
+  onSyncFromDesktop?: () => Promise<void>;
   runHistory: CompletedRun[];
 }
 
@@ -62,6 +64,7 @@ export function ProjectsView({
   onAddProject,
   onUpdateProject,
   onRemoveProject,
+  onSyncFromDesktop,
   runHistory,
 }: ProjectsViewProps) {
   const [showAddModal, setShowAddModal] = useState(false);
@@ -82,6 +85,8 @@ export function ProjectsView({
   const [deleteAlsoFile, setDeleteAlsoFile] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [pickingFolders, setPickingFolders] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncDone, setSyncDone] = useState(false);
   const [postImportScanQueue, setPostImportScanQueue] = useState<ProjectEntry[] | null>(null);
   const [batchScanning, setBatchScanning] = useState(false);
   // Per-row Initialize state. One project at a time can be busy initializing;
@@ -591,6 +596,29 @@ export function ProjectsView({
           </p>
         </div>
         <div className="flex gap-2">
+          {!isTauri && onSyncFromDesktop && (
+            <button
+              disabled={syncing}
+              onClick={async () => {
+                setSyncing(true);
+                setSyncDone(false);
+                await onSyncFromDesktop().catch(() => {});
+                setSyncing(false);
+                setSyncDone(true);
+                setTimeout(() => setSyncDone(false), 2500);
+              }}
+              className="inline-flex h-9 items-center gap-2 border border-stone-200/20 px-3 text-xs uppercase tracking-[0.14em] text-stone-200 hover:bg-white/5 disabled:opacity-50"
+            >
+              {syncing ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : syncDone ? (
+                <Check size={14} className="text-emerald-400" />
+              ) : (
+                <RefreshCw size={14} />
+              )}
+              {syncing ? 'Syncing…' : syncDone ? 'Synced' : 'Sync from Desktop'}
+            </button>
+          )}
           <button
             onClick={handleGenerateReport}
             className="inline-flex h-9 items-center gap-2 border border-stone-200/20 px-3 text-xs uppercase tracking-[0.14em] text-stone-200 hover:bg-white/5"

@@ -87,5 +87,6 @@ The following table surfaces are currently aligned to this contract and the comp
 - `app/ui/views/Keys/VlmArenaMethodPanel.tsx`
 - `app/ui/views/Keys/LlmArenaDetailSheet.tsx`
 - `app/ui/views/KeyboardShortcutsView.tsx`
+- `app/ui/views/ProjectFilesView.tsx`
 
 When introducing a new table view, add the path here once it has passed the verification checklist in this document.

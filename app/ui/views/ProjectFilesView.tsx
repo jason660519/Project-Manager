@@ -2,435 +2,592 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  CheckCircle2,
-  ChevronDown,
-  ChevronRight,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ExternalLink,
   File,
   FileCode2,
   FileJson,
   FileText,
   Filter,
   Folder,
-  FolderOpen,
+  FolderKanban,
   HelpCircle,
-  Minus,
   RefreshCw,
   Search,
-  XCircle,
+  Table2,
 } from 'lucide-react';
+import {
+  createColumnHelper,
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  type SortingState,
+  useReactTable,
+} from '@tanstack/react-table';
+import { clsx } from 'clsx';
 import { FileNode } from '../../../lib/bridge';
 import { Feature, FeaturePaths, FeatureStatus, ProjectEntry } from '../../../lib/types';
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-const FEATURE_COLORS = [
-  { bg: 'bg-blue-500/20', text: 'text-blue-300', border: 'border-blue-500/30' },
-  { bg: 'bg-purple-500/20', text: 'text-purple-300', border: 'border-purple-500/30' },
-  { bg: 'bg-pink-500/20', text: 'text-pink-300', border: 'border-pink-500/30' },
-  { bg: 'bg-amber-500/20', text: 'text-amber-300', border: 'border-amber-500/30' },
-  { bg: 'bg-cyan-500/20', text: 'text-cyan-300', border: 'border-cyan-500/30' },
-  { bg: 'bg-emerald-500/20', text: 'text-emerald-300', border: 'border-emerald-500/30' },
-  { bg: 'bg-red-500/20', text: 'text-red-300', border: 'border-red-500/30' },
-  { bg: 'bg-indigo-500/20', text: 'text-indigo-300', border: 'border-indigo-500/30' },
-];
-
-const PATH_TYPE_LABELS: Record<string, { label: string; style: string }> = {
-  spec: { label: 'SPEC', style: 'text-amber-300 border-amber-400/30' },
-  tdd: { label: 'TDD', style: 'text-blue-300 border-blue-400/30' },
-  tddProgressReport: { label: 'TDD-RPT', style: 'text-blue-200 border-blue-300/30' },
-  tddProgressReportHtml: { label: 'TDD-HTML', style: 'text-cyan-300 border-cyan-400/30' },
-  unitIntegrationTest: { label: 'UNIT', style: 'text-violet-300 border-violet-400/30' },
-  e2eAcceptanceTestScriptFolder: { label: 'E2E', style: 'text-purple-300 border-purple-400/30' },
-  developmentLogSummaryFolder: { label: 'LOG', style: 'text-stone-300 border-stone-400/30' },
-  devLogSummaryHtml: { label: 'LOG-HTML', style: 'text-teal-300 border-teal-400/30' },
-  test: { label: 'TEST', style: 'text-purple-300 border-purple-400/30' },
-  implementation: { label: 'IMPL', style: 'text-emerald-300 border-emerald-400/30' },
+const PATH_TYPE_LABELS: Record<string, string> = {
+  featureFolder: 'Feature Folder',
+  spec: 'feature-spec.md',
+  tdd: 'tdd-spec.md',
+  tddProgressReport: 'tdd-report.md',
+  tddProgressReportHtml: 'tdd-report.html',
+  unitIntegrationTest: 'Unit/Integration',
+  e2eAcceptanceTestScriptFolder: 'E2E',
+  developmentLogSummaryFolder: 'dev-log.md',
+  devLogSummaryHtml: 'dev-log.html',
+  test: 'Test',
+  implementation: 'Implementation',
 };
 
-const STATUS_STYLES: Record<FeatureStatus, { dot: string; text: string }> = {
-  done: { dot: 'bg-emerald-400', text: 'text-emerald-300' },
-  in_progress: { dot: 'bg-amber-400', text: 'text-amber-300' },
-  todo: { dot: 'bg-stone-400', text: 'text-stone-400' },
-  on_hold: { dot: 'bg-red-400', text: 'text-red-300' },
+const STATUS_LABELS: Record<FeatureStatus, string> = {
+  todo: 'To Do',
+  in_progress: 'In Progress',
+  done: 'Done',
+  on_hold: 'Blocked',
 };
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+const FEATURE_STATUS_STYLES: Record<FeatureStatus, string> = {
+  done: 'bg-emerald-500/15 text-emerald-400',
+  in_progress: 'bg-sky-500/15 text-sky-400',
+  todo: 'bg-stone-500/15 text-stone-400',
+  on_hold: 'bg-red-500/15 text-red-400',
+};
+
+type FileRowKind = 'folder' | 'file';
+type FileRowMappingStatus = 'mapped' | 'contains' | 'unmapped';
+type FileRowSource = 'filesystem' | 'feature-paths';
 
 interface FeaturePathInfo {
   featureId: string;
   featureName: string;
   featureStatus: FeatureStatus;
   pathType: string;
-  colorIdx: number;
   absPath: string;
 }
 
-// ── Utilities ─────────────────────────────────────────────────────────────────
-
-function hashToIndex(str: string, len: number): number {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) h = ((h << 5) - h + str.charCodeAt(i)) | 0;
-  return ((h % len) + len) % len;
+interface ProjectFileRow {
+  rowKey: string;
+  name: string;
+  relativePath: string;
+  absPath: string;
+  kind: FileRowKind;
+  extension: string;
+  depth: number;
+  source: FileRowSource;
+  featureRefs: FeaturePathInfo[];
+  descendantFeatureRefs: FeaturePathInfo[];
+  featureCount: number;
+  artifactLabels: string[];
+  mappingStatus: FileRowMappingStatus;
 }
 
-function normalizePath(p: string): string {
-  return p.replace(/\/+$/, '').replace(/^\/+/, '');
+interface ProjectFilesViewProps {
+  projects: ProjectEntry[];
+  selectedDashboardProjectIds: string[];
+  selectedProjectId?: string;
 }
 
-/** Build a map from absolute path → array of FeaturePathInfo */
+const columnHelper = createColumnHelper<ProjectFileRow>();
+
+function normalizePath(path: string): string {
+  return path.replace(/\/+$/, '').replace(/^\/+/, '');
+}
+
+function normalizeRoot(root: string): string {
+  return root.replace(/\/+$/, '');
+}
+
+function uniqueFeatureRefs(refs: FeaturePathInfo[]): FeaturePathInfo[] {
+  const seen = new Set<string>();
+  return refs.filter((ref) => {
+    const key = `${ref.featureId}:${ref.pathType}:${ref.absPath}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function buildFeaturePathMap(
   features: Feature[],
   projectRoot: string,
 ): Map<string, FeaturePathInfo[]> {
   const map = new Map<string, FeaturePathInfo[]>();
-  const root = normalizePath(projectRoot);
+  const root = normalizeRoot(projectRoot);
 
-  for (const f of features) {
-    const colorIdx = hashToIndex(f.id, FEATURE_COLORS.length);
-    const entries = Object.entries(f.paths) as [keyof FeaturePaths, string | undefined][];
-
+  for (const feature of features) {
+    const entries = Object.entries(feature.paths) as [keyof FeaturePaths, string | undefined][];
     for (const [pathType, relPath] of entries) {
-      if (!relPath) continue;
+      if (!relPath?.trim()) continue;
       const absPath = `${root}/${normalizePath(relPath)}`;
-      const info: FeaturePathInfo = {
-        featureId: f.id,
-        featureName: f.name,
-        featureStatus: f.status,
-        pathType: pathType as string,
-        colorIdx,
+      const refs = map.get(absPath) ?? [];
+      refs.push({
+        featureId: feature.id,
+        featureName: feature.name,
+        featureStatus: feature.status,
+        pathType: String(pathType),
         absPath,
-      };
-      const existing = map.get(absPath) ?? [];
-      existing.push(info);
-      map.set(absPath, existing);
+      });
+      map.set(absPath, refs);
     }
   }
+
   return map;
 }
 
-/** Check if a path is an ancestor of any feature path */
-function isAncestorOfFeaturePath(
-  nodePath: string,
-  featureMap: Map<string, FeaturePathInfo[]>,
-): boolean {
-  const np = normalizePath(nodePath);
-  for (const key of featureMap.keys()) {
-    if (key.startsWith(np + '/')) return true;
-  }
-  return false;
-}
-
-/** Build a virtual file tree from feature paths (browser mode fallback) */
 function buildVirtualTree(features: Feature[], projectRoot: string): FileNode[] {
-  const root = normalizePath(projectRoot);
+  const root = normalizeRoot(projectRoot);
   const nodeMap = new Map<string, FileNode>();
 
-  const ensureDir = (absPath: string): FileNode => {
-    if (nodeMap.has(absPath)) return nodeMap.get(absPath)!;
+  const ensureNode = (absPath: string, isDir: boolean): FileNode => {
+    const existing = nodeMap.get(absPath);
+    if (existing) {
+      existing.isDir = existing.isDir || isDir;
+      return existing;
+    }
     const name = absPath.split('/').pop() ?? absPath;
-    const node: FileNode = { name, path: absPath, isDir: true, children: [] };
+    const node: FileNode = { name, path: absPath, isDir, children: [] };
     nodeMap.set(absPath, node);
     return node;
   };
 
-  const allPaths: string[] = [];
-  for (const f of features) {
-    for (const relPath of Object.values(f.paths)) {
-      if (!relPath) continue;
-      allPaths.push(`${root}/${normalizePath(relPath)}`);
+  const ensureParentLink = (parentPath: string, child: FileNode) => {
+    const parent = ensureNode(parentPath, true);
+    if (!parent.children.some((item) => item.path === child.path)) {
+      parent.children.push(child);
     }
-  }
-
-  for (const absPath of allPaths) {
-    const rel = absPath.slice(root.length + 1);
-    const parts = rel.split('/');
-    let current = root;
-
-    for (let i = 0; i < parts.length; i++) {
-      const parent = current;
-      current = `${parent}/${parts[i]}`;
-      const isLast = i === parts.length - 1;
-      const isDir = isLast ? !parts[i].includes('.') : true;
-
-      if (!nodeMap.has(current)) {
-        const node: FileNode = { name: parts[i], path: current, isDir, children: [] };
-        nodeMap.set(current, node);
-      }
-
-      if (i > 0 || parts.length > 1) {
-        const parentNode = ensureDir(parent);
-        const childNode = nodeMap.get(current)!;
-        if (!parentNode.children.some((c) => c.path === childNode.path)) {
-          parentNode.children.push(childNode);
-        }
-      }
-    }
-  }
-
-  // Collect top-level nodes (children of root)
-  const topLevel: FileNode[] = [];
-  for (const [path, node] of nodeMap) {
-    const rel = path.slice(root.length + 1);
-    if (rel && !rel.includes('/')) topLevel.push(node);
-  }
-
-  const sortNodes = (nodes: FileNode[]) => {
-    nodes.sort((a, b) => {
-      if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
-      return a.name.localeCompare(b.name);
-    });
-    nodes.forEach((n) => sortNodes(n.children));
   };
+
+  for (const feature of features) {
+    for (const relPath of Object.values(feature.paths)) {
+      if (!relPath?.trim()) continue;
+
+      const parts = normalizePath(relPath).split('/').filter(Boolean);
+      let current = root;
+      parts.forEach((part, index) => {
+        const parentPath = current;
+        current = `${current}/${part}`;
+        const isLast = index === parts.length - 1;
+        const isDir = isLast ? !part.includes('.') : true;
+        const node = ensureNode(current, isDir);
+        ensureParentLink(parentPath, node);
+      });
+    }
+  }
+
+  const topLevel = nodeMap.get(root)?.children ?? [];
   sortNodes(topLevel);
   return topLevel;
 }
 
-/** Get icon for file based on extension */
-function FileIcon({ name }: { name: string }) {
-  const ext = name.split('.').pop()?.toLowerCase() ?? '';
-  if (['ts', 'tsx', 'js', 'jsx', 'rs', 'py', 'go', 'rb', 'java', 'swift', 'vue'].includes(ext))
-    return <FileCode2 size={12} className="shrink-0 text-sky-400/70" />;
-  if (['html', 'htm'].includes(ext))
-    return <FileCode2 size={12} className="shrink-0 text-orange-400/70" />;
-  if (['json', 'yaml', 'yml', 'toml'].includes(ext))
-    return <FileJson size={12} className="shrink-0 text-yellow-400/70" />;
-  if (['md', 'mdx', 'txt', 'rst'].includes(ext))
-    return <FileText size={12} className="shrink-0 text-stone-400/70" />;
-  return <File size={12} className="shrink-0 text-stone-500" />;
+function sortNodes(nodes: FileNode[]) {
+  nodes.sort((a, b) => {
+    if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+  nodes.forEach((node) => sortNodes(node.children));
 }
 
-// ── Sub-Components ────────────────────────────────────────────────────────────
+function relativePathFor(absPath: string, projectRoot: string): string {
+  const root = normalizeRoot(projectRoot);
+  const normalized = normalizeRoot(absPath);
+  return normalized.startsWith(`${root}/`) ? normalized.slice(root.length + 1) : normalized;
+}
 
-function FeatureBadge({ info }: { info: FeaturePathInfo }) {
-  const color = FEATURE_COLORS[info.colorIdx];
-  const ptStyle = PATH_TYPE_LABELS[info.pathType];
-  const tooltip = `${info.featureName} [${info.featureId}]\n${ptStyle?.label ?? info.pathType}: ${info.absPath}`;
+function extensionFor(name: string): string {
+  if (!name.includes('.')) return '';
+  return name.split('.').pop()?.toLowerCase() ?? '';
+}
+
+function collectDescendantRefs(
+  absPath: string,
+  featureMap: Map<string, FeaturePathInfo[]>,
+): FeaturePathInfo[] {
+  const normalized = normalizeRoot(absPath);
+  const refs: FeaturePathInfo[] = [];
+  for (const [path, pathRefs] of featureMap) {
+    if (path.startsWith(`${normalized}/`)) refs.push(...pathRefs);
+  }
+  return uniqueFeatureRefs(refs);
+}
+
+function flattenNodes(
+  nodes: FileNode[],
+  projectRoot: string,
+  featureMap: Map<string, FeaturePathInfo[]>,
+  source: FileRowSource,
+  depth = 0,
+): ProjectFileRow[] {
+  return nodes.flatMap((node) => {
+    const absPath = normalizeRoot(node.path);
+    const featureRefs = uniqueFeatureRefs(featureMap.get(absPath) ?? []);
+    const descendantFeatureRefs = node.isDir ? collectDescendantRefs(absPath, featureMap) : [];
+    const visibleRefs = featureRefs.length > 0 ? featureRefs : descendantFeatureRefs;
+    const featureIds = new Set(visibleRefs.map((ref) => ref.featureId));
+    const artifactLabels = Array.from(
+      new Set(featureRefs.map((ref) => PATH_TYPE_LABELS[ref.pathType] ?? ref.pathType)),
+    );
+
+    const row: ProjectFileRow = {
+      rowKey: absPath,
+      name: node.name,
+      relativePath: relativePathFor(absPath, projectRoot),
+      absPath,
+      kind: node.isDir ? 'folder' : 'file',
+      extension: node.isDir ? '' : extensionFor(node.name),
+      depth,
+      source,
+      featureRefs,
+      descendantFeatureRefs,
+      featureCount: featureIds.size,
+      artifactLabels,
+      mappingStatus:
+        featureRefs.length > 0 ? 'mapped' : descendantFeatureRefs.length > 0 ? 'contains' : 'unmapped',
+    };
+
+    return [row, ...flattenNodes(node.children, projectRoot, featureMap, source, depth + 1)];
+  });
+}
+
+function FileTypeIcon({ row }: { row: ProjectFileRow }) {
+  if (row.kind === 'folder') {
+    return <Folder size={13} className="shrink-0 text-amber-200/75" />;
+  }
+
+  if (['ts', 'tsx', 'js', 'jsx', 'rs', 'py', 'go', 'rb', 'java', 'swift', 'vue'].includes(row.extension)) {
+    return <FileCode2 size={13} className="shrink-0 text-sky-300/75" />;
+  }
+  if (['json', 'yaml', 'yml', 'toml'].includes(row.extension)) {
+    return <FileJson size={13} className="shrink-0 text-amber-200/75" />;
+  }
+  if (['md', 'mdx', 'txt', 'rst'].includes(row.extension)) {
+    return <FileText size={13} className="shrink-0 text-stone-300/80" />;
+  }
+  return <File size={13} className="shrink-0 text-stone-500" />;
+}
+
+function FeatureRefCell({ row }: { row: ProjectFileRow }) {
+  const refs = row.featureRefs.length > 0 ? row.featureRefs : row.descendantFeatureRefs;
+  if (refs.length === 0) return <span className="text-xs text-stone-500">—</span>;
+
+  const visible = refs.slice(0, 3);
+  const remaining = refs.length - visible.length;
+
   return (
-    <span className="inline-flex items-center gap-1" title={tooltip}>
-      <span
-        className={`inline-flex items-center gap-1 rounded-sm border px-1 py-px text-[9px] font-medium leading-none ${color.bg} ${color.text} ${color.border}`}
-      >
-        {info.featureId}
-      </span>
-      {ptStyle && (
+    <div className="flex min-w-[12rem] flex-wrap items-center gap-1">
+      {visible.map((ref) => (
         <span
-          className={`rounded-sm border px-1 py-px text-[8px] font-medium leading-none ${ptStyle.style}`}
+          key={`${ref.featureId}-${ref.pathType}-${ref.absPath}`}
+          title={`${ref.featureName} · ${PATH_TYPE_LABELS[ref.pathType] ?? ref.pathType}`}
+          className={clsx(
+            'inline-flex items-center gap-1 border px-1.5 py-0.5 text-[10px] font-medium',
+            row.featureRefs.length > 0
+              ? 'border-amber-200/20 bg-amber-100/10 text-amber-100/90'
+              : 'border-stone-200/15 bg-stone-200/8 text-stone-300',
+          )}
         >
-          {ptStyle.label}
+          <span className="font-mono">{ref.featureId}</span>
+          <span className="text-stone-500">·</span>
+          <span className={FEATURE_STATUS_STYLES[ref.featureStatus]}>
+            {STATUS_LABELS[ref.featureStatus]}
+          </span>
         </span>
-      )}
-    </span>
-  );
-}
-
-function CoverageSection({ features, projectRoot }: { features: Feature[]; projectRoot: string }) {
-  if (features.length === 0) return null;
-
-  const root = normalizePath(projectRoot);
-  const pathTypeKeys: (keyof FeaturePaths)[] = [
-    'spec',
-    'tdd',
-    'tddProgressReport',
-    'unitIntegrationTest',
-    'e2eAcceptanceTestScriptFolder',
-    'developmentLogSummaryFolder',
-  ];
-
-  return (
-    <section className="border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72">
-      <div className="flex items-center gap-2 border-b border-stone-200/12 px-4 py-2.5">
-        <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-200">
-          Feature → File Coverage
-        </h3>
-        <span className="ml-auto text-[10px] text-stone-500">
-          {features.length} feature{features.length !== 1 ? 's' : ''}
-        </span>
-      </div>
-      <div className="divide-y divide-stone-200/8">
-        {features.map((f) => {
-          const colorIdx = hashToIndex(f.id, FEATURE_COLORS.length);
-          const color = FEATURE_COLORS[colorIdx];
-          const statusStyle = STATUS_STYLES[f.status];
-          const defined = pathTypeKeys.filter((k) => f.paths[k]);
-          const total = pathTypeKeys.length;
-
-          return (
-            <div key={f.id} className="flex items-center gap-3 px-4 py-2">
-              <span
-                className={`inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-[10px] font-bold leading-none ${color.bg} ${color.text} ${color.border}`}
-              >
-                {f.id}
-              </span>
-              <span className="min-w-0 flex-1 truncate text-[11px] text-stone-200">{f.name}</span>
-
-              {/* Path type indicators */}
-              <div className="flex items-center gap-1">
-                {pathTypeKeys.map((k) => {
-                  const has = !!f.paths[k];
-                  const ptLabel = PATH_TYPE_LABELS[k]?.label ?? k;
-                  return (
-                    <span
-                      key={k}
-                      title={`${ptLabel}: ${has ? `${root}/${f.paths[k]}` : 'not defined'}`}
-                      className={`flex items-center gap-0.5 rounded-sm px-1 py-px text-[8px] font-medium leading-none ${
-                        has
-                          ? 'bg-emerald-500/15 text-emerald-300'
-                          : 'bg-stone-500/10 text-stone-600'
-                      }`}
-                    >
-                      {has ? <CheckCircle2 size={7} /> : <Minus size={7} />}
-                      {ptLabel}
-                    </span>
-                  );
-                })}
-              </div>
-
-              {/* Status */}
-              <span className="flex items-center gap-1">
-                <span className={`h-1.5 w-1.5 rounded-full ${statusStyle.dot}`} />
-                <span className={`text-[9px] uppercase tracking-wider ${statusStyle.text}`}>
-                  {f.status.replace('_', ' ')}
-                </span>
-              </span>
-
-              {/* Coverage ratio */}
-              <span className="w-8 text-right font-mono text-[10px] text-stone-500">
-                {defined.length}/{total}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-interface TreeNodeProps {
-  node: FileNode;
-  depth: number;
-  featureMap: Map<string, FeaturePathInfo[]>;
-  filterFeatureId: string | null;
-  searchQuery: string;
-}
-
-function TreeNodeRow({ node, depth, featureMap, filterFeatureId, searchQuery }: TreeNodeProps) {
-  const [open, setOpen] = useState(depth < 1);
-  const nodePath = normalizePath(node.path);
-  const directFeatures = featureMap.get(nodePath) ?? [];
-  const hasDescendantFeature = node.isDir && isAncestorOfFeaturePath(nodePath, featureMap);
-  const isRelevant = directFeatures.length > 0 || hasDescendantFeature;
-
-  // Filter logic
-  if (filterFeatureId) {
-    const matchesDirect = directFeatures.some((f) => f.featureId === filterFeatureId);
-    const matchesDescendant =
-      node.isDir &&
-      [...featureMap.entries()].some(
-        ([k, v]) => k.startsWith(nodePath + '/') && v.some((f) => f.featureId === filterFeatureId),
-      );
-    if (!matchesDirect && !matchesDescendant) return null;
-  }
-
-  // Search logic
-  if (searchQuery) {
-    const q = searchQuery.toLowerCase();
-    const nameMatch = node.name.toLowerCase().includes(q);
-    const featureMatch = directFeatures.some(
-      (f) => f.featureId.toLowerCase().includes(q) || f.featureName.toLowerCase().includes(q),
-    );
-    const hasMatchingChild =
-      node.isDir &&
-      node.children.some(
-        (c) =>
-          c.name.toLowerCase().includes(q) ||
-          (featureMap.get(normalizePath(c.path)) ?? []).some(
-            (f) => f.featureId.toLowerCase().includes(q) || f.featureName.toLowerCase().includes(q),
-          ),
-      );
-    if (!nameMatch && !featureMatch && !hasMatchingChild && !node.isDir) return null;
-  }
-
-  // Auto-expand if filter/search is active and this dir is relevant
-  const shouldAutoExpand =
-    (filterFeatureId || searchQuery) && node.isDir && (isRelevant || true);
-
-  const isOpen = shouldAutoExpand ? true : open;
-
-  if (!node.isDir) {
-    return (
-      <div
-        title={node.path}
-        className={`group flex items-center gap-1.5 py-[3px] pr-2 transition-colors hover:bg-white/[0.03] ${
-          directFeatures.length > 0 ? '' : 'opacity-70'
-        }`}
-        style={{ paddingLeft: `${depth * 16 + 8}px` }}
-      >
-        <FileIcon name={node.name} />
-        <span className="min-w-0 flex-1 truncate text-[12px] text-stone-300 group-hover:text-stone-100">
-          {node.name}
-        </span>
-        {directFeatures.map((info, i) => (
-          <FeatureBadge key={`${info.featureId}-${info.pathType}-${i}`} info={info} />
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <button
-        type="button"
-        title={node.path}
-        onClick={() => setOpen((v) => !v)}
-        className={`group flex w-full items-center gap-1.5 py-[3px] pr-2 text-left transition-colors hover:bg-white/[0.03] ${
-          isRelevant ? 'text-stone-200' : 'text-stone-400'
-        }`}
-        style={{ paddingLeft: `${depth * 16 + 8}px` }}
-      >
-        {isOpen ? (
-          <ChevronDown size={12} className="shrink-0 text-stone-500" />
-        ) : (
-          <ChevronRight size={12} className="shrink-0 text-stone-500" />
-        )}
-        {isOpen ? (
-          <FolderOpen size={12} className="shrink-0 text-amber-300/70" />
-        ) : (
-          <Folder size={12} className="shrink-0 text-amber-300/50" />
-        )}
-        <span className="min-w-0 flex-1 truncate text-[12px] font-medium">{node.name}</span>
-        {directFeatures.map((info, i) => (
-          <FeatureBadge key={`${info.featureId}-${info.pathType}-${i}`} info={info} />
-        ))}
-        {!isOpen && node.children.length > 0 && !directFeatures.length && (
-          <span className="text-[10px] text-stone-600">({node.children.length})</span>
-        )}
-      </button>
-      {isOpen && node.children.length > 0 && (
-        <div>
-          {node.children.map((child) => (
-            <TreeNodeRow
-              key={child.path}
-              node={child}
-              depth={depth + 1}
-              featureMap={featureMap}
-              filterFeatureId={filterFeatureId}
-              searchQuery={searchQuery}
-            />
-          ))}
-        </div>
-      )}
+      ))}
+      {remaining > 0 && <span className="text-[10px] text-stone-500">+{remaining}</span>}
     </div>
   );
 }
 
-// ── Per-project panel ─────────────────────────────────────────────────────────
+function MappingBadge({ status }: { status: FileRowMappingStatus }) {
+  const styles: Record<FileRowMappingStatus, string> = {
+    mapped: 'border-emerald-200/25 bg-emerald-100/10 text-emerald-100',
+    contains: 'border-amber-200/20 bg-amber-100/10 text-amber-100/90',
+    unmapped: 'border-stone-300/20 bg-stone-500/15 text-stone-400',
+  };
+  const labels: Record<FileRowMappingStatus, string> = {
+    mapped: 'Mapped',
+    contains: 'Contains',
+    unmapped: 'Unmapped',
+  };
 
-function ProjectPanel({ project }: { project: ProjectEntry }) {
+  return (
+    <span className={clsx('inline-flex border px-2 py-0.5 text-[10px] font-semibold', styles[status])}>
+      {labels[status]}
+    </span>
+  );
+}
+
+function ArtifactLabels({ labels }: { labels: string[] }) {
+  if (labels.length === 0) return <span className="text-xs text-stone-500">—</span>;
+
+  return (
+    <div className="flex min-w-[8rem] flex-wrap gap-1">
+      {labels.slice(0, 2).map((label) => (
+        <span
+          key={label}
+          className="border border-stone-200/15 bg-white/[0.035] px-1.5 py-0.5 font-mono text-[10px] text-stone-300"
+        >
+          {label}
+        </span>
+      ))}
+      {labels.length > 2 && <span className="text-[10px] text-stone-500">+{labels.length - 2}</span>}
+    </div>
+  );
+}
+
+function SortIcon({ direction }: { direction: false | 'asc' | 'desc' }) {
+  if (direction === 'asc') return <ArrowUp size={11} />;
+  if (direction === 'desc') return <ArrowDown size={11} />;
+  return <ArrowUpDown size={11} className="opacity-50" />;
+}
+
+function buildColumns(canOpenPaths: boolean, onOpenPath: (path: string) => void) {
+  return [
+    columnHelper.accessor('kind', {
+      id: 'col-kind',
+      header: 'Type',
+      cell: (info) => (
+        <span className="inline-flex items-center gap-2 text-xs text-stone-300">
+          <FileTypeIcon row={info.row.original} />
+          {info.getValue() === 'folder' ? 'Folder' : 'File'}
+        </span>
+      ),
+      sortingFn: 'alphanumeric',
+    }),
+    columnHelper.accessor('name', {
+      id: 'col-name',
+      header: 'Name',
+      cell: (info) => (
+        <div
+          className="flex min-w-[14rem] items-center gap-2"
+          style={{ paddingLeft: `${Math.min(info.row.original.depth, 6) * 14}px` }}
+        >
+          <FileTypeIcon row={info.row.original} />
+          <span className="truncate font-medium text-stone-100" title={info.row.original.absPath}>
+            {info.getValue()}
+          </span>
+        </div>
+      ),
+    }),
+    columnHelper.accessor('relativePath', {
+      id: 'col-path',
+      header: 'Path',
+      cell: (info) => (
+        <span
+          className="block max-w-[340px] truncate font-mono text-xs text-stone-300"
+          title={info.row.original.absPath}
+        >
+          {info.getValue() || '—'}
+        </span>
+      ),
+    }),
+    columnHelper.accessor('mappingStatus', {
+      id: 'col-status',
+      header: 'Status',
+      cell: (info) => <MappingBadge status={info.getValue()} />,
+    }),
+    columnHelper.accessor('featureCount', {
+      id: 'col-features',
+      header: 'Features',
+      cell: (info) => <FeatureRefCell row={info.row.original} />,
+    }),
+    columnHelper.accessor((row) => row.artifactLabels.join(', '), {
+      id: 'col-artifacts',
+      header: 'Artifact',
+      cell: (info) => <ArtifactLabels labels={info.row.original.artifactLabels} />,
+    }),
+    columnHelper.accessor('source', {
+      id: 'col-source',
+      header: 'Source',
+      cell: (info) => (
+        <span className="whitespace-nowrap text-xs text-stone-400">
+          {info.getValue() === 'filesystem' ? 'Filesystem' : 'Feature paths'}
+        </span>
+      ),
+    }),
+    columnHelper.display({
+      id: 'col-actions',
+      header: '',
+      cell: (info) => (
+        <button
+          type="button"
+          disabled={!canOpenPaths}
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenPath(info.row.original.absPath);
+          }}
+          title={canOpenPaths ? `Open ${info.row.original.absPath}` : 'Open requires desktop app'}
+          className="inline-flex h-7 items-center gap-1.5 border border-emerald-200/25 bg-emerald-100/10 px-2.5 text-xs font-medium text-emerald-100 hover:bg-emerald-100/18 disabled:cursor-not-allowed disabled:border-stone-200/10 disabled:bg-stone-500/10 disabled:text-stone-500"
+        >
+          <ExternalLink size={12} />
+          Open
+        </button>
+      ),
+      enableSorting: false,
+    }),
+  ];
+}
+
+function FilesTable({
+  rows,
+  loading,
+  error,
+  canOpenPaths,
+  onOpenPath,
+}: {
+  rows: ProjectFileRow[];
+  loading: boolean;
+  error: string;
+  canOpenPaths: boolean;
+  onOpenPath: (path: string) => void;
+}) {
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'col-path', desc: false }]);
+  const columns = useMemo(() => buildColumns(canOpenPaths, onOpenPath), [canOpenPaths, onOpenPath]);
+  const table = useReactTable({
+    data: rows,
+    columns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+
+  return (
+    <div className="min-h-0 flex-1 overflow-auto border border-stone-200/15 bg-[rgb(var(--pm-rail))]/70">
+      <table className="w-full min-w-[980px] border-collapse text-left">
+        <thead className="sticky top-0 z-20 border-b border-stone-200/12 bg-[rgb(var(--pm-card))]">
+          {table.getHeaderGroups().map((headerGroup) => (
+            <tr key={headerGroup.id}>
+              {headerGroup.headers.map((header) => {
+                const canSort = header.column.getCanSort();
+                return (
+                  <th
+                    key={header.id}
+                    className="border-r border-stone-200/10 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-stone-300 last:border-r-0"
+                  >
+                    {canSort ? (
+                      <button
+                        type="button"
+                        onClick={header.column.getToggleSortingHandler()}
+                        className="inline-flex items-center gap-1.5 text-left hover:text-stone-100"
+                      >
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        <SortIcon direction={header.column.getIsSorted()} />
+                      </button>
+                    ) : (
+                      flexRender(header.column.columnDef.header, header.getContext())
+                    )}
+                  </th>
+                );
+              })}
+            </tr>
+          ))}
+        </thead>
+        <tbody>
+          {loading && (
+            <tr>
+              <td
+                colSpan={table.getVisibleLeafColumns().length}
+                className="px-4 py-8 text-center text-xs text-stone-500"
+              >
+                Loading files…
+              </td>
+            </tr>
+          )}
+          {!loading && error && (
+            <tr>
+              <td
+                colSpan={table.getVisibleLeafColumns().length}
+                className="px-4 py-8 text-center text-xs text-red-300"
+              >
+                {error}
+              </td>
+            </tr>
+          )}
+          {!loading && !error && table.getRowModel().rows.length === 0 && (
+            <tr>
+              <td
+                colSpan={table.getVisibleLeafColumns().length}
+                className="px-4 py-8 text-center text-xs text-stone-500"
+              >
+                No files match the current filters.
+              </td>
+            </tr>
+          )}
+          {!loading &&
+            !error &&
+            table.getRowModel().rows.map((row) => (
+              <tr
+                key={row.id}
+                className="border-b border-stone-200/10 transition-colors hover:bg-white/[0.045]"
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <td key={cell.id} className="border-r border-stone-200/8 px-3 py-2 text-sm text-stone-300 last:border-r-0">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+            ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ProjectSheetTabs({
+  projects,
+  activeProjectId,
+  onSelectProject,
+}: {
+  projects: ProjectEntry[];
+  activeProjectId: string;
+  onSelectProject: (projectId: string) => void;
+}) {
+  return (
+    <div className="flex flex-none items-end overflow-x-auto border-t border-stone-200/15 bg-[rgb(var(--pm-rail))]/70">
+      {projects.map((project) => {
+        const active = project.id === activeProjectId;
+        return (
+          <button
+            key={project.id}
+            type="button"
+            onClick={() => onSelectProject(project.id)}
+            className={clsx(
+              'relative flex items-center gap-2 whitespace-nowrap border-r border-stone-200/15 px-4 py-2.5 text-sm font-medium transition-colors last:border-r-0',
+              active
+                ? 'bg-emerald-600/85 text-white shadow-sm'
+                : 'text-stone-300/85 hover:bg-white/5 hover:text-stone-100',
+            )}
+          >
+            <FolderKanban size={14} className={active ? 'text-current' : 'text-amber-100'} />
+            <span>{project.config.project.name}</span>
+            <span
+              className={clsx(
+                'ml-1 px-1.5 py-0.5 text-[10px] font-semibold leading-none',
+                active ? 'bg-white/25 text-white' : 'bg-stone-200/15 text-stone-100',
+              )}
+            >
+              {project.config.features.length}
+            </span>
+            {active && <span className="absolute left-0 right-0 top-0 h-0.5 bg-white/60" />}
+          </button>
+        );
+      })}
+      <div className="min-w-[20px] flex-1" />
+    </div>
+  );
+}
+
+function ProjectFileSheet({ project }: { project: ProjectEntry }) {
   const [realNodes, setRealNodes] = useState<FileNode[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isTauri, setIsTauri] = useState(false);
-  const [filterFeatureId, setFilterFeatureId] = useState<string | null>(null);
+  const [filterFeatureId, setFilterFeatureId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
   const isGitHub = project.configPath.startsWith('https://github.com/');
@@ -457,181 +614,204 @@ function ProjectPanel({ project }: { project: ProjectEntry }) {
   }, [isGitHub, root]);
 
   useEffect(() => {
-    if (isTauri) load();
+    if (isTauri) void load();
   }, [isTauri, load]);
 
-  // Auto-refresh every 30s
   useEffect(() => {
     if (!isTauri || isGitHub) return;
-    const timer = setInterval(load, 30_000);
-    return () => clearInterval(timer);
+    const timer = window.setInterval(() => void load(), 30_000);
+    return () => window.clearInterval(timer);
   }, [isTauri, isGitHub, load]);
 
   const featureMap = useMemo(() => buildFeaturePathMap(features, root), [features, root]);
+  const virtualNodes = useMemo(() => buildVirtualTree(features, root), [features, root]);
+  const baseNodes = isTauri && !isGitHub ? realNodes : virtualNodes;
+  const source: FileRowSource = isTauri && !isGitHub ? 'filesystem' : 'feature-paths';
 
-  // In browser mode, build virtual tree from feature paths
-  const virtualNodes = useMemo(() => {
-    if (isTauri) return null;
-    return buildVirtualTree(features, root);
-  }, [isTauri, features, root]);
+  const rows = useMemo(() => {
+    if (!baseNodes) return [];
+    const allRows = flattenNodes(baseNodes, root, featureMap, source);
+    const query = searchQuery.trim().toLowerCase();
 
-  const treeNodes = isTauri ? realNodes : virtualNodes;
-  const isBrowserMode = !isTauri && !isGitHub;
+    return allRows.filter((row) => {
+      if (filterFeatureId) {
+        const refs = [...row.featureRefs, ...row.descendantFeatureRefs];
+        if (!refs.some((ref) => ref.featureId === filterFeatureId)) return false;
+      }
+      if (!query) return true;
+      return (
+        row.name.toLowerCase().includes(query) ||
+        row.relativePath.toLowerCase().includes(query) ||
+        row.featureRefs.some(
+          (ref) =>
+            ref.featureId.toLowerCase().includes(query) ||
+            ref.featureName.toLowerCase().includes(query),
+        ) ||
+        row.descendantFeatureRefs.some(
+          (ref) =>
+            ref.featureId.toLowerCase().includes(query) ||
+            ref.featureName.toLowerCase().includes(query),
+        )
+      );
+    });
+  }, [baseNodes, featureMap, filterFeatureId, root, searchQuery, source]);
+
+  const mappedPathCount = useMemo(
+    () => features.reduce((sum, feature) => sum + Object.values(feature.paths).filter(Boolean).length, 0),
+    [features],
+  );
+
+  const openPath = useCallback((path: string) => {
+    if (!isTauri || isGitHub) return;
+    import('../../../lib/bridge')
+      .then(({ openPath: openProjectPath }) => openProjectPath(path))
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+  }, [isGitHub, isTauri]);
+
+  const modeMessage = isGitHub
+    ? 'GitHub-sourced project · feature path sheet'
+    : isTauri
+      ? 'Desktop filesystem sheet'
+      : 'Browser mode · feature path sheet';
 
   return (
-    <div className="space-y-4">
-      {/* Coverage Cards */}
-      <CoverageSection features={features} projectRoot={root} />
+    <section className="flex min-h-0 flex-1 flex-col">
+      <div className="flex flex-none flex-wrap items-center gap-3 border-b border-stone-200/12 px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-semibold uppercase tracking-[0.14em] text-stone-100">
+            {project.config.project.name}
+          </p>
+          <p className="mt-0.5 truncate font-mono text-[10px] text-stone-500">{root}</p>
+        </div>
+        <span className="inline-flex items-center gap-1.5 border border-stone-200/15 bg-white/[0.035] px-2 py-1 text-[10px] text-stone-400">
+          <HelpCircle size={10} />
+          {modeMessage}
+        </span>
+        <span className="text-[10px] text-stone-500">
+          {features.length} features · {mappedPathCount} mapped paths · {rows.length} rows
+        </span>
+      </div>
 
-      {/* File Tree Panel */}
-      <section className="border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72">
-        {/* Header */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-stone-200/12 px-4 py-2.5">
-          <FolderOpen size={14} className="shrink-0 text-amber-200/70" />
-          <div className="min-w-0 flex-1">
-            <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-stone-100">
-              {project.config.project.name}
-            </p>
-            <p className="mt-0.5 truncate text-[10px] text-stone-400">{root}</p>
-          </div>
-
-          {/* Feature Filter */}
-          <div className="relative">
-            <Filter size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-stone-500" />
-            <select
-              value={filterFeatureId ?? ''}
-              onChange={(e) => setFilterFeatureId(e.target.value || null)}
-              className="appearance-none border border-stone-200/15 bg-[rgb(var(--pm-input))] py-1 pl-6 pr-6 text-[10px] text-stone-300 outline-none focus:ring-1 focus:ring-emerald-300/35"
-            >
-              <option value="">All Features</option>
-              {features.map((f) => (
-                <option key={f.id} value={f.id}>
-                  [{f.id}] {f.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Search */}
-          <div className="relative">
-            <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-stone-500" />
-            <input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search…"
-              className="w-32 border border-stone-200/15 bg-[rgb(var(--pm-input))] py-1 pl-6 pr-2 text-[10px] text-stone-300 outline-none placeholder:text-stone-600 focus:ring-1 focus:ring-emerald-300/35"
-            />
-          </div>
-
-          {/* Refresh (Tauri only) */}
-          {!isGitHub && isTauri && (
-            <button
-              type="button"
-              onClick={load}
-              disabled={loading}
-              className="flex items-center gap-1 border border-stone-200/15 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-stone-400 hover:border-stone-200/30 hover:text-stone-200 disabled:opacity-40"
-            >
-              <RefreshCw size={10} className={loading ? 'animate-spin' : ''} />
-              Refresh
-            </button>
-          )}
+      <div className="flex flex-none flex-wrap items-center gap-2 border-b border-stone-200/10 px-4 py-2.5">
+        <div className="relative">
+          <Filter size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-stone-500" />
+          <select
+            value={filterFeatureId}
+            onChange={(event) => setFilterFeatureId(event.target.value)}
+            className="h-8 min-w-[220px] appearance-none border border-stone-200/15 bg-[rgb(var(--pm-input))] py-1 pl-7 pr-7 text-xs text-stone-300 outline-none focus:ring-1 focus:ring-emerald-300/35"
+          >
+            <option value="">All features</option>
+            {features.map((feature) => (
+              <option key={feature.id} value={feature.id}>
+                [{feature.id}] {feature.name}
+              </option>
+            ))}
+          </select>
         </div>
 
-        {/* Mode indicator */}
-        {isBrowserMode && (
-          <div className="border-b border-stone-200/8 bg-amber-500/[0.06] px-4 py-1.5">
-            <p className="flex items-center gap-1.5 text-[10px] text-amber-200/70">
-              <HelpCircle size={10} />
-              Browser mode — showing files defined in feature paths. Run the desktop app for full
-              file tree.
-            </p>
-          </div>
-        )}
-
-        {isGitHub && (
-          <div className="border-b border-stone-200/8 bg-stone-500/[0.06] px-4 py-1.5">
-            <p className="flex items-center gap-1.5 text-[10px] text-stone-400">
-              <HelpCircle size={10} />
-              GitHub-sourced project — showing files from feature path definitions.
-            </p>
-          </div>
-        )}
-
-        {/* Tree Body */}
-        <div className="p-1">
-          {isTauri && loading && (
-            <p className="px-3 py-4 text-[11px] text-stone-500">Loading…</p>
-          )}
-          {isTauri && error && <p className="px-3 py-4 text-[11px] text-red-400">{error}</p>}
-          {treeNodes && treeNodes.length === 0 && (
-            <p className="px-3 py-4 text-[11px] text-stone-500">
-              {features.length === 0
-                ? 'No features defined — add features with file paths to see the tree.'
-                : 'No matching files found.'}
-            </p>
-          )}
-          {treeNodes && treeNodes.length > 0 && (
-            <div className="max-h-[520px] overflow-y-auto py-1">
-              {treeNodes.map((node) => (
-                <TreeNodeRow
-                  key={node.path}
-                  node={node}
-                  depth={0}
-                  featureMap={featureMap}
-                  filterFeatureId={filterFeatureId}
-                  searchQuery={searchQuery}
-                />
-              ))}
-            </div>
-          )}
+        <div className="relative">
+          <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-stone-500" />
+          <input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search files"
+            className="h-8 w-56 border border-stone-200/15 bg-[rgb(var(--pm-input))] py-1 pl-7 pr-2 text-xs text-stone-300 outline-none placeholder:text-stone-600 focus:ring-1 focus:ring-emerald-300/35"
+          />
         </div>
-      </section>
-    </div>
+
+        {!isGitHub && isTauri && (
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            className="ml-auto inline-flex h-8 items-center gap-1.5 border border-stone-200/15 px-2.5 text-[10px] font-medium uppercase tracking-[0.14em] text-stone-400 hover:border-stone-200/30 hover:text-stone-200 disabled:opacity-40"
+          >
+            <RefreshCw size={11} className={loading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        )}
+      </div>
+
+      <FilesTable
+        rows={rows}
+        loading={loading && rows.length === 0}
+        error={error}
+        canOpenPaths={isTauri && !isGitHub}
+        onOpenPath={openPath}
+      />
+    </section>
   );
 }
 
-// ── Main view ─────────────────────────────────────────────────────────────────
+export function ProjectFilesView({
+  projects,
+  selectedDashboardProjectIds,
+  selectedProjectId,
+}: ProjectFilesViewProps) {
+  const displayedProjects = useMemo(() => {
+    const selected = projects.filter((project) => selectedDashboardProjectIds.includes(project.id));
+    if (selected.length > 0) return selected;
 
-interface ProjectFilesViewProps {
-  projects: ProjectEntry[];
-  selectedDashboardProjectIds: string[];
-}
+    const fallback = projects.find((project) => project.id === selectedProjectId) ?? projects[0];
+    return fallback ? [fallback] : [];
+  }, [projects, selectedDashboardProjectIds, selectedProjectId]);
 
-export function ProjectFilesView({ projects, selectedDashboardProjectIds }: ProjectFilesViewProps) {
-  const selected = projects.filter((p) => selectedDashboardProjectIds.includes(p.id));
-  const displayed = selected.length > 0 ? selected : projects.slice(0, 1);
+  const [activeProjectId, setActiveProjectId] = useState(displayedProjects[0]?.id ?? '');
 
-  // Aggregate stats
-  const totalFeatures = displayed.reduce((sum, p) => sum + p.config.features.length, 0);
-  const totalPaths = displayed.reduce(
-    (sum, p) =>
+  useEffect(() => {
+    if (displayedProjects.length === 0) {
+      setActiveProjectId('');
+      return;
+    }
+    if (!displayedProjects.some((project) => project.id === activeProjectId)) {
+      setActiveProjectId(displayedProjects[0].id);
+    }
+  }, [activeProjectId, displayedProjects]);
+
+  const activeProject =
+    displayedProjects.find((project) => project.id === activeProjectId) ?? displayedProjects[0];
+  const totalFeatures = displayedProjects.reduce((sum, project) => sum + project.config.features.length, 0);
+  const totalPaths = displayedProjects.reduce(
+    (sum, project) =>
       sum +
-      p.config.features.reduce(
-        (s, f) => s + Object.values(f.paths).filter(Boolean).length,
+      project.config.features.reduce(
+        (featureSum, feature) => featureSum + Object.values(feature.paths).filter(Boolean).length,
         0,
       ),
     0,
   );
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">
-          Project Files
-        </h1>
-        <p className="mt-1 text-xs text-stone-400">
-          Feature-aware file navigator.{' '}
-          <span className="text-stone-500">
-            {totalFeatures} feature{totalFeatures !== 1 ? 's' : ''} · {totalPaths} mapped path
-            {totalPaths !== 1 ? 's' : ''} · {displayed.length} project
-            {displayed.length !== 1 ? 's' : ''}
-          </span>
-        </p>
+    <div className="flex h-[calc(100vh-8rem)] min-h-[560px] flex-col overflow-hidden">
+      <div className="flex flex-none flex-wrap items-start gap-3 pb-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <Table2 size={17} className="text-emerald-200/80" />
+            <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">
+              Project Files
+            </h1>
+          </div>
+          <p className="mt-1 text-xs text-stone-400">
+            Dashboard project scope · {displayedProjects.length} sheet
+            {displayedProjects.length !== 1 ? 's' : ''} · {totalFeatures} features · {totalPaths} mapped paths
+          </p>
+        </div>
       </div>
 
-      {displayed.map((project) => (
-        <ProjectPanel key={project.id} project={project} />
-      ))}
+      {displayedProjects.length === 0 ? (
+        <div className="flex min-h-0 flex-1 items-center justify-center border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72 px-4 py-10 text-center text-xs text-stone-500">
+          No projects loaded.
+        </div>
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72">
+          <ProjectSheetTabs
+            projects={displayedProjects}
+            activeProjectId={activeProject?.id ?? ''}
+            onSelectProject={setActiveProjectId}
+          />
+          {activeProject && <ProjectFileSheet key={activeProject.id} project={activeProject} />}
+        </div>
+      )}
     </div>
   );
 }

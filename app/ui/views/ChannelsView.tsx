@@ -822,7 +822,7 @@ function countByStatus(features: Feature[]): Record<FeatureStatus, number> {
 async function handleStatusCommand(args: string[]): Promise<string> {
   const projects = await getProjectsRepository().listProjects();
   if (projects.length === 0) {
-    return 'No projects configured. Add one in the Projects view first.';
+    return 'No projects configured. Add one in the Dashboard Projects sheet first.';
   }
 
   if (args.length === 0) {

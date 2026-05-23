@@ -372,56 +372,57 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional one-shot per session
   }, [isTauri, storageInitialized]);
 
-  // Web dev mode: poll the dev-only registry route so projects added from the
-  // Tauri desktop app appear here automatically without a manual refresh.
+  // Callable from the Projects toolbar sync button and the background poll.
+  const syncFromDesktop = useCallback(async (): Promise<void> => {
+    const { buildProjectEntryFromPath } = await import('../../lib/storage');
+    const res = await fetch('/api/registry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'list' }),
+    });
+    if (!res.ok) return;
+    const entries = (await res.json()) as Array<{ configPath: string }>;
+    for (const entry of entries) {
+      try {
+        const built = await buildProjectEntryFromPath(entry.configPath, { isTauri: false });
+        setProjects((prev) =>
+          prev.some((p) => p.configPath === built.configPath) ? prev : [...prev, built],
+        );
+      } catch {
+        /* skip unreadable paths */
+      }
+    }
+  }, []);
+
+  // One-shot: write all existing Tauri projects into the shared registry so
+  // the web dev server can see them even before any new project is added.
   useEffect(() => {
-    if (isTauri || !storageInitialized) return;
-
-    let cancelled = false;
-    let inFlight = false;
-
-    async function syncFromRegistry(entries: Array<{ configPath: string }>) {
-      const { buildProjectEntryFromPath } = await import('../../lib/storage');
-      for (const entry of entries) {
-        if (cancelled) return;
-        try {
-          const built = await buildProjectEntryFromPath(entry.configPath, { isTauri: false });
-          setProjects((prev) =>
-            prev.some((p) => p.configPath === entry.configPath) ? prev : [...prev, built],
-          );
-        } catch {
-          /* skip unreadable paths */
+    if (!isTauri || !storageInitialized) return;
+    void (async () => {
+      const { addToRegistry } = await import('../../lib/bridge');
+      for (const p of projects) {
+        if (p.configPath && !p.configPath.startsWith('https://')) {
+          await addToRegistry(p.configPath).catch(() => {});
         }
       }
-    }
-
-    async function pollRegistry() {
-      if (inFlight || cancelled) return;
-      inFlight = true;
-      try {
-        const res = await fetch('/api/registry', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'list' }),
-        });
-        if (!res.ok) return;
-        const entries = (await res.json()) as Array<{ configPath: string }>;
-        await syncFromRegistry(entries);
-      } catch {
-        /* dev-only sync is best-effort */
-      } finally {
-        inFlight = false;
-      }
-    }
-
-    void pollRegistry();
-    const interval = window.setInterval(() => void pollRegistry(), 2000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional one-shot per session
   }, [isTauri, storageInitialized]);
+
+  // Web dev mode: background poll so new desktop projects appear automatically.
+  useEffect(() => {
+    if (isTauri || !storageInitialized) return;
+    let inFlight = false;
+    async function poll() {
+      if (inFlight) return;
+      inFlight = true;
+      await syncFromDesktop().catch(() => {});
+      inFlight = false;
+    }
+    void poll();
+    const interval = window.setInterval(() => void poll(), 2000);
+    return () => window.clearInterval(interval);
+  }, [isTauri, storageInitialized, syncFromDesktop]);
 
   // Persist projects and selected project across route changes/reloads.
   useEffect(() => {
@@ -465,7 +466,7 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
     });
   }, [projects, storageInitialized]);
 
-  // Respect route-provided project ID when opening /projects/[projectId].
+  // Respect an optional route-provided project ID for deep links.
   useEffect(() => {
     if (!initialProjectId) return;
     if (projects.some((p) => p.id === initialProjectId)) {
@@ -1081,12 +1082,21 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
           cronJobs={selectedProject.config.cronJobs ?? []}
           activeRuns={activeRuns}
           runHistory={runHistory}
+          projects={projects}
+          selectedProjectId={selectedProjectId}
+          selectedDashboardProjectIds={selectedDashboardProjectIds}
           dashboardProjectNames={effectiveDashboardProjects.map((p) => p.config.project.name)}
           dashboardProjects={effectiveDashboardProjects.map((p) => ({
             id: p.id,
             name: p.config.project.name,
             repoUrl: p.config.project.githubUrl,
           }))}
+          onSelectProject={setSelectedProjectId}
+          onToggleDashboardProject={handleToggleDashboardProject}
+          onAddProject={handleAddProject}
+          onUpdateProject={handleUpdateProject}
+          onRemoveProject={handleRemoveProject}
+          onSyncFromDesktop={syncFromDesktop}
           onCronJobsChange={handleCronJobsUpdate}
           onFeaturePatch={handleFeaturePatch}
           onFeaturePromptSave={handleFeaturePromptSave}
@@ -1094,6 +1104,20 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
           onRunStart={handleRunStart}
           onRunLog={handleRunLog}
           onRunEnd={handleRunEnd}
+        />
+      )}
+      {currentView === 'dashboard' && !selectedProject && (
+        <ProjectsView
+          projects={projects}
+          selectedProjectId={selectedProjectId}
+          selectedDashboardProjectIds={selectedDashboardProjectIds}
+          onSelectProject={setSelectedProjectId}
+          onToggleDashboardProject={handleToggleDashboardProject}
+          onAddProject={handleAddProject}
+          onUpdateProject={handleUpdateProject}
+          onRemoveProject={handleRemoveProject}
+          onSyncFromDesktop={syncFromDesktop}
+          runHistory={runHistory}
         />
       )}
       {currentView === 'features' && selectedProject && (
@@ -1108,19 +1132,6 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
           onRunLog={handleRunLog}
           onRunEnd={handleRunEnd}
           onFeatureUpdate={handleFeatureUpdate}
-        />
-      )}
-      {currentView === 'projects' && (
-        <ProjectsView
-          projects={projects}
-          selectedProjectId={selectedProjectId}
-          selectedDashboardProjectIds={selectedDashboardProjectIds}
-          onSelectProject={setSelectedProjectId}
-          onToggleDashboardProject={handleToggleDashboardProject}
-          onAddProject={handleAddProject}
-          onUpdateProject={handleUpdateProject}
-          onRemoveProject={handleRemoveProject}
-          runHistory={runHistory}
         />
       )}
       {currentView === 'plugins' && (
@@ -1177,6 +1188,7 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
         <ProjectFilesView
           projects={projects}
           selectedDashboardProjectIds={selectedDashboardProjectIds}
+          selectedProjectId={selectedProjectId}
         />
       )}
       {pendingEnvImportRoot && (

@@ -71,7 +71,7 @@ export const zhHant: Translations = {
     singleSelect: '單選',
     clear: '清除',
     loading: '載入中…',
-    noProjectsConfigured: '尚未設定專案，請先在「專案」頁面新增。',
+    noProjectsConfigured: '尚未設定專案，請先在 Dashboard 的「專案」sheet 新增。',
   },
   phases: {
     development: '開發',

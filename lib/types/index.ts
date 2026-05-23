@@ -26,6 +26,8 @@ export interface FeaturePromptConfig {
   maxIterations?: number;
   /** Optional working directory override. Defaults to the project root. */
   workingDir?: string;
+  /** "providerId/modelId" of the model that actually ran on the last dispatch, e.g. "openai/gpt-5.5". */
+  lastDispatchModel?: string;
 }
 
 export interface FeaturePaths {
@@ -190,6 +192,14 @@ export interface WorkingScope {
   mode: 'soft' | 'strict';
 }
 
+/** One entry in an engineer role's primary model or ordered fallback chain. */
+export interface ModelFallbackEntry {
+  /** LLM provider id — matches LlmProviderId from llmProviders.ts. */
+  providerId: string;
+  /** Exact model identifier passed to the provider API, e.g. "gpt-5.5". */
+  modelId: string;
+}
+
 export interface EngineerRole {
   id: string;
   name: string;
@@ -201,6 +211,10 @@ export interface EngineerRole {
   defaultAgentId?: string;
   notes?: string;
   workingScope?: WorkingScope;
+  /** Primary LLM model used when dispatching to this engineer. Stored on the role so dispatch modal stays simple. */
+  primaryModel?: ModelFallbackEntry;
+  /** Ordered fallback chain tried when primaryModel API call fails. Applies to direct LLM calls only, not CLI agent spawns. */
+  modelFallbacks?: ModelFallbackEntry[];
   /** LLM provider used by the in-page Test panel. Empty = fall back to Settings provider order. */
   testProviderId?: string;
   /** Model id for the chosen test provider. Empty = use that provider's defaultModel. */
@@ -209,7 +223,7 @@ export interface EngineerRole {
   testPrompt?: string;
 }
 
-export type ViewId = 'dashboard' | 'features' | 'projects' | 'project-files' | 'plugins' | 'settings' | 'engineers' | 'channels' | 'sessions' | 'cron-jobs' | 'logs' | 'keys' | 'documentation' | 'chat' | 'keyboard-shortcuts';
+export type ViewId = 'dashboard' | 'features' | 'project-files' | 'plugins' | 'settings' | 'engineers' | 'channels' | 'sessions' | 'cron-jobs' | 'logs' | 'keys' | 'documentation' | 'chat' | 'keyboard-shortcuts';
 
 export type IssueState = 'open' | 'closed';
 

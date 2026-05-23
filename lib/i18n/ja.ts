@@ -72,7 +72,7 @@ export const ja: Translations = {
     singleSelect: '単一選択',
     clear: 'クリア',
     loading: '読み込み中…',
-    noProjectsConfigured: 'プロジェクトが設定されていません。プロジェクト一覧で追加してください。',
+    noProjectsConfigured: 'プロジェクトが設定されていません。Dashboard の Projects sheet で追加してください。',
   },
   phases: {
     development: '開発',

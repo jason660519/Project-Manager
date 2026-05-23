@@ -146,6 +146,14 @@
       },
       "required": ["id", "name", "enabled", "schedule", "action", "createdAt"]
     },
+    "modelFallbackEntry": {
+      "type": "object",
+      "properties": {
+        "providerId": { "type": "string", "description": "LLM provider id, e.g. openai | anthropic | gemini | deepseek" },
+        "modelId":    { "type": "string", "description": "Exact model identifier passed to the provider API" }
+      },
+      "required": ["providerId", "modelId"]
+    },
     "engineerRole": {
       "type": "object",
       "properties": {
@@ -157,7 +165,13 @@
         "systemPrompt":   { "type": "string", "description": "Prepended to AI dispatch prompts" },
         "referenceFiles": { "type": "array", "items": { "type": "string" }, "description": "Paths relative to project root" },
         "defaultAgentId": { "type": "string" },
-        "notes":          { "type": "string" }
+        "notes":          { "type": "string" },
+        "primaryModel":   { "$ref": "#/definitions/modelFallbackEntry", "description": "Primary LLM model for dispatches from this role" },
+        "modelFallbacks": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/modelFallbackEntry" },
+          "description": "Ordered fallback chain tried when primaryModel fails (direct LLM calls only)"
+        }
       },
       "required": ["id", "name", "slug", "skills", "commands", "systemPrompt", "referenceFiles"]
     },
@@ -264,6 +278,7 @@
             "agentId":       { "type": "string" },
             "modelProviderId": { "type": "string" },
             "modelId":       { "type": "string" },
+            "lastDispatchModel": { "type": "string", "description": "providerId/modelId of the model that actually ran last, e.g. openai/gpt-5.5" },
             "autoLoop":      { "type": "boolean" },
             "stopCondition": { "type": "string" },
             "maxIterations": { "type": "integer", "minimum": 1 },

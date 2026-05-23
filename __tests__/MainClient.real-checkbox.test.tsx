@@ -2,13 +2,13 @@
  * Integration test using the REAL ProjectsView checkbox (not a mocked button).
  *
  * Reproduces the user-reported scenario:
- *   - On /projects, checking the project-manager checkbox should:
+ *   - In the Dashboard Projects sheet, checking the project-manager checkbox should:
  *     1. Show the DASHBOARD badge next to project-manager's name
  *     2. Bump "Dashboard scope: N" to 2
  *     3. Persist to localStorage so /project-progress-dashboard sees both
  */
 
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -18,11 +18,17 @@ vi.mock('../app/ui/AppShell', () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock('../app/ui/DashboardClient', () => ({
-  DashboardClient: ({ features }: { features: { id: string }[] }) => (
-    <div data-testid="dashboard" data-feature-count={features.length} />
-  ),
-}));
+vi.mock('../app/project-progress-dashboard/ProjectProgressClient', async () => {
+  const React = await import('react');
+  const { ProjectsView } = await vi.importActual<typeof import('../app/ui/views/ProjectsView')>(
+    '../app/ui/views/ProjectsView',
+  );
+
+  return {
+    ProjectProgressClient: (props: React.ComponentProps<typeof ProjectsView>) =>
+      React.createElement(ProjectsView, props),
+  };
+});
 
 vi.mock('../app/ui/views/FeaturesView', () => ({
   FeaturesView: () => <div data-testid="features" />,
@@ -48,6 +54,8 @@ vi.mock('../lib/adapters/registry', () => ({
 vi.mock('../lib/bridge', () => ({
   getGithubToken: async () => '',
   setGithubToken: async () => {},
+  getSecret: async () => null,
+  setSecret: async () => {},
 }));
 
 async function flushEffects() {
@@ -78,7 +86,7 @@ describe('real ProjectsView checkbox behavior', () => {
   it('clicking project-manager checkbox shows DASHBOARD badge and bumps scope to 2', async () => {
     const { MainClient } = await freshImport();
     const user = userEvent.setup();
-    render(<MainClient currentView="projects" />);
+    render(<MainClient currentView="dashboard" />);
     await flushEffects();
 
     // Two project rows should be rendered, both with their own checkbox.
@@ -107,7 +115,7 @@ describe('real ProjectsView checkbox behavior', () => {
   it('persists selection to namespaced localStorage so other routes see it', async () => {
     const { MainClient, getProjectsRepository } = await freshImport();
     const user = userEvent.setup();
-    const { unmount } = render(<MainClient currentView="projects" />);
+    const { unmount } = render(<MainClient currentView="dashboard" />);
     await flushEffects();
 
     const checkboxes = screen.getAllByRole('checkbox');
@@ -132,7 +140,7 @@ describe('real ProjectsView checkbox behavior', () => {
   it('unchecks project-manager when toggled off (does not stick like the first project)', async () => {
     const { MainClient } = await freshImport();
     const user = userEvent.setup();
-    render(<MainClient currentView="projects" />);
+    render(<MainClient currentView="dashboard" />);
     await flushEffects();
 
     const checkboxes = screen.getAllByRole('checkbox');
@@ -155,7 +163,7 @@ describe('real ProjectsView checkbox behavior', () => {
     );
 
     const { MainClient } = await freshImport();
-    render(<MainClient currentView="projects" />);
+    render(<MainClient currentView="dashboard" />);
     await flushEffects();
 
     const checkboxes = screen.getAllByRole('checkbox');

@@ -71,7 +71,7 @@ export const en: Translations = {
     singleSelect: 'Single',
     clear: 'Clear',
     loading: 'Loading…',
-    noProjectsConfigured: 'No projects configured. Add one in the Projects view first.',
+    noProjectsConfigured: 'No projects configured. Add one in the Dashboard Projects sheet first.',
   },
   phases: {
     development: 'Development',

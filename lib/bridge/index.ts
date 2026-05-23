@@ -986,6 +986,140 @@ export async function callGemini(opts: {
   });
 }
 
+// ── Multi-provider fallback call ─────────────────────────────────────────────
+
+export interface LlmFallbackAttempt {
+  providerId: string;
+  modelId: string;
+  outcome: 'success' | 'failed';
+  error?: string;
+}
+
+export interface LlmFallbackResult {
+  content: string;
+  inputTokens: number;
+  outputTokens: number;
+  usedProviderId: string;
+  usedModelId: string;
+  attempts: LlmFallbackAttempt[];
+}
+
+/**
+ * Returns true when the error string indicates the model ID does not exist at
+ * the provider — as opposed to a transient failure (rate limit, network, auth).
+ * Pattern-matched against the Rust command's error string.
+ */
+function isModelNotFoundError(err: string): boolean {
+  const s = err.toLowerCase();
+  return (
+    s.includes('model_not_found') ||
+    s.includes('model not found') ||
+    s.includes('no such model') ||
+    s.includes('does not exist') ||
+    s.includes('unknown model') ||
+    s.includes('invalid model') ||
+    s.includes('not_found') ||
+    // Gemini returns HTTP 404 for unknown model IDs
+    (s.includes('404') && (s.includes('model') || s.includes('not found')))
+  );
+}
+
+/**
+ * Call a single provider+model via the appropriate Tauri command.
+ * Extracted so both the primary attempt and the same-provider tier attempt
+ * can share the same dispatch logic.
+ */
+async function callOneModel(
+  spec: Awaited<ReturnType<typeof import('../keys/llmProviders').getLlmProvider>>,
+  apiKey: string,
+  modelId: string,
+  opts: { messages: AnthropicMessage[]; maxTokens?: number; temperature?: number },
+): Promise<AnthropicResponse> {
+  if (!spec) throw new Error('Unknown provider');
+  if (spec.apiKind === 'anthropic') {
+    return callAnthropic({ apiKey, model: modelId, maxTokens: opts.maxTokens, messages: opts.messages, temperature: opts.temperature });
+  }
+  if (spec.apiKind === 'gemini') {
+    return callGemini({ apiKey, model: modelId, maxTokens: opts.maxTokens, messages: opts.messages, temperature: opts.temperature });
+  }
+  return callOpenAICompatible({ apiKey, baseUrl: spec.baseUrl!, model: modelId, maxTokens: opts.maxTokens, messages: opts.messages, temperature: opts.temperature });
+}
+
+/**
+ * Try `primary` first; on failure walk `fallbacks` in order.
+ * Returns on the first successful response with a full attempt log.
+ * Throws only when every entry in the chain has been exhausted.
+ *
+ * Fallback strategy per entry:
+ *   1. Try the entry's model.
+ *   2. If it fails with a "model not found" error → try the provider's one-tier-
+ *      down `tierModel` (if defined and different from the entry model).
+ *   3. Transient errors (rate limit, network, auth) skip the tier attempt and
+ *      move immediately to the next chain entry.
+ *
+ * Applies to direct LLM API calls only — CLI agent spawns (spawn_agent) bake
+ * the primary model into the command args and do not use this fallback.
+ */
+export async function callLlmWithFallback(opts: {
+  primary: { providerId: string; modelId: string };
+  fallbacks?: Array<{ providerId: string; modelId: string }>;
+  messages: AnthropicMessage[];
+  maxTokens?: number;
+  temperature?: number;
+}): Promise<LlmFallbackResult> {
+  if (!isTauri()) throw new Error('callLlmWithFallback requires Tauri runtime');
+
+  const { getLlmProvider } = await import('../keys/llmProviders');
+  const chain = [opts.primary, ...(opts.fallbacks ?? [])];
+  const attempts: LlmFallbackAttempt[] = [];
+
+  for (const entry of chain) {
+    const spec = getLlmProvider(entry.providerId as Parameters<typeof getLlmProvider>[0]);
+    if (!spec) {
+      attempts.push({ providerId: entry.providerId, modelId: entry.modelId, outcome: 'failed', error: 'Unknown provider' });
+      continue;
+    }
+
+    let apiKey: string | null = null;
+    try {
+      apiKey = await getSecret('project-manager', spec.keychainKey);
+    } catch { /* key might not exist */ }
+    if (!apiKey) {
+      attempts.push({ providerId: entry.providerId, modelId: entry.modelId, outcome: 'failed', error: 'No API key stored' });
+      continue;
+    }
+
+    // ── Attempt 1: primary model for this entry ──────────────────────────────
+    try {
+      const res = await callOneModel(spec, apiKey, entry.modelId, opts);
+      attempts.push({ providerId: entry.providerId, modelId: entry.modelId, outcome: 'success' });
+      return { ...res, usedProviderId: entry.providerId, usedModelId: entry.modelId, attempts };
+    } catch (err) {
+      const errStr = String(err);
+      attempts.push({ providerId: entry.providerId, modelId: entry.modelId, outcome: 'failed', error: errStr });
+
+      // Transient error → skip tier attempt, try next provider
+      if (!isModelNotFoundError(errStr)) continue;
+    }
+
+    // ── Attempt 2: same-provider tier model (model-not-found only) ───────────
+    const tier = spec.tierModel;
+    if (!tier || tier === entry.modelId) continue;
+
+    try {
+      const res = await callOneModel(spec, apiKey, tier, opts);
+      attempts.push({ providerId: entry.providerId, modelId: tier, outcome: 'success' });
+      return { ...res, usedProviderId: entry.providerId, usedModelId: tier, attempts };
+    } catch (err) {
+      attempts.push({ providerId: entry.providerId, modelId: tier, outcome: 'failed', error: String(err) });
+      // tier also failed → fall through to next chain entry
+    }
+  }
+
+  const summary = attempts.map((a) => `${a.providerId}/${a.modelId}: ${a.error ?? 'failed'}`).join('; ');
+  throw new Error(`All models in fallback chain failed — ${summary}`);
+}
+
 // ── Sessions ──────────────────────────────────────────────────────────────────
 
 export interface SessionMessage {

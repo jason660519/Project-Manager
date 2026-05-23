@@ -51,6 +51,13 @@ export interface LlmProviderSpec {
   /** Default model used for AI Scan one-shots. The user can override later. */
   defaultModel: string;
   /**
+   * One-level-down fallback model tried automatically when the primary model
+   * returns a "model not found" error. Only one tier is attempted; on continued
+   * failure the chain moves to the next provider. Transient errors (rate limit,
+   * network) skip this and jump directly to the next provider.
+   */
+  tierModel?: string;
+  /**
    * Curated list of model IDs the user can pick from in Settings. We
    * intentionally hard-code instead of querying each provider's `/models`
    * endpoint — that adds noise (deprecated entries, embeddings, audio
@@ -74,7 +81,9 @@ const PROVIDERS: LlmProviderSpec[] = [
     docUrl: 'https://console.anthropic.com/settings/keys',
     apiKind: 'anthropic',
     defaultModel: 'claude-sonnet-4-6',
+    tierModel: 'claude-sonnet-4-6',
     availableModels: [
+      'claude-opus-4-7',
       'claude-sonnet-4-6',
       'claude-opus-4-1',
       'claude-haiku-4-5-20251001',
@@ -93,8 +102,9 @@ const PROVIDERS: LlmProviderSpec[] = [
     docUrl: 'https://platform.openai.com/api-keys',
     apiKind: 'openai-compatible',
     baseUrl: 'https://api.openai.com/v1',
-    defaultModel: 'gpt-4o',
-    availableModels: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'o1', 'o1-mini', 'gpt-3.5-turbo'],
+    defaultModel: 'gpt-5.5',
+    tierModel: 'gpt-4o',
+    availableModels: ['gpt-5.5', 'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'o1', 'o1-mini', 'gpt-3.5-turbo'],
   },
   {
     id: 'gemini',
@@ -106,12 +116,14 @@ const PROVIDERS: LlmProviderSpec[] = [
     validatePattern: /^AIza[A-Za-z0-9_-]{20,}$/,
     docUrl: 'https://aistudio.google.com/app/apikey',
     apiKind: 'gemini',
-    defaultModel: 'gemini-1.5-pro-latest',
+    defaultModel: 'gemini-2.5-flash',
+    tierModel: 'gemini-1.5-pro-latest',
     availableModels: [
+      'gemini-2.5-flash',
+      'gemini-2.5-pro',
       'gemini-1.5-pro-latest',
       'gemini-1.5-flash-latest',
       'gemini-2.0-flash-exp',
-      'gemini-2.5-pro',
     ],
   },
   {
@@ -124,8 +136,9 @@ const PROVIDERS: LlmProviderSpec[] = [
     docUrl: 'https://platform.deepseek.com/api_keys',
     apiKind: 'openai-compatible',
     baseUrl: 'https://api.deepseek.com/v1',
-    defaultModel: 'deepseek-chat',
-    availableModels: ['deepseek-chat', 'deepseek-reasoner'],
+    defaultModel: 'deepseek-v4',
+    tierModel: 'deepseek-chat',
+    availableModels: ['deepseek-v4', 'deepseek-chat', 'deepseek-reasoner'],
   },
   {
     id: 'grok',
@@ -138,6 +151,7 @@ const PROVIDERS: LlmProviderSpec[] = [
     apiKind: 'openai-compatible',
     baseUrl: 'https://api.x.ai/v1',
     defaultModel: 'grok-2-latest',
+    tierModel: 'grok-beta',
     availableModels: ['grok-2-latest', 'grok-2-1212', 'grok-beta'],
   },
   {

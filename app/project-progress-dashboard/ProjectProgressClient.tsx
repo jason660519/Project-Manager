@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, Upload } from 'lucide-react';
 import type {
   ActiveRun, AnyAdapterConfig, CompletedRun, CronJob, EngineerRole,
-  Feature, FeaturePhase, FeaturePromptConfig, ProjectConfig,
+  Feature, FeaturePhase, FeaturePromptConfig, ProjectConfig, ProjectEntry,
 } from '../../lib/types';
 import type { TabId } from './types';
 import type { CustomProjectProgressRow } from './types';
@@ -18,6 +18,7 @@ import { ExportProgressDialog } from './_components/ExportProgressDialog';
 import { PhaseTabContent } from './_components/PhaseTabContent';
 import { IssuesTab } from './_components/IssuesTab';
 import { TaskDispatchModal } from '../../components/table/TaskDispatchModal';
+import { ProjectsView } from '../ui/views/ProjectsView';
 
 interface ProjectProgressClientProps {
   project: ProjectConfig;
@@ -30,12 +31,21 @@ interface ProjectProgressClientProps {
   cronJobs: CronJob[];
   activeRuns: ActiveRun[];
   runHistory?: CompletedRun[];
+  projects: ProjectEntry[];
+  selectedProjectId: string;
+  selectedDashboardProjectIds: string[];
   dashboardProjectNames: string[];
   dashboardProjects: Array<{
     id: string;
     name: string;
     repoUrl?: string;
   }>;
+  onSelectProject: (id: string) => void;
+  onToggleDashboardProject: (id: string, selected: boolean) => void;
+  onAddProject: (entry: ProjectEntry) => void;
+  onUpdateProject: (entry: ProjectEntry) => void;
+  onRemoveProject: (id: string, deleteConfigFile: boolean) => Promise<void> | void;
+  onSyncFromDesktop?: () => Promise<void>;
   onCronJobsChange: (jobs: CronJob[]) => void;
   onFeaturePatch: (namespacedFeatureId: string, patch: Partial<Feature>) => void;
   onFeaturePromptSave: (featureId: string, config: FeaturePromptConfig) => void;
@@ -52,6 +62,7 @@ interface ProjectProgressClientProps {
 }
 
 const PHASE_IDS_ARRAY: FeaturePhase[] = ['development', 'e2e_testing', 'deployment', 'operations'];
+const TAB_IDS_ARRAY: TabId[] = ['projects', 'issues', ...PHASE_IDS_ARRAY];
 
 /** Legacy URL hash from before the testing tab was renamed to E2E. */
 const LEGACY_PHASE_HASH: Record<string, FeaturePhase> = {
@@ -61,11 +72,14 @@ const LEGACY_PHASE_HASH: Record<string, FeaturePhase> = {
 function resolveHashToTab(hash: string): TabId | null {
   const lowered = hash.toLowerCase();
   const resolved = LEGACY_PHASE_HASH[lowered] ?? lowered;
-  const validTabs: string[] = [...PHASE_IDS_ARRAY, 'issues'];
-  if (validTabs.includes(resolved)) {
+  if ((TAB_IDS_ARRAY as string[]).includes(resolved)) {
     return resolved as TabId;
   }
   return null;
+}
+
+function isFeaturePhaseTab(tab: TabId): tab is FeaturePhase {
+  return (PHASE_IDS_ARRAY as string[]).includes(tab);
 }
 
 function readInitialTab(): TabId {
@@ -80,7 +94,10 @@ function readInitialTab(): TabId {
 
 export function ProjectProgressClient({
   project, projectRoot, features, adapters, engineerRoles, cronJobs, activeRuns,
-  dashboardProjectNames, dashboardProjects, onCronJobsChange, onFeaturePatch, onFeaturePromptSave, onRunCronJob,
+  runHistory = [], projects, selectedProjectId, selectedDashboardProjectIds,
+  dashboardProjectNames, dashboardProjects, onSelectProject, onToggleDashboardProject,
+  onAddProject, onUpdateProject, onRemoveProject, onSyncFromDesktop,
+  onCronJobsChange, onFeaturePatch, onFeaturePromptSave, onRunCronJob,
   onRunStart, onRunLog, onRunEnd,
 }: ProjectProgressClientProps) {
   const [activeTab, setActiveTab] = useState<TabId>(() => readInitialTab());
@@ -88,7 +105,7 @@ export function ProjectProgressClient({
   const [dispatchRow, setDispatchRow] = useState<PhaseRow | null>(null);
   const [dispatchIssue, setDispatchIssue] = useState<{ title: string } | null>(null);
 
-  const isPhaseTab = activeTab !== 'issues';
+  const isPhaseTab = isFeaturePhaseTab(activeTab);
   const activePhase = isPhaseTab ? activeTab : 'development';
 
   // Sync URL hash both ways.
@@ -150,10 +167,15 @@ export function ProjectProgressClient({
             <Activity className="h-5 w-5 text-emerald-300" />
             Project Progress Dashboard
           </h1>
-          {dashboardProjectNames.length > 0 && (
+          {selectedDashboardProjectIds.length > 0 && dashboardProjectNames.length > 0 && (
             <p className="mt-1 text-xs text-cyan-200/85">
               Showing {dashboardProjectNames.length} selected project{dashboardProjectNames.length > 1 ? 's' : ''}:{' '}
               {dashboardProjectNames.join(', ')}
+            </p>
+          )}
+          {selectedDashboardProjectIds.length === 0 && dashboardProjectNames.length > 0 && (
+            <p className="mt-1 text-xs text-amber-100/85">
+              No dashboard projects selected; showing current project: {dashboardProjectNames.join(', ')}
             </p>
           )}
         </div>
@@ -187,7 +209,20 @@ export function ProjectProgressClient({
       {/* Active tab content area */}
       <div className="flex-1 min-h-0 flex flex-col">
         <div className="flex-1 min-h-0">
-          {isPhaseTab ? (
+          {activeTab === 'projects' ? (
+            <ProjectsView
+              projects={projects}
+              selectedProjectId={selectedProjectId}
+              selectedDashboardProjectIds={selectedDashboardProjectIds}
+              onSelectProject={onSelectProject}
+              onToggleDashboardProject={onToggleDashboardProject}
+              onAddProject={onAddProject}
+              onUpdateProject={onUpdateProject}
+              onRemoveProject={onRemoveProject}
+              onSyncFromDesktop={onSyncFromDesktop}
+              runHistory={runHistory}
+            />
+          ) : isPhaseTab ? (
             <PhaseTabContent
               phase={activePhase}
               projectName={project.name}
@@ -216,7 +251,12 @@ export function ProjectProgressClient({
             />
           )}
         </div>
-        <SheetTabs activeTab={activeTab} onTabChange={onChangeTab} phaseCounts={phaseCounts} />
+        <SheetTabs
+          activeTab={activeTab}
+          onTabChange={onChangeTab}
+          phaseCounts={phaseCounts}
+          projectCount={projects.length}
+        />
       </div>
 
       <ExportProgressDialog

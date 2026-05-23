@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { FolderLock, Loader2, Play, Plus, RefreshCw, Sparkles, Trash2, Users2, X } from 'lucide-react';
+import { Bot, FolderLock, Loader2, Play, Plus, RefreshCw, Sparkles, Trash2, Users2, X } from 'lucide-react';
 import { DEFAULT_ENGINEER_ROLES } from '../../../lib/defaults/engineerRoles';
 import { listLlmProviders, type LlmProviderId } from '../../../lib/keys/llmProviders';
 import { hasProviderKey, loadProviderKey } from '../../../lib/keys/loadProviderKey';
 import { loadProviderOrder, type ProviderOrderEntry } from '../../../lib/keys/providerOrder';
 import { callSingleProvider } from '../../../lib/scanner/runProjectScan';
-import type { AnyAdapterConfig, EngineerRole, WorkingScope } from '../../../lib/types';
+import type { AnyAdapterConfig, EngineerRole, ModelFallbackEntry, WorkingScope } from '../../../lib/types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -43,6 +43,10 @@ interface FormState {
   systemPrompt: string;
   defaultAgentId: string;
   notes: string;
+  primaryProviderId: string;
+  primaryModelId: string;
+  fallbacks: ModelFallbackEntry[];
+  fallbackInput: string;
   testProviderId: string;
   testModel: string;
   testPrompt: string;
@@ -59,6 +63,10 @@ function roleToForm(role: EngineerRole): FormState {
     systemPrompt: role.systemPrompt,
     defaultAgentId: role.defaultAgentId ?? '',
     notes: role.notes ?? '',
+    primaryProviderId: role.primaryModel?.providerId ?? '',
+    primaryModelId: role.primaryModel?.modelId ?? '',
+    fallbacks: role.modelFallbacks ?? [],
+    fallbackInput: '',
     testProviderId: role.testProviderId ?? '',
     testModel: role.testModel ?? '',
     testPrompt: role.testPrompt ?? '',
@@ -84,6 +92,10 @@ function formToRole(id: string, form: FormState, existing: EngineerRole): Engine
     defaultAgentId: form.defaultAgentId || undefined,
     notes: form.notes || undefined,
     workingScope,
+    primaryModel: form.primaryProviderId
+      ? { providerId: form.primaryProviderId, modelId: form.primaryModelId || (listLlmProviders().find((p) => p.id === form.primaryProviderId)?.defaultModel ?? '') }
+      : undefined,
+    modelFallbacks: form.fallbacks.length > 0 ? form.fallbacks : undefined,
     testProviderId: form.testProviderId || undefined,
     testModel: form.testModel || undefined,
     testPrompt: form.testPrompt || undefined,
@@ -216,6 +228,9 @@ function DetailPanel({ role, agents, onSave, onDelete }: DetailPanelProps) {
       if (field === 'testProviderId') {
         next.testModel = '';
       }
+      if (field === 'primaryProviderId') {
+        next.primaryModelId = '';
+      }
       return next;
     });
     setDirty(true);
@@ -234,6 +249,16 @@ function DetailPanel({ role, agents, onSave, onDelete }: DetailPanelProps) {
   const handleReset = () => {
     setForm(roleToForm(role));
     setDirty(false);
+  };
+
+  const handleAutoFill = () => {
+    const already = new Set(form.fallbacks.map((fb) => fb.providerId));
+    const toAdd: ModelFallbackEntry[] = providers
+      .filter((p) => keyAvail[p.id] && p.id !== form.primaryProviderId && !already.has(p.id))
+      .map((p) => ({ providerId: p.id, modelId: p.availableModels[0] ?? p.defaultModel }));
+    if (toAdd.length === 0) return;
+    setForm((prev) => ({ ...prev, fallbacks: [...prev.fallbacks, ...toAdd] }));
+    setDirty(true);
   };
 
   const handleResetTestPrompt = () => {
@@ -316,6 +341,131 @@ function DetailPanel({ role, agents, onSave, onDelete }: DetailPanelProps) {
           </select>
         </FormField>
       )}
+
+      {/* AI Model Configuration */}
+      <div className="space-y-3 border border-stone-200/15 bg-[rgb(var(--pm-card-3))]/40 p-3">
+        <div className="flex items-center gap-2">
+          <Bot size={13} className="text-stone-400" />
+          <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">
+            AI Model Configuration
+          </span>
+          <span className="ml-auto text-[10px] text-stone-600">
+            Primary + fallback chain for dispatch
+          </span>
+        </div>
+
+        {/* Primary model */}
+        <div className="grid grid-cols-2 gap-3">
+          <FormField label="Primary Provider">
+            <select value={form.primaryProviderId} onChange={set('primaryProviderId')} className={inputCls}>
+              <option value="">— Use dispatch default —</option>
+              {providers.map((p) => (
+                <option key={p.id} value={p.id}>{p.label}</option>
+              ))}
+            </select>
+          </FormField>
+          <FormField label="Primary Model">
+            <select
+              value={form.primaryModelId}
+              onChange={set('primaryModelId')}
+              disabled={!form.primaryProviderId}
+              className={`${inputCls} font-mono text-xs`}
+            >
+              {(() => {
+                const spec = providers.find((p) => p.id === form.primaryProviderId);
+                return (
+                  <>
+                    <option value="">{spec ? `Default (${spec.defaultModel})` : 'Pick a provider first'}</option>
+                    {spec?.availableModels.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </>
+                );
+              })()}
+            </select>
+          </FormField>
+        </div>
+
+        {/* Fallback chain */}
+        {form.fallbacks.length > 0 && (
+          <div className="space-y-2">
+            <span className="text-[10px] uppercase tracking-[0.12em] text-stone-600">Fallback Chain</span>
+            {form.fallbacks.map((fb, idx) => {
+              const fbSpec = providers.find((p) => p.id === fb.providerId);
+              return (
+                <div key={idx} className="grid grid-cols-[1fr_1fr_auto] items-center gap-2">
+                  <select
+                    value={fb.providerId}
+                    onChange={(e) => {
+                      const updated = form.fallbacks.map((f, i) => i === idx ? { providerId: e.target.value, modelId: '' } : f);
+                      setForm((prev) => ({ ...prev, fallbacks: updated }));
+                      setDirty(true);
+                    }}
+                    className={`${inputCls} text-xs`}
+                  >
+                    <option value="">— Provider —</option>
+                    {providers.map((p) => (
+                      <option key={p.id} value={p.id}>{p.label}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={fb.modelId}
+                    disabled={!fb.providerId}
+                    onChange={(e) => {
+                      const updated = form.fallbacks.map((f, i) => i === idx ? { ...f, modelId: e.target.value } : f);
+                      setForm((prev) => ({ ...prev, fallbacks: updated }));
+                      setDirty(true);
+                    }}
+                    className={`${inputCls} font-mono text-xs`}
+                  >
+                    <option value="">{fbSpec ? `Default (${fbSpec.defaultModel})` : 'Pick provider first'}</option>
+                    {fbSpec?.availableModels.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForm((prev) => ({ ...prev, fallbacks: prev.fallbacks.filter((_, i) => i !== idx) }));
+                      setDirty(true);
+                    }}
+                    className="text-stone-500 hover:text-red-400"
+                    aria-label="Remove fallback"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setForm((prev) => ({ ...prev, fallbacks: [...prev.fallbacks, { providerId: '', modelId: '' }] }));
+              setDirty(true);
+            }}
+            className="inline-flex items-center gap-1 border border-stone-200/18 px-2.5 py-1 text-[10px] text-stone-500 hover:border-stone-200/35 hover:text-stone-300"
+          >
+            <Plus size={10} /> Add Fallback
+          </button>
+          <button
+            type="button"
+            onClick={handleAutoFill}
+            disabled={!providers.some((p) => keyAvail[p.id])}
+            title="Add one entry per provider that has a saved API key (skips primary and already-added providers)"
+            className="inline-flex items-center gap-1 border border-stone-200/18 px-2.5 py-1 text-[10px] text-stone-500 hover:border-sky-300/30 hover:text-sky-300 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Sparkles size={10} /> Auto-fill from providers
+          </button>
+        </div>
+
+        <p className="text-[10px] text-stone-600">
+          CLI agent dispatches use the primary model flag only. Fallbacks apply to direct AI calls.
+        </p>
+      </div>
 
       {/* Skills */}
       <FormField label="Skills" hint="(one per line)">

@@ -24,7 +24,7 @@ import {
   checkCommandAvailability,
   type CommandAvailability,
 } from '../../lib/adapters/availability';
-import { listLlmProviders, type LlmProviderId } from '../../lib/keys/llmProviders';
+import { listLlmProviders } from '../../lib/keys/llmProviders';
 import { collectEnabledMcpServers } from '../../lib/storage/plugins';
 import { useI18n } from '../../lib/i18n';
 import type { Translations } from '../../lib/i18n/types';
@@ -420,18 +420,6 @@ const PHASE_OPTIONS: Array<{ value: FeaturePhase; phaseKey: keyof Translations['
   { value: 'operations', phaseKey: 'operations' },
 ];
 
-function inferProviderFromAdapter(adapter: AnyAdapterConfig | undefined): LlmProviderId | undefined {
-  if (!adapter || adapter.type !== 'agent') return undefined;
-  const marker = `${adapter.id} ${adapter.name} ${adapter.command}`.toLowerCase();
-  if (marker.includes('claude') || marker.includes('anthropic')) return 'anthropic';
-  if (marker.includes('codex') || marker.includes('openai')) return 'openai';
-  if (marker.includes('gemini') || marker.includes('google')) return 'gemini';
-  if (marker.includes('deepseek')) return 'deepseek';
-  if (marker.includes('grok') || marker.includes('xai')) return 'grok';
-  if (marker.includes('qwen')) return 'qwen';
-  if (marker.includes('openrouter')) return 'openrouter';
-  return undefined;
-}
 
 function adapterToIDE(adapter: AnyAdapterConfig): IDEId | undefined {
   if (adapter.type !== 'ide') return undefined;
@@ -606,24 +594,9 @@ export function TaskDispatchModal({
     () => resolveInitialAdapterId(feature, adapters, engineerRoles, defaultIDE),
     [adapters, defaultIDE, engineerRoles, feature],
   );
-  const fallbackProviderId = llmProviders[0]?.id ?? 'anthropic';
-
   const [selectedRoleId, setSelectedRoleId] = useState(feature.assignedRoleId ?? '');
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>('');
   const [selectedAdapterId, setSelectedAdapterId] = useState(initialAdapterId);
-  const [selectedModelProviderId, setSelectedModelProviderId] = useState<LlmProviderId>(() => {
-    const saved = feature.promptConfig?.modelProviderId;
-    const savedProvider = llmProviders.find((provider) => provider.id === saved);
-    if (savedProvider) return savedProvider.id;
-    const initialAdapter = adapters.find((adapter) => adapter.id === initialAdapterId);
-    return inferProviderFromAdapter(initialAdapter) ?? fallbackProviderId;
-  });
-  const [selectedModelId, setSelectedModelId] = useState(() => {
-    const saved = feature.promptConfig?.modelId?.trim();
-    if (saved) return saved;
-    const provider = llmProviders.find((candidate) => candidate.id === selectedModelProviderId);
-    return provider?.defaultModel ?? '';
-  });
   const [selectedPhase, setSelectedPhase] = useState<FeaturePhase>(
     feature.phase ?? 'development',
   );
@@ -689,15 +662,6 @@ export function TaskDispatchModal({
   const isSelectedTargetBlocked = selectedPreflight?.canRun === false;
   const selectedRole = engineerRoles.find((r) => r.id === selectedRoleId) ?? null;
   const selectedWorkflow = selectedWorkflowId ? getAgentWorkflowById(selectedWorkflowId) ?? null : null;
-  const selectedModelProvider =
-    llmProviders.find((provider) => provider.id === selectedModelProviderId) ?? llmProviders[0];
-  const selectedModelOptions = selectedModelProvider
-    ? Array.from(new Set([
-        selectedModelProvider.defaultModel,
-        ...selectedModelProvider.availableModels,
-        selectedModelId,
-      ].filter(Boolean)))
-    : [];
   const executionTargetGroups = [
     {
       label: d.targetGroupIde,
@@ -722,31 +686,23 @@ export function TaskDispatchModal({
     }
   };
 
-  const handleModelProviderChange = (providerId: string) => {
-    const provider = llmProviders.find((candidate) => candidate.id === providerId);
-    if (!provider) return;
-    setSelectedModelProviderId(provider.id);
-    setSelectedModelId(provider.defaultModel);
-  };
-
   const buildAssignmentPatch = (): DispatchFeatureUpdate => {
     const adapter = adapters.find((a) => a.id === selectedAdapterId);
+    const role = engineerRoles.find((r) => r.id === selectedRoleId);
+    const lastDispatchModel = role?.primaryModel
+      ? `${role.primaryModel.providerId}/${role.primaryModel.modelId}`
+      : undefined;
     const promptConfig: FeaturePromptConfig = {
       body: prompt.trim() || undefined,
       agentId: selectedAdapterId || undefined,
-      modelProviderId: selectedModelProviderId,
-      modelId: selectedModelId || undefined,
       autoLoop: autoLoop || undefined,
       stopCondition: autoLoop && stopCondition.trim() ? stopCondition.trim() : undefined,
       maxIterations: autoLoop ? maxIterations : undefined,
+      lastDispatchModel,
     };
-    const role = engineerRoles.find((r) => r.id === selectedRoleId);
     const adapterLabel = adapter?.name ?? selectedAdapterId;
     const roleLabel = role ? ` (${role.name})` : '';
-    const modelLabel = selectedModelProvider && selectedModelId
-      ? ` · ${selectedModelProvider.label} / ${selectedModelId}`
-      : '';
-    const assignedTo = `${adapterLabel}${roleLabel}${modelLabel}`;
+    const assignedTo = `${adapterLabel}${roleLabel}`;
     const patch: DispatchFeatureUpdate = {
       assignedRoleId: selectedRoleId || undefined,
       phase: selectedPhase,
@@ -850,11 +806,12 @@ export function TaskDispatchModal({
 
   const buildExecutionPrompt = () => {
     let effectivePrompt = prompt;
-    if (!isIDE && selectedModelProvider && selectedModelId) {
+    if (!isIDE && selectedRole?.primaryModel) {
+      const providerLabel = llmProviders.find((p) => p.id === selectedRole.primaryModel!.providerId)?.label ?? selectedRole.primaryModel.providerId;
       effectivePrompt =
         `[${d.modelPromptTitle}]\n` +
-        `${d.modelProviderLabel}: ${selectedModelProvider.label}\n` +
-        `${d.modelIdLabel}: ${selectedModelId}\n\n---\n\n${effectivePrompt}`;
+        `${d.modelProviderLabel}: ${providerLabel}\n` +
+        `${d.modelIdLabel}: ${selectedRole.primaryModel.modelId}\n\n---\n\n${effectivePrompt}`;
     }
     if (selectedRole) {
       const parts: string[] = [];
@@ -927,6 +884,10 @@ export function TaskDispatchModal({
         onRunEnd?.(exitPid, code);
         onFeatureUpdate?.(feature.id, { assignedTo: undefined, assignedAt: undefined });
         if (succeeded) {
+          const role = engineerRoles.find((r) => r.id === selectedRoleId);
+          if (role?.primaryModel) {
+            setLogs((prev) => [...prev, `── executed by: ${role.primaryModel!.providerId}/${role.primaryModel!.modelId} ──`]);
+          }
           onFeatureUpdate?.(feature.id, { progress: Math.min(feature.progress + 20, 100) });
         }
       });
@@ -1223,122 +1184,68 @@ export function TaskDispatchModal({
                 </div>
               )}
 
-              {/* Model selector */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-stone-200">
-                    {d.modelProviderLabel}
-                  </label>
-                  <select
-                    value={selectedModelProviderId}
-                    onChange={(e) => handleModelProviderChange(e.target.value)}
-                    className="w-full border border-stone-200/20 bg-[rgb(var(--pm-input))] px-3 py-2 text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
-                  >
-                    {llmProviders.map((provider) => (
-                      <option key={provider.id} value={provider.id}>
-                        {provider.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-stone-200">
-                    {d.modelIdLabel}
-                  </label>
-                  <select
-                    value={selectedModelId}
-                    onChange={(e) => setSelectedModelId(e.target.value)}
-                    className="w-full border border-stone-200/20 bg-[rgb(var(--pm-input))] px-3 py-2 text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
-                  >
-                    {selectedModelOptions.map((model) => (
-                      <option key={model} value={model}>
-                        {model}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              {/* Model + execution target preview (read-only, configured on the Engineers page) */}
+              <div className="space-y-1.5">
+                {selectedRole?.primaryModel ? (
+                  <div className="border border-stone-200/12 bg-[rgb(var(--pm-input))]/50 px-3 py-2 text-[11px] text-stone-400">
+                    <span className="text-stone-300">Model: </span>
+                    {llmProviders.find((p) => p.id === selectedRole.primaryModel!.providerId)?.label ?? selectedRole.primaryModel.providerId}
+                    {' / '}
+                    <span className="font-mono">{selectedRole.primaryModel.modelId}</span>
+                    {selectedRole.modelFallbacks && selectedRole.modelFallbacks.length > 0 && (
+                      <span className="ml-2 text-stone-500" title={selectedRole.modelFallbacks.map((f) => `${f.providerId}/${f.modelId}`).join(' → ')}>
+                        +{selectedRole.modelFallbacks.length} fallback{selectedRole.modelFallbacks.length > 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+                ) : selectedRoleId ? (
+                  <p className="text-[11px] text-amber-400/70">
+                    No primary model configured on this engineer — set one in the Engineers page.
+                  </p>
+                ) : null}
 
-              {/* Execution target selector */}
-              <div>
-                <label className="mb-1 block text-sm font-medium text-stone-200">
-                  {d.runtimeLabel}
-                </label>
-                <select
-                  value={selectedAdapterId}
-                  onChange={(e) => setSelectedAdapterId(e.target.value)}
-                  className="w-full border border-stone-200/20 bg-[rgb(var(--pm-input))] px-3 py-2 text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
-                >
-                  {executionTargetGroups.map((group) => (
-                    <optgroup key={group.label} label={group.label}>
-                      {group.adapters.map((a) => {
-                        const preflight = describeTargetPreflight(a, commandAvailability[a.id], d);
-                        const statusMarker =
-                          preflight?.status === 'available'
-                            ? '✓'
-                            : preflight?.status === 'missing' || preflight?.status === 'blocked'
-                              ? '⚠'
-                              : '?';
-                        return (
-                          <option key={a.id} value={a.id}>
-                            {statusMarker} {a.name}
-                          </option>
-                        );
-                      })}
-                    </optgroup>
-                  ))}
-                </select>
-                {selectedPreflight && (
-                  <div
-                    className={[
-                      'mt-2 border px-3 py-2 text-[11px]',
-                      selectedPreflight.status === 'available'
-                        ? 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100'
-                        : selectedPreflight.status === 'missing' || selectedPreflight.status === 'blocked'
-                          ? 'border-red-400/35 bg-red-500/10 text-red-100'
-                          : selectedPreflight.status === 'checking'
-                            ? 'border-stone-300/20 bg-white/[0.035] text-stone-300'
-                            : 'border-amber-300/30 bg-amber-500/10 text-amber-100',
-                    ].join(' ')}
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold">{selectedPreflight.label}</span>
-                      <span className="text-stone-400">{selectedPreflight.managementLabel}</span>
-                    </div>
-                    <p className="mt-1 text-stone-300/85">{selectedPreflight.description}</p>
-                    <p className="mt-1 break-all font-mono text-[10px] text-stone-400">
-                      {d.targetCommandLabel}: {selectedPreflight.commandLabel}
-                    </p>
+                {selectedAdapter && (
+                  <div className="border border-stone-200/12 bg-[rgb(var(--pm-input))]/50 px-3 py-2 text-[11px] text-stone-400">
+                    <span className="text-stone-300">Target: </span>
+                    {selectedAdapter.name}
+                    {selectedPreflight && selectedPreflight.status !== 'available' && (
+                      <span className={[
+                        'ml-2',
+                        selectedPreflight.status === 'missing' || selectedPreflight.status === 'blocked'
+                          ? 'text-red-400/80'
+                          : 'text-amber-400/80',
+                      ].join(' ')}>
+                        ⚠ {selectedPreflight.label} — {selectedPreflight.description}
+                      </span>
+                    )}
                   </div>
                 )}
+
                 {mcpLoading && (
-                  <div className="mt-1.5 flex items-center gap-2 text-[11px] text-stone-400">
+                  <div className="flex items-center gap-2 text-[11px] text-stone-400">
                     <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-stone-400 border-t-transparent" />
                     {d.mcpLoading}
                   </div>
                 )}
                 {mcpError && (
-                  <div className="mt-1.5 border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-[11px] text-red-200">
+                  <div className="border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-[11px] text-red-200">
                     {mcpError}
                   </div>
                 )}
                 {!mcpLoading && !mcpError && mcpInjection && (
-                  <p className="mt-1.5 text-[11px] text-emerald-300/80">
+                  <p className="text-[11px] text-emerald-300/80">
                     {d.mcpInjected
                       .replace('{count}', String(mcpInjection.count))
                       .replace('{flag}', mcpInjection.flag)}
                   </p>
                 )}
                 {!mcpLoading && !mcpError && !mcpInjection && selectedTargetKind === 'agent-cli' && (
-                  <p className="mt-1.5 text-[11px] text-stone-500">
-                    {d.mcpEmpty}
-                  </p>
+                  <p className="text-[11px] text-stone-500">{d.mcpEmpty}</p>
                 )}
                 {isAgentApp && (
-                  <p className="mt-1.5 text-[11px] text-amber-200/80">
-                    {d.appTargetHint}
-                  </p>
+                  <p className="text-[11px] text-amber-200/80">{d.appTargetHint}</p>
                 )}
+
               </div>
 
               {isIDE ? (
@@ -1504,6 +1411,14 @@ export function TaskDispatchModal({
               {phase === 'error' && dispatchError && (
                 <div className="mt-2 border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
                   {dispatchError}
+                </div>
+              )}
+              {/* Fallback hint: shown after a failed run if the engineer has a fallback chain */}
+              {phase === 'error' && selectedRole?.modelFallbacks && selectedRole.modelFallbacks.length > 0 && (
+                <div className="mt-2 border border-amber-400/25 bg-amber-950/30 px-3 py-2 text-[11px] text-amber-200/80">
+                  <p>Primary model: <span className="font-mono">{selectedRole.primaryModel?.providerId}/{selectedRole.primaryModel?.modelId}</span></p>
+                  <p className="mt-0.5">Available fallbacks: {selectedRole.modelFallbacks.map((f) => `${f.providerId}/${f.modelId}`).join(' · ')}</p>
+                  <p className="mt-0.5 text-stone-500">→ Update this engineer&apos;s primary model in the Engineers page to retry with a different one.</p>
                 </div>
               )}
             </div>

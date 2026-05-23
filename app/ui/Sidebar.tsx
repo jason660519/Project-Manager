@@ -4,7 +4,6 @@ import Link from 'next/link';
 import {
   Activity,
   BookOpen,
-  Boxes,
   CircleGauge,
   Files,
   FileText,
@@ -45,7 +44,6 @@ const NAV_GROUPS: NavGroup[] = [
   {
     groupKey: 'workspace',
     items: [
-      { id: 'projects',      itemKey: 'projects',  href: '/projects',                  icon: Boxes },
       { id: 'dashboard',     itemKey: 'dashboard', href: '/project-progress-dashboard', icon: CircleGauge },
       { id: 'project-files', itemKey: 'files',     href: '/project-files',             icon: Files },
     ],
@@ -53,10 +51,10 @@ const NAV_GROUPS: NavGroup[] = [
   {
     groupKey: 'execution',
     items: [
-      { id: 'engineers', itemKey: 'engineers', href: '/engineers', icon: Users2 },
       { id: 'plugins',   itemKey: 'plugins',   href: '/plugins',   icon: Plug },
       { id: 'channels',  itemKey: 'channels',  href: '/channels',  icon: Radio },
       { id: 'cron-jobs', itemKey: 'cronJobs',  href: '/cron-jobs', icon: Timer },
+      { id: 'engineers', itemKey: 'engineers', href: '/engineers', icon: Users2 },
     ],
   },
   {

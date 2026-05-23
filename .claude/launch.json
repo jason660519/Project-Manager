@@ -2,7 +2,8 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "Project Manager Dev",
+      "name": "Project Manager Web",
+      "autoPort": false,
       "runtimeExecutable": "npx",
       "runtimeArgs": ["next", "dev", "--port", "43187"],
       "port": 43187

@@ -33,6 +33,7 @@ export interface PhaseRow extends PhaseRowMeta {
   assignedIDE?: IDEId;
   assignedTo?: string;
   assignedAt?: string;
+  lastDispatchModel?: string;
   /** Absolute project root for this row's source project (may differ from the dashboard's selected project). */
   sourceProjectRoot?: string;
   /** Underlying feature, when source==='feature'. */
@@ -83,6 +84,7 @@ export function featureToPhaseRow(feature: Feature, defaultProjectName?: string)
     assignedIDE: feature.assignedIDE,
     assignedTo: feature.assignedTo,
     assignedAt: feature.assignedAt,
+    lastDispatchModel: feature.promptConfig?.lastDispatchModel,
     feature,
   };
 }

@@ -23,6 +23,7 @@ import {
   createGithubIssue,
   fetchGithubIssues,
   getGithubToken,
+  onGithubUpdated,
   reopenGithubIssueWithComment,
   updateGithubIssue,
   type GithubIssueCommentPayload,
@@ -87,6 +88,8 @@ const GITHUB_PROVIDER = PROVIDERS.find((provider) => provider.id === 'github') ?
 function isTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
+
+const AUTO_SYNC_MS = 5 * 60 * 1000; // 5 minutes
 
 function cacheKey(projectName: string): string {
   return `${CACHE_PREFIX}${projectName.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
@@ -223,6 +226,9 @@ export function IssuesTab({
   const [oauthOpen, setOauthOpen] = useState(false);
 
   const initialized = useRef(false);
+  // Stable ref so auto-sync effects can call the latest onSync without
+  // restarting their intervals/listeners every time syncedAt changes.
+  const onSyncRef = useRef<() => Promise<void>>(async () => {});
   const effectiveRepoUrl = (repoUrl ?? '').trim();
   const repoTargets = useMemo<RepoTarget[]>(() => {
     const fromSelected = selectedProjects
@@ -470,6 +476,46 @@ export function IssuesTab({
     }
     void onSync();
   }, [hasToken, onSync]);
+
+  // Keep the ref current so auto-sync effects always call the latest onSync.
+  useEffect(() => {
+    onSyncRef.current = onSync;
+  }, [onSync]);
+
+  // Auto-sync when token becomes available and cached data is stale (>5 min).
+  useEffect(() => {
+    if (hasToken !== true || repoTargets.length === 0) return;
+    const now = Date.now();
+    const anyStale = repoTargets.some((r) => {
+      const t = syncedAt[r.repoUrl];
+      return !t || now - t > AUTO_SYNC_MS;
+    });
+    if (anyStale) void onSyncRef.current();
+    // Intentional: only fires when hasToken flips to true, not on every syncedAt update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasToken]);
+
+  // Tauri: auto-refresh when the background poll fires for a watched repo.
+  // Bridges the gap so the Issues tab stays current without manual "Sync" clicks.
+  useEffect(() => {
+    if (!isTauri() || repoTargets.length === 0) return;
+    const watchedUrls = new Set(repoTargets.map((r) => r.repoUrl));
+    let unlisten: (() => void) | undefined;
+    (async () => {
+      unlisten = await onGithubUpdated(({ repoUrl }) => {
+        if (watchedUrls.has(repoUrl)) void onSyncRef.current();
+      });
+    })();
+    return () => unlisten?.();
+  }, [repoTargets]);
+
+  // Browser/web mode: periodic sync every 5 minutes (Tauri uses startGithubPoll instead).
+  useEffect(() => {
+    if (isTauri() || hasToken !== true || repoTargets.length === 0) return;
+    const id = setInterval(() => void onSyncRef.current(), AUTO_SYNC_MS);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasToken, repoTargets]);
 
   useEffect(() => {
     if (!detailIssue) return;

@@ -9,7 +9,6 @@ import type { ChatContext } from '../../lib/chat/types';
 import { ChatPanel } from '../../components/chat/ChatPanel';
 
 const VIEW_LABELS: Record<ViewId, string> = {
-  projects:            'Projects',
   dashboard:           'Project Progress Dashboard',
   'project-files':     'Project Files',
   plugins:             'Plugins',

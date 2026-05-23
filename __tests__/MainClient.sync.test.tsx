@@ -2,7 +2,7 @@
  * Integration tests for the cross-route dashboard-project selection sync.
  *
  * Core scenario:
- *   1. User visits /projects (MainClient currentView='projects')
+ *   1. User opens the Dashboard Projects sheet (MainClient currentView='dashboard')
  *   2. User toggles the 'project-manager' checkbox → selection persisted to localStorage
  *   3. User navigates to /project-progress-dashboard or /project-files
  *      (new MainClient instance mounts)
@@ -29,8 +29,30 @@ vi.mock('../app/ui/AppShell', () => ({
 // stub it the same way the legacy DashboardClient stub worked so the existing
 // data-testid contract still holds.
 vi.mock('../app/project-progress-dashboard/ProjectProgressClient', () => ({
-  ProjectProgressClient: ({ features }: { features: { id: string }[] }) => (
-    <div data-testid="dashboard" data-feature-count={features.length} />
+  ProjectProgressClient: ({
+    features,
+    selectedDashboardProjectIds,
+    onToggleDashboardProject,
+  }: {
+    features: { id: string }[];
+    selectedDashboardProjectIds: string[];
+    onToggleDashboardProject: (id: string, selected: boolean) => void;
+  }) => (
+    <div data-testid="dashboard" data-feature-count={features.length}>
+      <span data-testid="current-selection">{JSON.stringify(selectedDashboardProjectIds)}</span>
+      <button
+        data-testid="toggle-project-manager-on"
+        onClick={() => onToggleDashboardProject('project-manager', true)}
+      >
+        Add project-manager
+      </button>
+      <button
+        data-testid="toggle-project-manager-off"
+        onClick={() => onToggleDashboardProject('project-manager', false)}
+      >
+        Remove project-manager
+      </button>
+    </div>
   ),
 }));
 
@@ -117,7 +139,7 @@ beforeEach(() => {
 describe('checkbox toggle → localStorage sync', () => {
   it('adds project-manager to localStorage immediately when checkbox is checked', async () => {
     const user = userEvent.setup();
-    const { unmount } = render(<MainClient currentView="projects" />);
+    const { unmount } = render(<MainClient currentView="dashboard" />);
     await flushEffects();
 
     await user.click(screen.getByTestId('toggle-project-manager-on'));
@@ -136,7 +158,7 @@ describe('checkbox toggle → localStorage sync', () => {
     );
 
     const user = userEvent.setup();
-    const { unmount } = render(<MainClient currentView="projects" />);
+    const { unmount } = render(<MainClient currentView="dashboard" />);
     await flushEffects();
 
     await user.click(screen.getByTestId('toggle-project-manager-off'));
@@ -154,7 +176,7 @@ describe('checkbox toggle → localStorage sync', () => {
     );
 
     const user = userEvent.setup();
-    const { unmount } = render(<MainClient currentView="projects" />);
+    const { unmount } = render(<MainClient currentView="dashboard" />);
     await flushEffects();
 
     // Remove project-manager — selection should drop to just owner-property
@@ -170,12 +192,12 @@ describe('checkbox toggle → localStorage sync', () => {
   });
 });
 
-describe('cross-route persistence: /projects → /project-files', () => {
-  it('project-files view sees project-manager selected after it was toggled in projects view', async () => {
+describe('cross-route persistence: dashboard Projects sheet → /project-files', () => {
+  it('project-files view sees project-manager selected after it was toggled in the Projects sheet', async () => {
     const user = userEvent.setup();
 
-    // Mount /projects and add project-manager
-    const { unmount: unmount1 } = render(<MainClient currentView="projects" />);
+    // Mount Dashboard and add project-manager from the Projects sheet.
+    const { unmount: unmount1 } = render(<MainClient currentView="dashboard" />);
     await flushEffects();
     await user.click(screen.getByTestId('toggle-project-manager-on'));
     unmount1();
@@ -199,7 +221,7 @@ describe('cross-route persistence: /projects → /project-files', () => {
     );
 
     const user = userEvent.setup();
-    const { unmount: unmount1 } = render(<MainClient currentView="projects" />);
+    const { unmount: unmount1 } = render(<MainClient currentView="dashboard" />);
     await flushEffects();
     await user.click(screen.getByTestId('toggle-project-manager-off'));
     unmount1();
@@ -215,11 +237,11 @@ describe('cross-route persistence: /projects → /project-files', () => {
   });
 });
 
-describe('cross-route persistence: /projects → /project-progress-dashboard', () => {
+describe('cross-route persistence: dashboard Projects sheet → /project-progress-dashboard', () => {
   it('dashboard receives updated feature list after project-manager is added', async () => {
     const user = userEvent.setup();
 
-    const { unmount: unmount1 } = render(<MainClient currentView="projects" />);
+    const { unmount: unmount1 } = render(<MainClient currentView="dashboard" />);
     await flushEffects();
     await user.click(screen.getByTestId('toggle-project-manager-on'));
     unmount1();
@@ -240,7 +262,7 @@ describe('init: localStorage state is restored on fresh mount', () => {
       JSON.stringify(['owner-property', 'project-manager']),
     );
 
-    render(<MainClient currentView="projects" />);
+    render(<MainClient currentView="dashboard" />);
     await flushEffects();
 
     const selectionEl = screen.getByTestId('current-selection');
@@ -251,7 +273,7 @@ describe('init: localStorage state is restored on fresh mount', () => {
   });
 
   it('defaults to first project when localStorage is empty', async () => {
-    render(<MainClient currentView="projects" />);
+    render(<MainClient currentView="dashboard" />);
     await flushEffects();
 
     const selectionEl = screen.getByTestId('current-selection');
@@ -262,11 +284,11 @@ describe('init: localStorage state is restored on fresh mount', () => {
 });
 
 describe('empty project list', () => {
-  it('renders projects view without crashing when storage has zero projects', async () => {
+  it('renders dashboard without crashing when storage has zero projects', async () => {
     localStorage.setItem(KEY_SHARED_PROJECTS, JSON.stringify([]));
     localStorage.setItem(KEY_PERSONAL_SEEDED, 'true');
 
-    render(<MainClient currentView="projects" />);
+    render(<MainClient currentView="dashboard" />);
     await flushEffects();
 
     expect(screen.getByTestId('projects')).toBeInTheDocument();

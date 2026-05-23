@@ -71,7 +71,7 @@ export const zh: Translations = {
     singleSelect: '单选',
     clear: '清除',
     loading: '加载中…',
-    noProjectsConfigured: '暂无项目，请先在「项目」页面添加。',
+    noProjectsConfigured: '暂无项目，请先在 Dashboard 的“项目”sheet 添加。',
   },
   phases: {
     development: '开发',

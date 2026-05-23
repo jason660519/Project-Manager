@@ -56,11 +56,14 @@ export interface WidthPreset {
   widths: number[];
 }
 
-/** Phase tab id — matches FeaturePhase 1:1. */
-export const PHASE_IDS = ['development', 'e2e_testing', 'deployment', 'operations', 'issues'] as const;
+/** Phase tab ids — match FeaturePhase 1:1. */
+export const PHASE_IDS = ['development', 'e2e_testing', 'deployment', 'operations'] as const;
+
+/** All dashboard sheet ids, in visual order. */
+export const SHEET_IDS = ['projects', 'issues', ...PHASE_IDS] as const;
 
 /** All recognized tab ids: phase tabs + sheet tabs. */
-export type TabId = (typeof PHASE_IDS)[number];
+export type TabId = (typeof SHEET_IDS)[number];
 
 export interface PhaseRowMeta {
   rowKey: string;        // unique within the phase (eg `feature::F01` or `custom::abc`)
