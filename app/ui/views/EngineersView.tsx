@@ -455,7 +455,11 @@ function DetailPanel({ role, agents, onSave, onDelete }: DetailPanelProps) {
             type="button"
             onClick={handleAutoFill}
             disabled={!providers.some((p) => keyAvail[p.id])}
-            title="Add one entry per provider that has a saved API key (skips primary and already-added providers)"
+            title={
+              providers.some((p) => keyAvail[p.id])
+                ? 'Add one entry per provider that has a saved API key (skips primary and already-added providers)'
+                : 'No API keys saved yet — visit the Keys page first'
+            }
             className="inline-flex items-center gap-1 border border-stone-200/18 px-2.5 py-1 text-[10px] text-stone-500 hover:border-sky-300/30 hover:text-sky-300 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Sparkles size={10} /> Auto-fill from providers
