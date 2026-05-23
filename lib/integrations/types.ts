@@ -6,7 +6,6 @@ export type IntegrationSheet =
   | 'channels'
   | 'memory'
   | 'commands'
-  | 'company_standards'
   | 'connect';
 
 export type IntegrationStatus =
@@ -30,8 +29,7 @@ export type IntegrationSourceKind =
   | 'command-mapping'
   | 'memory'
   | 'slash-command'
-  | 'system-cli'
-  | 'standards-provider';
+  | 'system-cli';
 
 export interface IntegrationManualFields {
   lv?: number;

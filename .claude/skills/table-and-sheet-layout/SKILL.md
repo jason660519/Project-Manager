@@ -1,32 +1,86 @@
 ---
-name: 'Create TanStack Table'
-description: 'Build or extend data tables in Project-Manager using raw TanStack Table v8. Triggered when creating a new table, adding columns, or modifying TableCore. Covers column patterns, numeric sort rules, complex cell extraction, layout pitfalls, and the project colour system.'
-applyTo: 'components/table/**,app/ui/views/**,app/project-progress-dashboard/**'
+name: 'Table and Sheet Layout'
+description: 'Build or modify any data table, sheet tab panel, bottom sheet tabs, workstation-style view, or dashboard layout in Project-Manager. Triggered when creating, editing, refactoring, or debugging any TanStack table, view with multiple tabs, viewport-fixed page, panel container, or any file under app/ui/views/. Covers the WorkstationFrame + BottomSheetTabs reusable components, column patterns, numeric sort rules, complex cell extraction, the Excel-style bottom tabs contract, layout pitfalls, and the project colour system.'
+applyTo: 'components/table/**,components/layout/**,components/sheets/**,app/ui/views/**,app/project-progress-dashboard/**'
 ---
 
-# Create TanStack Table — Project-Manager
+# Table and Sheet Layout — Project-Manager
 
-Build data tables using **raw TanStack Table v8** (no wrapper). Reference implementation:
-`components/table/TableCore.tsx`
+Build data tables, sheets, and workstation-style views using **raw TanStack Table v8** and the project's reusable layout components. Reference implementations:
+
+- `components/layout/WorkstationFrame.tsx` — viewport-fixed page frame with header / toolbar / content / bottom-tabs slots
+- `components/sheets/BottomSheetTabs.tsx` — Excel-style sheet tabs (active indicator at top, icon + badge supported)
+- `components/table/TableCore.tsx` — table primitives, column patterns, styling tokens
 
 ## When to Use This Skill
 
-- Creating a new table in `components/table/` or `app/ui/views/`
+- Creating a new view under `app/ui/views/` (table-heavy, sheet-with-tabs, dashboard, form — any of them)
+- Adding or moving tab / sheet UI on an existing view
+- Creating a new table in `components/table/` or extending `TableCore`
 - Adding columns to an existing table
 - Refactoring inline cell JSX into separate cell components
-- Debugging sort, layout, or scroll issues in a table
+- Debugging sort, layout, scroll, sheet-tab-position, or double-scrollbar issues
 
 ## When NOT to Use
 
 - Simple lists with < 5 rows (a plain `<ul>` is cleaner)
 - Read-only single-column displays (use a card layout instead)
+- Modal dialogs or popovers (different layout contract)
+
+---
+
+## Reusable Layout Components — Use These Before Inlining
+
+Every page with a workstation contract (table, sheets, dashboard panels) **must** use `WorkstationFrame`. Every sheet tab strip **must** use `BottomSheetTabs`. Do not re-implement them inline — drift from the contract is the entire reason these components exist.
+
+### WorkstationFrame
+
+```tsx
+import { WorkstationFrame } from '@/components/layout/WorkstationFrame';
+
+<WorkstationFrame
+  header={<h1>My View</h1>}
+  toolbar={<FilterBar />}              // optional
+  panelClassName="border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72"
+  scrollChildren={false}                // false when children own their own scroll (e.g. a table)
+  bottomTabs={<BottomSheetTabs ... />}  // optional
+>
+  <YourContent />
+</WorkstationFrame>
+```
+
+Slot rules:
+- `header` — shrink-0. Title, breadcrumbs.
+- `toolbar` — shrink-0. Filters, search, action buttons.
+- `children` — flex-1, min-h-0. Owns the vertical scroll unless `scrollChildren={false}`.
+- `bottomTabs` — shrink-0 at the very bottom. **Always pass `<BottomSheetTabs />` here. Never put a tab strip in the header.**
+- `scrollChildren` — default `true`. Set to `false` when content has its own `overflow-auto` to avoid double scrollbars.
+
+### BottomSheetTabs
+
+```tsx
+import { BottomSheetTabs, type SheetTabItem } from '@/components/sheets/BottomSheetTabs';
+
+const TABS: ReadonlyArray<SheetTabItem<MyTabKey>> = [
+  { key: 'overview', label: 'Overview', icon: <Layers size={14} />, badge: 12 },
+  { key: 'details',  label: 'Details' },
+];
+
+<BottomSheetTabs tabs={TABS} activeKey={tab} onSelect={setTab} />
+```
+
+Tab strip sits at the **bottom** of the panel (Excel-style). Active indicator is the top white bar.
+
+Reference migrations: `app/ui/views/ProjectFilesView.tsx`, `app/ui/views/KeysView.tsx`.
 
 ---
 
 ## Source Files — Read Before Generating
 
-1. `components/table/TableCore.tsx` — the main table component (column patterns, styling tokens)
-2. `lib/types/index.ts` — `Feature`, `FeatureStatus`, `FeaturePaths` type definitions
+1. `components/layout/WorkstationFrame.tsx` — frame contract
+2. `components/sheets/BottomSheetTabs.tsx` — bottom-tab contract
+3. `components/table/TableCore.tsx` — table component (column patterns, styling tokens)
+4. `lib/types/index.ts` — `Feature`, `FeatureStatus`, `FeaturePaths` type definitions
 
 ---
 

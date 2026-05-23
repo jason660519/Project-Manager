@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import {
   Activity,
+  BadgeCheck,
   BookOpen,
   CircleGauge,
   Files,
@@ -51,7 +52,7 @@ const NAV_GROUPS: NavGroup[] = [
     groupKey: 'execution',
     items: [
       { id: 'keys',             itemKey: 'keys',            href: '/keys',                     icon: KeyRound },
-      { id: 'integrations-hub', itemKey: 'integrationsHub', href: '/integrations-hub',         icon: Plug },
+      { id: 'integrations-hub', itemKey: 'integrationsHub', href: '/integrations-hub/plugins', icon: Plug },
       { id: 'cron-jobs',        itemKey: 'cronJobs',        href: '/cron-jobs',                icon: Timer },
       { id: 'engineers',        itemKey: 'engineers',       href: '/engineers',                icon: Users2 },
     ],
@@ -67,8 +68,9 @@ const NAV_GROUPS: NavGroup[] = [
   {
     groupKey: 'system',
     items: [
-      { id: 'settings',      itemKey: 'settings', href: '/settings',      icon: Settings },
-      { id: 'documentation', itemKey: 'docs',     href: '/documentation', icon: BookOpen },
+      { id: 'settings',          itemKey: 'settings',         href: '/settings',          icon: Settings },
+      { id: 'documentation',     itemKey: 'docs',             href: '/documentation',     icon: BookOpen },
+      { id: 'company-standards', itemKey: 'companyStandards', href: '/company-standards', icon: BadgeCheck },
     ],
   },
 ];

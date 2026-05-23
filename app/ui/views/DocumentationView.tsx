@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
-  ArrowLeft,
   BookOpen,
   CheckCircle2,
   Clock3,
@@ -27,7 +26,6 @@ import type {
 interface DocumentationViewProps {
   manifest: DocumentationSiteManifest;
   initialSlug?: string[];
-  standalone?: boolean;
 }
 
 type ClassificationFilter = DocumentationClassification | 'all';
@@ -241,7 +239,7 @@ function SyncPreview({ manifest }: { manifest: DocumentationSiteManifest }) {
   );
 }
 
-export function DocumentationView({ manifest, initialSlug = [], standalone = false }: DocumentationViewProps) {
+export function DocumentationView({ manifest, initialSlug = [] }: DocumentationViewProps) {
   const initialPath = normalizeInitialSlug(initialSlug);
   const initialDoc = manifest.docs.find((doc) => doc.slug === initialPath);
   const initialFolder =
@@ -295,24 +293,10 @@ export function DocumentationView({ manifest, initialSlug = [], standalone = fal
     setActiveDocId('');
   };
 
-  const containerClass = standalone
-    ? 'min-h-screen text-stone-100'
-    : 'flex h-full min-h-0 flex-col overflow-hidden text-stone-100';
-  const frameClass = standalone ? 'flex min-h-screen flex-col overflow-hidden' : 'flex h-full min-h-0 flex-col overflow-hidden';
-
   return (
-    <div className={containerClass} style={standalone ? { background: 'var(--pm-bg)' } : undefined}>
-      <div className={frameClass}>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden text-stone-100">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden">
         <header className="shrink-0 border-b border-stone-200/10 bg-black/10 px-5 py-4">
-          {standalone && (
-            <a
-              href="/"
-              className="mb-3 inline-flex items-center gap-1.5 text-[11px] text-stone-500 transition-colors hover:text-stone-300"
-            >
-              <ArrowLeft size={12} />
-              Back to App
-            </a>
-          )}
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2">

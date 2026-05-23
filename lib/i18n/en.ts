@@ -22,6 +22,7 @@ export const en: Translations = {
     shortcuts: 'Shortcuts',
     settings: 'Settings',
     docs: 'Docs',
+    companyStandards: 'Company Standards',
     chat: 'Chat',
   },
   system: {

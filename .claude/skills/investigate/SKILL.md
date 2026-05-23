@@ -66,7 +66,7 @@ Only walk this table after Pass 1 didn't match — Pass 2 patterns are narrower 
 | **Prompt-assembly leak** | Prompt structure changes server-side feel wrong | Prompt must be assembled in **TypeScript** (ADR-003), not Rust |
 | **Renderer key exposure** | API key appears anywhere outside `call_anthropic` | ADR-004 violation — never let the renderer see it |
 | **Race on file watch / save** | UI updates skip, double-write to `.project-manager.json` | Debounce / dedupe in the writing path; check Tauri FS watcher overlap |
-| **TanStack column drift** | Column count vs `flexRender` mismatch, sort breaks | `TableCore.tsx` column definitions — see `create-tanstack-table` skill |
+| **TanStack column drift** | Column count vs `flexRender` mismatch, sort breaks | `TableCore.tsx` column definitions — see `table-and-sheet-layout` skill |
 | **Next.js cache stale** | UI shows old data, fixes on hard reload | App Router cache, `revalidatePath`, or `next.config.ts` static export interaction |
 | **Tauri menu/event leak** | Event fires N times after N reloads | `unlisten()` not called in component cleanup |
 

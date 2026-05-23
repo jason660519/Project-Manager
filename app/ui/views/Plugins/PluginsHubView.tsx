@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ExternalLink, FileText, MessageCircle, RotateCw, Snowflake, X } from 'lucide-react';
 import type { IntegrationRow, IntegrationSheet } from '../../../../lib/integrations/types';
 import { mergeAllManual } from '../../../../lib/integrations/manual-metadata';
@@ -110,11 +111,14 @@ type PluginsRowDensity = 'compact' | 'comfortable';
 
 export interface PluginsHubViewProps {
   projectRoot?: string;
+  /** Sheet driven by the URL (`/integrations-hub/<sheet>`). Defaults to `plugins`. */
+  initialSheet?: IntegrationSheet;
 }
 
-export function PluginsHubView({ projectRoot = '' }: PluginsHubViewProps) {
+export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubViewProps) {
   const { t } = useI18n();
-  const [activeSheet, setActiveSheet] = useState<IntegrationSheet>('plugins');
+  const router = useRouter();
+  const activeSheet: IntegrationSheet = initialSheet ?? 'plugins';
   const [pluginsFilter, setPluginsFilter] = useState<PluginsFilter>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
@@ -150,6 +154,14 @@ export function PluginsHubView({ projectRoot = '' }: PluginsHubViewProps) {
   const [rowDensity, setRowDensity] = useState<PluginsRowDensity>('comfortable');
 
   const refreshManual = () => setManualVersion((v) => v + 1);
+
+  // Reset per-sheet state when the URL sheet changes — dynamic-segment
+  // navigation keeps the component mounted, so selection/filters persist
+  // across tabs unless we explicitly clear them here.
+  useEffect(() => {
+    setSelectedRow(null);
+    setCategoryFilter('all');
+  }, [activeSheet]);
 
   useEffect(() => {
     const c = loadPluginCatalog();
@@ -411,45 +423,6 @@ export function PluginsHubView({ projectRoot = '' }: PluginsHubViewProps) {
   const skillsRowsMerged = useMemo(() => mergeAllManual(skillRows), [skillRows, manualVersion]);
   const memoryRowsMerged = useMemo(() => mergeAllManual(memoryRows), [memoryRows, manualVersion]);
   const commandRowsMerged = useMemo(() => mergeAllManual(commandRows), [commandRows, manualVersion]);
-  const companyStandardsRows = useMemo<IntegrationRow[]>(
-    () =>
-      mergeAllManual([
-        {
-          rowKey: 'standards:company-ai-app-design-standards',
-          sheet: 'company_standards',
-          sourceKind: 'standards-provider',
-          sourceId: 'company-ai-app-standards',
-          enabled: true,
-          category1: 'Governance',
-          category2: 'Design Standards',
-          githubUrl: '',
-          company: 'Company AI',
-          name: 'Company-AI-App-Design Standards',
-          version: 'draft-v0.1',
-          license: '',
-          scope: 'project',
-          port: '5174',
-          installPath: '/Volumes/KLEVV-4T-1/Company-AI-App-Standards',
-          status: 'connected',
-          statusLabel: 'Available',
-          lastUpdated: new Date().toISOString().slice(0, 10),
-          notes:
-            'Optional provider for standards profiles and checks. Uses local docs as fallback when provider is unavailable.',
-          lv: null,
-          badges: ['optional', 'plugin-contract', 'design-governance'],
-          payload: {
-            standardsRoot: '/Volumes/KLEVV-4T-1/Company-AI-App-Standards',
-            contractDoc:
-              '/Volumes/KLEVV-4T-1/Project-Manager/docs/integrations/company-standards-plugin-contract.md',
-            baselineDoc:
-              '/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/patterns/table-governance.md',
-            profileDoc:
-              '/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/patterns/project-manager-table-profile.md',
-          },
-        },
-      ]),
-    [manualVersion],
-  );
   const systemCliRows = useMemo(
     () => commandRowsMerged.filter((row) => row.sourceKind === 'system-cli'),
     [commandRowsMerged],
@@ -489,9 +462,7 @@ export function PluginsHubView({ projectRoot = '' }: PluginsHubViewProps) {
             ? channelRows
             : activeSheet === 'memory'
               ? memoryRowsMerged
-              : activeSheet === 'company_standards'
-                ? companyStandardsRows
-                : commandRowsMerged;
+              : commandRowsMerged;
     if (categoryFilter !== 'all') {
       rows = rows.filter((r) => r.category1 === categoryFilter);
     }
@@ -502,7 +473,6 @@ export function PluginsHubView({ projectRoot = '' }: PluginsHubViewProps) {
     skillsRowsMerged,
     channelRows,
     memoryRowsMerged,
-    companyStandardsRows,
     commandRowsMerged,
     categoryFilter,
   ]);
@@ -714,11 +684,6 @@ export function PluginsHubView({ projectRoot = '' }: PluginsHubViewProps) {
     { id: 'channels', label: t.integrations.sheetChannels, count: channelRows.length },
     { id: 'memory', label: t.integrations.sheetMemory, count: memoryRowsMerged.length },
     { id: 'commands', label: t.integrations.sheetCommands, count: commandRowsMerged.length },
-    {
-      id: 'company_standards',
-      label: 'Company-AI-App-Design Standards',
-      count: companyStandardsRows.length,
-    },
     { id: 'connect', label: 'Connect', count: null },
   ];
 
@@ -1018,9 +983,9 @@ export function PluginsHubView({ projectRoot = '' }: PluginsHubViewProps) {
                 key={s.id}
                 type="button"
                 onClick={() => {
-                  setActiveSheet(s.id);
                   setSelectedRow(null);
                   setCategoryFilter('all');
+                  router.push(`/integrations-hub/${s.id}`);
                 }}
                 className={`relative flex items-center gap-1.5 border-r border-stone-200/15 px-4 py-2.5 text-xs font-medium uppercase tracking-[0.08em] ${
                   isActive

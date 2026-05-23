@@ -128,8 +128,12 @@ When the diff introduces a new enum value, status string, tier, or discriminated
 ### 4C. Doc Governance (if `docs/*.md` touched)
 - Top-level docs must be bilingual block layout — run `npm run docs:check`. Fix or flag failures.
 
-### 4D. TanStack Tables (if `components/table/**` or new table)
-- Did the diff follow the `create-tanstack-table` skill? Cell extraction, numeric sort, layout pitfalls.
+### 4D. Tables, Sheets & Workstation Layout (if `app/ui/views/**`, `components/table/**`, `components/sheets/**`, or `components/layout/**` touched)
+- Did the diff follow the `table-and-sheet-layout` skill? Cell extraction, numeric sort, layout pitfalls.
+- Any view with multiple tabs / sheets uses `WorkstationFrame` + `BottomSheetTabs` from `components/layout` and `components/sheets/` — flag any inline re-implementation.
+- Sheet tab strip sits at the **bottom** of the panel (Excel-style). A tab strip rendered above the content is a defect.
+- Single vertical scroll owner per workstation page — no `overflow-auto` on a node that also has `overflow-hidden`, no nested `overflow-auto` causing double scrollbars.
+- Hard-coded `h-[calc(100vh-XXrem)]` inside a sheet/panel that should fill its parent — change to `h-full min-h-0`.
 
 ### 4E. Tests
 - New behaviour has no test → flag and propose the test file path + 1-line test name.

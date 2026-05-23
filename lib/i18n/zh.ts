@@ -22,6 +22,7 @@ export const zh: Translations = {
     shortcuts: '快捷键',
     settings: '设置',
     docs: '文档',
+    companyStandards: '公司规范',
     chat: '聊天',
   },
   system: {
