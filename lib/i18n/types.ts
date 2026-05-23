@@ -347,6 +347,10 @@ export interface Translations {
   dispatch: {
     title: string;
     phaseLabel: string;
+    taskRoleLabel: string;
+    taskRolePlanner: string;
+    taskRoleWorker: string;
+    taskRoleEvaluator: string;
     engineerLabel: string;
     workflowLabel: string;
     modelProviderLabel: string;

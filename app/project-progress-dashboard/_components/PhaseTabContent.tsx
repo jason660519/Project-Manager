@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import type { Feature, FeaturePhase, FeaturePromptConfig } from '../../../lib/types';
+import type { EngineerRole, Feature, FeaturePhase, FeaturePromptConfig } from '../../../lib/types';
 import { useI18n } from '../../../lib/i18n';
 import type { CustomProjectProgressRow, PhaseTablePrefs } from '../types';
 import { buildPhaseRows, type PhaseRow } from '../_lib/phaseRows';
@@ -24,6 +24,7 @@ interface PhaseTabContentProps {
   projectNames?: string[];
   projectRoot: string;
   features: Feature[];
+  engineerRoles?: EngineerRole[];
   prefs: PhaseTablePrefs;
   patch: (next: Partial<PhaseTablePrefs>) => void;
   reset: () => void;
@@ -35,7 +36,7 @@ interface PhaseTabContentProps {
 }
 
 export function PhaseTabContent({
-  phase, projectName, projectNames, projectRoot, features, prefs, patch, reset,
+  phase, projectName, projectNames, projectRoot, features, engineerRoles, prefs, patch, reset,
   onFeaturePromptSave, onFeaturePatch, onDispatchRow,
 }: PhaseTabContentProps) {
   const { t } = useI18n();
@@ -77,7 +78,7 @@ export function PhaseTabContent({
       if (!showHiddenRows && hiddenSet.has(r.rowKey)) return false;
       if (q) {
         const catHay = phase === 'e2e_testing' ? e2eCategorySearchTokens(r.category) : r.category;
-        const hay = `${r.projectName ?? ''} ${r.id} ${r.name} ${catHay} ${r.locatedPage ?? ''}`.toLowerCase();
+        const hay = `${r.projectName ?? ''} ${r.id} ${r.name} ${catHay} ${r.locatedSection ?? ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -160,6 +161,7 @@ export function PhaseTabContent({
 
   const handlers = useMemo(() => ({
     projectRoot,
+    engineerRoles,
     hiddenRowKeysSet: hiddenSet,
     onToggleHideRow,
     onDeleteCustomRow,
@@ -168,7 +170,7 @@ export function PhaseTabContent({
     onChangePhase,
     onDispatch: onDispatchRow,
     onOpenNotePanel: (absPath: string) => setNotesPanelPath(absPath),
-  }), [projectRoot, hiddenSet, onToggleHideRow, onDeleteCustomRow, onPatchFeature, onPatchCustomRow, onChangePhase, onDispatchRow]);
+  }), [projectRoot, engineerRoles, hiddenSet, onToggleHideRow, onDeleteCustomRow, onPatchFeature, onPatchCustomRow, onChangePhase, onDispatchRow]);
 
   return (
     <div className="flex flex-col gap-2">

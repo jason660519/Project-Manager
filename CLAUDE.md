@@ -34,7 +34,7 @@ Project Manager is a cross-project engineering dashboard that ingests heterogene
 ```
 Source (Word/Excel/MD/Folder)
   -> Ingestion Layer (static + AI mapping)
-  -> Canonical Project Manager JSON (.project-manager/config.json, schemaVersion: 5)
+  -> Canonical Project Manager JSON (.project-manager/config.json, schemaVersion: 6)
   -> Dashboard UI (TanStack Table)
   -> Runtime Adapters -> Local IDE / Agent CLI (via Rust bridge)
 ```

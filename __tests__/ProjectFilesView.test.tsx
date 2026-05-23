@@ -5,7 +5,7 @@ import type { ProjectEntry, ProjectManagerConfig } from '../lib/types';
 
 function projectEntry(id: string, name: string, root: string, featureId: string, filePath: string): ProjectEntry {
   const config: ProjectManagerConfig = {
-    schemaVersion: 5,
+    schemaVersion: 6,
     id,
     project: {
       name,

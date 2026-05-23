@@ -10,7 +10,7 @@ export interface PhaseRow extends PhaseRowMeta {
   status: FeatureStatus;
   progress: number;      // 0-100
   points: number;        // SP weight for aggregations (defaults to 1)
-  locatedPage?: string;
+  locatedSection?: string;
   notes?: string;
   testCoverage?: number;
   testStatus?: Feature['testStatus'];
@@ -58,7 +58,7 @@ export function featureToPhaseRow(feature: Feature, defaultProjectName?: string)
     status: feature.status,
     progress: Math.max(0, Math.min(100, feature.progress ?? 0)),
     points: safePoints(feature),
-    locatedPage: feature.locatedPage,
+    locatedSection: feature.locatedSection,
     notes: feature.notes,
     readmePath: feature.readmePath
       ?? (feature.paths?.featureFolder
@@ -103,7 +103,9 @@ export function customRowToPhaseRow(row: CustomProjectProgressRow, defaultProjec
     status: row.status ?? 'todo',
     progress: Math.max(0, Math.min(100, row.percentage ?? 0)),
     points,
-    locatedPage: row.locatedPage,
+    locatedSection:
+      row.locatedSection ??
+      ((row as CustomProjectProgressRow & { locatedPage?: string }).locatedPage),
     testCoverage: row.testCoverage,
     testStatus: row.testStatus,
     deployStatus: row.deployStatus,

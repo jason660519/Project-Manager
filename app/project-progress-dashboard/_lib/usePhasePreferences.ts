@@ -10,7 +10,7 @@ const LEGACY_E2E_PHASE_KEY = 'testing';
 
 /** Phase-specific defaults. Column counts must match the column factories. */
 export const DEFAULT_WIDTHS_BY_PHASE: Record<FeaturePhase, number[]> = {
-  // 19 cols: project, id, SP, category, name, progress, status, locatedPage,
+  // 19 cols: project, id, SP, category, name, progress, status, locatedSection,
   //          spec, tdd, unitInteg, e2eFolder, tddProgress, tddReport, devLog,
   //          engineer, ide, notes, actions
   development: [120, 60, 50, 110, 220, 140, 110, 110, 150, 150, 150, 150, 130, 150, 150, 130, 110, 180, 200],
@@ -42,10 +42,24 @@ function storageKey(phase: FeaturePhase): string {
 function migrateLegacyPrefsJson(raw: string): string {
   const parsed = JSON.parse(raw) as Partial<PhaseTablePrefs>;
   if (!Array.isArray(parsed.customRows)) return raw;
-  parsed.customRows = parsed.customRows.map((row) =>
-    (row.phase as string) === 'testing' ? { ...row, phase: 'e2e_testing' } : row,
-  );
-  return JSON.stringify(parsed);
+  let changed = false;
+  parsed.customRows = parsed.customRows.map((row) => {
+    const phaseMigrated: PhaseTablePrefs['customRows'][number] =
+      (row.phase as string) === 'testing'
+        ? { ...row, phase: 'e2e_testing' as FeaturePhase }
+        : row;
+    if (phaseMigrated !== row) changed = true;
+    if (!('locatedSection' in phaseMigrated) && 'locatedPage' in phaseMigrated) {
+      const legacy = phaseMigrated as PhaseTablePrefs['customRows'][number] & { locatedPage?: string };
+      changed = true;
+      return {
+        ...phaseMigrated,
+        locatedSection: legacy.locatedPage,
+      };
+    }
+    return phaseMigrated;
+  });
+  return changed ? JSON.stringify(parsed) : raw;
 }
 
 function readPrefs(phase: FeaturePhase): PhaseTablePrefs {
@@ -61,7 +75,11 @@ function readPrefs(phase: FeaturePhase): PhaseTablePrefs {
       }
     }
     if (!raw) return buildDefaults(phase);
-    const parsed = JSON.parse(raw) as Partial<PhaseTablePrefs>;
+    const migratedRaw = migrateLegacyPrefsJson(raw);
+    if (migratedRaw !== raw) {
+      window.localStorage.setItem(storageKey(phase), migratedRaw);
+    }
+    const parsed = JSON.parse(migratedRaw) as Partial<PhaseTablePrefs>;
     const defaults = buildDefaults(phase);
     return {
       ...defaults,

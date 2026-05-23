@@ -7,6 +7,7 @@ export type IDEId = 'Cursor' | 'VSCode' | 'Trae' | 'Antigravity' | 'Kiro';
 export type FeaturePhase = 'development' | 'e2e_testing' | 'deployment' | 'operations';
 export type TestStatus = 'passed' | 'failed' | 'pending';
 export type DeployStatus = 'production' | 'staging' | 'not_deployed';
+export type HarnessTaskRole = 'planner' | 'worker' | 'evaluator';
 
 /** Auto-loop prompt config stored per feature (used by task/[rowId] page). */
 export interface FeaturePromptConfig {
@@ -45,6 +46,27 @@ export interface FeaturePaths {
   implementation?: string;            // Implementation code path
 }
 
+export interface FeatureHarnessAssignment {
+  engineerRoleId?: string;
+  assignedIDE?: IDEId;
+  assignedTo?: string;
+  assignedAt?: string;
+  adapterId?: string;
+  lastDispatchModel?: string;
+}
+
+export interface FeatureHarnessAssignments {
+  planner?: FeatureHarnessAssignment;
+  worker?: FeatureHarnessAssignment;
+  evaluator?: FeatureHarnessAssignment;
+}
+
+export interface FeatureAcceptanceChecklistItem {
+  id: string;
+  description: string;
+  passes: boolean;
+}
+
 export interface Feature {
   id: string;
   name: string;
@@ -69,8 +91,8 @@ export interface Feature {
   phase?: FeaturePhase;
   /** Story-point weight (defaults to 1 in aggregations). */
   points?: number;
-  /** Estimated source page / route where the feature lives. */
-  locatedPage?: string;
+  /** Estimated source section / area where the feature lives. */
+  locatedSection?: string;
   // e2e_testing
   testCoverage?: number;
   testStatus?: TestStatus;
@@ -93,6 +115,9 @@ export interface Feature {
   assignedTo?: string;
   /** ISO 8601 timestamp when the task was claimed via dispatch. */
   assignedAt?: string;
+  /** Optional multi-role assignments for harness-style workflows (Planner / Worker / Evaluator). */
+  harnessAssignments?: FeatureHarnessAssignments;
+  acceptanceChecklist?: FeatureAcceptanceChecklistItem[];
   // prompt engineer (row-level auto-loop config)
   promptConfig?: FeaturePromptConfig;
 }
@@ -162,7 +187,7 @@ export interface ExecutionResult {
 export type AnyAdapterConfig = IDEAdapterConfig | AgentAdapterConfig | AgentAppAdapterConfig;
 
 export interface ProjectManagerConfig {
-  /** Increment when making breaking changes to the config structure. Current: 5 */
+  /** Increment when making breaking changes to the config structure. Current: 6 */
   schemaVersion: number;
   engineerRoles?: EngineerRole[];
   // ── Sync identity + audit fields (schema v2, ADR-006) ──────────────────

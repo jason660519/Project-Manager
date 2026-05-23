@@ -34,7 +34,7 @@ const context: ChatContext = {
     id: 'pm',
     configPath: '/tmp/config.json',
     config: {
-      schemaVersion: 5,
+      schemaVersion: 6,
       id: 'pm',
       project: { name: 'Project Manager', root: '/tmp/project-manager', defaultIDE: 'Cursor' },
       features: [

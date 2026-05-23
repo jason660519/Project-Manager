@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Bot, Eye, EyeOff, FileText, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import type {
-  DeployStatus, Feature, FeaturePhase, FeatureStatus, TestStatus,
+  DeployStatus, EngineerRole, Feature, FeaturePhase, FeatureStatus, TestStatus,
 } from '../../../lib/types';
 import type { CustomProjectProgressRow } from '../types';
 import type { PhaseRow } from './phaseRows';
@@ -20,6 +20,7 @@ export interface ColumnDef {
 
 export interface ColumnHandlers {
   projectRoot: string;
+  engineerRoles?: EngineerRole[];
   hiddenRowKeysSet: Set<string>;
   onToggleHideRow: (rowKey: string) => void;
   onDeleteCustomRow: (rowId: string) => void;
@@ -342,12 +343,48 @@ function commonIdNameCols(phase: FeaturePhase, projectNameLabel = 'Project Name'
 function actionsCol(): ColumnDef {
   return {
     id: 'actions',
-    header: '',
+    header: 'Dispatch',
     cell: (row, h) => {
       const hidden = h.hiddenRowKeysSet.has(row.rowKey);
       const canDispatch = h.onDispatch && row.source === 'feature';
+      const resolveEngineerName = (engineerRoleId: string | undefined) => {
+        if (!engineerRoleId) return '—';
+        const role = h.engineerRoles?.find((r) => r.id === engineerRoleId);
+        return role?.name ?? engineerRoleId;
+      };
+      const plannerRoleId = row.feature?.harnessAssignments?.planner?.engineerRoleId;
+      const workerRoleId =
+        row.feature?.harnessAssignments?.worker?.engineerRoleId
+        ?? row.assignedRoleId
+        ?? row.feature?.assignedRoleId;
+      const evaluatorRoleId = row.feature?.harnessAssignments?.evaluator?.engineerRoleId;
       return (
         <div className="flex items-center gap-1">
+          {row.source === 'feature' && (
+            <div className="mr-1 flex items-center gap-1">
+              <span
+                className="inline-flex h-6 items-center gap-1 rounded border border-stone-200/15 bg-stone-500/10 px-1.5 text-[10px] leading-none text-stone-200"
+                title={`Planner: ${resolveEngineerName(plannerRoleId)}`}
+              >
+                <span className="font-mono text-[10px] text-stone-400">P</span>
+                <span className="max-w-[90px] truncate">{resolveEngineerName(plannerRoleId)}</span>
+              </span>
+              <span
+                className="inline-flex h-6 items-center gap-1 rounded border border-stone-200/15 bg-cyan-500/10 px-1.5 text-[10px] leading-none text-cyan-100"
+                title={`Worker: ${resolveEngineerName(workerRoleId)}`}
+              >
+                <span className="font-mono text-[10px] text-cyan-200/80">W</span>
+                <span className="max-w-[90px] truncate">{resolveEngineerName(workerRoleId)}</span>
+              </span>
+              <span
+                className="inline-flex h-6 items-center gap-1 rounded border border-stone-200/15 bg-amber-500/10 px-1.5 text-[10px] leading-none text-amber-100"
+                title={`Evaluator: ${resolveEngineerName(evaluatorRoleId)}`}
+              >
+                <span className="font-mono text-[10px] text-amber-200/80">E</span>
+                <span className="max-w-[90px] truncate">{resolveEngineerName(evaluatorRoleId)}</span>
+              </span>
+            </div>
+          )}
           {row.source === 'custom' && (
             <PhaseSwitch row={row} onChange={(p) => h.onChangePhase(row, p)} />
           )}
@@ -466,6 +503,97 @@ function NotesCell({
   );
 }
 
+function AcceptanceChecklistCell({ row, handlers }: { row: PhaseRow; handlers: ColumnHandlers }) {
+  const items = row.feature?.acceptanceChecklist ?? [];
+  const total = items.length;
+  const passed = items.filter((i) => i.passes).length;
+  const [open, setOpen] = useState(false);
+
+  const status = total === 0 ? 'empty' : passed === total ? 'done' : passed > 0 ? 'partial' : 'todo';
+  const badgeClass = status === 'done'
+    ? 'border-emerald-300/35 bg-emerald-500/10 text-emerald-200'
+    : status === 'partial'
+      ? 'border-amber-300/35 bg-amber-500/10 text-amber-200'
+      : status === 'todo'
+        ? 'border-stone-300/25 bg-stone-500/10 text-stone-200'
+        : 'border-stone-200/15 bg-stone-500/5 text-stone-500';
+
+  const toggle = (id: string) => {
+    const next = items.map((it) => (it.id === id ? { ...it, passes: !it.passes } : it));
+    patchRow(row, { acceptanceChecklist: next }, handlers);
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+        className={`inline-flex h-6 items-center gap-1 rounded border px-1.5 text-[11px] ${badgeClass}`}
+        title={total === 0 ? 'No checklist' : `Checklist: ${passed}/${total} passed`}
+      >
+        <span className="font-mono text-[10px] opacity-80">CL</span>
+        <span className="font-mono text-[11px]">{total === 0 ? '—' : `${passed}/${total}`}</span>
+      </button>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="w-full max-w-lg border border-stone-200/15 bg-[rgb(var(--pm-panel))] shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-stone-200/12 bg-white/[0.035] px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-stone-100">Acceptance Checklist</p>
+                <p className="mt-0.5 text-[11px] text-stone-400">
+                  {row.id} · {row.name} · {total === 0 ? '—' : `${passed}/${total} passed`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="border border-stone-200/25 px-3 py-1.5 text-xs font-medium text-stone-300 hover:bg-white/5"
+              >
+                Close
+              </button>
+            </div>
+            <div className="max-h-[60vh] overflow-auto px-4 py-3">
+              {total === 0 ? (
+                <p className="text-sm text-stone-400">No checklist yet. Add acceptanceChecklist items in config.json for this feature.</p>
+              ) : (
+                <div className="space-y-2">
+                  {items.map((it) => (
+                    <div key={it.id} className="flex items-start justify-between gap-3 border border-stone-200/10 bg-white/[0.02] px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-stone-500">{it.id}</p>
+                        <p className="mt-0.5 text-sm text-stone-200">{it.description}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggle(it.id)}
+                        className={[
+                          'shrink-0 rounded border px-2 py-1 text-[11px] font-semibold',
+                          it.passes
+                            ? 'border-emerald-300/35 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15'
+                            : 'border-stone-300/25 bg-stone-500/10 text-stone-200 hover:bg-white/5',
+                        ].join(' ')}
+                      >
+                        {it.passes ? 'PASS' : 'TODO'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ── Column factories ────────────────────────────────────────────────────────
 
 export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[] {
@@ -505,10 +633,13 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
         )}
       </div>
     )},
-    { id: 'page', header: 'Located Page', accessor: (r) => r.locatedPage ?? '', cell: (r, h) => (
+    { id: 'checklist', header: 'Checklist', accessor: (r) => (
+      r.feature?.acceptanceChecklist?.filter((i) => i.passes).length ?? 0
+    ), cell: (r, h) => (r.source === 'feature' ? <AcceptanceChecklistCell row={r} handlers={h} /> : <span className="text-xs text-stone-500">—</span>) },
+    { id: 'section', header: 'Located Section', accessor: (r) => r.locatedSection ?? '', cell: (r, h) => (
       <EditableText
-        value={r.locatedPage}
-        onCommit={(v) => patchRow(r, { locatedPage: v || undefined }, h)}
+        value={r.locatedSection}
+        onCommit={(v) => patchRow(r, { locatedSection: v || undefined }, h)}
       />
     )},
     {
@@ -626,10 +757,10 @@ export function createTestingColumns(projectNameLabel?: string): ColumnDef[] {
       />
     )},
     { id: 'progress', header: 'Progress', accessor: (r) => r.progress, cell: (r) => progressBar(r.progress) },
-    { id: 'page', header: 'Located Page', accessor: (r) => r.locatedPage ?? '', cell: (r, h) => (
+    { id: 'section', header: 'Located Section', accessor: (r) => r.locatedSection ?? '', cell: (r, h) => (
       <EditableText
-        value={r.locatedPage}
-        onCommit={(v) => patchRow(r, { locatedPage: v || undefined }, h)}
+        value={r.locatedSection}
+        onCommit={(v) => patchRow(r, { locatedSection: v || undefined }, h)}
       />
     )},
     actionsCol(),

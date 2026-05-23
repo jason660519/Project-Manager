@@ -21,7 +21,7 @@ Any schema change must update all four.
 
 ## 2. Schema Version
 
-Current schema version: `5`.
+Current schema version: `6`.
 
 Schema v2 adds:
 

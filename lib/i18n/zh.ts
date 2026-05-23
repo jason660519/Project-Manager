@@ -344,6 +344,10 @@ export const zh: Translations = {
   dispatch: {
     title: '任务派遣',
     phaseLabel: '项目阶段',
+    taskRoleLabel: '任务角色',
+    taskRolePlanner: '规划',
+    taskRoleWorker: '执行',
+    taskRoleEvaluator: '验收',
     engineerLabel: 'AI 工程师',
     workflowLabel: 'Agent Workflow',
     modelProviderLabel: '模型公司',

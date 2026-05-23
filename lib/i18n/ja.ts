@@ -345,6 +345,10 @@ export const ja: Translations = {
   dispatch: {
     title: 'タスクディスパッチ',
     phaseLabel: 'プロジェクトフェーズ',
+    taskRoleLabel: 'タスク役割',
+    taskRolePlanner: 'プランナー',
+    taskRoleWorker: 'ワーカー',
+    taskRoleEvaluator: '評価',
     engineerLabel: 'AIエンジニア',
     workflowLabel: 'エージェントワークフロー',
     modelProviderLabel: 'モデル会社',

@@ -5,7 +5,7 @@
   "properties": {
     "schemaVersion": {
       "type": "integer",
-      "description": "Schema version. Increment when making breaking changes to the config structure. Current: 5.",
+      "description": "Schema version. Increment when making breaking changes to the config structure. Current: 6.",
       "minimum": 1
     },
     "id": {
@@ -234,9 +234,9 @@
           "minimum": 0,
           "description": "Story-point weight (v3); defaults to 1 in aggregations."
         },
-        "locatedPage": {
+        "locatedSection": {
           "type": "string",
-          "description": "Page or route where the feature lives (v3)."
+          "description": "Section, area, or route where the feature lives (v6)."
         },
         "testCoverage": { "type": "number", "minimum": 0, "maximum": 100 },
         "testStatus": { "type": "string", "enum": ["passed", "failed", "pending"] },
@@ -270,6 +270,19 @@
           "type": "string",
           "description": "ISO 8601 timestamp when the task was claimed via dispatch."
         },
+        "harnessAssignments": {
+          "type": "object",
+          "description": "Optional multi-role assignments for harness-style workflows (Planner / Worker / Evaluator).",
+          "properties": {
+            "planner": { "$ref": "#/definitions/featureHarnessAssignment" },
+            "worker": { "$ref": "#/definitions/featureHarnessAssignment" },
+            "evaluator": { "$ref": "#/definitions/featureHarnessAssignment" }
+          }
+        },
+        "acceptanceChecklist": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/featureAcceptanceChecklistItem" }
+        },
         "promptConfig": {
           "type": "object",
           "description": "Auto-loop prompt config (v3).",
@@ -287,6 +300,26 @@
         }
       },
       "required": ["id", "name", "category", "status", "progress", "paths"]
+    },
+    "featureHarnessAssignment": {
+      "type": "object",
+      "properties": {
+        "engineerRoleId": { "type": "string" },
+        "assignedIDE": { "type": "string", "enum": ["Cursor", "VSCode", "Trae", "Antigravity", "Kiro"] },
+        "assignedTo": { "type": "string" },
+        "assignedAt": { "type": "string" },
+        "adapterId": { "type": "string" },
+        "lastDispatchModel": { "type": "string" }
+      }
+    },
+    "featureAcceptanceChecklistItem": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "passes": { "type": "boolean" }
+      },
+      "required": ["id", "description", "passes"]
     }
   }
 }

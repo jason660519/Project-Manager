@@ -2,9 +2,9 @@
 
 > **Created Date**: 2026-05-12
 > **Created By**: GitHub Copilot
-> **Last Modified**: 2026-05-19
+> **Last Modified**: 2026-05-24
 > **Modified By**: Codex
-> **Version**: 1.2
+> **Version**: 1.3
 > **Document Type**: Architecture / ADR Index
 
 ---
@@ -35,6 +35,7 @@ ADR 記錄重要的技術決策、背景和決策理由，作為專案架構演�
 | [008](./ADR-008-dashboard-folder-consolidation.md) | Dashboard Folder Consolidation | Accepted | 2026-05-19 | Use `.project-manager/` as the canonical dashboard artifact folder |
 | [009](./ADR-009-schema-v5-feature-readme-path.md) | Schema v5 Feature README Path | Accepted | 2026-05-19 | Split README file pointers from human-authored notes |
 | [010](./ADR-010-documentation-site-static-sync.md) | Documentation Site Static Sync | Accepted | 2026-05-23 | Generate `/documentation` routes from the repo `docs/` tree before static export |
+| [011](./ADR-011-schema-v6-located-section.md) | Schema v6 Located Section Rename | Accepted | 2026-05-24 | Rename `locatedPage` to `locatedSection` with backward-compatible migration |
 
 ## Architecture Sources
 
@@ -111,6 +112,7 @@ Related documents, links, and resources.
 | 2026-05-12 | 1.0     | GitHub Copilot | Initial ADR index creation |
 | 2026-05-15 | 1.1     | Codex          | Added ADR-006 to index |
 | 2026-05-19 | 1.2     | Codex          | Added ADR-007 through ADR-009 to index |
+| 2026-05-24 | 1.3     | Codex          | Added ADR-011 to index |
 
 ---
 

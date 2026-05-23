@@ -23,7 +23,7 @@ interface RawConfig {
   [key: string]: unknown;
 }
 
-export const CURRENT_SCHEMA_VERSION = 5;
+export const CURRENT_SCHEMA_VERSION = 6;
 
 export function migrateConfig(raw: unknown): ProjectManagerConfig {
   const cfg = (raw && typeof raw === 'object' ? (raw as RawConfig) : {}) as RawConfig;
@@ -33,6 +33,7 @@ export function migrateConfig(raw: unknown): ProjectManagerConfig {
   if (version < 3) next = migrate_2_to_3(next);
   if (version < 4) next = migrate_3_to_4(next);
   if (version < 5) next = migrate_4_to_5(next);
+  if (version < 6) next = migrate_5_to_6(next);
   // Cast through unknown: `RawConfig` is intentionally a permissive bag,
   // and the migration steps above are responsible for ensuring the result
   // matches `ProjectManagerConfig`.
@@ -131,6 +132,34 @@ function migrate_4_to_5(cfg: RawConfig): RawConfig {
   return {
     ...cfg,
     schemaVersion: 5,
+    features,
+  };
+}
+
+/**
+ * v5 → v6: rename `locatedPage` to `locatedSection`.
+ *
+ * The dashboard now tracks a broader "where this lives" hint that can be a
+ * section, module, flow segment, or route. Keep old configs readable by
+ * lifting legacy `locatedPage` into `locatedSection` when needed.
+ */
+function migrate_5_to_6(cfg: RawConfig): RawConfig {
+  const features = Array.isArray(cfg.features)
+    ? (cfg.features as Array<Feature & { locatedPage?: string }>).map((f) => {
+        const locatedSection =
+          f.locatedSection ??
+          (typeof f.locatedPage === 'string' ? f.locatedPage : undefined);
+        const { locatedPage: _legacyLocatedPage, ...rest } = f;
+        void _legacyLocatedPage;
+        return {
+          ...rest,
+          locatedSection,
+        };
+      })
+    : [];
+  return {
+    ...cfg,
+    schemaVersion: 6,
     features,
   };
 }

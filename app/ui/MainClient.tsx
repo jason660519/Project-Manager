@@ -11,6 +11,8 @@ import {
   mergeFeaturesById,
   mergeProjectConfigFromDisk,
   migrateConfig,
+  normalizeProjectEntries,
+  remapProjectIds,
   resolveDashboardProjectIds,
   resolveInitialProjectId,
 } from '../../lib/storage';
@@ -186,12 +188,20 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, d
         safeProjects = stored.map((p) => ({ ...p, config: ensureEngineerRoles(p.config) }));
       }
 
+      const normalized = normalizeProjectEntries(safeProjects);
+      safeProjects = normalized.projects;
+
+      const remappedStoredSelectedId = storedSelectedId
+        ? (normalized.idMap.get(storedSelectedId) ?? storedSelectedId)
+        : storedSelectedId;
+      const remappedStoredDashboardIds = remapProjectIds(storedDashboardIds, normalized.idMap);
+
       setProjects(safeProjects);
       setSelectedProjectId(
-        resolveInitialProjectId(safeProjects, initialProjectId, storedSelectedId),
+        resolveInitialProjectId(safeProjects, initialProjectId, remappedStoredSelectedId),
       );
       setSelectedDashboardProjectIds(
-        resolveDashboardProjectIds(safeProjects, storedDashboardIds),
+        resolveDashboardProjectIds(safeProjects, remappedStoredDashboardIds),
       );
       setStorageInitialized(true);
     });
@@ -422,7 +432,7 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, d
               return next;
             }
             // Brand new project — take the disk config as the local copy.
-            return [
+            return normalizeProjectEntries([
               ...prev,
               {
                 id: `proj-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -430,14 +440,16 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, d
                 configPath: entry.configPath,
                 configMissing: false,
               },
-            ];
+            ]).projects;
           });
         } else {
           // Disk unreadable / missing — fall back to scaffold so the folder
           // still surfaces in the Projects tab.
           const built = await buildProjectEntryFromPath(entry.configPath, { isTauri: false });
           setProjects((prev) =>
-            prev.some((p) => p.configPath === built.configPath) ? prev : [...prev, built],
+            normalizeProjectEntries(
+              prev.some((p) => p.configPath === built.configPath) ? prev : [...prev, built],
+            ).projects,
           );
         }
       } catch {
@@ -822,6 +834,7 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, d
         ensureFeaturePaths,
         hasRecoverableDashboardArtifacts,
         mergeProjectConfig,
+        normalizeFeaturesLocatedSection,
       } = await import('../../lib/storage');
       const { initializeProject, listProjectFiles, readConfig, readFile, writeConfig } =
         await import('../../lib/bridge');
@@ -855,10 +868,16 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, d
         }
       }
 
-      config = { ...config, features: ensureFeaturePaths(config.features) };
+      config = {
+        ...config,
+        features: normalizeFeaturesLocatedSection(ensureFeaturePaths(config.features)),
+      };
       const result = await initializeProject(root, config, invokeMode);
       let mergedConfig = await readConfig(result.configPath);
-      mergedConfig = { ...mergedConfig, features: ensureFeaturePaths(mergedConfig.features) };
+      mergedConfig = {
+        ...mergedConfig,
+        features: normalizeFeaturesLocatedSection(ensureFeaturePaths(mergedConfig.features)),
+      };
       await writeConfig(result.configPath, mergedConfig);
 
       setProjects((prev) =>

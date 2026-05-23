@@ -18,7 +18,7 @@ const mockContext: ChatContext = {
     id: 'project-manager',
     configPath: '/tmp/config.json',
     config: {
-      schemaVersion: 5,
+      schemaVersion: 6,
       id: 'project-manager',
       project: { name: 'Project Manager', root: '/tmp/project-manager', defaultIDE: 'Cursor' },
       features: [],

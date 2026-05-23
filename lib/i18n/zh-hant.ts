@@ -344,6 +344,10 @@ export const zhHant: Translations = {
   dispatch: {
     title: '任務派遣',
     phaseLabel: '專案階段',
+    taskRoleLabel: '任務角色',
+    taskRolePlanner: '規劃',
+    taskRoleWorker: '執行',
+    taskRoleEvaluator: '驗收',
     engineerLabel: 'AI 工程師',
     workflowLabel: 'Agent Workflow',
     modelProviderLabel: '模型公司',

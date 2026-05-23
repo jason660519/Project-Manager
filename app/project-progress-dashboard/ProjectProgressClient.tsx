@@ -229,6 +229,7 @@ export function ProjectProgressClient({
               projectNames={dashboardProjectNames}
               projectRoot={projectRoot}
               features={phaseFeatures}
+              engineerRoles={engineerRoles}
               prefs={activePhasePrefs.prefs}
               patch={activePhasePrefs.patch}
               reset={activePhasePrefs.reset}

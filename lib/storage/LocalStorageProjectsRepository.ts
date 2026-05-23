@@ -9,6 +9,7 @@ import {
   LEGACY_KEY_SELECTED_PROJECT_ID,
 } from './keys';
 import { migrateConfig } from './migrate';
+import { normalizeProjectEntries } from './projectEntryNormalization';
 import type { ProjectsRepository } from './ProjectsRepository';
 
 function readJSON<T>(key: string): T | null {
@@ -70,10 +71,11 @@ export class LocalStorageProjectsRepository implements ProjectsRepository {
     if (!Array.isArray(raw)) return [];
     // Always run schema migration on read so v1 configs lifted from older
     // sessions get bumped to the current shape transparently.
-    return raw.map((entry) => ({
+    const migrated = raw.map((entry) => ({
       ...entry,
       config: migrateConfig(entry.config),
     }));
+    return normalizeProjectEntries(migrated).projects;
   }
 
   async saveProjects(projects: ProjectEntry[]): Promise<void> {

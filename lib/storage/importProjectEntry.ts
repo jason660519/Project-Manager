@@ -1,5 +1,6 @@
 import { buildProjectScaffold } from './createProjectScaffold';
 import { resolveProjectRoot } from './dashboardLayout';
+import { normalizeFeaturesLocatedSection } from './featureLocationInference';
 import { migrateConfig } from './migrate';
 import { mergeProjectConfigFromDisk } from './mergeProjectFromDisk';
 import { resolveConfigPath } from './resolveConfigPath';
@@ -98,6 +99,7 @@ export async function applyScanConfigToProject(
       name: scanned.project.name || project.config.project.name,
     },
   });
+  config.features = normalizeFeaturesLocatedSection(config.features);
   await writeConfig(configPath, config);
   return {
     ...project,

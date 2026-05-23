@@ -41,7 +41,7 @@ export function AddRowModal({
     () => (phase === 'e2e_testing' ? DEFAULT_E2E_CATEGORY : 'Custom'),
   );
   const [percentage, setPercentage] = useState<number>(0);
-  const [locatedPage, setLocatedPage] = useState('');
+  const [locatedSection, setLocatedSection] = useState('');
   const [status, setStatus] = useState<FeatureStatus>('todo');
   // Phase-specific fields. Empty string = "leave undefined" — keeps the JSON
   // tidy when the user doesn't have a value to enter yet.
@@ -83,7 +83,7 @@ export function AddRowModal({
       category: phase === 'e2e_testing' ? category : (category.trim() || 'Custom'),
       percentage: Math.max(0, Math.min(100, percentage)),
       points: phase === 'development' ? Math.max(1, points || 1) : undefined,
-      locatedPage: locatedPage.trim() || undefined,
+      locatedSection: locatedSection.trim() || undefined,
       status,
       phase,
       testCoverage: num(testCoverage, 0, 100),
@@ -103,7 +103,7 @@ export function AddRowModal({
     setName('');
     setCategory(phase === 'e2e_testing' ? DEFAULT_E2E_CATEGORY : 'Custom');
     setPercentage(0);
-    setLocatedPage('');
+    setLocatedSection('');
     setStatus('todo');
     setTestCoverage('');
     setTestStatus('');
@@ -170,8 +170,8 @@ export function AddRowModal({
               <input value={category} onChange={(e) => setCategory(e.target.value)} className="input" />
             )}
           </Field>
-          <Field label="Located Page">
-            <input value={locatedPage} onChange={(e) => setLocatedPage(e.target.value)} className="input" placeholder="optional" />
+          <Field label="Located Section">
+            <input value={locatedSection} onChange={(e) => setLocatedSection(e.target.value)} className="input" placeholder="optional" />
           </Field>
           <div className="grid grid-cols-2 gap-2">
             <Field label="Status">

@@ -35,6 +35,7 @@ import {
   Feature,
   FeaturePhase,
   FeaturePromptConfig,
+  HarnessTaskRole,
   IDEId,
 } from '../../lib/types';
 
@@ -545,7 +546,7 @@ type DispatchFeatureUpdate = Partial<
   Pick<
     Feature,
     | 'status' | 'progress' | 'assignedRoleId' | 'assignedIDE' | 'phase' | 'promptConfig'
-    | 'assignedTo' | 'assignedAt'
+    | 'assignedTo' | 'assignedAt' | 'harnessAssignments'
   >
 >;
 
@@ -594,7 +595,12 @@ export function TaskDispatchModal({
     () => resolveInitialAdapterId(feature, adapters, engineerRoles, defaultIDE),
     [adapters, defaultIDE, engineerRoles, feature],
   );
-  const [selectedRoleId, setSelectedRoleId] = useState(feature.assignedRoleId ?? '');
+  const [selectedTaskRole, setSelectedTaskRole] = useState<HarnessTaskRole>('worker');
+  const [selectedRoleId, setSelectedRoleId] = useState(() => (
+    feature.harnessAssignments?.worker?.engineerRoleId
+    ?? feature.assignedRoleId
+    ?? ''
+  ));
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>('');
   const [selectedAdapterId, setSelectedAdapterId] = useState(initialAdapterId);
   const [selectedPhase, setSelectedPhase] = useState<FeaturePhase>(
@@ -686,6 +692,15 @@ export function TaskDispatchModal({
     }
   };
 
+  useEffect(() => {
+    const nextRoleId = (() => {
+      if (selectedTaskRole === 'planner') return feature.harnessAssignments?.planner?.engineerRoleId ?? '';
+      if (selectedTaskRole === 'evaluator') return feature.harnessAssignments?.evaluator?.engineerRoleId ?? '';
+      return feature.harnessAssignments?.worker?.engineerRoleId ?? feature.assignedRoleId ?? '';
+    })();
+    setSelectedRoleId(nextRoleId);
+  }, [feature, selectedTaskRole]);
+
   const buildAssignmentPatch = (): DispatchFeatureUpdate => {
     const adapter = adapters.find((a) => a.id === selectedAdapterId);
     const role = engineerRoles.find((r) => r.id === selectedRoleId);
@@ -703,15 +718,38 @@ export function TaskDispatchModal({
     const adapterLabel = adapter?.name ?? selectedAdapterId;
     const roleLabel = role ? ` (${role.name})` : '';
     const assignedTo = `${adapterLabel}${roleLabel}`;
+    const now = new Date().toISOString();
+    const ide = adapter ? adapterToIDE(adapter) : undefined;
+
+    const nextAssignments = { ...(feature.harnessAssignments ?? {}) };
+    const nextRoleAssignment = {
+      ...(selectedTaskRole === 'planner'
+        ? feature.harnessAssignments?.planner
+        : selectedTaskRole === 'evaluator'
+          ? feature.harnessAssignments?.evaluator
+          : feature.harnessAssignments?.worker),
+      engineerRoleId: selectedRoleId || undefined,
+      assignedIDE: ide,
+      assignedTo: assignedTo || undefined,
+      assignedAt: now,
+      adapterId: selectedAdapterId || undefined,
+      lastDispatchModel,
+    };
+    if (selectedTaskRole === 'planner') nextAssignments.planner = nextRoleAssignment;
+    if (selectedTaskRole === 'worker') nextAssignments.worker = nextRoleAssignment;
+    if (selectedTaskRole === 'evaluator') nextAssignments.evaluator = nextRoleAssignment;
+
     const patch: DispatchFeatureUpdate = {
-      assignedRoleId: selectedRoleId || undefined,
       phase: selectedPhase,
       promptConfig,
-      assignedTo: assignedTo || undefined,
-      assignedAt: new Date().toISOString(),
+      harnessAssignments: nextAssignments,
     };
-    const ide = adapter ? adapterToIDE(adapter) : undefined;
-    if (ide) patch.assignedIDE = ide;
+    if (selectedTaskRole === 'worker') {
+      patch.assignedRoleId = selectedRoleId || undefined;
+      patch.assignedTo = assignedTo || undefined;
+      patch.assignedAt = now;
+      if (ide) patch.assignedIDE = ide;
+    }
     return patch;
   };
 
@@ -863,7 +901,15 @@ export function TaskDispatchModal({
     setDispatchError(null);
     setCommandLoading(true);
 
-    onFeatureUpdate?.(feature.id, { ...buildAssignmentPatch(), status: 'in_progress' });
+    {
+      const assignmentPatch = buildAssignmentPatch();
+      onFeatureUpdate?.(
+        feature.id,
+        selectedTaskRole === 'worker'
+          ? { ...assignmentPatch, status: 'in_progress' }
+          : assignmentPatch,
+      );
+    }
 
     try {
       const { command, args: baseArgs } = await buildCommand(adapter);
@@ -882,8 +928,10 @@ export function TaskDispatchModal({
         setActivePid(null);
         activePidRef.current = null;
         onRunEnd?.(exitPid, code);
-        onFeatureUpdate?.(feature.id, { assignedTo: undefined, assignedAt: undefined });
-        if (succeeded) {
+        if (selectedTaskRole === 'worker') {
+          onFeatureUpdate?.(feature.id, { assignedTo: undefined, assignedAt: undefined });
+        }
+        if (succeeded && selectedTaskRole === 'worker') {
           const role = engineerRoles.find((r) => r.id === selectedRoleId);
           if (role?.primaryModel) {
             setLogs((prev) => [...prev, `── executed by: ${role.primaryModel!.providerId}/${role.primaryModel!.modelId} ──`]);
@@ -923,7 +971,15 @@ export function TaskDispatchModal({
     try {
       const { command, args } = await buildCommand(adapter);
       const pid = await spawnAgent({ command, args, workingDir: projectRoot });
-      onFeatureUpdate?.(feature.id, { ...buildAssignmentPatch(), status: 'in_progress' });
+      {
+        const assignmentPatch = buildAssignmentPatch();
+        onFeatureUpdate?.(
+          feature.id,
+          selectedTaskRole === 'worker'
+            ? { ...assignmentPatch, status: 'in_progress' }
+            : assignmentPatch,
+        );
+      }
       onExecuted({
         success: true,
         message: `${adapter.name} opened (PID: ${pid})`,
@@ -950,7 +1006,15 @@ export function TaskDispatchModal({
       // so collapse literal newlines in args into spaces before spawning.
       const flatArgs = args.map((a) => a.replace(/\r?\n/g, ' '));
       await spawnTerminal({ command, args: flatArgs, cwd: projectRoot });
-      onFeatureUpdate?.(feature.id, { ...buildAssignmentPatch(), status: 'in_progress' });
+      {
+        const assignmentPatch = buildAssignmentPatch();
+        onFeatureUpdate?.(
+          feature.id,
+          selectedTaskRole === 'worker'
+            ? { ...assignmentPatch, status: 'in_progress' }
+            : assignmentPatch,
+        );
+      }
       onExecuted({
         success: true,
         message: `${adapter.name} opened in new Terminal window`,
@@ -984,6 +1048,7 @@ export function TaskDispatchModal({
   const isPending = phase === 'pending';
   const isRunning = phase === 'running';
   const isAssignedBlocked =
+    selectedTaskRole === 'worker' &&
     phase === 'idle' &&
     !!feature.assignedTo &&
     feature.status === 'in_progress' &&
@@ -1049,7 +1114,7 @@ export function TaskDispatchModal({
             </div>
           )}
 
-          {phase === 'idle' && feature.assignedTo && feature.status === 'in_progress' && !overrideConfirmed && (
+          {selectedTaskRole === 'worker' && phase === 'idle' && feature.assignedTo && feature.status === 'in_progress' && !overrideConfirmed && (
             <div className="flex items-start justify-between gap-3 border border-amber-400/30 bg-amber-500/10 px-4 py-3">
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-amber-200">
@@ -1088,6 +1153,21 @@ export function TaskDispatchModal({
                         : `${opt.value.toUpperCase().slice(0, 3)} — ${t.phases[opt.phaseKey]}`}
                     </option>
                   ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-stone-200">
+                  {d.taskRoleLabel}
+                </label>
+                <select
+                  value={selectedTaskRole}
+                  onChange={(e) => setSelectedTaskRole(e.target.value as HarnessTaskRole)}
+                  className="w-full border border-stone-200/20 bg-[rgb(var(--pm-input))] px-3 py-2 text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
+                >
+                  <option value="planner">{d.taskRolePlanner}</option>
+                  <option value="worker">{d.taskRoleWorker}</option>
+                  <option value="evaluator">{d.taskRoleEvaluator}</option>
                 </select>
               </div>
 

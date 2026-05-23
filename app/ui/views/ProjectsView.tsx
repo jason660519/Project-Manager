@@ -716,15 +716,53 @@ export function ProjectsView({
                   <div className="flex items-center gap-1">
                     {showInitialize &&
                       (isReady ? (
-                        // Initialized = passive success state, solid emerald
-                        // (matches the project-state semantics: "done, healthy").
-                        <span
-                          title="Project is initialized — dashboard reads .project-manager/config.json from disk"
-                          className="flex h-7 items-center gap-1 border border-emerald-400/50 bg-emerald-600/30 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-emerald-100"
-                        >
-                          <Check size={12} />
-                          Initialized
-                        </span>
+                        <>
+                          {/* Initialized = healthy state indicator. Keep visible even after adding re-init. */}
+                          <span
+                            title="Project is initialized — dashboard reads .project-manager/config.json from disk"
+                            className="flex h-7 items-center gap-1 border border-emerald-400/50 bg-emerald-600/30 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-emerald-100"
+                          >
+                            <Check size={12} />
+                            Initialized
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!isTauri) return;
+                              if (anyProviderKeyPresent === false) {
+                                openKeysView();
+                                return;
+                              }
+                              void handleInitializeOne(project);
+                            }}
+                            disabled={
+                              !isTauri ||
+                              isInitializing ||
+                              batchScanning ||
+                              anyProviderKeyPresent === null
+                            }
+                            title={
+                              !isTauri
+                                ? 'Re-initialize requires the Project Manager desktop app.'
+                                : anyProviderKeyPresent === false
+                                  ? 'No AI provider configured — click to open Keys'
+                                  : 'Re-run AI scan and refresh .project-manager/config.json'
+                            }
+                            className="flex h-7 items-center gap-1 border border-cyan-300/35 bg-cyan-500/15 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-cyan-100 hover:bg-cyan-500/30 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {isInitializing ? (
+                              <>
+                                <Loader2 size={12} className="animate-spin" />
+                                Re-initializing…
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw size={12} />
+                                Re-init
+                              </>
+                            )}
+                          </button>
+                        </>
                       ) : (
                         // Initialize = call-to-action, amber to match the
                         // "NEEDS SETUP" chip so the visual link is obvious.

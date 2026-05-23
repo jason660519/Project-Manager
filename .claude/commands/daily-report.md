@@ -13,7 +13,7 @@
 
 | 項目 | Owner-Property | Project Manager |
 | :-- | :-- | :-- |
-| 進度資料來源 | `apps/superadmin/app/data/roadmap.ts`（TS 陣列） | `.project-manager/config.json`（schema v5，ADR-006 / ADR-008 / ADR-009） |
+| 進度資料來源 | `apps/superadmin/app/data/roadmap.ts`（TS 陣列） | `.project-manager/config.json`（schema v6，ADR-006 / ADR-008 / ADR-009） |
 | Dev log 目錄 | `project-process/dev-logs/` | daily report 放 `.project-manager/dev-logs/`；feature dashboard log 放 `.project-manager/features/<ID>/dev-log.md` |
 | Issue tracker | VIS Paperclip（內建系統） | 無對外 tracker；GitHub 整合可選 |
 | Dashboard | superadmin 自帶 | Project Manager 自己的 `/project-progress-dashboard`（讀 `.project-manager/config.json`） |

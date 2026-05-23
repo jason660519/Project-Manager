@@ -49,12 +49,12 @@ describe('featureToPhaseRow', () => {
     expect(
       featureToPhaseRow(f({
         metadata: { sourceProjectName: 'Alpha' },
-        locatedPage: 'app/page.tsx',
+        locatedSection: 'app/page.tsx',
       })).projectName,
     ).toBe('Alpha');
     expect(featureToPhaseRow(f({}), 'Fallback').projectName).toBe('Fallback');
     expect(
-      featureToPhaseRow(f({ locatedPage: 'app/page.tsx' })).locatedPage,
+      featureToPhaseRow(f({ locatedSection: 'app/page.tsx' })).locatedSection,
     ).toBe('app/page.tsx');
   });
 });

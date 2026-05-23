@@ -64,7 +64,7 @@ Keep the report factual. Do not invent tasks, verification results, issue IDs, o
 
 Project Manager does not currently have the Owner SPA `roadmap.ts` workflow. Do not update a roadmap by default.
 
-Project Manager feature-local artifacts use the schema v5 document contract:
+Project Manager feature-local artifacts use the schema v6 document contract:
 
 | Artifact | Config field |
 | :-- | :-- |

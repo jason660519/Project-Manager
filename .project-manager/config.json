@@ -1,451 +1,127 @@
 {
-  "schemaVersion": 5,
-  "id": "5b9422db-4007-48fd-b9c0-dd192299e4dd",
-  "createdAt": "2026-05-19T00:46:36.208Z",
-  "updatedAt": "2026-05-24T04:00:00.000+10:00",
-  "updatedBy": "claude-code",
-  "project": {
-    "name": "Project Manager",
-    "root": "/Volumes/KLEVV-4T-1/Project-Manager",
-    "defaultIDE": "Cursor",
-    "githubUrl": "https://github.com/jason660519/Project-Manager"
-  },
-  "features": [
-    {
-      "id": "F12",
-      "name": "Skills Management Page",
-      "category": "Execution/Engineer Tools",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "featureFolder": ".project-manager/features/F12/",
-        "spec": ".project-manager/features/F12/feature-spec.md",
-        "tdd": ".project-manager/features/F12/tdd-spec.md",
-        "implementation": "app/ui/views/SkillsView.tsx",
-        "developmentLogSummaryFolder": ".project-manager/features/F12/"
-      },
-      "readmePath": ".project-manager/features/F12/README.md",
-      "createdAt": "2026-05-19T00:30:00.000Z",
-      "updatedAt": "2026-05-20T02:10:00.000+10:00",
-      "phase": "development",
-      "points": 1,
-      "updatedBy": "f12_engineer"
-    },
-    {
-      "id": "F01",
-      "name": "Sidebar Navigation",
-      "category": "Frontend/UI",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "featureFolder": ".project-manager/features/F01/",
-        "implementation": "app/ui/Sidebar.tsx",
-        "developmentLogSummaryFolder": ".project-manager/features/F01/"
-      },
-      "readmePath": ".project-manager/features/F01/README.md",
-      "createdAt": "2026-05-18T23:48:51.000Z",
-      "updatedAt": "2026-05-18T23:48:51.000Z",
-      "phase": "development",
-      "points": 1
-    },
-    {
-      "id": "F02",
-      "name": "Feature Filter Tabs",
-      "category": "Frontend/UX",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "featureFolder": ".project-manager/features/F02/",
-        "spec": ".project-manager/features/F02/feature-spec.md",
-        "tdd": ".project-manager/features/F02/tdd-spec.md",
-        "implementation": "app/ui/DashboardClient.tsx",
-        "test": "__tests__/dashboardClient.phaseTabs.test.tsx",
-        "developmentLogSummaryFolder": ".project-manager/features/F02/"
-      },
-      "notes": ".project-manager/features/F02/notes.md",
-      "readmePath": ".project-manager/features/F02/README.md",
-      "createdAt": "2026-05-18T22:54:50.000Z",
-      "updatedAt": "2026-05-20T02:10:00.000+10:00",
-      "phase": "development",
-      "points": 1,
-      "updatedBy": "f02_engineer"
-    },
-    {
-      "id": "F03",
-      "name": "Live Run Inspector",
-      "category": "Frontend/Monitor",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "featureFolder": ".project-manager/features/F03/",
-        "implementation": "app/ui/views/RunsView.tsx",
-        "test": "__tests__/agentWorkflows.test.ts",
-        "developmentLogSummaryFolder": ".project-manager/features/F03/"
-      },
-      "readmePath": ".project-manager/features/F03/README.md",
-      "createdAt": "2026-05-18T22:54:57.000Z",
-      "updatedAt": "2026-05-20T02:01:00.000Z",
-      "phase": "development",
-      "points": 1,
-      "updatedBy": "f03_engineer"
-    },
-    {
-      "id": "F04",
-      "name": "Add Project by GitHub URL",
-      "category": "Core/Integration",
-      "status": "in_progress",
-      "progress": 85,
-      "paths": {
-        "featureFolder": ".project-manager/features/F04/",
-        "spec": ".project-manager/features/F04/feature-spec.md",
-        "implementation": "app/api/anthropic/route.ts",
-        "developmentLogSummaryFolder": ".project-manager/features/F04/",
-        "tdd": ".project-manager/features/F04/tdd-spec.md"
-      },
-      "readmePath": ".project-manager/features/F04/README.md",
-      "createdAt": "2026-05-18T22:55:03.000Z",
-      "updatedAt": "2026-05-20T03:48:11.846Z",
-      "phase": "development",
-      "points": 1,
-      "updatedBy": "wilson"
-    },
-    {
-      "id": "F05",
-      "name": "Spec Ingestion Pipeline",
-      "category": "Core/AI",
-      "status": "todo",
-      "progress": 0,
-      "paths": {
-        "featureFolder": ".project-manager/features/F05/",
-        "spec": ".project-manager/features/F05/feature-spec.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F05/"
-      },
-      "notes": ".project-manager/features/F05/notes.md",
-      "readmePath": ".project-manager/features/F05/README.md",
-      "createdAt": "2026-05-18T22:55:11.000Z",
-      "updatedAt": "2026-05-18T22:55:11.000Z",
-      "phase": "development",
-      "points": 1
-    },
-    {
-      "id": "F06",
-      "name": "Storage Abstraction & Schema v2 Sync Fields",
-      "category": "Core/Architecture",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "featureFolder": ".project-manager/features/F06/",
-        "implementation": "lib/storage/",
-        "spec": ".project-manager/features/F06/feature-spec.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F06/"
-      },
-      "readmePath": ".project-manager/features/F06/README.md",
-      "createdAt": "2026-05-18T22:55:18.000Z",
-      "updatedAt": "2026-05-18T22:55:18.000Z",
-      "phase": "development",
-      "points": 1
-    },
-    {
-      "id": "F07",
-      "name": "Zone 1: Sidebar Redesign",
-      "category": "Frontend/UI",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "featureFolder": ".project-manager/features/F07/",
-        "implementation": "app/ui/Sidebar.tsx",
-        "developmentLogSummaryFolder": ".project-manager/features/F07/"
-      },
-      "readmePath": ".project-manager/features/F07/README.md",
-      "createdAt": "2026-05-18T22:55:27.000Z",
-      "updatedAt": "2026-05-18T22:55:27.000Z",
-      "phase": "development",
-      "points": 1
-    },
-    {
-      "id": "F08",
-      "name": "Zone 2: Top Command Bar",
-      "category": "Frontend/UI",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "featureFolder": ".project-manager/features/F08/",
-        "implementation": "app/ui/TopBar.tsx",
-        "developmentLogSummaryFolder": ".project-manager/features/F08/"
-      },
-      "notes": ".project-manager/features/F08/notes.md",
-      "readmePath": ".project-manager/features/F08/README.md",
-      "createdAt": "2026-05-18T22:55:33.000Z",
-      "updatedAt": "2026-05-18T22:55:33.000Z",
-      "phase": "development",
-      "points": 1
-    },
-    {
-      "id": "F09",
-      "name": "Zone 3: ViewHeader (Removed)",
-      "category": "Frontend/UI",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "featureFolder": ".project-manager/features/F09/",
-        "developmentLogSummaryFolder": ".project-manager/features/F09/"
-      },
-      "notes": ".project-manager/features/F09/notes.md",
-      "readmePath": ".project-manager/features/F09/README.md",
-      "createdAt": "2026-05-18T22:55:41.000Z",
-      "updatedAt": "2026-05-18T22:55:41.000Z",
-      "phase": "development",
-      "points": 1
-    },
-    {
-      "id": "F10",
-      "name": "Zone 4: AppShell Canvas & Layout Grid",
-      "category": "Frontend/UI",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "featureFolder": ".project-manager/features/F10/",
-        "implementation": "app/ui/AppShell.tsx",
-        "developmentLogSummaryFolder": ".project-manager/features/F10/"
-      },
-      "notes": ".project-manager/features/F10/notes.md",
-      "readmePath": ".project-manager/features/F10/README.md",
-      "createdAt": "2026-05-18T22:55:48.000Z",
-      "updatedAt": "2026-05-18T22:55:48.000Z",
-      "phase": "development",
-      "points": 1
-    },
-    {
-      "id": "F11",
-      "name": "i18n: Multilingual Contributor Guide",
-      "category": "Documentation/i18n",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "featureFolder": ".project-manager/features/F11/",
-        "implementation": "lib/hooks/useLang.ts",
-        "spec": ".project-manager/features/F11/feature-spec.md",
-        "tdd": ".project-manager/features/F11/tdd-spec.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F11/",
-        "test": "__tests__/keys.detectProviders.test.ts"
-      },
-      "notes": ".project-manager/features/F11/notes.md",
-      "readmePath": ".project-manager/features/F11/README.md",
-      "createdAt": "2026-05-19T00:24:47.000Z",
-      "updatedAt": "2026-05-20T02:01:00.000+10:00",
-      "phase": "development",
-      "points": 1,
-      "updatedBy": "f11_i18n_engineer"
-    },
-    {
-      "id": "F13",
-      "name": "Dispatch UX Improvements & Bug Fixes",
-      "category": "Frontend/Dispatch",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "featureFolder": ".project-manager/features/F13/",
-        "spec": ".project-manager/features/F13/feature-spec.md",
-        "tdd": ".project-manager/features/F13/tdd-spec.md",
-        "implementation": "components/table/TaskDispatchModal.tsx",
-        "developmentLogSummaryFolder": ".project-manager/features/F13/"
-      },
-      "readmePath": ".project-manager/features/F13/README.md",
-      "notes": ".project-manager/features/F13/notes.md",
-      "createdAt": "2026-05-19T13:47:00.000Z",
-      "updatedAt": "2026-05-20T02:06:00.000+10:00",
-      "updatedBy": "openclaw/Codex",
-      "phase": "deployment",
-      "points": 1
-    },
-    {
-      "id": "F14",
-      "name": "Sidebar Chatbot",
-      "category": "Frontend/AI Assistant",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "featureFolder": ".project-manager/features/F14/",
-        "spec": ".project-manager/features/F14/feature-spec.md",
-        "tdd": ".project-manager/features/F14/tdd-spec.md",
-        "implementation": "components/chat/",
-        "unitIntegrationTest": "components/chat/",
-        "developmentLogSummaryFolder": ".project-manager/features/F14/"
-      },
-      "readmePath": ".project-manager/features/F14/README.md",
-      "notes": ".project-manager/features/F14/notes.md",
-      "createdAt": "2026-05-20T01:46:00.000+10:00",
-      "updatedAt": "2026-05-20T09:30:00.000+10:00",
-      "updatedBy": "f14_engineer",
-      "phase": "development",
-      "points": 1
-    },
-    {
-      "id": "F15",
-      "name": "GitHub Issues Dashboard Tab",
-      "category": "Core/Integration",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "featureFolder": ".project-manager/features/F15/",
-        "spec": ".project-manager/features/F15/feature-spec.md",
-        "tdd": ".project-manager/features/F15/tdd-spec.md",
-        "implementation": "app/project-progress-dashboard/_components/IssuesTab.tsx",
-        "developmentLogSummaryFolder": ".project-manager/features/F15/"
-      },
-      "readmePath": ".project-manager/features/F15/README.md",
-      "createdAt": "2026-05-20T03:41:11.332Z",
-      "updatedAt": "2026-05-20T03:48:11.846Z",
-      "phase": "development",
-      "points": 5,
-      "updatedBy": "subagent"
-    },
-    {
-      "id": "F16",
-      "name": "Keys Page Redesign (3 Sheets)",
-      "category": "System/Settings",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "featureFolder": ".project-manager/features/F16/",
-        "spec": ".project-manager/features/F16/feature-spec.md",
-        "tdd": ".project-manager/features/F16/tdd-spec.md",
-        "implementation": "app/keys/page.tsx",
-        "developmentLogSummaryFolder": ".project-manager/features/F16/"
-      },
-      "notes": ".project-manager/features/F16/notes.md",
-      "readmePath": ".project-manager/features/F16/README.md",
-      "createdAt": "2026-05-20T22:34:39.843777Z",
-      "updatedAt": "2026-05-21T09:09:00.000+10:00",
-      "phase": "development",
-      "points": 5,
-      "updatedBy": "antigravity"
-    },
-    {
-      "id": "F17",
-      "name": "Decoupled Mermaid Integration",
-      "category": "Core/Architecture",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "featureFolder": ".project-manager/features/F17/",
-        "spec": ".project-manager/features/F17/feature-spec.md",
-        "tdd": ".project-manager/features/F17/tdd-spec.md",
-        "implementation": "components/chat/MermaidBlock.tsx",
-        "developmentLogSummaryFolder": ".project-manager/features/F17/"
-      },
-      "readmePath": ".project-manager/features/F17/README.md",
-      "createdAt": "2026-05-21T00:44:00.000Z",
-      "updatedAt": "2026-05-21T00:44:00.000Z",
-      "phase": "development",
-      "points": 3,
-      "updatedBy": "agent"
-    },
-    {
-      "id": "F18",
-      "name": "Documentation Site Publishing & Classification",
-      "category": "Documentation/Publishing",
-      "status": "done",
-      "progress": 100,
-      "paths": {
-        "featureFolder": ".project-manager/features/F18/",
-        "spec": ".project-manager/features/F18/feature-spec.md",
-        "tdd": ".project-manager/features/F18/tdd-spec.md",
-        "implementation": "app/documentation/[[...slug]]/page.tsx",
-        "unitIntegrationTest": "__tests__/documentationSiteManifest.test.ts",
-        "developmentLogSummaryFolder": ".project-manager/features/F18/"
-      },
-      "readmePath": ".project-manager/features/F18/README.md",
-      "notes": ".project-manager/features/F18/notes.md",
-      "createdAt": "2026-05-23T08:15:00.000+10:00",
-      "updatedAt": "2026-05-23T08:15:00.000+10:00",
-      "phase": "development",
-      "points": 3,
-      "updatedBy": "codex"
-    },
-    {
-      "id": "F19",
-      "name": "Plugins → Connect Sheet",
-      "category": "Integrations/UI",
-      "status": "in_progress",
-      "progress": 90,
-      "paths": {
-        "featureFolder": ".project-manager/features/F19/",
-        "spec": ".project-manager/features/F19/feature-spec.md",
-        "tdd": ".project-manager/features/F19/tdd-spec.md",
-        "implementation": "app/ui/views/Plugins/ConnectSheet.tsx",
-        "unitIntegrationTest": "",
-        "developmentLogSummaryFolder": ".project-manager/features/F19/"
-      },
-      "readmePath": ".project-manager/features/F19/README.md",
-      "notes": ".project-manager/features/F19/notes.md",
-      "createdAt": "2026-05-24T03:00:00.000+10:00",
-      "updatedAt": "2026-05-24T04:00:00.000+10:00",
-      "phase": "development",
-      "points": 2,
-      "updatedBy": "claude-code"
-    },
-    {
-      "id": "F20",
-      "name": "Channels — Multi-platform Messaging",
-      "category": "Integrations/Channels",
-      "status": "in_progress",
-      "progress": 55,
-      "paths": {
-        "featureFolder": ".project-manager/features/F20/",
-        "spec": ".project-manager/features/F20/feature-spec.md",
-        "tdd": ".project-manager/features/F20/tdd-spec.md",
-        "implementation": "app/ui/views/Plugins/PluginsHubView.tsx",
-        "unitIntegrationTest": "",
-        "developmentLogSummaryFolder": ".project-manager/features/F20/"
-      },
-      "readmePath": ".project-manager/features/F20/README.md",
-      "notes": ".project-manager/features/F20/notes.md",
-      "createdAt": "2026-05-24T04:00:00.000+10:00",
-      "updatedAt": "2026-05-24T04:00:00.000+10:00",
-      "phase": "development",
-      "points": 5,
-      "updatedBy": "claude-code"
-    }
-  ],
   "adapters": {
-    "ides": [
-      {
-        "id": "Cursor",
-        "name": "Cursor",
-        "type": "ide",
-        "command": "cursor"
-      },
-      {
-        "id": "VSCode",
-        "name": "Visual Studio Code",
-        "type": "ide",
-        "command": "code"
-      }
-    ],
     "agents": [
       {
+        "argsTemplate": [
+          "--cwd",
+          "{root}",
+          "{prompt}"
+        ],
+        "command": "claude-code",
         "id": "claude-code",
         "name": "Claude Code",
-        "type": "agent",
-        "command": "claude",
-        "argsTemplate": [
-          "--cwd",
-          "{root}",
-          "{prompt}"
-        ]
+        "type": "agent"
       },
       {
-        "id": "codex",
-        "name": "Codex",
-        "type": "agent",
-        "command": "codex",
         "argsTemplate": [
           "--cwd",
           "{root}",
           "{prompt}"
-        ]
+        ],
+        "command": "codex",
+        "id": "codex",
+        "name": "Codex",
+        "type": "agent"
+      }
+    ],
+    "ides": [
+      {
+        "command": "cursor",
+        "id": "Cursor",
+        "name": "Cursor",
+        "type": "ide"
       }
     ]
-  }
+  },
+  "createdAt": "2026-05-23T21:50:02.617Z",
+  "features": [
+    {
+      "category": "Frontend/UI",
+      "createdAt": "2026-05-23T21:50:02.617Z",
+      "id": "F01",
+      "locatedSection": "ui",
+      "name": "Sidebar Navigation",
+      "paths": {
+        "implementation": "app/ui/Sidebar.tsx",
+        "spec": ".project-manager/features/F01/feature-spec.md"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-23T21:50:02.617Z"
+    },
+    {
+      "category": "Frontend/UX",
+      "createdAt": "2026-05-23T21:50:02.617Z",
+      "id": "F02",
+      "locatedSection": "ui",
+      "name": "Feature Filter Tabs",
+      "paths": {
+        "implementation": "app/ui/DashboardClient.tsx",
+        "spec": ".project-manager/features/F02/feature-spec.md",
+        "tdd": ".project-manager/features/F02/tdd-spec.md",
+        "test": "__tests__/dashboardClient.phaseTabs.test.tsx"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-23T21:50:02.617Z"
+    },
+    {
+      "category": "Frontend/Monitor",
+      "createdAt": "2026-05-23T21:50:02.617Z",
+      "id": "F03",
+      "locatedSection": "ui/views",
+      "name": "Live Run Inspector",
+      "paths": {
+        "implementation": "app/ui/views/RunsView.tsx",
+        "test": "__tests__/agentWorkflows.test.ts"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-23T21:50:02.617Z"
+    },
+    {
+      "category": "Core/Integration",
+      "createdAt": "2026-05-23T21:50:02.617Z",
+      "id": "F04",
+      "locatedSection": "api/anthropic",
+      "name": "Add Project by GitHub URL",
+      "paths": {
+        "implementation": "app/api/anthropic/route.ts",
+        "spec": ".project-manager/features/F04/feature-spec.md",
+        "tdd": ".project-manager/features/F04/tdd-spec.md"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 85,
+      "status": "in_progress",
+      "updatedAt": "2026-05-23T21:50:02.617Z"
+    },
+    {
+      "category": "Core/AI",
+      "createdAt": "2026-05-23T21:50:02.617Z",
+      "id": "F05",
+      "locatedSection": "Core/AI",
+      "name": "Spec Ingestion Pipeline",
+      "paths": {},
+      "phase": "development",
+      "points": 1,
+      "progress": 0,
+      "status": "todo",
+      "updatedAt": "2026-05-23T21:50:02.617Z"
+    }
+  ],
+  "id": "6be5e570-fb8a-4873-8c5c-a4f88055f157",
+  "project": {
+    "defaultIDE": "Cursor",
+    "name": "Project Manager",
+    "root": "/Volumes/KLEVV-4T-1/Project-Manager"
+  },
+  "schemaVersion": 6,
+  "updatedAt": "2026-05-23T21:50:02.617Z"
 }

@@ -343,6 +343,10 @@ export const en: Translations = {
   dispatch: {
     title: 'Task Dispatch',
     phaseLabel: 'Project Phase',
+    taskRoleLabel: 'Task Role',
+    taskRolePlanner: 'Planner',
+    taskRoleWorker: 'Worker',
+    taskRoleEvaluator: 'Evaluator',
     engineerLabel: 'AI Engineer',
     workflowLabel: 'Agent Workflow',
     modelProviderLabel: 'Model Company',

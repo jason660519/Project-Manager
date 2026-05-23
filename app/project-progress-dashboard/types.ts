@@ -10,7 +10,7 @@ export interface CustomProjectProgressRow {
   percentage: number;
   /** Story points (development tab). Defaults to 1 when missing. */
   points?: number;
-  locatedPage?: string;
+  locatedSection?: string;
   phase: FeaturePhase;
   status?: FeatureStatus;
   testCoverage?: number;

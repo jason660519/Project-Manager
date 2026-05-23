@@ -117,7 +117,7 @@ describe('column cell editing — custom rows route through onPatchCustomRow', (
     const row = customRowToPhaseRow(baseCustom({ rowId: 'C-9', phase: 'development' }));
     const onPatchFeature = vi.fn();
     const onPatchCustomRow = vi.fn();
-    renderCell('development', 'page', row, { onPatchFeature, onPatchCustomRow });
+    renderCell('development', 'section', row, { onPatchFeature, onPatchCustomRow });
 
     await user.click(screen.getByRole('button')); // page cell starts with "—" placeholder
     const input = screen.getByRole('textbox') as HTMLInputElement;
@@ -125,7 +125,7 @@ describe('column cell editing — custom rows route through onPatchCustomRow', (
     fireEvent.blur(input);
 
     expect(onPatchFeature).not.toHaveBeenCalled();
-    expect(onPatchCustomRow).toHaveBeenCalledWith('C-9', { locatedPage: 'app/page.tsx' });
+    expect(onPatchCustomRow).toHaveBeenCalledWith('C-9', { locatedSection: 'app/page.tsx' });
   });
 });
 

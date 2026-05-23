@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { CURRENT_SCHEMA_VERSION, migrateConfig } from '../lib/storage/migrate';
 
-describe('migrateConfig v2 → v3 → v4 → v5', () => {
-  it('exposes 5 as the current schema version', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(5);
+describe('migrateConfig v2 → v3 → v4 → v5 → v6', () => {
+  it('exposes 6 as the current schema version', () => {
+    expect(CURRENT_SCHEMA_VERSION).toBe(6);
   });
 
-  it('bumps schemaVersion to 5 on a v2 document', () => {
+  it('bumps schemaVersion to 6 on a v2 document', () => {
     const v2 = {
       schemaVersion: 2,
       id: 'aaa',
@@ -15,7 +15,7 @@ describe('migrateConfig v2 → v3 → v4 → v5', () => {
       adapters: { ides: [], agents: [] },
     };
     const out = migrateConfig(v2);
-    expect(out.schemaVersion).toBe(5);
+    expect(out.schemaVersion).toBe(6);
   });
 
   it('defaults every feature to phase=development and points=1 when missing', () => {
@@ -80,7 +80,7 @@ describe('migrateConfig v2 → v3 → v4 → v5', () => {
       adapters: { ides: [], agents: [] },
     });
 
-    expect(out.schemaVersion).toBe(5);
+    expect(out.schemaVersion).toBe(6);
     expect(out.features[0].readmePath).toBe('.project-manager/features/F01/README.md');
     expect(out.features[0].notes).toBe('Short summary');
     expect(out.features[0].paths.spec).toBeUndefined();
@@ -113,7 +113,7 @@ describe('migrateConfig v2 → v3 → v4 → v5', () => {
       features: [{ id: 'F01', name: 'f', category: 'c', status: 'todo', progress: 0, paths: {} }],
       adapters: { ides: [], agents: [] },
     });
-    expect(out.schemaVersion).toBe(5);
+    expect(out.schemaVersion).toBe(6);
     expect(out.features[0].phase).toBe('development');
     expect(out.features[0].points).toBe(1);
     // v2 sync fields were also added during the v1 → v2 step.
@@ -131,5 +131,29 @@ describe('migrateConfig v2 → v3 → v4 → v5', () => {
     });
     const v3Again = migrateConfig(v3);
     expect(v3Again).toEqual(v3);
+  });
+
+  it('maps legacy locatedPage into locatedSection during v5 → v6', () => {
+    const out = migrateConfig({
+      schemaVersion: 5,
+      id: 'x',
+      project: { name: 'P', root: '/r', defaultIDE: 'Cursor' },
+      features: [
+        {
+          id: 'F01',
+          name: 'Feature',
+          category: 'Core',
+          status: 'todo',
+          progress: 0,
+          paths: {},
+          locatedPage: '/dashboard/settings',
+        },
+      ],
+      adapters: { ides: [], agents: [] },
+    });
+
+    expect(out.schemaVersion).toBe(6);
+    expect(out.features[0].locatedSection).toBe('/dashboard/settings');
+    expect((out.features[0] as { locatedPage?: string }).locatedPage).toBeUndefined();
   });
 });

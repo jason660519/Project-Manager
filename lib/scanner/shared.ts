@@ -75,6 +75,7 @@ Return ONLY a valid JSON object (no markdown fences, no commentary). The JSON mu
       "id": "<short unique id, e.g. F01>",
       "name": "<descriptive feature name>",
       "category": "<e.g. Frontend/UI, Backend/API, Core/Auth, DevOps/CI>",
+      "locatedSection": "<optional: route/module/area where this feature lives>",
       "status": "<todo|in_progress|done|on_hold>",
       "progress": <0-100>,
       "paths": {
@@ -102,6 +103,8 @@ Return ONLY a valid JSON object (no markdown fences, no commentary). The JSON mu
 3. **project.defaultIDE**: Detected IDEs: ${context.detectedIDEs.length > 0 ? context.detectedIDEs.join(', ') : 'none detected, default to "Cursor"'}. Pick the first detected, or "Cursor" as fallback.
 4. **features**: Identify 3–15 features from the directory structure, README, and docs. Each feature should correspond to a real functional area of the project.
    - Map paths to actual files/directories that exist in the tree.
+   - Populate "locatedSection" whenever possible. It can be a route, module, workflow area, or subsystem label (not only pages).
+   - Prefer deriving "locatedSection" from implementation paths first, then spec/test paths when implementation is absent.
    - Set status to "todo" by default unless there is clear evidence of completion or progress.
    - Only use paths that actually appear in the directory tree.
 5. **adapters.ides**: Include entries for detected IDEs. Always include at least one.
