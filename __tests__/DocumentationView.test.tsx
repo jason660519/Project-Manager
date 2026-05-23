@@ -9,7 +9,6 @@ describe('DocumentationView', () => {
       <DocumentationView
         manifest={DOCUMENTATION_SITE_INTERNAL_MANIFEST}
         initialSlug={['product']}
-        standalone
       />,
     );
 

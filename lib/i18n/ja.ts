@@ -22,6 +22,7 @@ export const ja: Translations = {
     shortcuts: 'ショートカット',
     settings: '設定',
     docs: 'ドキュメント',
+    companyStandards: '社内規範',
     chat: 'チャット',
   },
   system: {

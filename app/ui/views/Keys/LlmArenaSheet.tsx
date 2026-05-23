@@ -230,7 +230,7 @@ export function LlmArenaSheet() {
   const selectedHistory = selectedResultKey ? historyByResultKey[selectedResultKey] ?? [] : [];
 
   return (
-    <div className="flex h-[calc(100vh-12rem)] flex-col gap-4">
+    <div className="flex h-full min-h-0 flex-col gap-4">
       <LlmArenaMethodPanel
         systemPrompt={llmState.systemPrompt}
         userPrompt={llmState.userPrompt}

@@ -44,7 +44,7 @@ Full diagram: [`docs/architecture/architecture-overview.md`](docs/architecture/a
 ## Key Conventions
 
 - **Design system**: read [`DESIGN.md`](DESIGN.md) and [`docs/design/shared-ai-desktop-style.md`](docs/design/shared-ai-desktop-style.md) before UI changes. Keep the PM rail, dense dashboard layout, semantic status badges, and guarded-execution UX intact.
-- **Table governance**: read [`docs/engineering/table-standards.md`](docs/engineering/table-standards.md) before creating or changing any data-heavy view.
+- **Table & sheet layout**: any view under `app/ui/views/` that has a table, sheet, or multiple tab panels MUST use [`WorkstationFrame`](components/layout/WorkstationFrame.tsx) + [`BottomSheetTabs`](components/sheets/BottomSheetTabs.tsx). Tab strips always sit at the panel **bottom** (Excel-style), never in the header. Full contract: [`docs/engineering/table-standards.md`](docs/engineering/table-standards.md) and the [`table-and-sheet-layout`](.claude/skills/table-and-sheet-layout/SKILL.md) skill.
 - **Feature folders**: every feature has a canonical folder at `.project-manager/features/<ID>/`. `readmePath` points to that folder's `README.md`; `notes` in config.json is a path to that folder's `notes.md` (free-form markdown, no length restriction). Standard dashboard artifacts: `README.md`, `feature-spec.md`, `tdd-spec.md`, `dev-log.md`, `notes.md`.
 - **Dashboard document links**: path columns render fixed labels only (`README.md`, `feature-spec.md`, `tdd-spec.md`, `dev-log.md`, `notes.md`). Markdown artifacts open in the right-side document panel; raw paths belong in tooltips and config only.
 - **Static export**: Next.js produces a static bundle for Tauri. `app/api/` only runs under `next dev`. Anything that must exist in the shipped app belongs in Rust.
@@ -81,7 +81,7 @@ cargo build  --manifest-path src-tauri/Cargo.toml   # Rust build
 - PRD / scenarios / competitive analysis: [`docs/product/`](docs/product/) — **internal**, never publish.
 - User-facing guides: [`docs/guides/`](docs/guides/) — **public**, shown on `/documentation`.
 - Doc governance: [`scripts/docs-governance-check.sh`](scripts/docs-governance-check.sh) and `/docs-governance` slash command.
-- TanStack Table patterns: use the `create-tanstack-table` skill before building or extending tables.
+- TanStack Table + workstation layout patterns: use the `table-and-sheet-layout` skill before building or extending any table, sheet, or tab-panel view.
 
 ## Project Manager skills (gstack-inspired)
 
@@ -91,7 +91,7 @@ Custom skills live under [`.claude/skills/`](.claude/skills/) and are auto-loade
 |---|---|---|
 | Design a non-trivial change | [`plan-review`](.claude/skills/plan-review/SKILL.md) | Before `ExitPlanMode`; user says "review my plan / audit this approach" |
 | Debug a bug, regression, or unexpected behaviour | [`investigate`](.claude/skills/investigate/SKILL.md) | User reports a stack trace / "it was working yesterday" / IPC failure / unexpected UI state |
-| Build a TanStack table | [`create-tanstack-table`](.claude/skills/create-tanstack-table/SKILL.md) | New table or extending `TableCore` |
+| Build a table, sheet, tab panel, or any `app/ui/views/` page | [`table-and-sheet-layout`](.claude/skills/table-and-sheet-layout/SKILL.md) | Any new or modified view, new table, new tab strip, sheet-position fix, double-scrollbar fix |
 | Final diff audit before push | [`pre-landing-review`](.claude/skills/pre-landing-review/SKILL.md) | After implementation, before `git push` / opening a PR |
 | End-to-end ship (verify → commit → push → PR) | [`ship`](.claude/skills/ship/SKILL.md) | User says "ship it / land this / open the PR" |
 | Pause work mid-session, save state | [`context-save`](.claude/skills/context-save/SKILL.md) | User says "save context / checkpoint this / pause here" |

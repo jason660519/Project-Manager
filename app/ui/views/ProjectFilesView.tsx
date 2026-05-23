@@ -29,6 +29,8 @@ import {
 import { clsx } from 'clsx';
 import { FileNode } from '../../../lib/bridge';
 import { Feature, FeaturePaths, FeatureStatus, ProjectEntry } from '../../../lib/types';
+import { WorkstationFrame } from '../../../components/layout/WorkstationFrame';
+import { BottomSheetTabs, type SheetTabItem } from '../../../components/sheets/BottomSheetTabs';
 
 const PATH_TYPE_LABELS: Record<string, string> = {
   featureFolder: 'Feature Folder',
@@ -538,50 +540,6 @@ function FilesTable({
   );
 }
 
-function ProjectSheetTabs({
-  projects,
-  activeProjectId,
-  onSelectProject,
-}: {
-  projects: ProjectEntry[];
-  activeProjectId: string;
-  onSelectProject: (projectId: string) => void;
-}) {
-  return (
-    <div className="flex flex-none items-end overflow-x-auto border-t border-stone-200/15 bg-[rgb(var(--pm-rail))]/70">
-      {projects.map((project) => {
-        const active = project.id === activeProjectId;
-        return (
-          <button
-            key={project.id}
-            type="button"
-            onClick={() => onSelectProject(project.id)}
-            className={clsx(
-              'relative flex items-center gap-2 whitespace-nowrap border-r border-stone-200/15 px-4 py-2.5 text-sm font-medium transition-colors last:border-r-0',
-              active
-                ? 'bg-emerald-600/85 text-white shadow-sm'
-                : 'text-stone-300/85 hover:bg-white/5 hover:text-stone-100',
-            )}
-          >
-            <FolderKanban size={14} className={active ? 'text-current' : 'text-amber-100'} />
-            <span>{project.config.project.name}</span>
-            <span
-              className={clsx(
-                'ml-1 px-1.5 py-0.5 text-[10px] font-semibold leading-none',
-                active ? 'bg-white/25 text-white' : 'bg-stone-200/15 text-stone-100',
-              )}
-            >
-              {project.config.features.length}
-            </span>
-            {active && <span className="absolute left-0 right-0 top-0 h-0.5 bg-white/60" />}
-          </button>
-        );
-      })}
-      <div className="min-w-[20px] flex-1" />
-    </div>
-  );
-}
-
 function ProjectFileSheet({ project }: { project: ProjectEntry }) {
   const [realNodes, setRealNodes] = useState<FileNode[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -781,37 +739,50 @@ export function ProjectFilesView({
     0,
   );
 
-  return (
-    <div className="flex h-[calc(100vh-8rem)] min-h-[560px] flex-col overflow-hidden">
-      <div className="flex flex-none flex-wrap items-start gap-3 pb-4">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <Table2 size={17} className="text-emerald-200/80" />
-            <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">
-              Coding Editor
-            </h1>
-          </div>
-          <p className="mt-1 text-xs text-stone-400">
-            Dashboard project scope · {displayedProjects.length} sheet
-            {displayedProjects.length !== 1 ? 's' : ''} · {totalFeatures} features · {totalPaths} mapped paths
-          </p>
-        </div>
-      </div>
+  const sheetTabs: SheetTabItem<string>[] = displayedProjects.map((project) => ({
+    key: project.id,
+    label: project.config.project.name,
+    icon: <FolderKanban size={14} />,
+    badge: project.config.features.length,
+  }));
 
+  return (
+    <WorkstationFrame
+      header={
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <Table2 size={17} className="text-emerald-200/80" />
+              <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">
+                Coding Editor
+              </h1>
+            </div>
+            <p className="mt-1 text-xs text-stone-400">
+              Dashboard project scope · {displayedProjects.length} sheet
+              {displayedProjects.length !== 1 ? 's' : ''} · {totalFeatures} features · {totalPaths} mapped paths
+            </p>
+          </div>
+        </div>
+      }
+      panelClassName="border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72"
+      scrollChildren={false}
+      bottomTabs={
+        displayedProjects.length > 0 ? (
+          <BottomSheetTabs
+            tabs={sheetTabs}
+            activeKey={activeProject?.id ?? ''}
+            onSelect={setActiveProjectId}
+          />
+        ) : undefined
+      }
+    >
       {displayedProjects.length === 0 ? (
-        <div className="flex min-h-0 flex-1 items-center justify-center border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72 px-4 py-10 text-center text-xs text-stone-500">
+        <div className="flex h-full items-center justify-center px-4 py-10 text-center text-xs text-stone-500">
           No projects loaded.
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72">
-          {activeProject && <ProjectFileSheet key={activeProject.id} project={activeProject} />}
-          <ProjectSheetTabs
-            projects={displayedProjects}
-            activeProjectId={activeProject?.id ?? ''}
-            onSelectProject={setActiveProjectId}
-          />
-        </div>
+        activeProject && <ProjectFileSheet key={activeProject.id} project={activeProject} />
       )}
-    </div>
+    </WorkstationFrame>
   );
 }

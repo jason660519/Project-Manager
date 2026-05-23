@@ -253,7 +253,7 @@ export function VlmArenaSheet() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-12rem)] flex-col gap-4">
+    <div className="flex h-full min-h-0 flex-col gap-4">
       <VlmArenaMethodPanel
         imageDataUrl={vlmState.imageDataUrl}
         imageDetail={vlmState.imageDetail}

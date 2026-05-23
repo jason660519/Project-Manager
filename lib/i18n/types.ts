@@ -24,6 +24,7 @@ export interface Translations {
     shortcuts: string;
     settings: string;
     docs: string;
+    companyStandards: string;
     chat: string;
   };
   system: {

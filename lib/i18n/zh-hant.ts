@@ -22,6 +22,7 @@ export const zhHant: Translations = {
     shortcuts: '快捷鍵',
     settings: '設定',
     docs: '文件',
+    companyStandards: '公司規範',
     chat: '聊天',
   },
   system: {

@@ -12,8 +12,11 @@ Use it when creating or extending table-heavy views so current and future pages 
 ## Source Of Truth
 
 1. `DESIGN.md` and `docs/design/shared-ai-desktop-style.md`
-2. `.claude/skills/create-tanstack-table/SKILL.md`
-3. Table implementations:
+2. `.claude/skills/table-and-sheet-layout/SKILL.md`
+3. Reusable layout components (use these — do not inline equivalents):
+   - `components/layout/WorkstationFrame.tsx`
+   - `components/sheets/BottomSheetTabs.tsx`
+4. Table implementations:
    - `app/project-progress-dashboard/_components/PhaseTable.tsx`
    - `app/project-progress-dashboard/_lib/columns.tsx`
    - `app/project-progress-dashboard/_lib/pathLinks.tsx`

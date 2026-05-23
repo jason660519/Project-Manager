@@ -519,49 +519,6 @@ export function IntegrationsDetailSheet({
             </section>
           )}
 
-          {row.sourceKind === 'standards-provider' && onOpenPath && (
-            <section className="border-t border-stone-200/12 pt-4 space-y-2">
-              <p className="text-xs text-stone-400">
-                Company standards provider is optional. Project Manager keeps local docs as fallback.
-              </p>
-              {typeof row.payload.standardsRoot === 'string' && (
-                <button
-                  type="button"
-                  onClick={() => onOpenPath(row.payload.standardsRoot as string)}
-                  className="flex items-center gap-1 border border-stone-200/20 px-2 py-1 text-xs text-stone-300"
-                >
-                  <FolderOpen size={12} /> Open Standards Repo
-                </button>
-              )}
-              {typeof row.payload.contractDoc === 'string' && (
-                <button
-                  type="button"
-                  onClick={() => onOpenPath(row.payload.contractDoc as string)}
-                  className="flex items-center gap-1 border border-stone-200/20 px-2 py-1 text-xs text-stone-300"
-                >
-                  <FileText size={12} /> Open PM Plugin Contract
-                </button>
-              )}
-              {typeof row.payload.baselineDoc === 'string' && (
-                <button
-                  type="button"
-                  onClick={() => onOpenPath(row.payload.baselineDoc as string)}
-                  className="flex items-center gap-1 border border-stone-200/20 px-2 py-1 text-xs text-stone-300"
-                >
-                  <FileText size={12} /> Open Table Baseline
-                </button>
-              )}
-              {typeof row.payload.profileDoc === 'string' && (
-                <button
-                  type="button"
-                  onClick={() => onOpenPath(row.payload.profileDoc as string)}
-                  className="flex items-center gap-1 border border-stone-200/20 px-2 py-1 text-xs text-stone-300"
-                >
-                  <FileText size={12} /> Open PM Table Profile
-                </button>
-              )}
-            </section>
-          )}
         </div>
       </aside>
     </>

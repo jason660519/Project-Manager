@@ -223,7 +223,7 @@ export interface EngineerRole {
   testPrompt?: string;
 }
 
-export type ViewId = 'dashboard' | 'features' | 'coding-editor' | 'integrations-hub' | 'settings' | 'engineers' | 'channels' | 'sessions' | 'cron-jobs' | 'logs' | 'keys' | 'documentation' | 'chat' | 'keyboard-shortcuts';
+export type ViewId = 'dashboard' | 'features' | 'coding-editor' | 'integrations-hub' | 'settings' | 'engineers' | 'channels' | 'sessions' | 'cron-jobs' | 'logs' | 'keys' | 'documentation' | 'company-standards' | 'chat' | 'keyboard-shortcuts';
 
 export type IssueState = 'open' | 'closed';
 

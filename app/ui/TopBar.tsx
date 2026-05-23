@@ -18,6 +18,7 @@ const VIEW_LABELS: Record<ViewId, string> = {
   'cron-jobs':         'Cron Jobs',
   logs:                'Logs',
   documentation:       'Documentation',
+  'company-standards': 'Company Standards',
   keys:                'Keys',
   chat:                'AI Assistant',
   'keyboard-shortcuts': 'Keyboard Shortcuts',

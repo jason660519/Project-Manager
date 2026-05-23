@@ -72,7 +72,7 @@ export function AgentOpsPanel({ adapters, activeRuns }: AgentOpsPanelProps) {
                           : 'border-emerald-300/30 bg-emerald-500/15 text-emerald-200',
                       )}>{busy ? 'running' : 'idle'}</span>
                       <Link
-                        href="/integrations-hub"
+                        href="/integrations-hub/plugins"
                         className="flex h-6 w-6 items-center justify-center rounded border border-stone-200/15 text-stone-300 hover:text-stone-100 hover:bg-white/10"
                         title="Configure adapter"
                       >

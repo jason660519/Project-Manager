@@ -1,4 +1,4 @@
-import { DocumentationView } from '../../ui/views/DocumentationView';
+import { MainClient } from '../../ui/MainClient';
 import { DOCUMENTATION_SITE_PUBLIC_MANIFEST } from '../../../lib/generated/documentation-site-public';
 
 export const dynamicParams = false;
@@ -15,5 +15,5 @@ export default async function DocumentationPage({
   params: Promise<{ slug?: string[] }>;
 }) {
   const { slug = [] } = await params;
-  return <DocumentationView manifest={DOCUMENTATION_SITE_PUBLIC_MANIFEST} initialSlug={slug} standalone />;
+  return <MainClient currentView="documentation" documentationSlug={slug} />;
 }

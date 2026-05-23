@@ -44,6 +44,9 @@ import { EnvImportModal } from './views/_components/EnvImportModal';
 import { parseEnvText } from '../../lib/keys/envParser';
 import { detectProviders } from '../../lib/keys/detectProviders';
 import { SettingsView } from './views/SettingsView';
+import { DocumentationView } from './views/DocumentationView';
+import { CompanyStandardsView } from './views/CompanyStandardsView';
+import { DOCUMENTATION_SITE_PUBLIC_MANIFEST } from '../../lib/generated/documentation-site-public';
 import { ChatPageClient } from '../chat/ChatPageClient';
 
 type BridgeFileNode = {
@@ -121,9 +124,11 @@ const SEED_PROJECT_IDS = new Set(SEED_PROJECTS.map((p) => p.id));
 interface MainClientProps {
   currentView: ViewId;
   initialProjectId?: string;
+  integrationsSheet?: import('../../lib/integrations/types').IntegrationSheet;
+  documentationSlug?: string[];
 }
 
-export function MainClient({ currentView, initialProjectId }: MainClientProps) {
+export function MainClient({ currentView, initialProjectId, integrationsSheet, documentationSlug }: MainClientProps) {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectEntry[]>(SEED_PROJECTS);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
@@ -373,6 +378,11 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
   }, [isTauri, storageInitialized]);
 
   // Callable from the Projects toolbar sync button and the background poll.
+  //
+  // The dev `/api/registry` route inlines each project's on-disk config so we
+  // can hydrate with real features instead of an empty scaffold. Older builds
+  // of the route only returned `{ configPath }` — we still tolerate that
+  // shape via the `buildProjectEntryFromPath` fallback below.
   const syncFromDesktop = useCallback(async (): Promise<void> => {
     const { buildProjectEntryFromPath } = await import('../../lib/storage');
     const res = await fetch('/api/registry', {
@@ -381,13 +391,55 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
       body: JSON.stringify({ action: 'list' }),
     });
     if (!res.ok) return;
-    const entries = (await res.json()) as Array<{ configPath: string }>;
+    const entries = (await res.json()) as Array<{
+      configPath: string;
+      config?: ProjectManagerConfig | null;
+    }>;
     for (const entry of entries) {
       try {
-        const built = await buildProjectEntryFromPath(entry.configPath, { isTauri: false });
-        setProjects((prev) =>
-          prev.some((p) => p.configPath === built.configPath) ? prev : [...prev, built],
-        );
+        if (entry.config) {
+          const diskConfig = entry.config;
+          setProjects((prev) => {
+            const idx = prev.findIndex((p) => p.configPath === entry.configPath);
+            if (idx >= 0) {
+              // One-shot upgrade: if the existing entry is still an empty
+              // scaffold (configMissing or features: []), pull the disk
+              // features in. Skip otherwise so the 2 s poll doesn't trample
+              // PM-side edits or churn re-renders.
+              const local = prev[idx];
+              const diskFeatures = Array.isArray(diskConfig.features) ? diskConfig.features : [];
+              if (local.config.features.length > 0 || diskFeatures.length === 0) {
+                if (local.configMissing) {
+                  const next = [...prev];
+                  next[idx] = { ...local, configMissing: false };
+                  return next;
+                }
+                return prev;
+              }
+              const merged = mergeProjectConfigFromDisk(local.config, diskConfig, entry.configPath);
+              const next = [...prev];
+              next[idx] = { ...local, config: merged, configMissing: false };
+              return next;
+            }
+            // Brand new project — take the disk config as the local copy.
+            return [
+              ...prev,
+              {
+                id: `proj-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                config: migrateConfig(diskConfig),
+                configPath: entry.configPath,
+                configMissing: false,
+              },
+            ];
+          });
+        } else {
+          // Disk unreadable / missing — fall back to scaffold so the folder
+          // still surfaces in the Projects tab.
+          const built = await buildProjectEntryFromPath(entry.configPath, { isTauri: false });
+          setProjects((prev) =>
+            prev.some((p) => p.configPath === built.configPath) ? prev : [...prev, built],
+          );
+        }
       } catch {
         /* skip unreadable paths */
       }
@@ -1135,7 +1187,10 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
         />
       )}
       {currentView === 'integrations-hub' && (
-        <PluginsView projectRoot={selectedProject?.config.project.root ?? ''} />
+        <PluginsView
+          projectRoot={selectedProject?.config.project.root ?? ''}
+          initialSheet={integrationsSheet}
+        />
       )}
       {currentView === 'channels' && <ChannelsView />}
       {currentView === 'sessions' && selectedProject && (
@@ -1191,6 +1246,13 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
           selectedProjectId={selectedProjectId}
         />
       )}
+      {currentView === 'documentation' && (
+        <DocumentationView
+          manifest={DOCUMENTATION_SITE_PUBLIC_MANIFEST}
+          initialSlug={documentationSlug ?? []}
+        />
+      )}
+      {currentView === 'company-standards' && <CompanyStandardsView />}
       {pendingEnvImportRoot && (
         <EnvImportModal
           projectRoot={pendingEnvImportRoot}
