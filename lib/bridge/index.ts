@@ -986,6 +986,75 @@ export async function callGemini(opts: {
   });
 }
 
+// ── Provider key validation ──────────────────────────────────────────────────
+
+/**
+ * Mirror of `ValidateProviderKeyResult` in src-tauri/src/lib.rs. `ok=false`
+ * is a *business* failure (401, network unreachable, malformed JSON) — the
+ * promise itself only rejects on harness-level errors (unknown apiKind,
+ * missing baseUrl for openai-compatible).
+ */
+export interface ValidateProviderKeyResult {
+  ok: boolean;
+  models: string[];
+  errorReason: string | null;
+}
+
+export type ProviderApiKind =
+  | 'anthropic'
+  | 'openai-compatible'
+  | 'gemini'
+  | 'github';
+
+/**
+ * Validate a *just-typed* key by hitting the provider's list-models endpoint.
+ * The renderer passes the raw key in; Rust pings the endpoint, returns
+ * `{ ok, models, errorReason }`, and does **not** persist anything. Caller
+ * is responsible for storing the key via `setSecret` only when `ok === true`.
+ *
+ * `baseUrl` is required when `apiKind === 'openai-compatible'` and ignored
+ * for the other kinds.
+ */
+export async function validateProviderKey(opts: {
+  apiKind: ProviderApiKind;
+  apiKey: string;
+  baseUrl?: string;
+}): Promise<ValidateProviderKeyResult> {
+  if (!isTauri()) {
+    throw new Error('validateProviderKey requires Tauri runtime');
+  }
+  return invoke<ValidateProviderKeyResult>('validate_provider_key', {
+    apiKind: opts.apiKind,
+    baseUrl: opts.baseUrl ?? null,
+    apiKey: opts.apiKey,
+  });
+}
+
+/**
+ * Re-validate a key already stored in the keychain.  Rust reads the secret
+ * from keyring itself — the key never leaves Rust, so this is the strictest
+ * ADR-004 path. Use this for the Keys page's "Re-validate" button.
+ *
+ * Returns `{ ok: false, errorReason: 'No key configured' }` when the
+ * keychain entry is missing (normal state, not an error).
+ */
+export async function revalidateProviderKey(opts: {
+  keychainService: string;
+  keychainKey: string;
+  apiKind: ProviderApiKind;
+  baseUrl?: string;
+}): Promise<ValidateProviderKeyResult> {
+  if (!isTauri()) {
+    throw new Error('revalidateProviderKey requires Tauri runtime');
+  }
+  return invoke<ValidateProviderKeyResult>('revalidate_provider_key', {
+    keychainService: opts.keychainService,
+    keychainKey: opts.keychainKey,
+    apiKind: opts.apiKind,
+    baseUrl: opts.baseUrl ?? null,
+  });
+}
+
 // ── Multi-provider fallback call ─────────────────────────────────────────────
 
 export interface LlmFallbackAttempt {

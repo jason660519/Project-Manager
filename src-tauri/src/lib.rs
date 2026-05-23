@@ -965,6 +965,260 @@ async fn call_gemini(
     Ok(AnthropicResponse { content, input_tokens, output_tokens })
 }
 
+// ── Provider key validation ───────────────────────────────────────────────────
+//
+// One unified entry point for "is this API key live?" + "what models can it
+// reach?" used by the Keys page. Each `api_kind` maps to its provider's
+// public list-models endpoint:
+//   * anthropic         → GET /v1/models (`x-api-key`)
+//   * openai-compatible → GET {base_url}/models (Bearer)
+//   * gemini            → GET /v1beta/models (`x-goog-api-key`)
+//   * github            → GET /user (`Authorization: token <pat>`); no model list
+//
+// Behavioural contract: the Result is always `Ok` from the harness perspective
+// — provider-level rejection (401, network unreachable, JSON parse failure)
+// is reported as `ValidateProviderKeyResult { ok: false, error_reason }`.
+// `Err` is reserved for harness-level mistakes (caller passed unknown
+// `api_kind`, or `openai-compatible` was missing `base_url`).
+//
+// Anthropic *does* expose `/v1/models` (Anthropic API, see context7) so we
+// don't have to burn a billable `/v1/messages` token to probe Claude keys.
+
+#[derive(Serialize)]
+struct ValidateProviderKeyResult {
+    ok: bool,
+    models: Vec<String>,
+    #[serde(rename = "errorReason")]
+    error_reason: Option<String>,
+}
+
+async fn validate_anthropic_models(api_key: &str) -> Result<Vec<String>, String> {
+    let client = reqwest::Client::new();
+    let res = client
+        .get("https://api.anthropic.com/v1/models")
+        .header("x-api-key", api_key)
+        .header("anthropic-version", "2023-06-01")
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {e}"))?;
+
+    if !res.status().is_success() {
+        let status = res.status();
+        let text = res.text().await.unwrap_or_default();
+        return Err(format!("Anthropic {status}: {}", truncate_error(&text)));
+    }
+
+    let raw: serde_json::Value = res
+        .json()
+        .await
+        .map_err(|e| format!("Parse error: {e}"))?;
+
+    let models = raw["data"]
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|m| m["id"].as_str().map(|s| s.to_string()))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    Ok(models)
+}
+
+async fn validate_openai_compatible_models(
+    base_url: &str,
+    api_key: &str,
+) -> Result<Vec<String>, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/models", base_url.trim_end_matches('/'));
+    let res = client
+        .get(&url)
+        .bearer_auth(api_key)
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {e}"))?;
+
+    if !res.status().is_success() {
+        let status = res.status();
+        let text = res.text().await.unwrap_or_default();
+        return Err(format!("{status}: {}", truncate_error(&text)));
+    }
+
+    let raw: serde_json::Value = res
+        .json()
+        .await
+        .map_err(|e| format!("Parse error: {e}"))?;
+
+    let models = raw["data"]
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|m| m["id"].as_str().map(|s| s.to_string()))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    Ok(models)
+}
+
+async fn validate_gemini_models(api_key: &str) -> Result<Vec<String>, String> {
+    let client = reqwest::Client::new();
+    let res = client
+        .get("https://generativelanguage.googleapis.com/v1beta/models")
+        .header("x-goog-api-key", api_key)
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {e}"))?;
+
+    if !res.status().is_success() {
+        let status = res.status();
+        let text = res.text().await.unwrap_or_default();
+        return Err(format!("Gemini {status}: {}", truncate_error(&text)));
+    }
+
+    let raw: serde_json::Value = res
+        .json()
+        .await
+        .map_err(|e| format!("Parse error: {e}"))?;
+
+    // Gemini returns models as `{ models: [{ name: "models/gemini-1.5-pro", ... }] }`.
+    // Strip the leading `models/` so callers see the bare model id.
+    let models = raw["models"]
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|m| m["name"].as_str().map(|s| {
+                    s.strip_prefix("models/").unwrap_or(s).to_string()
+                }))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    Ok(models)
+}
+
+async fn validate_github_token(api_key: &str) -> Result<Vec<String>, String> {
+    let client = reqwest::Client::new();
+    let res = client
+        .get("https://api.github.com/user")
+        .header("Authorization", format!("token {api_key}"))
+        // GitHub rejects requests without a User-Agent.
+        .header("User-Agent", "project-manager")
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {e}"))?;
+
+    if !res.status().is_success() {
+        let status = res.status();
+        let text = res.text().await.unwrap_or_default();
+        return Err(format!("GitHub {status}: {}", truncate_error(&text)));
+    }
+
+    // No model concept — empty list signals "validated but N/A".
+    Ok(Vec::new())
+}
+
+/// Keep error_reason short enough to render in a single line in the UI.
+fn truncate_error(text: &str) -> String {
+    const MAX: usize = 200;
+    if text.chars().count() <= MAX {
+        text.to_string()
+    } else {
+        let truncated: String = text.chars().take(MAX).collect();
+        format!("{truncated}…")
+    }
+}
+
+async fn run_validation(
+    api_kind: &str,
+    base_url: Option<&str>,
+    api_key: &str,
+) -> Result<ValidateProviderKeyResult, String> {
+    if api_key.is_empty() {
+        return Ok(ValidateProviderKeyResult {
+            ok: false,
+            models: Vec::new(),
+            error_reason: Some("API key is empty".to_string()),
+        });
+    }
+
+    let result = match api_kind {
+        "anthropic" => validate_anthropic_models(api_key).await,
+        "openai-compatible" => {
+            let base = base_url.ok_or_else(|| {
+                "openai-compatible requires base_url".to_string()
+            })?;
+            validate_openai_compatible_models(base, api_key).await
+        }
+        "gemini" => validate_gemini_models(api_key).await,
+        "github" => validate_github_token(api_key).await,
+        other => return Err(format!("Unknown api_kind: {other}")),
+    };
+
+    Ok(match result {
+        Ok(models) => ValidateProviderKeyResult {
+            ok: true,
+            models,
+            error_reason: None,
+        },
+        Err(reason) => ValidateProviderKeyResult {
+            ok: false,
+            models: Vec::new(),
+            error_reason: Some(reason),
+        },
+    })
+}
+
+/// Validate a *just-typed* API key without persisting it.  Caller passes the
+/// raw key; on `result.ok` they then call `set_secret` to actually store it.
+/// On `result.ok === false`, the key is discarded — nothing is written.
+#[tauri::command]
+async fn validate_provider_key(
+    api_kind: String,
+    base_url: Option<String>,
+    api_key: String,
+) -> Result<ValidateProviderKeyResult, String> {
+    run_validation(&api_kind, base_url.as_deref(), &api_key).await
+}
+
+/// Re-validate a key that is already stored in the keychain.  The renderer
+/// never sees the key — Rust reads it from keyring, validates, and reports
+/// `{ ok, models, errorReason }` only.  Honors ADR-004 strictly.
+///
+/// Returns `Ok(result.ok=false)` with reason "No key configured" if the
+/// keychain entry is missing — that's a normal "nothing to validate" state,
+/// not a harness error.
+#[tauri::command]
+async fn revalidate_provider_key(
+    keychain_service: String,
+    keychain_key: String,
+    api_kind: String,
+    base_url: Option<String>,
+) -> Result<ValidateProviderKeyResult, String> {
+    let key_opt = if dev_secrets::dev_plaintext_secrets_enabled() {
+        dev_secrets::get_dev_secret(&keychain_service, &keychain_key)?
+    } else {
+        let entry = keyring::Entry::new(&keychain_service, &keychain_key)
+            .map_err(|e| e.to_string())?;
+        match entry.get_password() {
+            Ok(v) => Some(v),
+            Err(keyring::Error::NoEntry) => None,
+            Err(e) => return Err(e.to_string()),
+        }
+    };
+
+    let api_key = match key_opt {
+        Some(k) if !k.is_empty() => k,
+        _ => {
+            return Ok(ValidateProviderKeyResult {
+                ok: false,
+                models: Vec::new(),
+                error_reason: Some("No key configured".to_string()),
+            });
+        }
+    };
+
+    run_validation(&api_kind, base_url.as_deref(), &api_key).await
+}
+
 // ── Terminal spawn (interactive) ──────────────────────────────────────────────
 
 /// POSIX single-quote a string. Embedded single quotes use the `'\''` trick.
@@ -3704,6 +3958,8 @@ pub fn run() {
             call_openai,
             call_openai_compatible,
             call_gemini,
+            validate_provider_key,
+            revalidate_provider_key,
             watch_config,
             fetch_github_repo,
             fetch_github_issues,

@@ -56,7 +56,16 @@ describe('LLM provider registry', () => {
     for (const spec of listLlmProviders()) {
       if (spec.apiKind !== 'openai-compatible') continue;
       expect(spec.baseUrl, `${spec.id} needs baseUrl`).toBeTruthy();
-      expect(spec.baseUrl?.startsWith('https://')).toBe(true);
+      // Public providers must be HTTPS; local-loopback (Ollama Local etc.)
+      // legitimately runs over plain HTTP on 127.0.0.1 / localhost.
+      const url = spec.baseUrl!;
+      const isHttps = url.startsWith('https://');
+      const isLoopback =
+        url.startsWith('http://localhost') || url.startsWith('http://127.0.0.1');
+      expect(
+        isHttps || isLoopback,
+        `${spec.id} baseUrl must be https or loopback (got ${url})`,
+      ).toBe(true);
     }
   });
 
