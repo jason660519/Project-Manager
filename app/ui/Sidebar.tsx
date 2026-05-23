@@ -50,9 +50,10 @@ const NAV_GROUPS: NavGroup[] = [
   {
     groupKey: 'execution',
     items: [
-      { id: 'integrations-hub', itemKey: 'integrationsHub', href: '/integrations-hub', icon: Plug },
-      { id: 'cron-jobs', itemKey: 'cronJobs',  href: '/cron-jobs', icon: Timer },
-      { id: 'engineers', itemKey: 'engineers', href: '/engineers', icon: Users2 },
+      { id: 'keys',             itemKey: 'keys',            href: '/keys',                     icon: KeyRound },
+      { id: 'integrations-hub', itemKey: 'integrationsHub', href: '/integrations-hub',         icon: Plug },
+      { id: 'cron-jobs',        itemKey: 'cronJobs',        href: '/cron-jobs',                icon: Timer },
+      { id: 'engineers',        itemKey: 'engineers',       href: '/engineers',                icon: Users2 },
     ],
   },
   {
@@ -66,9 +67,8 @@ const NAV_GROUPS: NavGroup[] = [
   {
     groupKey: 'system',
     items: [
-      { id: 'keys',     itemKey: 'keys',     href: '/keys',     icon: KeyRound },
-      { id: 'settings', itemKey: 'settings', href: '/settings', icon: Settings },
-      { id: 'documentation',      itemKey: 'docs',      href: '/documentation',      icon: BookOpen },
+      { id: 'settings',      itemKey: 'settings', href: '/settings',      icon: Settings },
+      { id: 'documentation', itemKey: 'docs',     href: '/documentation', icon: BookOpen },
     ],
   },
 ];

@@ -21,7 +21,10 @@ export type LlmProviderId =
   | 'perplexity'
   | 'together'
   | 'zhipu'
-  | 'qwen';
+  | 'qwen'
+  | 'huggingface'
+  | 'ollama-local'
+  | 'ollama-cloud';
 
 /**
  * `anthropic` → POST /v1/messages with `x-api-key`.
@@ -249,6 +252,75 @@ const PROVIDERS: LlmProviderSpec[] = [
     baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     defaultModel: 'qwen-plus',
     availableModels: ['qwen-plus', 'qwen-max', 'qwen-turbo', 'qwen-long'],
+  },
+  {
+    // Hugging Face Inference Providers gateway exposes a unified
+    // OpenAI-compatible surface at https://router.huggingface.co/v1.
+    // Per-model dedicated endpoints under /hf-inference/models/... still
+    // exist but are model-scoped; for PM's "pick a model from the dropdown"
+    // flow the router endpoint is the right one.
+    id: 'huggingface',
+    label: 'Hugging Face',
+    placeholder: 'hf_...',
+    keychainKey: 'huggingface-api-key',
+    lsKey: `${LS_PREFIX}huggingface`,
+    envVarNames: ['HUGGINGFACE_API_TOKEN', 'HF_TOKEN'],
+    validatePattern: /^hf_[A-Za-z0-9]{20,}$/,
+    docUrl: 'https://huggingface.co/settings/tokens',
+    apiKind: 'openai-compatible',
+    baseUrl: 'https://router.huggingface.co/v1',
+    // HF routes model IDs through the router — these are warm chat models
+    // commonly used; the dynamic list (from /v1/models) supersedes when
+    // validation succeeds.
+    defaultModel: 'meta-llama/Llama-3.1-8B-Instruct',
+    availableModels: [
+      'meta-llama/Llama-3.3-70B-Instruct',
+      'meta-llama/Llama-3.1-8B-Instruct',
+      'mistralai/Mistral-7B-Instruct-v0.3',
+      'Qwen/Qwen2.5-72B-Instruct',
+      'deepseek-ai/DeepSeek-V3',
+    ],
+  },
+  {
+    // Ollama running on the user's machine. OpenAI-compat lives under /v1;
+    // the API key is *required but ignored* by Ollama (any non-empty
+    // string works — we suggest "ollama" as the placeholder). Validation
+    // hits GET /v1/models which returns whatever the user has pulled.
+    //
+    // TODO(settings): make baseUrl user-configurable so non-default ports
+    // (e.g. Docker) are supported. Read OLLAMA_LOCAL_BASE_URL from .env
+    // until then.
+    id: 'ollama-local',
+    label: 'Ollama (Local)',
+    placeholder: 'ollama (any value — auth is ignored locally)',
+    keychainKey: 'ollama-local-api-key',
+    lsKey: `${LS_PREFIX}ollama-local`,
+    envVarNames: ['OLLAMA_LOCAL_API_KEY'],
+    docUrl: 'https://github.com/ollama/ollama/blob/main/docs/openai.md',
+    apiKind: 'openai-compatible',
+    baseUrl: 'http://localhost:11434/v1',
+    // Default to a model that ships in most local installs; if absent the
+    // validation step will replace this list with whatever the user has.
+    defaultModel: 'llama3.2',
+    availableModels: ['llama3.2', 'llama3.1', 'qwen2.5', 'mistral', 'phi3'],
+  },
+  {
+    // Ollama Cloud — the OpenAI-compat URL is not yet documented in the
+    // official docs page (the native `/api/chat` is). We guess `/v1` based
+    // on the convention every other openai-compatible provider follows.
+    // If validation fails with 404, this baseUrl is the first thing to
+    // check.
+    id: 'ollama-cloud',
+    label: 'Ollama Cloud',
+    placeholder: 'ollama_cloud_...',
+    keychainKey: 'ollama-cloud-api-key',
+    lsKey: `${LS_PREFIX}ollama-cloud`,
+    envVarNames: ['OLLAMA_CLOUD_API_KEY'],
+    docUrl: 'https://ollama.com/cloud',
+    apiKind: 'openai-compatible',
+    baseUrl: 'https://ollama.com/v1',
+    defaultModel: 'gpt-oss:120b',
+    availableModels: ['gpt-oss:120b', 'gpt-oss:20b', 'llama3.3:70b'],
   },
 ];
 
