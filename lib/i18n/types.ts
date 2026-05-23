@@ -12,9 +12,9 @@ export interface Translations {
   navItems: {
     projects: string;
     dashboard: string;
-    files: string;
+    codingEditor: string;
     engineers: string;
-    plugins: string;
+    integrationsHub: string;
     channels: string;
     cronJobs: string;
     skills: string;

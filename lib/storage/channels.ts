@@ -93,5 +93,72 @@ export function loadChannelSecrets(
   );
 }
 
+// ── Activity log (Channels Phase 3 / AC-T3) ─────────────────────────────────
+//
+// Per-channel ring buffer of inbound messages persisted to localStorage so
+// activity survives reloads. Key pattern:
+//   projectManager.personal.channel.<channelId>.activity
+// Value: JSON array of ChannelActivityEntry, newest first, capped at
+// ACTIVITY_CAP_PER_CHANNEL (200) entries.
+
+export interface ChannelActivityEntry {
+  channelId: string;
+  updateId?: number;
+  messageId?: number;
+  chatId?: number;
+  fromUsername?: string;
+  fromName?: string;
+  text: string;
+  /** ISO 8601 timestamp. */
+  timestamp: string;
+}
+
+export const ACTIVITY_CAP_PER_CHANNEL = 200;
+
+function activityKey(channelId: string): string {
+  return `projectManager.personal.channel.${channelId}.activity`;
+}
+
+export function loadChannelActivity(channelId: string): ChannelActivityEntry[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(activityKey(channelId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as ChannelActivityEntry[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function loadAllChannelActivity(channelIds: string[]): ChannelActivityEntry[] {
+  const merged: ChannelActivityEntry[] = [];
+  for (const id of channelIds) {
+    merged.push(...loadChannelActivity(id));
+  }
+  merged.sort((a, b) => (b.timestamp < a.timestamp ? -1 : b.timestamp > a.timestamp ? 1 : 0));
+  return merged;
+}
+
+export function appendChannelActivity(channelId: string, entry: ChannelActivityEntry): void {
+  if (typeof window === 'undefined') return;
+  const existing = loadChannelActivity(channelId);
+  const next = [entry, ...existing].slice(0, ACTIVITY_CAP_PER_CHANNEL);
+  try {
+    window.localStorage.setItem(activityKey(channelId), JSON.stringify(next));
+  } catch {
+    /* quota — drop oldest silently */
+  }
+}
+
+export function clearChannelActivity(channelId: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(activityKey(channelId));
+  } catch {
+    /* ignore */
+  }
+}
+
 export { DEFAULT_COMMAND_MAPPINGS };
 export type { CommandAction };

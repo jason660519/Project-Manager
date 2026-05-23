@@ -10,8 +10,8 @@ import { ChatPanel } from '../../components/chat/ChatPanel';
 
 const VIEW_LABELS: Record<ViewId, string> = {
   dashboard:           'Project Progress Dashboard',
-  'project-files':     'Project Files',
-  plugins:             'Plugins',
+  'coding-editor':     'Coding Editor',
+  'integrations-hub':  'Integrations Hub',
   engineers:           'AI Engineers',
   sessions:            'Sessions',
   channels:            'Channels',

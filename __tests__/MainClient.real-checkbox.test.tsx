@@ -36,7 +36,7 @@ vi.mock('../app/ui/views/FeaturesView', () => ({
 
 vi.mock('../app/ui/views/ProjectFilesView', () => ({
   ProjectFilesView: ({ selectedDashboardProjectIds }: { selectedDashboardProjectIds: string[] }) => (
-    <div data-testid="project-files" data-selected={JSON.stringify(selectedDashboardProjectIds)} />
+    <div data-testid="coding-editor" data-selected={JSON.stringify(selectedDashboardProjectIds)} />
   ),
 }));
 
@@ -127,11 +127,11 @@ describe('real ProjectsView checkbox behavior', () => {
     expect(stored).toContain('project-manager');
     unmount();
 
-    // Mount a fresh /project-files instance — it should see both projects.
-    render(<MainClient currentView="project-files" />);
+    // Mount a fresh /coding-editor instance — it should see both projects.
+    render(<MainClient currentView="coding-editor" />);
     await flushEffects();
 
-    const panel = screen.getByTestId('project-files');
+    const panel = screen.getByTestId('coding-editor');
     const selected: string[] = JSON.parse(panel.getAttribute('data-selected') ?? '[]');
     expect(selected).toContain('project-manager');
     expect(selected).toContain('owner-property');

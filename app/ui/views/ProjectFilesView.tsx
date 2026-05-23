@@ -590,7 +590,7 @@ function ProjectFileSheet({ project }: { project: ProjectEntry }) {
   const [filterFeatureId, setFilterFeatureId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const isGitHub = project.configPath.startsWith('https://github.com/');
+  const isGitHub = project.configPath?.startsWith('https://github.com/') ?? false;
   const root = project.config.project.root;
   const features = project.config.features;
 
@@ -788,7 +788,7 @@ export function ProjectFilesView({
           <div className="flex items-center gap-2">
             <Table2 size={17} className="text-emerald-200/80" />
             <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">
-              Project Files
+              Coding Editor
             </h1>
           </div>
           <p className="mt-1 text-xs text-stone-400">
@@ -804,12 +804,12 @@ export function ProjectFilesView({
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72">
+          {activeProject && <ProjectFileSheet key={activeProject.id} project={activeProject} />}
           <ProjectSheetTabs
             projects={displayedProjects}
             activeProjectId={activeProject?.id ?? ''}
             onSelectProject={setActiveProjectId}
           />
-          {activeProject && <ProjectFileSheet key={activeProject.id} project={activeProject} />}
         </div>
       )}
     </div>

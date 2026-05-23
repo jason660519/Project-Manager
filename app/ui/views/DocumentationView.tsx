@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  ArrowLeft,
   BookOpen,
   CheckCircle2,
   Clock3,
@@ -303,6 +304,15 @@ export function DocumentationView({ manifest, initialSlug = [], standalone = fal
     <div className={containerClass} style={standalone ? { background: 'var(--pm-bg)' } : undefined}>
       <div className={frameClass}>
         <header className="shrink-0 border-b border-stone-200/10 bg-black/10 px-5 py-4">
+          {standalone && (
+            <a
+              href="/"
+              className="mb-3 inline-flex items-center gap-1.5 text-[11px] text-stone-500 transition-colors hover:text-stone-300"
+            >
+              <ArrowLeft size={12} />
+              Back to App
+            </a>
+          )}
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2">

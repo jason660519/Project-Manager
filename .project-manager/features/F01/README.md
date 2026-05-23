@@ -7,7 +7,7 @@
 ## Summary
 
 180px fixed sidebar with text labels and icons, organized into 4 nav groups:
-- **WORKSPACE** — Projects, Dashboard, Files
+- **WORKSPACE** — Projects, Dashboard, Coding Editor
 - **EXECUTION** — Engineers, Plugins, Channels, Cron Jobs
 - **OBSERVE** — Sessions, Logs
 - **SYSTEM** — Keys, Shortcuts, Settings, Docs

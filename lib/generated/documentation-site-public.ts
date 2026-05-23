@@ -4,19 +4,19 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-05-22T23:43:08.000Z",
+    "generatedAt": "2026-05-23T17:13:56.000Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
     "manifestAudience": "public",
-    "totalDocuments": 3,
-    "totalFolders": 3,
-    "publicDocuments": 9,
-    "internalDocuments": 34,
+    "totalDocuments": 5,
+    "totalFolders": 4,
+    "publicDocuments": 8,
+    "internalDocuments": 39,
     "restrictedDocuments": 1,
-    "publishableDocuments": 3,
+    "publishableDocuments": 5,
     "reviewRequiredDocuments": 27,
-    "warningCount": 59
+    "warningCount": 56
   },
   "folders": [
     {
@@ -26,22 +26,22 @@ export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
       "sourcePath": "docs",
       "label": "All Docs",
       "title": "Documentation",
-      "summary": "3 documentation files indexed from docs.",
+      "summary": "5 documentation files indexed from docs.",
       "parentSlug": null,
       "folderSlugs": [
         "deployment",
-        "product"
+        "guides"
       ],
       "docIds": [],
       "classificationCounts": {
-        "public": 3,
+        "public": 5,
         "internal": 0,
         "restricted": 0
       },
-      "publishableCount": 3,
+      "publishableCount": 5,
       "reviewRequiredCount": 0,
       "visibilityCounts": {
-        "public": 3,
+        "public": 5,
         "internal": 0,
         "restricted": 0
       },
@@ -75,28 +75,58 @@ export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
       "warnings": []
     },
     {
-      "id": "product",
-      "slug": "product",
-      "route": "/documentation/product",
-      "sourcePath": "docs/product",
-      "label": "Product",
-      "title": "Project Manager Product Documents",
-      "summary": "This folder is the only location for Project Manager product strategy, user-scenario, PRD, audience, and market-positioning documents. 1. Product docs go under `docs/product/` with Englis...",
+      "id": "guides",
+      "slug": "guides",
+      "route": "/documentation/guides",
+      "sourcePath": "docs/guides",
+      "label": "Guides",
+      "title": "Guides",
+      "summary": "4 documentation files indexed from docs/guides.",
       "parentSlug": "",
-      "folderSlugs": [],
+      "folderSlugs": [
+        "guides/features"
+      ],
       "docIds": [
-        "product/competitive-analysis",
-        "product/readme"
+        "guides/getting-started"
       ],
       "classificationCounts": {
-        "public": 2,
+        "public": 4,
         "internal": 0,
         "restricted": 0
       },
-      "publishableCount": 2,
+      "publishableCount": 4,
       "reviewRequiredCount": 0,
       "visibilityCounts": {
-        "public": 2,
+        "public": 4,
+        "internal": 0,
+        "restricted": 0
+      },
+      "warnings": []
+    },
+    {
+      "id": "guides/features",
+      "slug": "guides/features",
+      "route": "/documentation/guides/features",
+      "sourcePath": "docs/guides/features",
+      "label": "Features",
+      "title": "Features",
+      "summary": "3 documentation files indexed from docs/guides/features.",
+      "parentSlug": "guides",
+      "folderSlugs": [],
+      "docIds": [
+        "guides/features/dispatch",
+        "guides/features/documentation",
+        "guides/features/workstation"
+      ],
+      "classificationCounts": {
+        "public": 3,
+        "internal": 0,
+        "restricted": 0
+      },
+      "publishableCount": 3,
+      "reviewRequiredCount": 0,
+      "visibilityCounts": {
+        "public": 3,
         "internal": 0,
         "restricted": 0
       },
@@ -136,76 +166,140 @@ export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
       "updatedAt": "2026-05-16T20:51:36.000Z"
     },
     {
-      "id": "product/competitive-analysis",
-      "slug": "product/competitive-analysis",
-      "route": "/documentation/product/competitive-analysis",
-      "sourcePath": "docs/product/competitive-analysis.md",
-      "folderSlug": "product",
-      "folderPath": "docs/product",
-      "title": "Project Manager Competitive Analysis",
-      "summary": "Version: v0.1 Date: 2026-05-12 Project Manager sits at the intersection of project management, AI IDE tooling, and desktop launchers. The core white space is local-first, agent-native tas...",
-      "content": "# Project Manager Competitive Analysis\n\nVersion: v0.1  \nDate: 2026-05-12\n\n---\n\n## English Version\n\n## 1. Category Mapping\n\nProject Manager sits at the intersection of project management, AI IDE tooling, and desktop launchers. The core white space is local-first, agent-native task orchestration.\n\n## 2. Direct Competitors\n\n### 2.1 Linear\n\n- Strong issue tracking and team collaboration.\n- No native local agent dispatch workflow.\n- Project Manager is complementary as an execution layer.\n\nConclusion: not a direct replacement; future adapter opportunity exists.\n\n### 2.2 Jira\n\n- Enterprise-oriented, configurable, process-heavy.\n- Project Manager targets lightweight solo/small-team execution flow.\n\nConclusion: different audience and complexity profile.\n\n### 2.3 Notion\n\n- Flexible but generic workspace.\n- Requires manual setup for engineering dispatch workflows.\n\nConclusion: Project Manager solves engineering-specific dispatch pain more directly.\n\n## 3. Indirect Competitors\n\n### 3.1 Raycast\n\n- Great launcher UX and shortcut ergonomics.\n- Not built for end-to-end engineering task orchestration.\n\nConclusion: coexistence is likely; Project Manager can borrow overlay interaction patterns.\n\n### 3.2 Claude Code / Cursor\n\n- Deep in-editor coding support.\n- Limited multi-project task control and orchestration layer.\n\nConclusion: Project Manager acts as planning/dispatch/monitoring layer above IDE assistants.\n\n### 3.3 GitHub Projects / Issues\n\n- Excellent for issue and PR lifecycle tracking.\n- No local agent runtime orchestration.\n\nConclusion: integrate GitHub issues as feature sources for Project Manager.\n\n## 4. Emerging Watchlist\n\n| Product | Threat | Notes |\n| --- | --- | --- |\n| Amp (Kiro) | Medium | AI-native IDE direction |\n| Devin | Medium-High | Could overlap if task UI matures |\n| Windsurf | Medium | IDE-centric tasking evolution |\n| MCP Hub tools | Low | Different abstraction layer |\n\n## 5. Differentiation\n\n1. Agent-native product design.\n2. Progress as Code (`.project-manager.json`).\n3. Local Rust runtime for process/FS/OS operations.\n4. AI-assisted spec ingestion pipeline.\n\nOne-line position:\n\nProject Manager connects planning intent, agent execution, and runtime visibility in one local workflow.\n\n## 6. Capability Comparison\n\n| Capability | Project Manager | Linear | Notion | Raycast | Claude Code |\n| --- | --- | --- | --- | --- | --- |\n| Local-first operation | Yes | No | No | Partial | Yes |\n| Agent dispatch orchestration | Yes | No | No | No | Self-only |\n| Multi-project view | Yes | Yes | Yes (configured) | No | No |\n| AI spec ingestion | Yes | No | No | No | No |\n| Live runtime logs | Yes | No | No | No | Terminal-level |\n| Progress-as-code model | Yes | No | No | No | No |\n\n---\n\n## 中文版本\n\n## 1. 競品分類定位\n\nProject Manager 位於專案管理、AI IDE、桌面啟動器三個市場交會處，主要空白是「本機優先 + Agent 原生 + 任務指揮」。\n\n## 2. 直接競品\n\n### 2.1 Linear\n\n- 擅長 issue 管理與團隊協作。\n- 缺少本機 Agent 派遣與執行監控流程。\n\n結論：不是直接替代關係，未來可透過 adapter 共存。\n\n### 2.2 Jira\n\n- 企業導向、流程重、設定複雜。\n- Project Manager 聚焦個人與小團隊的輕量執行流程。\n\n結論：目標客群與使用情境不同。\n\n### 2.3 Notion\n\n- 通用性高，但工程派遣流程需手動拼裝。\n- Project Manager 直接解工程任務派遣與監控痛點。\n\n結論：Project Manager 在工程執行場景更直接。\n\n## 3. 間接競品\n\n### 3.1 Raycast\n\n- 在喚起速度與快捷鍵體驗上很強。\n- 不負責完整工程任務派遣閉環。\n\n結論：可共存，Project Manager 可借鑑 overlay 互動模式。\n\n### 3.2 Claude Code / Cursor\n\n- IDE 內 coding 能力強。\n- 缺乏跨專案任務調度層。\n\n結論：Project Manager 應作為 IDE 之上的規劃、派遣與監控層。\n\n### 3.3 GitHub Projects / Issues\n\n- 非常適合 issue/PR 生命週期管理。\n- 不處理本機 Agent 執行編排。\n\n結論：可把 GitHub issue 納入 Project Manager 的 Feature 來源。\n\n## 4. 新興競品觀察\n\n| 工具 | 威脅程度 | 說明 |\n| --- | --- | --- |\n| Amp（Kiro） | 中 | AI IDE 路線 |\n| Devin | 中高 | 若任務介面成熟可能重疊 |\n| Windsurf | 中 | 仍偏 IDE 內任務追蹤 |\n| MCP Hub 工具 | 低 | 層級不同 |\n\n## 5. 差異化護城河\n\n1. Agent-native 產品設計。\n2. Progress as Code（`.project-manager.json`）。\n3. 本機 Rust runtime（process/FS/OS）。\n4. 規格文件 AI 匯入能力。\n\n一句話定位：\n\nProject Manager 把規劃意圖、Agent 執行與即時可見性，整合成單一本機工作流。\n\n## 6. 功能比較\n\n| 能力 | Project Manager | Linear | Notion | Raycast | Claude Code |\n| --- | --- | --- | --- | --- | --- |\n| 本機優先 | 是 | 否 | 否 | 部分 | 是 |\n| Agent 派遣編排 | 是 | 否 | 否 | 否 | 自身範圍 |\n| 跨專案視圖 | 是 | 是 | 可設定 | 否 | 否 |\n| AI 規格匯入 | 是 | 否 | 否 | 否 | 否 |\n| 即時執行日誌 | 是 | 否 | 否 | 否 | terminal 層 |\n| Progress as Code | 是 | 否 | 否 | 否 | 否 |\n",
-      "contentHash": "6b09309e393659a0",
-      "readingMinutes": 4,
-      "classification": "public",
-      "classificationSource": "policy",
-      "classificationConfidence": 0.92,
-      "classificationReason": "Product documentation is intended for users and customer-facing product review when no sensitive content is detected.",
-      "matchedPolicyRule": "CLS-PUBLIC-PRODUCT",
-      "publish": true,
-      "reviewStatus": "approved",
-      "needsReview": false,
-      "visibility": "public",
-      "audience": [
-        "customers",
-        "users",
-        "product"
-      ],
-      "tags": [
-        "product"
-      ],
-      "warnings": [],
-      "updatedAt": "2026-05-14T22:27:27.000Z"
-    },
-    {
-      "id": "product/readme",
-      "slug": "product/readme",
-      "route": "/documentation/product/readme",
-      "sourcePath": "docs/product/README.md",
-      "folderSlug": "product",
-      "folderPath": "docs/product",
-      "title": "Project Manager Product Documents",
-      "summary": "This folder is the only location for Project Manager product strategy, user-scenario, PRD, audience, and market-positioning documents. 1. Product docs go under `docs/product/` with Englis...",
-      "content": "# Project Manager Product Documents\n\n> Status: Product documentation index  \n> Last updated: 2026-05-15\n\n---\n\n## English Version\n\n## 1. Purpose\n\nThis folder is the only location for Project Manager product strategy, user-scenario, PRD, audience, and market-positioning documents.\n\n## 2. Current Product Sources\n\n| Document | Purpose |\n| --- | --- |\n| [user-scenarios.md](./user-scenarios.md) | User workflows and Tauri dependencies |\n| [project-manager-prd.md](./project-manager-prd.md) | Product requirements and MVP scope |\n| [target-audience.md](./target-audience.md) | Target audience and JTBD |\n| [competitive-analysis.md](./competitive-analysis.md) | Competitive positioning |\n\n## 3. Rules\n\n1. Product docs go under `docs/product/` with English kebab-case filenames.\n2. Do not put product docs in the repo root or `docs/` root.\n3. Technical implementation contracts belong in `docs/engineering/`.\n4. Durable architecture decisions belong in `docs/architecture/`.\n5. Deprecated product docs move to `docs/archive/archived-YYYYMMDD-name.md` with a short deprecation note.\n\n---\n\n## 中文版本\n\n## 1. 目的\n\n此目錄是 Project Manager 產品策略、使用情境、PRD、客群與市場定位文件的唯一標準位置。\n\n## 2. 目前產品文件來源\n\n| 文件 | 用途 |\n| --- | --- |\n| [user-scenarios.md](./user-scenarios.md) | 使用者工作流與 Tauri dependencies |\n| [project-manager-prd.md](./project-manager-prd.md) | 產品需求與 MVP scope |\n| [target-audience.md](./target-audience.md) | 目標客群與 JTBD |\n| [competitive-analysis.md](./competitive-analysis.md) | 競品定位 |\n\n## 3. 規則\n\n1. 產品文件放在 `docs/product/`，檔名使用英文 kebab-case。\n2. 不要把產品文件放在 repo root 或 `docs/` root。\n3. 技術實作 contract 放在 `docs/engineering/`。\n4. 長期架構決策放在 `docs/architecture/`。\n5. 過時產品文件移到 `docs/archive/archived-YYYYMMDD-name.md`，並在檔案開頭加簡短停用說明。\n",
-      "contentHash": "920b5793317092e8",
+      "id": "guides/features/dispatch",
+      "slug": "guides/features/dispatch",
+      "route": "/documentation/guides/features/dispatch",
+      "sourcePath": "docs/guides/features/dispatch.md",
+      "folderSlug": "guides/features",
+      "folderPath": "docs/guides/features",
+      "title": "Dispatch",
+      "summary": "Dispatch sends a task from Project Manager to a local IDE or AI agent. It handles context assembly, adapter selection, and status tracking automatically. Task selected → Context assembled...",
+      "content": "\n# Dispatch\n\nDispatch sends a task from Project Manager to a local IDE or AI agent. It handles context assembly, adapter selection, and status tracking automatically.\n\n## How It Works\n\n```\nTask selected → Context assembled → Adapter invoked → IDE / Agent opens → Status updated\n```\n\n1. Project Manager assembles the task context (title, description, linked files, feature spec).\n2. The selected adapter translates context into the target IDE or agent format.\n3. The adapter opens the IDE or launches the agent CLI with the assembled prompt.\n4. Task status is updated to **in-progress** and the dispatch is logged.\n\n## Supported Adapters\n\n| Adapter | Type | Notes |\n|---|---|---|\n| VS Code | IDE | Opens workspace with task context injected |\n| Cursor | IDE | Passes task to Cursor's AI panel |\n| Windsurf | IDE | Opens with Cascade context |\n| Claude (CLI) | Agent | Launches `claude` with assembled prompt |\n\n## Dispatch History\n\nThe Dispatch panel in the sidebar shows recent dispatches with their status and timestamps. Click any entry to see the full context that was sent.\n",
+      "contentHash": "4e9bfc6fe5d28238",
       "readingMinutes": 1,
       "classification": "public",
-      "classificationSource": "policy",
-      "classificationConfidence": 0.92,
-      "classificationReason": "Product documentation is intended for users and customer-facing product review when no sensitive content is detected.",
-      "matchedPolicyRule": "CLS-PUBLIC-PRODUCT",
+      "classificationSource": "frontmatter",
+      "classificationConfidence": 0.95,
+      "classificationReason": "User-facing feature guide with no internal operational or sensitive content.",
+      "matchedPolicyRule": "CLS-FRONTMATTER-OVERRIDE",
       "publish": true,
       "reviewStatus": "approved",
       "needsReview": false,
       "visibility": "public",
       "audience": [
-        "customers",
         "users",
-        "product"
+        "customers"
       ],
       "tags": [
-        "product"
+        "guides"
       ],
       "warnings": [],
-      "updatedAt": "2026-05-14T22:27:27.000Z"
+      "updatedAt": "2026-05-23T16:57:23.000Z"
+    },
+    {
+      "id": "guides/features/documentation",
+      "slug": "guides/features/documentation",
+      "route": "/documentation/guides/features/documentation",
+      "sourcePath": "docs/guides/features/documentation.md",
+      "folderSlug": "guides/features",
+      "folderPath": "docs/guides/features",
+      "title": "Documentation",
+      "summary": "The Documentation view lets you browse, search, and publish your project's documentation directly from Project Manager. Project Manager scans your `docs/` folder and generates a structure...",
+      "content": "\n# Documentation\n\nThe Documentation view lets you browse, search, and publish your project's documentation directly from Project Manager.\n\n## Overview\n\nProject Manager scans your `docs/` folder and generates a structured documentation site. Documents are classified automatically by folder policy, and a strict publish gate prevents internal or sensitive content from appearing in the public view.\n\n## Document Classification\n\nEach document has one of three classification levels:\n\n| Level | Badge | Meaning |\n|---|---|---|\n| **Public** | Green | Safe for external users and customers |\n| **Internal** | Amber | Visible to maintainers only, not published |\n| **Restricted** | Red | Contains sensitive content, metadata only |\n\n## Browsing\n\n- Use the **folder tree** (left panel) to navigate by topic.\n- Use the **search bar** to filter by title, summary, path, or tag.\n- Use the **classification filter** to show only public, internal, or restricted documents.\n- Click any document title to read it in the right panel.\n\n## Publishing Guides\n\nTo add a document that appears on the public documentation site:\n\n1. Create a Markdown file under `docs/guides/`.\n2. Add this frontmatter block at the top:\n\n```yaml\n---\nclassification: public\npublish: true\nreviewStatus: approved\naudience: users, customers\nclassificationReason: Brief reason this is safe to publish.\n---\n```\n\n3. Run `npm run docs:site:sync` to regenerate the manifest.\n4. The document now appears in the public view.\n\n## Sync Status\n\nThe right sidebar in the Documentation view shows sync metadata: total documents, classification breakdown, last sync time, and the number of documents pending review.\n",
+      "contentHash": "f39679571442217b",
+      "readingMinutes": 2,
+      "classification": "public",
+      "classificationSource": "frontmatter",
+      "classificationConfidence": 0.95,
+      "classificationReason": "User-facing feature guide with no internal operational or sensitive content.",
+      "matchedPolicyRule": "CLS-FRONTMATTER-OVERRIDE",
+      "publish": true,
+      "reviewStatus": "approved",
+      "needsReview": false,
+      "visibility": "public",
+      "audience": [
+        "users",
+        "customers"
+      ],
+      "tags": [
+        "guides"
+      ],
+      "warnings": [],
+      "updatedAt": "2026-05-23T16:57:31.000Z"
+    },
+    {
+      "id": "guides/features/workstation",
+      "slug": "guides/features/workstation",
+      "route": "/documentation/guides/features/workstation",
+      "sourcePath": "docs/guides/features/workstation.md",
+      "folderSlug": "guides/features",
+      "folderPath": "docs/guides/features",
+      "title": "Workstation",
+      "summary": "The Workstation is the main operational view of Project Manager. It shows all tasks across your connected projects in a unified table. 1. Select a task row. 2. Click **Dispatch** in the a...",
+      "content": "\n# Workstation\n\nThe Workstation is the main operational view of Project Manager. It shows all tasks across your connected projects in a unified table.\n\n## Layout\n\n| Column | Description |\n|---|---|\n| **Task** | Task title and linked feature folder |\n| **Status** | Current status badge (planned / in-progress / done / blocked) |\n| **Priority** | P0–P3 priority level |\n| **Adapter** | Target IDE or agent runtime |\n| **Updated** | Last modified timestamp |\n\n## Dispatching a Task\n\n1. Select a task row.\n2. Click **Dispatch** in the action bar (or press `D`).\n3. Choose an adapter — VS Code, Cursor, Windsurf, or a Claude agent.\n4. Confirm dispatch. The task status changes to **in-progress** and the IDE opens automatically.\n\n## Filtering and Search\n\nUse the search bar to filter by task name, status, or priority. Click any column header to sort. Active filters are shown as chips below the search bar and can be cleared individually.\n",
+      "contentHash": "108504d7f915e4d0",
+      "readingMinutes": 1,
+      "classification": "public",
+      "classificationSource": "frontmatter",
+      "classificationConfidence": 0.95,
+      "classificationReason": "User-facing feature guide with no internal operational or sensitive content.",
+      "matchedPolicyRule": "CLS-FRONTMATTER-OVERRIDE",
+      "publish": true,
+      "reviewStatus": "approved",
+      "needsReview": false,
+      "visibility": "public",
+      "audience": [
+        "users",
+        "customers"
+      ],
+      "tags": [
+        "guides",
+        "table"
+      ],
+      "warnings": [],
+      "updatedAt": "2026-05-23T16:57:17.000Z"
+    },
+    {
+      "id": "guides/getting-started",
+      "slug": "guides/getting-started",
+      "route": "/documentation/guides/getting-started",
+      "sourcePath": "docs/guides/getting-started.md",
+      "folderSlug": "guides",
+      "folderPath": "docs/guides",
+      "title": "Getting Started with Project Manager",
+      "summary": "Project Manager is an engineering dashboard that centralises your projects, dispatches work to IDEs and AI agents, and keeps your team in sync across tools. - macOS 13 or later - Node.js...",
+      "content": "\n# Getting Started with Project Manager\n\nProject Manager is an engineering dashboard that centralises your projects, dispatches work to IDEs and AI agents, and keeps your team in sync across tools.\n\n## Prerequisites\n\n- macOS 13 or later\n- Node.js 20+\n- Rust toolchain (for development builds)\n\n## Installation\n\nDownload the latest release from the Releases page and open the `.dmg` installer. Drag Project Manager to your Applications folder and launch it.\n\n## First Launch\n\n1. **Import a project** — Click **New Project** in the sidebar and point to your project directory or an existing `.project-manager.json` file.\n2. **Connect your IDE** — Go to **Settings → Adapters** and select your IDE (VS Code, Cursor, or Windsurf).\n3. **Start the workstation** — Open the Workstation view to see all active tasks, dispatch work, and monitor agent runs.\n\n## Next Steps\n\n- [Workstation](features/workstation.md) — manage tasks and dispatch work\n- [Dispatch](features/dispatch.md) — send tasks to your IDE or AI agent\n- [Documentation](features/documentation.md) — browse and publish project docs\n",
+      "contentHash": "0074ce5b9752a2e7",
+      "readingMinutes": 1,
+      "classification": "public",
+      "classificationSource": "frontmatter",
+      "classificationConfidence": 0.95,
+      "classificationReason": "End-user onboarding guide with no internal operational or sensitive content.",
+      "matchedPolicyRule": "CLS-FRONTMATTER-OVERRIDE",
+      "publish": true,
+      "reviewStatus": "approved",
+      "needsReview": false,
+      "visibility": "public",
+      "audience": [
+        "users",
+        "customers"
+      ],
+      "tags": [
+        "guides"
+      ],
+      "warnings": [],
+      "updatedAt": "2026-05-23T16:57:11.000Z"
     }
   ],
   "routes": [
     "",
     "deployment",
-    "product",
+    "guides",
+    "guides/features",
     "deployment/readme",
-    "product/competitive-analysis",
-    "product/readme"
+    "guides/features/dispatch",
+    "guides/features/documentation",
+    "guides/features/workstation",
+    "guides/getting-started"
   ]
 } satisfies DocumentationSiteManifest;

@@ -1,3 +1,9 @@
+---
+classification: internal
+publish: false
+classificationReason: Competitive intelligence is proprietary strategic material; internal use only.
+---
+
 # Project Manager Competitive Analysis
 
 Version: v0.1  

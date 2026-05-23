@@ -3562,6 +3562,55 @@ async fn telegram_send_message(
     Ok(())
 }
 
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all(deserialize = "snake_case", serialize = "camelCase"))]
+struct TelegramBotInfo {
+    id: i64,
+    is_bot: bool,
+    first_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    username: Option<String>,
+    #[serde(default)]
+    can_join_groups: bool,
+    #[serde(default)]
+    can_read_all_group_messages: bool,
+    #[serde(default)]
+    supports_inline_queries: bool,
+}
+
+/// Validate a Telegram bot token by calling the `getMe` endpoint.
+///
+/// Error paths intentionally never include the raw `bot_token` in their
+/// messages so that token strings stay out of any log surface (Tauri log,
+/// browser console, renderer error UI).
+#[tauri::command]
+async fn telegram_get_me(bot_token: String) -> Result<TelegramBotInfo, String> {
+    let url = format!("https://api.telegram.org/bot{bot_token}/getMe");
+    let res = reqwest::Client::new()
+        .get(&url)
+        .send()
+        .await
+        .map_err(|_| "getMe request failed (network error)".to_string())?;
+    let status = res.status();
+    let body: serde_json::Value = res
+        .json()
+        .await
+        .map_err(|_| "getMe parse failed (invalid JSON response)".to_string())?;
+    let ok = body.get("ok").and_then(|v| v.as_bool()).unwrap_or(false);
+    if !status.is_success() || !ok {
+        let desc = body
+            .get("description")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Telegram rejected the token");
+        return Err(format!("getMe {status}: {desc}"));
+    }
+    let result = body
+        .get("result")
+        .ok_or_else(|| "getMe response missing result".to_string())?;
+    serde_json::from_value::<TelegramBotInfo>(result.clone())
+        .map_err(|e| format!("getMe response parse failed: {e}"))
+}
+
 // ── App update check ─────────────────────────────────────────────────────────
 
 #[derive(Serialize)]
@@ -3695,6 +3744,7 @@ pub fn run() {
             telegram_stop_poll,
             telegram_status_all,
             telegram_send_message,
+            telegram_get_me,
             check_update,
         ])
         .run(tauri::generate_context!())

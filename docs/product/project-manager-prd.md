@@ -1,3 +1,9 @@
+---
+classification: internal
+publish: false
+classificationReason: Product requirements document contains strategic direction and internal planning; internal use only.
+---
+
 # Project Manager PRD - Product Requirements Document
 
 Version: v0.1  

@@ -6,7 +6,8 @@ export type IntegrationSheet =
   | 'channels'
   | 'memory'
   | 'commands'
-  | 'company_standards';
+  | 'company_standards'
+  | 'connect';
 
 export type IntegrationStatus =
   | 'installed'

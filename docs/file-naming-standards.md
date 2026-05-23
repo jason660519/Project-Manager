@@ -34,14 +34,15 @@
 
 ## 3. Documentation Naming
 
-| Document Type | Folder | Filename Rule | Example |
-| --- | --- | --- | --- |
-| Product strategy, PRD, comparison, feature plan | `docs/product/` | English kebab-case | `competitive-analysis.md` |
-| Engineering spec or runbook | `docs/engineering/` | English kebab-case | `runtime-bridge.md` |
-| UI/design guidance | `docs/design/` | English kebab-case | `shared-ai-desktop-style.md` |
-| Architecture decision | `docs/architecture/` | `ADR-###-kebab-case.md` | `ADR-006-schema-v2-sync-fields.md` |
-| Project progress or handoff report | `docs/project-process/` | `YYYY-MM-DD-kebab-case.md` | `2026-05-15-technical-documentation-update.md` |
-| Deprecated document | `docs/archive/` | `archived-YYYYMMDD-kebab-case.md` | `archived-20260512-adr-tauri.md` |
+| Document Type | Folder | Filename Rule | Example | Visibility |
+| --- | --- | --- | --- | --- |
+| User-facing guide or tutorial | `docs/guides/` | English kebab-case | `getting-started.md` | **public** |
+| Product strategy, PRD, comparison, feature plan | `docs/product/` | English kebab-case | `competitive-analysis.md` | **internal** |
+| Engineering spec or runbook | `docs/engineering/` | English kebab-case | `runtime-bridge.md` | internal |
+| UI/design guidance | `docs/design/` | English kebab-case | `shared-ai-desktop-style.md` | public |
+| Architecture decision | `docs/architecture/` | `ADR-###-kebab-case.md` | `ADR-006-schema-v2-sync-fields.md` | internal |
+| Project progress or handoff report | `docs/project-process/` | `YYYY-MM-DD-kebab-case.md` | `2026-05-15-technical-documentation-update.md` | internal |
+| Deprecated document | `docs/archive/` | `archived-YYYYMMDD-kebab-case.md` | `archived-20260512-adr-tauri.md` | internal |
 
 ## 4. Project Manager Feature Artifact Naming
 
@@ -69,12 +70,13 @@ Project Manager and SayDo use the same folder meanings:
 
 ```text
 docs/
-├── architecture/       # ADR index and ADR-### records
-├── archive/            # Deprecated docs only
-├── design/             # UI/design system and design briefs
-├── engineering/        # Engineering specs, command contracts, runbooks
-├── product/            # Product strategy, PRDs, feature plans, comparisons
-└── project-process/    # Progress reports, handoffs, daily/weekly logs
+├── architecture/       # ADR index and ADR-### records                (internal)
+├── archive/            # Deprecated docs only                          (internal)
+├── design/             # UI/design system and design briefs            (public)
+├── engineering/        # Engineering specs, command contracts, runbooks (internal)
+├── guides/             # User-facing app guides and tutorials          (public)
+├── product/            # Product strategy, PRDs, comparisons — INTERNAL (internal)
+└── project-process/    # Progress reports, handoffs, daily/weekly logs (internal)
 ```
 
 No product, engineering, design, or architecture overview documents should live in the repo root or `docs/` root. Root-level `docs/*.md` files are reserved for repository-wide governance documents only, such as this file.
@@ -193,14 +195,15 @@ All external integrations and plugins must strictly follow our Three-Tier Plugin
 
 ## 3. 文件命名
 
-| 文件類型 | 資料夾 | 檔名規則 | 範例 |
-| --- | --- | --- | --- |
-| 產品策略、PRD、比較報告、feature plan | `docs/product/` | 英文 kebab-case | `competitive-analysis.md` |
-| 工程規格或 runbook | `docs/engineering/` | 英文 kebab-case | `runtime-bridge.md` |
-| UI/design guidance | `docs/design/` | 英文 kebab-case | `shared-ai-desktop-style.md` |
-| Architecture decision | `docs/architecture/` | `ADR-###-kebab-case.md` | `ADR-006-schema-v2-sync-fields.md` |
-| 專案進度或 handoff report | `docs/project-process/` | `YYYY-MM-DD-kebab-case.md` | `2026-05-15-technical-documentation-update.md` |
-| 過時文件 | `docs/archive/` | `archived-YYYYMMDD-kebab-case.md` | `archived-20260512-adr-tauri.md` |
+| 文件類型 | 資料夾 | 檔名規則 | 範例 | 可見性 |
+| --- | --- | --- | --- | --- |
+| 使用者導向指南、教學 | `docs/guides/` | 英文 kebab-case | `getting-started.md` | **public** |
+| 產品策略、PRD、比較報告、feature plan | `docs/product/` | 英文 kebab-case | `competitive-analysis.md` | **internal** |
+| 工程規格或 runbook | `docs/engineering/` | 英文 kebab-case | `runtime-bridge.md` | internal |
+| UI/design guidance | `docs/design/` | 英文 kebab-case | `shared-ai-desktop-style.md` | public |
+| Architecture decision | `docs/architecture/` | `ADR-###-kebab-case.md` | `ADR-006-schema-v2-sync-fields.md` | internal |
+| 專案進度或 handoff report | `docs/project-process/` | `YYYY-MM-DD-kebab-case.md` | `2026-05-15-technical-documentation-update.md` | internal |
+| 過時文件 | `docs/archive/` | `archived-YYYYMMDD-kebab-case.md` | `archived-20260512-adr-tauri.md` | internal |
 
 ## 4. Project Manager Feature Artifact 命名
 
@@ -228,12 +231,13 @@ Project Manager 與 SayDo 使用相同資料夾語意：
 
 ```text
 docs/
-├── architecture/       # ADR index and ADR-### records
-├── archive/            # Deprecated docs only
-├── design/             # UI/design system and design briefs
-├── engineering/        # Engineering specs, command contracts, runbooks
-├── product/            # Product strategy, PRDs, feature plans, comparisons
-└── project-process/    # Progress reports, handoffs, daily/weekly logs
+├── architecture/       # ADR index and ADR-### records                  (internal)
+├── archive/            # Deprecated docs only                            (internal)
+├── design/             # UI/design system and design briefs              (public)
+├── engineering/        # Engineering specs, command contracts, runbooks  (internal)
+├── guides/             # 使用者導向指南與教學                             (public)
+├── product/            # 產品策略、PRD、比較報告 — 僅限內部               (internal)
+└── project-process/    # Progress reports, handoffs, daily/weekly logs   (internal)
 ```
 
 產品、工程、設計或 architecture overview 文件不應放在 repo root 或 `docs/` root。`docs/*.md` 根層只保留全 repo governance 文件，例如本文件。

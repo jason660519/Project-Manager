@@ -2,8 +2,8 @@
   "schemaVersion": 5,
   "id": "5b9422db-4007-48fd-b9c0-dd192299e4dd",
   "createdAt": "2026-05-19T00:46:36.208Z",
-  "updatedAt": "2026-05-23T08:15:00.000+10:00",
-  "updatedBy": "codex",
+  "updatedAt": "2026-05-24T04:00:00.000+10:00",
+  "updatedBy": "claude-code",
   "project": {
     "name": "Project Manager",
     "root": "/Volumes/KLEVV-4T-1/Project-Manager",
@@ -362,6 +362,50 @@
       "phase": "development",
       "points": 3,
       "updatedBy": "codex"
+    },
+    {
+      "id": "F19",
+      "name": "Plugins → Connect Sheet",
+      "category": "Integrations/UI",
+      "status": "in_progress",
+      "progress": 90,
+      "paths": {
+        "featureFolder": ".project-manager/features/F19/",
+        "spec": ".project-manager/features/F19/feature-spec.md",
+        "tdd": ".project-manager/features/F19/tdd-spec.md",
+        "implementation": "app/ui/views/Plugins/ConnectSheet.tsx",
+        "unitIntegrationTest": "",
+        "developmentLogSummaryFolder": ".project-manager/features/F19/"
+      },
+      "readmePath": ".project-manager/features/F19/README.md",
+      "notes": ".project-manager/features/F19/notes.md",
+      "createdAt": "2026-05-24T03:00:00.000+10:00",
+      "updatedAt": "2026-05-24T04:00:00.000+10:00",
+      "phase": "development",
+      "points": 2,
+      "updatedBy": "claude-code"
+    },
+    {
+      "id": "F20",
+      "name": "Channels — Multi-platform Messaging",
+      "category": "Integrations/Channels",
+      "status": "in_progress",
+      "progress": 55,
+      "paths": {
+        "featureFolder": ".project-manager/features/F20/",
+        "spec": ".project-manager/features/F20/feature-spec.md",
+        "tdd": ".project-manager/features/F20/tdd-spec.md",
+        "implementation": "app/ui/views/Plugins/PluginsHubView.tsx",
+        "unitIntegrationTest": "",
+        "developmentLogSummaryFolder": ".project-manager/features/F20/"
+      },
+      "readmePath": ".project-manager/features/F20/README.md",
+      "notes": ".project-manager/features/F20/notes.md",
+      "createdAt": "2026-05-24T04:00:00.000+10:00",
+      "updatedAt": "2026-05-24T04:00:00.000+10:00",
+      "phase": "development",
+      "points": 5,
+      "updatedBy": "claude-code"
     }
   ],
   "adapters": {

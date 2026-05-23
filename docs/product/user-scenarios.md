@@ -1,3 +1,9 @@
+---
+classification: internal
+publish: false
+classificationReason: Internal engineering scenarios reference Tauri/Rust integration details not suitable for external readers.
+---
+
 # Project Manager User Scenarios
 
 > This document describes realistic workflows for engineers using Project Manager.

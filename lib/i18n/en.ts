@@ -9,10 +9,10 @@ export const en: Translations = {
   },
   navItems: {
     projects: 'Projects',
-    dashboard: 'Dashboard',
-    files: 'Files',
+    dashboard: 'Project Dashboard',
+    codingEditor: 'Coding Editor',
     engineers: 'Engineers',
-    plugins: 'Plugins',
+    integrationsHub: 'Integrations Hub',
     channels: 'Channels',
     cronJobs: 'Cron Jobs',
     skills: 'Skills',

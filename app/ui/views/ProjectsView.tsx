@@ -530,7 +530,7 @@ export function ProjectsView({
   // user has at least one project that would actually need a scan. Avoids
   // nagging users who only track ready / GitHub projects.
   const projectsThatNeedKey = projects.filter(
-    (p) => !p.configPath.startsWith('https://') && projectNeedsScan(p),
+    (p) => !p.configPath?.startsWith('https://') && projectNeedsScan(p),
   );
   const showKeyPreflight =
     anyProviderKeyPresent === false && projectsThatNeedKey.length > 0;
@@ -652,7 +652,7 @@ export function ProjectsView({
           const isDashboardSelected = selectedDashboardProjectIds.includes(project.id);
           const isInitializing = initializingIds.has(project.id);
           const initError = initErrors[project.id];
-          const isGithub = project.configPath.startsWith('https://github.com/');
+          const isGithub = project.configPath?.startsWith('https://github.com/') ?? false;
           const setupStatus = getProjectSetupStatus(project);
           const isReady = setupStatus === 'ready';
           // GitHub repos have their own feature-sync path — the Initialize
@@ -885,7 +885,7 @@ export function ProjectsView({
 
               {/* Disk-delete opt-in (disabled for GitHub-sourced projects) */}
               {(() => {
-                const isGithubTarget = deleteTarget.configPath.startsWith('https://');
+                const isGithubTarget = deleteTarget.configPath?.startsWith('https://') ?? false;
                 return (
                   <label
                     className={`flex items-start gap-2 border border-stone-200/12 px-3 py-2 text-xs ${

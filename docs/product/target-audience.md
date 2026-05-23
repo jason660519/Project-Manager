@@ -1,3 +1,9 @@
+---
+classification: internal
+publish: false
+classificationReason: Target audience analysis is internal product strategy; not for external distribution.
+---
+
 # Project Manager Target Audience Analysis
 
 Version: v0.1  

@@ -23,14 +23,20 @@ describe('documentation site manifest', () => {
     expect(productPrd?.content.length).toBeGreaterThan(500);
   });
 
-  it('classifies public candidates separately from internal operating docs', () => {
+  it('classifies product strategy as internal and engineering docs as internal', () => {
     const productDocs = DOCUMENTATION_SITE_INTERNAL_MANIFEST.docs.filter((doc) => doc.folderSlug === 'product');
     const engineeringDocs = DOCUMENTATION_SITE_INTERNAL_MANIFEST.docs.filter((doc) => doc.folderSlug === 'engineering');
 
     expect(productDocs.length).toBeGreaterThan(0);
     expect(engineeringDocs.length).toBeGreaterThan(0);
-    expect(productDocs.every((doc) => doc.classification === 'public')).toBe(true);
+    expect(productDocs.every((doc) => doc.classification === 'internal')).toBe(true);
     expect(engineeringDocs.every((doc) => doc.classification === 'internal')).toBe(true);
+  });
+
+  it('classifies guides folder as public', () => {
+    const guidesDocs = DOCUMENTATION_SITE_INTERNAL_MANIFEST.docs.filter((doc) => doc.folderSlug.startsWith('guides'));
+    expect(guidesDocs.length).toBeGreaterThan(0);
+    expect(guidesDocs.every((doc) => doc.classification === 'public')).toBe(true);
   });
 
   it('includes sync preview counts that match the generated payload', () => {

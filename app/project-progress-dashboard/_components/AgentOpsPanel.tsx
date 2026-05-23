@@ -15,7 +15,7 @@ interface AgentOpsPanelProps {
  * Project Manager flavour of the Paperclip AgentOpsPanel. It shows the
  * configured adapters (agents + IDEs) and whether any of them are currently
  * executing a run. Resume/Pause/Switch don't have an in-app equivalent here,
- * so the action slot links to the Plugins page where adapters are managed.
+ * so the action slot links to the Integrations Hub page where adapters are managed.
  */
 export function AgentOpsPanel({ adapters, activeRuns }: AgentOpsPanelProps) {
   const [expanded, setExpanded] = useState(false);
@@ -72,7 +72,7 @@ export function AgentOpsPanel({ adapters, activeRuns }: AgentOpsPanelProps) {
                           : 'border-emerald-300/30 bg-emerald-500/15 text-emerald-200',
                       )}>{busy ? 'running' : 'idle'}</span>
                       <Link
-                        href="/plugins"
+                        href="/integrations-hub"
                         className="flex h-6 w-6 items-center justify-center rounded border border-stone-200/15 text-stone-300 hover:text-stone-100 hover:bg-white/10"
                         title="Configure adapter"
                       >

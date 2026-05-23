@@ -28,7 +28,12 @@ import type {
   PluginCatalog,
   ProviderPlugin,
 } from '../../../../../lib/types/plugins';
-import type { ChannelConfig } from '../../../../../lib/types/channels';
+import type {
+  ChannelConfig,
+  ChannelWebhookMode,
+  CommandAction,
+  CommandMapping,
+} from '../../../../../lib/types/channels';
 import { updatePlugin } from '../../../../../lib/storage/plugins';
 import { useI18n } from '../../../../../lib/i18n';
 import { StatusBadge } from './status-badge';
@@ -39,6 +44,8 @@ import {
   ProviderConfigForm,
   inputCls,
 } from './plugin-config-forms';
+import { ChannelEditForm } from './ChannelEditForm';
+import { CommandMappingEditForm } from './CommandMappingEditForm';
 
 function MetaRow({ label, value }: { label: string; value: string }) {
   if (!value) return null;
@@ -73,6 +80,26 @@ export interface IntegrationsDetailSheetProps {
   skillsDir?: string;
   onChannelStartPoll?: (ch: ChannelConfig) => void;
   onChannelStopPoll?: (channelId: string) => void;
+  onChannelClearLog?: (channelId: string) => void;
+  onChannelUpdate?: (
+    channelId: string,
+    patch: { label: string; enabled: boolean; webhookMode: ChannelWebhookMode; credentials: Record<string, string> },
+    secrets: Record<string, string>,
+  ) => void;
+  onChannelDelete?: (channelId: string) => void;
+  /** Validate a Telegram bot token; throws on rejection. */
+  onTestTelegramToken?: (botToken: string) => Promise<{ username?: string }>;
+  /** Update a command mapping (trigger/description/action/enabled). */
+  onCommandMappingUpdate?: (
+    mappingId: string,
+    patch: { trigger: string; description: string; action: CommandAction; enabled: boolean },
+  ) => void;
+  /** Delete a non-default command mapping. */
+  onCommandMappingDelete?: (mappingId: string) => void;
+  /** Triggers of every other mapping (for uniqueness validation). */
+  otherCommandTriggers?: (currentMappingId: string) => string[];
+  /** True when the mapping id is one of the seeded defaults. */
+  isDefaultCommandMapping?: (mappingId: string) => boolean;
   onManualSaved?: () => void;
 }
 
@@ -99,6 +126,14 @@ export function IntegrationsDetailSheet({
   skillsDir,
   onChannelStartPoll,
   onChannelStopPoll,
+  onChannelClearLog,
+  onChannelUpdate,
+  onChannelDelete,
+  onTestTelegramToken,
+  onCommandMappingUpdate,
+  onCommandMappingDelete,
+  otherCommandTriggers,
+  isDefaultCommandMapping,
   onManualSaved,
 }: IntegrationsDetailSheetProps) {
   const { t } = useI18n();
@@ -134,6 +169,7 @@ export function IntegrationsDetailSheet({
 
   const plugin = row.payload.plugin as AnyPlugin | undefined;
   const channel = row.payload.channel as ChannelConfig | undefined;
+  const mapping = row.payload.mapping as CommandMapping | undefined;
   const skillPath = (row.payload.skill as { absPath?: string } | undefined)?.absPath ?? row.sourceId;
   const filePath = (row.payload.file as { absPath?: string } | undefined)?.absPath;
 
@@ -358,33 +394,58 @@ export function IntegrationsDetailSheet({
           )}
 
           {row.sourceKind === 'channel' && channel && (
-            <section className="border-t border-stone-200/12 pt-4 space-y-2">
-              <p className="text-xs text-stone-400">
-                {channel.platform} · {channel.webhookMode}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {channel.platform === 'telegram' && onChannelStartPoll && (
-                  <button
-                    type="button"
-                    onClick={() => onChannelStartPoll(channel)}
-                    className="border border-emerald-400/30 px-2 py-1 text-xs text-emerald-300"
-                  >
-                    <Play size={12} className="inline" /> Start poll
-                  </button>
-                )}
-                {onChannelStopPoll && (
-                  <button
-                    type="button"
-                    onClick={() => onChannelStopPoll(channel.id)}
-                    className="border border-stone-200/20 px-2 py-1 text-xs text-stone-300"
-                  >
-                    <Power size={12} className="inline" /> Stop
-                  </button>
-                )}
+            <section className="border-t border-stone-200/12 pt-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-stone-400">
+                  {channel.platform} · {channel.webhookMode}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {channel.platform === 'telegram' && onChannelStartPoll && (
+                    <button
+                      type="button"
+                      onClick={() => onChannelStartPoll(channel)}
+                      className="border border-emerald-400/30 px-2 py-1 text-xs text-emerald-300"
+                    >
+                      <Play size={12} className="inline" /> Start poll
+                    </button>
+                  )}
+                  {onChannelStopPoll && (
+                    <button
+                      type="button"
+                      onClick={() => onChannelStopPoll(channel.id)}
+                      className="border border-stone-200/20 px-2 py-1 text-xs text-stone-300"
+                    >
+                      <Power size={12} className="inline" /> Stop
+                    </button>
+                  )}
+                  {onChannelClearLog && (
+                    <button
+                      type="button"
+                      onClick={() => onChannelClearLog(channel.id)}
+                      className="border border-stone-200/20 px-2 py-1 text-xs text-stone-300"
+                    >
+                      Clear log
+                    </button>
+                  )}
+                  {onChannelDelete && (
+                    <button
+                      type="button"
+                      onClick={() => onChannelDelete(channel.id)}
+                      className="border border-red-500/30 px-2 py-1 text-xs text-red-400"
+                    >
+                      <Trash2 size={12} className="inline" /> Delete
+                    </button>
+                  )}
+                </div>
               </div>
-              <p className="text-[11px] text-stone-500">
-                {t.integrations.channelEditHint}
-              </p>
+
+              {onChannelUpdate && (
+                <ChannelEditForm
+                  channel={channel}
+                  onSave={(patch, secrets) => onChannelUpdate(channel.id, patch, secrets)}
+                  onTestTelegramToken={onTestTelegramToken}
+                />
+              )}
             </section>
           )}
 
@@ -415,9 +476,32 @@ export function IntegrationsDetailSheet({
             </section>
           )}
 
-          {row.sourceKind === 'command-mapping' && (
-            <section className="border-t border-stone-200/12 pt-4 space-y-2">
-              <p className="text-xs text-stone-400">{row.notes}</p>
+          {row.sourceKind === 'command-mapping' && mapping && (
+            <section className="border-t border-stone-200/12 pt-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-stone-400">
+                  command · <span className="font-mono">{mapping.action}</span>
+                </p>
+                {onCommandMappingDelete && isDefaultCommandMapping && !isDefaultCommandMapping(mapping.id) && (
+                  <button
+                    type="button"
+                    onClick={() => onCommandMappingDelete(mapping.id)}
+                    className="border border-red-500/30 px-2 py-1 text-xs text-red-400"
+                  >
+                    <Trash2 size={12} className="inline" /> Delete
+                  </button>
+                )}
+              </div>
+
+              {onCommandMappingUpdate && (
+                <CommandMappingEditForm
+                  mapping={mapping}
+                  isDefault={isDefaultCommandMapping ? isDefaultCommandMapping(mapping.id) : false}
+                  otherTriggers={otherCommandTriggers ? otherCommandTriggers(mapping.id) : []}
+                  onSave={(patch) => onCommandMappingUpdate(mapping.id, patch)}
+                />
+              )}
+
               <p className="text-[11px] text-stone-500">{t.integrations.channelCommandMappingHint}</p>
             </section>
           )}

@@ -1,7 +1,7 @@
 # Document Classification Standard
 
 > Status: Active  
-> Last updated: 2026-05-23  
+> Last updated: 2026-05-24  
 > Audience: AI engineers, documentation owners, maintainers
 
 ## Purpose
@@ -20,17 +20,24 @@ The goal is to let automation classify most documents without daily manual revie
 
 ## Default Folder Policy
 
-| Folder | Default Classification | Rule ID |
-| --- | --- | --- |
-| `docs/product/` | `public` | `CLS-PUBLIC-PRODUCT` |
-| `docs/design/` | `public` | `CLS-PUBLIC-DESIGN` |
-| `docs/deployment/` | `public` | `CLS-PUBLIC-DEPLOYMENT` |
-| `docs/integrations/` | `public` | `CLS-PUBLIC-INTEGRATIONS` |
-| `docs/architecture/` | `internal` | `CLS-INTERNAL-ARCHITECTURE` |
-| `docs/engineering/` | `internal` | `CLS-INTERNAL-ENGINEERING` |
-| `docs/project-process/` | `internal` | `CLS-INTERNAL-PROCESS` |
-| `docs/archive/` | `internal` | `CLS-INTERNAL-PROCESS` |
-| unknown folders | `internal` + review required | `CLS-UNKNOWN-FOLDER` |
+| Folder | Default Classification | Rule ID | Notes |
+| --- | --- | --- | --- |
+| `docs/guides/` | `public` | `CLS-PUBLIC-GUIDES` | User-facing app guides and tutorials |
+| `docs/design/` | `public` | `CLS-PUBLIC-DESIGN` | Product-facing UX and design system |
+| `docs/deployment/` | `public` | `CLS-PUBLIC-DEPLOYMENT` | Deployment overviews (no credentials) |
+| `docs/integrations/` | `public` | `CLS-PUBLIC-INTEGRATIONS` | Integration contracts and partner docs |
+| `docs/product/` | `internal` | `CLS-INTERNAL-PRODUCT` | PRDs, competitive analysis, strategy |
+| `docs/architecture/` | `internal` | `CLS-INTERNAL-ARCHITECTURE` | ADRs and internal design decisions |
+| `docs/engineering/` | `internal` | `CLS-INTERNAL-ENGINEERING` | Runbooks and implementation contracts |
+| `docs/project-process/` | `internal` | `CLS-INTERNAL-PROCESS` | Project process and operating records |
+| `docs/archive/` | `internal` | `CLS-INTERNAL-PROCESS` | Archived docs |
+| unknown folders | `internal` + review required | `CLS-UNKNOWN-FOLDER` | |
+
+### Design Intent
+
+`docs/guides/` is the canonical home for all user-facing documentation (app usage instructions, feature tutorials, onboarding). Content in this folder is public by default.
+
+`docs/product/` contains internal planning records (PRDs, competitive analysis, target audience). These are never public regardless of folder policy; each file also carries an explicit `classification: internal` frontmatter override as a redundant guard.
 
 ## Restricted Overrides
 

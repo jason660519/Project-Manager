@@ -83,13 +83,13 @@ function isFeaturePhaseTab(tab: TabId): tab is FeaturePhase {
 }
 
 function readInitialTab(): TabId {
-  if (typeof window === 'undefined') return 'development';
+  if (typeof window === 'undefined') return 'projects';
   const hash = window.location.hash.slice(1);
   const tab = resolveHashToTab(hash);
   if (tab && hash.toLowerCase() === 'testing') {
     window.location.replace(`#${tab}`);
   }
-  return tab ?? 'development';
+  return tab ?? 'projects';
 }
 
 export function ProjectProgressClient({

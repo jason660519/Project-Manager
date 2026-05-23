@@ -1134,7 +1134,7 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
           onFeatureUpdate={handleFeatureUpdate}
         />
       )}
-      {currentView === 'plugins' && (
+      {currentView === 'integrations-hub' && (
         <PluginsView projectRoot={selectedProject?.config.project.root ?? ''} />
       )}
       {currentView === 'channels' && <ChannelsView />}
@@ -1184,7 +1184,7 @@ export function MainClient({ currentView, initialProjectId }: MainClientProps) {
           onRolesChange={handleRolesUpdate}
         />
       )}
-      {currentView === 'project-files' && (
+      {currentView === 'coding-editor' && (
         <ProjectFilesView
           projects={projects}
           selectedDashboardProjectIds={selectedDashboardProjectIds}

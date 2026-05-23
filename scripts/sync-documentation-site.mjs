@@ -19,12 +19,20 @@ const generatorVersion = '2.0.0';
 
 const classificationPolicies = [
   {
-    id: 'CLS-PUBLIC-PRODUCT',
-    prefixes: ['product'],
+    id: 'CLS-PUBLIC-GUIDES',
+    prefixes: ['guides'],
     classification: 'public',
-    audience: ['customers', 'users', 'product'],
-    confidence: 0.92,
-    reason: 'Product documentation is intended for users and customer-facing product review when no sensitive content is detected.',
+    audience: ['users', 'customers'],
+    confidence: 0.95,
+    reason: 'User-facing guides and tutorials are intended for public distribution when no sensitive content is detected.',
+  },
+  {
+    id: 'CLS-INTERNAL-PRODUCT',
+    prefixes: ['product'],
+    classification: 'internal',
+    audience: ['team', 'product'],
+    confidence: 0.96,
+    reason: 'Product strategy documents (PRDs, competitive analysis, target audience) are internal planning records.',
   },
   {
     id: 'CLS-PUBLIC-DESIGN',

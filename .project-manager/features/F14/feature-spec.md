@@ -122,7 +122,7 @@ The v1 experience should feel like a compact agent panel living at the bottom of
 - Natural language and slash-command navigation must route to existing pages:
   - `projects` -> `/projects`
   - `dashboard` -> `/project-progress-dashboard`
-  - `project-files` -> `/project-files`
+  - `coding-editor` -> `/coding-editor`
   - `engineers`, `plugins`, `skills`, `channels`, `sessions`, `cron-jobs`, `logs`, `keys`, `settings`, `documentation`
 
 ## Acceptance Criteria

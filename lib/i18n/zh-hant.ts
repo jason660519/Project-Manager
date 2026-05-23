@@ -9,10 +9,10 @@ export const zhHant: Translations = {
   },
   navItems: {
     projects: '專案',
-    dashboard: '儀表板',
-    files: '檔案',
+    dashboard: '專案儀表板',
+    codingEditor: 'Coding Editor',
     engineers: '工程師',
-    plugins: '插件',
+    integrationsHub: '整合中樞',
     channels: '頻道',
     cronJobs: '排程任務',
     skills: '技能庫',

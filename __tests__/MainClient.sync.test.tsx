@@ -4,7 +4,7 @@
  * Core scenario:
  *   1. User opens the Dashboard Projects sheet (MainClient currentView='dashboard')
  *   2. User toggles the 'project-manager' checkbox → selection persisted to localStorage
- *   3. User navigates to /project-progress-dashboard or /project-files
+ *   3. User navigates to /project-progress-dashboard or /coding-editor
  *      (new MainClient instance mounts)
  *   4. New instance reads localStorage → shows the updated selection
  */
@@ -67,7 +67,7 @@ vi.mock('../app/ui/views/FeaturesView', () => ({
 vi.mock('../app/ui/views/ProjectFilesView', () => ({
   ProjectFilesView: ({ selectedDashboardProjectIds }: { selectedDashboardProjectIds: string[] }) => (
     <div
-      data-testid="project-files"
+      data-testid="coding-editor"
       data-selected={JSON.stringify(selectedDashboardProjectIds)}
     />
   ),
@@ -192,8 +192,8 @@ describe('checkbox toggle → localStorage sync', () => {
   });
 });
 
-describe('cross-route persistence: dashboard Projects sheet → /project-files', () => {
-  it('project-files view sees project-manager selected after it was toggled in the Projects sheet', async () => {
+describe('cross-route persistence: dashboard Projects sheet → /coding-editor', () => {
+  it('coding-editor view sees project-manager selected after it was toggled in the Projects sheet', async () => {
     const user = userEvent.setup();
 
     // Mount Dashboard and add project-manager from the Projects sheet.
@@ -202,18 +202,18 @@ describe('cross-route persistence: dashboard Projects sheet → /project-files',
     await user.click(screen.getByTestId('toggle-project-manager-on'));
     unmount1();
 
-    // Mount /project-files in a fresh instance
-    render(<MainClient currentView="project-files" />);
+    // Mount /coding-editor in a fresh instance
+    render(<MainClient currentView="coding-editor" />);
     await flushEffects();
 
-    const panel = screen.getByTestId('project-files');
+    const panel = screen.getByTestId('coding-editor');
     const selected: string[] = JSON.parse(panel.getAttribute('data-selected') ?? '[]');
 
     expect(selected).toContain('project-manager');
     expect(selected).toContain('owner-property');
   });
 
-  it('project-files view correctly shows only owner-property when project-manager is deselected', async () => {
+  it('coding-editor view correctly shows only owner-property when project-manager is deselected', async () => {
     // Seed both selected
     localStorage.setItem(
       DASHBOARD_SELECTED_PROJECTS_STORAGE_KEY,
@@ -226,10 +226,10 @@ describe('cross-route persistence: dashboard Projects sheet → /project-files',
     await user.click(screen.getByTestId('toggle-project-manager-off'));
     unmount1();
 
-    render(<MainClient currentView="project-files" />);
+    render(<MainClient currentView="coding-editor" />);
     await flushEffects();
 
-    const panel = screen.getByTestId('project-files');
+    const panel = screen.getByTestId('coding-editor');
     const selected: string[] = JSON.parse(panel.getAttribute('data-selected') ?? '[]');
 
     expect(selected).not.toContain('project-manager');

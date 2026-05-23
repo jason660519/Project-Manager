@@ -9,10 +9,10 @@ export const ja: Translations = {
   },
   navItems: {
     projects: 'プロジェクト',
-    dashboard: 'ダッシュボード',
-    files: 'ファイル',
+    dashboard: 'プロジェクトダッシュボード',
+    codingEditor: 'Coding Editor',
     engineers: 'エンジニア',
-    plugins: 'プラグイン',
+    integrationsHub: '統合ハブ',
     channels: 'チャンネル',
     cronJobs: 'Cronジョブ',
     skills: 'スキル',

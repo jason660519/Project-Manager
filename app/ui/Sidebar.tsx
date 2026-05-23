@@ -10,7 +10,6 @@ import {
   KeyRound,
   MessageSquareText,
   Plug,
-  Radio,
   RefreshCw,
   ScrollText,
   Settings,
@@ -45,14 +44,13 @@ const NAV_GROUPS: NavGroup[] = [
     groupKey: 'workspace',
     items: [
       { id: 'dashboard',     itemKey: 'dashboard', href: '/project-progress-dashboard', icon: CircleGauge },
-      { id: 'project-files', itemKey: 'files',     href: '/project-files',             icon: Files },
+      { id: 'coding-editor', itemKey: 'codingEditor', href: '/coding-editor',           icon: Files },
     ],
   },
   {
     groupKey: 'execution',
     items: [
-      { id: 'plugins',   itemKey: 'plugins',   href: '/plugins',   icon: Plug },
-      { id: 'channels',  itemKey: 'channels',  href: '/channels',  icon: Radio },
+      { id: 'integrations-hub', itemKey: 'integrationsHub', href: '/integrations-hub', icon: Plug },
       { id: 'cron-jobs', itemKey: 'cronJobs',  href: '/cron-jobs', icon: Timer },
       { id: 'engineers', itemKey: 'engineers', href: '/engineers', icon: Users2 },
     ],

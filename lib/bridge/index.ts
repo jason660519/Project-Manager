@@ -1332,6 +1332,26 @@ export async function telegramSendMessage(
   return invoke<void>('telegram_send_message', { botToken, chatId, text });
 }
 
+export interface TelegramBotInfo {
+  id: number;
+  isBot: boolean;
+  firstName: string;
+  username?: string;
+  canJoinGroups: boolean;
+  canReadAllGroupMessages: boolean;
+  supportsInlineQueries: boolean;
+}
+
+/**
+ * Validate a Telegram Bot Token against the `getMe` endpoint. Returns bot
+ * identity on success. The Rust side scrubs the token from error messages, so
+ * caller can safely surface the rejected reason to the UI.
+ */
+export async function telegramGetMe(botToken: string): Promise<TelegramBotInfo> {
+  if (!isTauri()) throw new Error('telegramGetMe requires Tauri runtime');
+  return invoke<TelegramBotInfo>('telegram_get_me', { botToken });
+}
+
 export function onTelegramMessage(cb: (p: TelegramMessagePayload) => void): Promise<UnlistenFn> {
   return listen<TelegramMessagePayload>('telegram-message', cb);
 }

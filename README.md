@@ -108,7 +108,8 @@ npm run tauri build           # 打包成 .app / .exe
 
 - [Architecture Overview](./docs/architecture/architecture-overview.md): 系統資料流、雙模式執行與文件格式策略。
 - [File Naming Standards](./docs/file-naming-standards.md): Project Manager/SayDo 對齊後的檔案命名與歸檔規則。
-- [Product Docs](./docs/product/README.md): 產品文件入口。
+- [User Guides](./docs/guides/getting-started.md): 對外使用說明與功能導覽（public，發布至 `/documentation`）。
+- [Product Docs](./docs/product/README.md): 產品策略文件入口（PRD、競品分析）— **internal only**，不對外發布。
 - [Engineering Docs](./docs/engineering/README.md): runtime bridge、storage/schema、ingestion、security、verification runbooks。
 - [Document Classification Standard](./docs/engineering/document-classification-standard.md): public/internal/restricted 文件分類與對外發布 gate。
 - [Documentation Site Sync](./docs/engineering/documentation-site-sync.md): `/documentation` 靜態網站如何從 `docs/` 產生 folder/document pages。

@@ -25,6 +25,8 @@ Project Manager is a cross-project engineering dashboard that ingests heterogene
 | `config/samples/` | Sample `.project-manager.json` |
 | `docs/architecture/ADR-*.md` | Closed architecture decisions |
 | `docs/engineering/` | Operational engineering docs for bridge, storage, ingestion, security, and verification |
+| `docs/guides/` | **Public** user-facing app guides and tutorials (safe to publish) |
+| `docs/product/` | **Internal** product strategy — PRDs, competitive analysis, target audience (never publish) |
 | `.project-manager/features/<ID>/` | Per-feature documentation home (README.md, feature-spec.md, tdd-spec.md, tdd-report.md, dev-log.md, dispatch.json) |
 
 ## Architecture (short)
@@ -76,7 +78,8 @@ cargo build  --manifest-path src-tauri/Cargo.toml   # Rust build
 
 - ADRs: [`docs/architecture/`](docs/architecture/) — read before changing closed decisions.
 - Engineering docs: [`docs/engineering/README.md`](docs/engineering/README.md) — read before changing runtime bridge, storage/schema, ingestion, secrets, sessions, GitHub sync, or release checks.
-- PRD / scenarios / competitive analysis: [`docs/01-04-*.md`](docs/).
+- PRD / scenarios / competitive analysis: [`docs/product/`](docs/product/) — **internal**, never publish.
+- User-facing guides: [`docs/guides/`](docs/guides/) — **public**, shown on `/documentation`.
 - Doc governance: [`scripts/docs-governance-check.sh`](scripts/docs-governance-check.sh) and `/docs-governance` slash command.
 - TanStack Table patterns: use the `create-tanstack-table` skill before building or extending tables.
 

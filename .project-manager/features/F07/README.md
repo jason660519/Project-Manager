@@ -10,7 +10,7 @@ Expanded sidebar from 68px icon-only to 180px with text labels. Organized into 4
 
 | Group | Items |
 |---|---|
-| WORKSPACE | Projects, Dashboard, Files |
+| WORKSPACE | Projects, Dashboard, Coding Editor |
 | EXECUTION | Engineers, Plugins, Channels, Cron Jobs |
 | OBSERVE | Sessions, Logs |
 | SYSTEM | Keys, Shortcuts, Settings, Docs |

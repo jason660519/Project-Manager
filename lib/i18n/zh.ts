@@ -9,10 +9,10 @@ export const zh: Translations = {
   },
   navItems: {
     projects: '项目',
-    dashboard: '仪表盘',
-    files: '文件',
+    dashboard: '项目仪表盘',
+    codingEditor: 'Coding Editor',
     engineers: '工程师',
-    plugins: '插件',
+    integrationsHub: '集成中枢',
     channels: '频道',
     cronJobs: '定时任务',
     skills: '技能库',

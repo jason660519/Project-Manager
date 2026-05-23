@@ -1,7 +1,7 @@
 # Documentation Site Sync
 
 > Status: Active  
-> Last updated: 2026-05-23  
+> Last updated: 2026-05-24  
 > Audience: AI engineers, maintainers, documentation owners
 
 ## Purpose
@@ -37,7 +37,7 @@ The public `/documentation` route imports only `documentation-site-public.ts`. I
 Every folder under `docs/` gets an independent folder page:
 
 ```text
-docs/product/        -> /documentation/product
+docs/guides/         -> /documentation/guides
 docs/engineering/    -> /documentation/engineering
 docs/project-process/commands/ -> /documentation/project-process/commands
 ```
@@ -45,25 +45,27 @@ docs/project-process/commands/ -> /documentation/project-process/commands
 Every Markdown file gets a document page:
 
 ```text
-docs/product/project-manager-prd.md -> /documentation/product/project-manager-prd
+docs/guides/getting-started.md      -> /documentation/guides/getting-started
+docs/guides/features/workstation.md -> /documentation/guides/features/workstation
 docs/engineering/runtime-bridge.md  -> /documentation/engineering/runtime-bridge
-docs/product/README.md              -> /documentation/product/readme
+docs/product/project-manager-prd.md -> /documentation/product/project-manager-prd
 ```
 
 ## Classification Policy
 
 The generator assigns default classification by folder. The full policy lives in [document-classification-standard.md](./document-classification-standard.md).
 
-| Folder | Default |
-| --- | --- |
-| `docs/product/` | `public` |
-| `docs/design/` | `public` |
-| `docs/deployment/` | `public` |
-| `docs/integrations/` | `public` |
-| `docs/architecture/` | `internal` |
-| `docs/engineering/` | `internal` |
-| `docs/project-process/` | `internal` |
-| `docs/archive/` | `internal` |
+| Folder | Default | Notes |
+| --- | --- | --- |
+| `docs/guides/` | `public` | User-facing guides and tutorials |
+| `docs/design/` | `public` | Product-facing UX and design system |
+| `docs/deployment/` | `public` | Deployment overviews (no credentials) |
+| `docs/integrations/` | `public` | Integration contracts |
+| `docs/product/` | `internal` | PRDs, competitive analysis, strategy |
+| `docs/architecture/` | `internal` | ADRs and internal design decisions |
+| `docs/engineering/` | `internal` | Runbooks and implementation contracts |
+| `docs/project-process/` | `internal` | Project process and operating records |
+| `docs/archive/` | `internal` | Archived docs |
 
 Use Markdown frontmatter to override when a specific file needs a different status:
 
