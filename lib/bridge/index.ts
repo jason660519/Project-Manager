@@ -1008,8 +1008,11 @@ export interface LlmFallbackResult {
  * Returns true when the error string indicates the model ID does not exist at
  * the provider — as opposed to a transient failure (rate limit, network, auth).
  * Pattern-matched against the Rust command's error string.
+ *
+ * Exported so other modules (e.g. the AI scanner) can apply the same
+ * classification without duplicating the pattern list.
  */
-function isModelNotFoundError(err: string): boolean {
+export function isModelNotFoundError(err: string): boolean {
   const s = err.toLowerCase();
   return (
     s.includes('model_not_found') ||

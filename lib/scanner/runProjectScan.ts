@@ -1,4 +1,4 @@
-import { callAnthropic, callGemini, callOpenAICompatible, type AnthropicMessage } from '../bridge';
+import { callAnthropic, callGemini, callOpenAICompatible, isModelNotFoundError, type AnthropicMessage } from '../bridge';
 import { getLlmProvider } from '../keys/llmProviders';
 import { hasProviderKey, loadProviderKey } from '../keys/loadProviderKey';
 import {
@@ -13,9 +13,11 @@ function isTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
 
-/** Reportable summary of one provider attempt. The UI shows these in order. */
+/** Reportable summary of one provider+model attempt. The UI shows these in order. */
 export interface ProviderAttempt {
   provider: LlmProviderId;
+  /** The specific model ID that was called. Undefined for legacy attempts lacking this data. */
+  modelId?: string;
   outcome: 'success' | 'retryable' | 'fatal';
   error?: string;
 }
@@ -24,6 +26,8 @@ export interface ProviderAttempt {
 export interface FallbackScanResult extends ScanResult {
   attempts?: ProviderAttempt[];
   providerUsed?: LlmProviderId;
+  /** The exact model ID that produced the successful response (may be the tier fallback). */
+  usedModelId?: string;
 }
 
 const SYSTEM_PRELUDE =
@@ -90,16 +94,6 @@ export async function callSingleProvider(
   return { content: r.content, inputTokens: r.inputTokens, outputTokens: r.outputTokens, model };
 }
 
-async function callProvider(
-  provider: LlmProviderId,
-  apiKey: string,
-  fullPrompt: string,
-  modelOverride?: string,
-): Promise<string> {
-  const r = await callSingleProvider(provider, apiKey, fullPrompt, modelOverride);
-  return r.content;
-}
-
 /**
  * Run the AI project scan with provider fallback (Settings → AI providers).
  *
@@ -107,9 +101,12 @@ async function callProvider(
  *   1. Load the user's preferred provider order (defaults to Anthropic →
  *      OpenAI → Gemini, all enabled).
  *   2. Filter out providers without a stored API key.
- *   3. Try each in turn. On success → return immediately. On retryable
- *      failure → record + try next. On fatal failure (401/403/400) →
- *      record + still try next, since the next provider's key may be valid.
+ *   3. For each provider in turn:
+ *        a. Try the user's preferred model (or the provider default).
+ *        b. On "model not found" → try the provider's one-tier-down `tierModel`.
+ *        c. On any other error (rate limit, auth, network) → skip tier attempt
+ *           and move to the next provider.
+ *   4. Return on the first successful response.
  *
  * Browser dev path is unchanged — it goes through `/api/scan-project`,
  * which uses server-side env vars (a deliberate inconsistency: dev/server
@@ -170,23 +167,59 @@ export async function runProjectScan(projectRoot: string): Promise<FallbackScanR
 
   const attempts: ProviderAttempt[] = [];
   for (const provider of sequence) {
+    const spec = getLlmProvider(provider);
+    const primaryModel = modelMap.get(provider) ?? spec?.defaultModel ?? provider;
+    let apiKey: string;
     try {
-      const apiKey = await loadProviderKey(provider);
-      const content = await callProvider(provider, apiKey, prompt, modelMap.get(provider));
-      const config = parseScanResponse(content);
-      attempts.push({ provider, outcome: 'success' });
+      apiKey = await loadProviderKey(provider);
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      attempts.push({ provider, modelId: primaryModel, outcome: 'retryable', error: raw });
+      continue;
+    }
+
+    // ── Attempt 1: user-preferred model (or provider default) ────────────────
+    try {
+      const r = await callSingleProvider(provider, apiKey, prompt, primaryModel);
+      const config = parseScanResponse(r.content);
+      attempts.push({ provider, modelId: primaryModel, outcome: 'success' });
       return {
         success: true,
         config,
         context,
-        rawResponse: content,
+        rawResponse: r.content,
         attempts,
         providerUsed: provider,
+        usedModelId: primaryModel,
       };
-    } catch (error) {
-      const raw = error instanceof Error ? error.message : String(error);
-      attempts.push({ provider, outcome: classifyProviderError(raw), error: raw });
-      // Always continue to the next provider — the user opted into a chain.
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      attempts.push({ provider, modelId: primaryModel, outcome: classifyProviderError(raw), error: raw });
+      // Transient errors (rate limit, auth, network) → skip tier, try next provider.
+      if (!isModelNotFoundError(raw)) continue;
+    }
+
+    // ── Attempt 2: same-provider tier model (model-not-found only) ───────────
+    const tierModel = spec?.tierModel;
+    if (!tierModel || tierModel === primaryModel) continue;
+
+    try {
+      const r = await callSingleProvider(provider, apiKey, prompt, tierModel);
+      const config = parseScanResponse(r.content);
+      attempts.push({ provider, modelId: tierModel, outcome: 'success' });
+      return {
+        success: true,
+        config,
+        context,
+        rawResponse: r.content,
+        attempts,
+        providerUsed: provider,
+        usedModelId: tierModel,
+      };
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      attempts.push({ provider, modelId: tierModel, outcome: classifyProviderError(raw), error: raw });
+      // Tier also failed — fall through to next provider.
     }
   }
 
