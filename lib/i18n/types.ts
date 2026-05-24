@@ -448,4 +448,19 @@ export interface Translations {
     /** Uses {id} and {fallback} placeholders */
     adapterWarningHint: string;
   };
+  codeEditor: {
+    title: string;
+    save: string;
+    saved: string;
+    loading: string;
+    loadingEditor: string;
+    openInEditor: string;
+    expand: string;
+    collapse: string;
+    close: string;
+    saveShortcut: string;
+    readError: string;
+    poweredBy: string;
+    languageLabel: string;
+  };
 }
