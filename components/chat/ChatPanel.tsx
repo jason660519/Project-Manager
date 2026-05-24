@@ -178,7 +178,7 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen }: Chat
         </button>
         <button
           type="button"
-          onClick={() => router.push('/chat')}
+          onClick={() => router.push('/ai_assistants')}
           aria-label="Open full chat page"
           className="rounded p-1 text-stone-500 transition-colors hover:bg-white/5 hover:text-stone-200"
         >

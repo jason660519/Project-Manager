@@ -33,7 +33,7 @@ const ROUTES: Record<string, string> = {
   settings: '/settings',
   docs: '/documentation',
   documentation: '/documentation',
-  chat: '/chat',
+  chat: '/ai_assistants',
 };
 
 const HELP_TEXT = [

@@ -23,7 +23,7 @@ export const ja: Translations = {
     settings: '設定',
     docs: 'ドキュメント',
     companyStandards: '社内規範',
-    chat: 'チャット',
+    chat: 'AI Assistants',
   },
   system: {
     checkForUpdates: 'アップデートを確認',
@@ -327,7 +327,7 @@ export const ja: Translations = {
     label: '言語',
   },
   chat: {
-    title: 'AIアシスタント',
+    title: 'AI Assistants',
     placeholder: '何でも聞いてください...',
     welcome: 'こんにちは。Project Managerアシスタントです。機能や実行状況について質問するか、/helpでコマンドを確認できます。',
     send: '送信',

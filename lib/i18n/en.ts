@@ -23,7 +23,7 @@ export const en: Translations = {
     settings: 'Settings',
     docs: 'Docs',
     companyStandards: 'Company Standards',
-    chat: 'Chat',
+    chat: 'AI Assistants',
   },
   system: {
     checkForUpdates: 'Check for Updates',
@@ -325,7 +325,7 @@ export const en: Translations = {
     label: 'Language',
   },
   chat: {
-    title: 'AI Assistant',
+    title: 'AI Assistants',
     placeholder: 'Ask me anything...',
     welcome: "Hi! I'm your Project Manager assistant. Ask me about features, runs, or use /help for commands.",
     send: 'Send',

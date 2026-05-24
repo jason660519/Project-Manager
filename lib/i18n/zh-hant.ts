@@ -23,7 +23,7 @@ export const zhHant: Translations = {
     settings: '設定',
     docs: '文件',
     companyStandards: '公司規範',
-    chat: '聊天',
+    chat: 'AI Assistants',
   },
   system: {
     checkForUpdates: '檢查更新',
@@ -326,7 +326,7 @@ export const zhHant: Translations = {
     label: '語言',
   },
   chat: {
-    title: 'AI 助手',
+    title: 'AI Assistants',
     placeholder: '隨便問我...',
     welcome: '你好！我是你的 Project Manager 助手。可以問我功能、執行記錄，或使用 /help 查看指令。',
     send: '傳送',

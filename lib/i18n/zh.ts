@@ -23,7 +23,7 @@ export const zh: Translations = {
     settings: '设置',
     docs: '文档',
     companyStandards: '公司规范',
-    chat: '聊天',
+    chat: 'AI Assistants',
   },
   system: {
     checkForUpdates: '检查更新',
@@ -326,7 +326,7 @@ export const zh: Translations = {
     label: '语言',
   },
   chat: {
-    title: 'AI 助手',
+    title: 'AI Assistants',
     placeholder: '随便问我...',
     welcome: '你好！我是你的 Project Manager 助手。可以问我功能、运行记录，或使用 /help 查看命令。',
     send: '发送',

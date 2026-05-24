@@ -62,7 +62,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'sessions', itemKey: 'sessions', href: '/sessions', icon: ScrollText },
       { id: 'logs',     itemKey: 'logs',     href: '/logs',     icon: FileText },
-      { id: 'chat',     itemKey: 'chat',     href: '/chat',     icon: MessageSquareText },
+      { id: 'chat',     itemKey: 'chat',     href: '/ai_assistants',     icon: MessageSquareText },
     ],
   },
   {
