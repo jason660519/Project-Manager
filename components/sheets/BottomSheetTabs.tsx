@@ -9,8 +9,8 @@ import { clsx } from 'clsx';
  * indicator line (signalling that this tab's content is shown above, the
  * standard Excel visual metaphor).
  *
- * The generic <Key> lets callers narrow the key union (e.g. 'api_config' |
- * 'llm_arena') so onSelect is type-safe per view.
+ * The generic <Key> lets callers narrow the key union (e.g. 'api_key_validation'
+ * | 'llm_arena') so onSelect is type-safe per view.
  */
 export interface SheetTabItem<Key extends string> {
   key: Key;

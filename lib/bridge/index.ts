@@ -359,11 +359,24 @@ export async function openInEditor(opts: OpenInEditorOptions): Promise<void> {
 
 /**
  * Write content to a plain-text file. Creates parent directories if needed.
- * Throws outside Tauri (no FS access in browser dev mode).
+ * In Tauri mode uses the Rust bridge; in browser dev mode uses
+ * the /api/editor/write-file Next.js route.
  */
 export async function writeFile(path: string, content: string): Promise<void> {
-  if (!isTauri()) throw new Error('writeFile requires Tauri runtime');
-  return invoke<void>('write_file', { path, content });
+  if (isTauri()) {
+    return invoke<void>('write_file', { path, content });
+  }
+  // Browser dev mode: proxy through Next.js API route
+  if (typeof window === 'undefined') return;
+  const res = await fetch('/api/editor/write-file', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, content }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(err.error ?? `Write failed (${res.status})`);
+  }
 }
 
 /** Check if a command exists in the user's system PATH. */
@@ -1334,11 +1347,27 @@ export async function saveSession(sessionsDir: string, session: AgentSession): P
 
 /**
  * Read a plain-text file from disk and return its content.
- * Returns an empty string in browser dev mode (no Tauri runtime).
+ * In Tauri mode uses the Rust bridge; in browser dev mode uses
+ * the /api/editor/read-file Next.js route.
  */
 export async function readFile(path: string): Promise<string> {
-  if (!isTauri()) return '';
-  return invoke<string>('read_file', { path });
+  if (isTauri()) {
+    return invoke<string>('read_file', { path });
+  }
+  // Browser dev mode: proxy through Next.js API route
+  if (typeof window === 'undefined') return '';
+  try {
+    const res = await fetch('/api/editor/read-file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path }),
+    });
+    if (!res.ok) return '';
+    const data = await res.json();
+    return data.content ?? '';
+  } catch {
+    return '';
+  }
 }
 
 // ── .env discovery (Keys view bulk import) ────────────────────────────────────

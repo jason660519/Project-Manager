@@ -1,8 +1,17 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { KeysProvider, useKeysContext, type KeysTab } from './Keys/KeysContext';
-import { ApiConfigSheet } from './Keys/ApiConfigSheet';
+import { useRouter } from 'next/navigation';
+import {
+  KeysProvider,
+  useKeysContext,
+  keysSheetSlugToTab,
+  keysTabToSheetSlug,
+  DEFAULT_KEYS_SHEET_SLUG,
+  type KeysTab,
+  type KeysSheetSlug,
+} from './Keys/KeysContext';
+import { ApiKeyValidationSheet } from './Keys/ApiKeyValidationSheet';
 import { LlmArenaSheet } from './Keys/LlmArenaSheet';
 import { VlmArenaSheet } from './Keys/VlmArenaSheet';
 import { WorkstationFrame } from '../../../components/layout/WorkstationFrame';
@@ -12,12 +21,19 @@ import {
 } from '../../../components/sheets/BottomSheetTabs';
 
 const KEY_TABS: ReadonlyArray<SheetTabItem<KeysTab>> = [
-  { key: 'api_config', label: 'API Config' },
+  { key: 'api_key_validation', label: 'API Key Validation' },
   { key: 'llm_arena', label: 'LLM Arena' },
   { key: 'vlm_arena', label: 'VLM Arena' },
 ];
 
-function KeysViewContent({ projectRoot }: { projectRoot?: string }) {
+function KeysViewContent({
+  projectRoot,
+  initialSheet,
+}: {
+  projectRoot?: string;
+  initialSheet: KeysSheetSlug;
+}) {
+  const router = useRouter();
   const { activeTab, setActiveTab } = useKeysContext();
   const [isTauri, setIsTauri] = useState(false);
 
@@ -25,6 +41,20 @@ function KeysViewContent({ projectRoot }: { projectRoot?: string }) {
     const tauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
     setIsTauri(tauri);
   }, []);
+
+  // Keep context in sync when the user navigates via browser back/forward or
+  // when the route is loaded directly (e.g. `/keys/llm-arena`).
+  useEffect(() => {
+    const desired = keysSheetSlugToTab(initialSheet);
+    if (desired !== activeTab) {
+      setActiveTab(desired);
+    }
+  }, [initialSheet, activeTab, setActiveTab]);
+
+  const handleTabSelect = (next: KeysTab) => {
+    setActiveTab(next);
+    router.push(`/keys/${keysTabToSheetSlug(next)}`);
+  };
 
   return (
     <WorkstationFrame
@@ -35,12 +65,12 @@ function KeysViewContent({ projectRoot }: { projectRoot?: string }) {
       panelClassName="border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72"
       scrollChildren={false}
       bottomTabs={
-        <BottomSheetTabs tabs={KEY_TABS} activeKey={activeTab} onSelect={setActiveTab} />
+        <BottomSheetTabs tabs={KEY_TABS} activeKey={activeTab} onSelect={handleTabSelect} />
       }
     >
       {/* Mounted in parallel + display toggled so per-tab state is preserved */}
-      <div className={activeTab === 'api_config' ? 'h-full overflow-auto p-4' : 'hidden'}>
-        <ApiConfigSheet isTauri={isTauri} projectRoot={projectRoot} />
+      <div className={activeTab === 'api_key_validation' ? 'h-full overflow-auto p-4' : 'hidden'}>
+        <ApiKeyValidationSheet isTauri={isTauri} projectRoot={projectRoot} />
       </div>
       <div className={activeTab === 'llm_arena' ? 'h-full overflow-hidden p-4' : 'hidden'}>
         <LlmArenaSheet />
@@ -52,10 +82,17 @@ function KeysViewContent({ projectRoot }: { projectRoot?: string }) {
   );
 }
 
-export function KeysView({ projectRoot }: { projectRoot?: string }) {
+export function KeysView({
+  projectRoot,
+  initialSheet,
+}: {
+  projectRoot?: string;
+  initialSheet?: KeysSheetSlug;
+}) {
+  const resolvedSheet = initialSheet ?? DEFAULT_KEYS_SHEET_SLUG;
   return (
-    <KeysProvider>
-      <KeysViewContent projectRoot={projectRoot} />
+    <KeysProvider initialTab={keysSheetSlugToTab(resolvedSheet)}>
+      <KeysViewContent projectRoot={projectRoot} initialSheet={resolvedSheet} />
     </KeysProvider>
   );
 }

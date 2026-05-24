@@ -5,6 +5,8 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  ChevronDown,
+  Code2,
   ExternalLink,
   File,
   FileCode2,
@@ -14,6 +16,7 @@ import {
   Folder,
   FolderKanban,
   HelpCircle,
+  Pencil,
   RefreshCw,
   Search,
   Table2,
@@ -27,7 +30,8 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 import { clsx } from 'clsx';
-import { FileNode } from '../../../lib/bridge';
+import { checkCommandExistsTauri, FileNode, openInEditor } from '../../../lib/bridge';
+import { CodeEditor, type CodeEditorFile } from '../../../components/CodeEditor';
 import { Feature, FeaturePaths, FeatureStatus, ProjectEntry } from '../../../lib/types';
 import { WorkstationFrame } from '../../../components/layout/WorkstationFrame';
 import { BottomSheetTabs, type SheetTabItem } from '../../../components/sheets/BottomSheetTabs';
@@ -347,7 +351,11 @@ function SortIcon({ direction }: { direction: false | 'asc' | 'desc' }) {
   return <ArrowUpDown size={11} className="opacity-50" />;
 }
 
-function buildColumns(canOpenPaths: boolean, onOpenPath: (path: string) => void) {
+function buildColumns(
+  canOpenPaths: boolean,
+  onOpenPath: (path: string) => void,
+  editMode: 'monaco' | 'external',
+) {
   return [
     columnHelper.accessor('kind', {
       id: 'col-kind',
@@ -414,7 +422,9 @@ function buildColumns(canOpenPaths: boolean, onOpenPath: (path: string) => void)
     columnHelper.display({
       id: 'col-actions',
       header: '',
-      cell: (info) => (
+      cell: (info) => {
+        const isMonaco = editMode === 'monaco';
+        return (
         <button
           type="button"
           disabled={!canOpenPaths}
@@ -422,13 +432,26 @@ function buildColumns(canOpenPaths: boolean, onOpenPath: (path: string) => void)
             event.stopPropagation();
             onOpenPath(info.row.original.absPath);
           }}
-          title={canOpenPaths ? `Open ${info.row.original.absPath}` : 'Open requires desktop app'}
-          className="inline-flex h-7 items-center gap-1.5 border border-emerald-200/25 bg-emerald-100/10 px-2.5 text-xs font-medium text-emerald-100 hover:bg-emerald-100/18 disabled:cursor-not-allowed disabled:border-stone-200/10 disabled:bg-stone-500/10 disabled:text-stone-500"
+          title={
+            canOpenPaths
+              ? isMonaco
+                ? 'Quick Edit in Monaco'
+                : `Open in ${editMode}`
+              : 'Open requires desktop app'
+          }
+          className={clsx(
+            'inline-flex h-7 items-center gap-1.5 border px-2.5 text-xs font-medium',
+            'disabled:cursor-not-allowed disabled:border-stone-200/10 disabled:bg-stone-500/10 disabled:text-stone-500',
+            isMonaco
+              ? 'border-sky-200/25 bg-sky-100/10 text-sky-100 hover:bg-sky-100/18'
+              : 'border-emerald-200/25 bg-emerald-100/10 text-emerald-100 hover:bg-emerald-100/18',
+          )}
         >
-          <ExternalLink size={12} />
-          Open
+          {isMonaco ? <Pencil size={12} /> : <ExternalLink size={12} />}
+          {isMonaco ? 'Edit' : 'Open'}
         </button>
-      ),
+      );
+      },
       enableSorting: false,
     }),
   ];
@@ -440,15 +463,20 @@ function FilesTable({
   error,
   canOpenPaths,
   onOpenPath,
+  editMode,
 }: {
   rows: ProjectFileRow[];
   loading: boolean;
   error: string;
   canOpenPaths: boolean;
   onOpenPath: (path: string) => void;
+  editMode: 'monaco' | 'external';
 }) {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'col-path', desc: false }]);
-  const columns = useMemo(() => buildColumns(canOpenPaths, onOpenPath), [canOpenPaths, onOpenPath]);
+  const columns = useMemo(
+    () => buildColumns(canOpenPaths, onOpenPath, editMode),
+    [canOpenPaths, onOpenPath, editMode],
+  );
   const table = useReactTable({
     data: rows,
     columns,
@@ -540,7 +568,17 @@ function FilesTable({
   );
 }
 
-function ProjectFileSheet({ project }: { project: ProjectEntry }) {
+function ProjectFileSheet({
+  project,
+  editMode,
+  preferredEditor,
+  onOpenInMonaco,
+}: {
+  project: ProjectEntry;
+  editMode: 'monaco' | 'external';
+  preferredEditor: string;
+  onOpenInMonaco?: (files: CodeEditorFile[], line?: number) => void;
+}) {
   const [realNodes, setRealNodes] = useState<FileNode[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -619,12 +657,23 @@ function ProjectFileSheet({ project }: { project: ProjectEntry }) {
     [features],
   );
 
-  const openPath = useCallback((path: string) => {
-    if (!isTauri || isGitHub) return;
-    import('../../../lib/bridge')
-      .then(({ openPath: openProjectPath }) => openProjectPath(path))
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
-  }, [isGitHub, isTauri]);
+  const openPathForRow = useCallback(
+    (path: string) => {
+      if (!isTauri || isGitHub) return;
+      if (editMode === 'monaco') {
+        // Open in inline Monaco editor via parent callback
+        onOpenInMonaco?.([{ path }]);
+      } else {
+        // Open in external editor (try preferred, fall back to openPath)
+        openInEditor({ editor: preferredEditor, path }).catch(() => {
+          import('../../../lib/bridge')
+            .then(({ openPath: osOpen }) => osOpen(path))
+            .catch(() => {});
+        });
+      }
+    },
+    [editMode, isGitHub, isTauri, onOpenInMonaco, preferredEditor],
+  );
 
   const modeMessage = isGitHub
     ? 'GitHub-sourced project · feature path sheet'
@@ -695,17 +744,34 @@ function ProjectFileSheet({ project }: { project: ProjectEntry }) {
         loading={loading && rows.length === 0}
         error={error}
         canOpenPaths={isTauri && !isGitHub}
-        onOpenPath={openPath}
+        onOpenPath={openPathForRow}
+        editMode={editMode}
       />
+
+      {/* Monaco CodeEditor modal — handled by parent */}
     </section>
   );
 }
+
+const ALL_EDITORS = [
+  { value: 'codium', label: 'VSCodium' },
+  { value: 'code', label: 'VS Code' },
+  { value: 'cursor', label: 'Cursor' },
+  { value: 'windsurf', label: 'Windsurf' },
+  { value: 'zed', label: 'Zed' },
+] as const;
 
 export function ProjectFilesView({
   projects,
   selectedDashboardProjectIds,
   selectedProjectId,
 }: ProjectFilesViewProps) {
+  const [editMode, setEditMode] = useState<'monaco' | 'external'>('monaco');
+  const [preferredEditor, setPreferredEditor] = useState('codium');
+  const [availableEditors, setAvailableEditors] = useState<Set<string>>(new Set());
+  const [detectingEditors, setDetectingEditors] = useState(false);
+  const [openEditorFiles, setOpenEditorFiles] = useState<CodeEditorFile[] | null>(null);
+
   const displayedProjects = useMemo(() => {
     const selected = projects.filter((project) => selectedDashboardProjectIds.includes(project.id));
     if (selected.length > 0) return selected;
@@ -716,6 +782,37 @@ export function ProjectFilesView({
 
   const [activeProjectId, setActiveProjectId] = useState(displayedProjects[0]?.id ?? '');
 
+  // ── Auto-detect installed editors ───────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    async function detect() {
+      setDetectingEditors(true);
+      const found = new Set<string>();
+      for (const editor of ALL_EDITORS) {
+        if (cancelled) return;
+        try {
+          const exists = await checkCommandExistsTauri(editor.value);
+          if (exists) found.add(editor.value);
+        } catch {
+          // Not Tauri or check failed — skip
+        }
+      }
+      if (!cancelled) {
+        setAvailableEditors(found);
+        // If preferred editor not found, pick first available
+        if (found.size > 0 && !found.has(preferredEditor)) {
+          const first = ALL_EDITORS.find((e) => found.has(e.value));
+          if (first) setPreferredEditor(first.value);
+        }
+        setDetectingEditors(false);
+      }
+    }
+    detect();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Sync active project ────────────────────────────────────────────────
   useEffect(() => {
     if (displayedProjects.length === 0) {
       setActiveProjectId('');
@@ -762,6 +859,64 @@ export function ProjectFilesView({
               {displayedProjects.length !== 1 ? 's' : ''} · {totalFeatures} features · {totalPaths} mapped paths
             </p>
           </div>
+          <div className="flex items-center gap-2">
+            {/* Edit mode toggle */}
+            <div className="flex items-center rounded border border-stone-200/15 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setEditMode('monaco')}
+                className={clsx(
+                  'flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium transition-colors',
+                  editMode === 'monaco'
+                    ? 'bg-sky-500/15 text-sky-300 border-r border-stone-200/15'
+                    : 'text-stone-500 hover:text-stone-300 border-r border-stone-200/15',
+                )}
+              >
+                <Code2 size={12} />
+                Monaco
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditMode('external')}
+                className={clsx(
+                  'flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium transition-colors',
+                  editMode === 'external'
+                    ? 'bg-emerald-500/15 text-emerald-300'
+                    : 'text-stone-500 hover:text-stone-300',
+                )}
+              >
+                <ExternalLink size={12} />
+                External
+              </button>
+            </div>
+
+            {/* Editor selector (only visible in external mode) */}
+            {editMode === 'external' && (
+              <div className="relative">
+                <select
+                  value={preferredEditor}
+                  onChange={(e) => setPreferredEditor(e.target.value)}
+                  className="h-7 appearance-none border border-stone-200/15 bg-[rgb(var(--pm-input))] pl-2.5 pr-7 text-[11px] font-medium text-stone-300 outline-none focus:ring-1 focus:ring-emerald-300/35"
+                >
+                  {detectingEditors ? (
+                    <option value="">Detecting…</option>
+                  ) : (
+                    <>
+                      {ALL_EDITORS.filter(
+                        (e) => availableEditors.size === 0 || availableEditors.has(e.value),
+                      ).map((editor) => (
+                        <option key={editor.value} value={editor.value}>
+                          {editor.label}
+                        </option>
+                      ))}
+                      <option value="">System Default</option>
+                    </>
+                  )}
+                </select>
+                <ChevronDown size={10} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-stone-500" />
+              </div>
+            )}
+          </div>
         </div>
       }
       panelClassName="border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72"
@@ -781,7 +936,34 @@ export function ProjectFilesView({
           No projects loaded.
         </div>
       ) : (
-        activeProject && <ProjectFileSheet key={activeProject.id} project={activeProject} />
+        activeProject && (
+          <ProjectFileSheet
+            key={activeProject.id}
+            project={activeProject}
+            editMode={editMode}
+            preferredEditor={preferredEditor}
+            onOpenInMonaco={(files) => setOpenEditorFiles(files)}
+          />
+        )
+      )}
+
+      {/* Monaco CodeEditor modal */}
+      {openEditorFiles && (
+        <CodeEditor
+          modal
+          files={openEditorFiles}
+          preferredEditor={preferredEditor}
+          onClose={() => setOpenEditorFiles(null)}
+          onTabClose={(path) => {
+            // Remove closed tab from open files
+            const remaining = openEditorFiles.filter((f) => f.path !== path);
+            if (remaining.length === 0) {
+              setOpenEditorFiles(null);
+            } else {
+              setOpenEditorFiles(remaining);
+            }
+          }}
+        />
       )}
     </WorkstationFrame>
   );

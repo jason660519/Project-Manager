@@ -281,6 +281,7 @@ export const zh: Translations = {
     title: '整合中心',
     subtitle: '插件、技能、频道、Memory、Commands 统一清单；点选行打开详细设置。',
     sheetPlugins: '插件',
+    sheetMcp: 'MCP',
     sheetSkills: '技能',
     sheetChannels: '频道',
     sheetMemory: 'Memory',

@@ -280,6 +280,7 @@ export const en: Translations = {
     title: 'Integrations Hub',
     subtitle: 'Plugins, skills, channels, memory, and commands in one inventory table. Click a row for details.',
     sheetPlugins: 'Plugins',
+    sheetMcp: 'MCP',
     sheetSkills: 'Skills',
     sheetChannels: 'Channels',
     sheetMemory: 'Memory',

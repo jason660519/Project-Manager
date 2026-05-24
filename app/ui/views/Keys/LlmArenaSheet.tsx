@@ -205,7 +205,7 @@ export function LlmArenaSheet() {
     }
 
     if (nextToAdd.length === 0) {
-      setAutoAddHint('找不到可新增模型：請先在 API Config 匯入或儲存 provider key。');
+      setAutoAddHint('找不到可新增模型：請先在 API Key Validation 匯入或儲存 provider key。');
       return;
     }
 

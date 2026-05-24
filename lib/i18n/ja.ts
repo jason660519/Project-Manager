@@ -282,6 +282,7 @@ export const ja: Translations = {
     title: 'インテグレーション Hub',
     subtitle: 'プラグイン・スキル・チャネル・Memory・Commands を一覧管理。行をクリックして詳細。',
     sheetPlugins: 'プラグイン',
+    sheetMcp: 'MCP',
     sheetSkills: 'スキル',
     sheetChannels: 'チャネル',
     sheetMemory: 'Memory',

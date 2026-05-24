@@ -4,7 +4,7 @@
  * Six-column TanStack v8 table that lists every provider PM knows about,
  * showing at-a-glance: configured / validated / model count / last check.
  *
- * The table is purely a dumb renderer — its parent (`ApiConfigSheet`) is
+ * The table is purely a dumb renderer — its parent (`ApiKeyValidationSheet`) is
  * responsible for loading data, persisting changes, and opening the detail
  * sheet on row click. Keeping the table this thin makes it easy to mock for
  * tests and reuse in the .env import preview.

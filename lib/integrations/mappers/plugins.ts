@@ -157,10 +157,11 @@ function mapPlugin(plugin: AnyPlugin, ctx: PluginMapperContext): IntegrationRow 
   const reg = registryFor(plugin.id);
   const { status, statusLabel, badges } = resolveStatus(plugin, ctx);
   const scope = (reg.scope ?? '') as IntegrationScope;
+  const sheet = plugin.kind === 'mcp' ? 'mcp' : 'plugins';
 
   return {
-    rowKey: `plugins:${plugin.id}`,
-    sheet: 'plugins',
+    rowKey: `${sheet}:${plugin.id}`,
+    sheet,
     sourceKind: 'plugin-installed',
     sourceId: plugin.id,
     enabled: plugin.enabled,
@@ -211,9 +212,10 @@ export function mapMarketplaceRow(
 ): IntegrationRow {
   const reg = registryFor(entry.id);
   const detectedPath = resolved?.appBundlePath ?? resolved?.commandPath ?? '';
+  const sheet = entry.kind === 'mcp' ? 'mcp' : 'plugins';
   return {
     rowKey: `marketplace:${entry.id}`,
-    sheet: 'plugins',
+    sheet,
     sourceKind: 'plugin-marketplace',
     sourceId: entry.id,
     enabled: false,

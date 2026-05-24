@@ -285,6 +285,7 @@ export interface Translations {
     title: string;
     subtitle: string;
     sheetPlugins: string;
+    sheetMcp: string;
     sheetSkills: string;
     sheetChannels: string;
     sheetMemory: string;

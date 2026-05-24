@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Tab body for the Keys page's "API Config" tab.
+ * Tab body for the Keys page's "API Key Validation" tab.
  *
  * Renders a single TanStack table of every provider PM knows about, with
  * status, model count, and last-validated columns. Clicking a row opens the
@@ -41,12 +41,12 @@ function staticModelsFor(providerId: string): string[] {
   return listLlmProviders().find((p) => p.id === providerId)?.availableModels ?? [];
 }
 
-interface ApiConfigSheetProps {
+interface ApiKeyValidationSheetProps {
   isTauri: boolean;
   projectRoot?: string;
 }
 
-export function ApiConfigSheet({ isTauri: _isTauri, projectRoot }: ApiConfigSheetProps) {
+export function ApiKeyValidationSheet({ isTauri: _isTauri, projectRoot }: ApiKeyValidationSheetProps) {
   const [secrets, setSecrets] = useState<Record<string, string>>({});
   const [metadata, setMetadata] = useState<ProviderMetadataMap>({});
   const [loaded, setLoaded] = useState(false);

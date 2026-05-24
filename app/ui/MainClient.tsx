@@ -127,10 +127,11 @@ interface MainClientProps {
   currentView: ViewId;
   initialProjectId?: string;
   integrationsSheet?: import('../../lib/integrations/types').IntegrationSheet;
+  keysSheet?: import('../../lib/keys/sheetSlugs').KeysSheetSlug;
   documentationSlug?: string[];
 }
 
-export function MainClient({ currentView, initialProjectId, integrationsSheet, documentationSlug }: MainClientProps) {
+export function MainClient({ currentView, initialProjectId, integrationsSheet, keysSheet, documentationSlug }: MainClientProps) {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectEntry[]>(SEED_PROJECTS);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
@@ -1247,7 +1248,10 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, d
         />
       )}
       {currentView === 'keys' && (
-        <KeysView projectRoot={projectManagerRoot ?? selectedProject?.config.project.root} />
+        <KeysView
+          projectRoot={projectManagerRoot ?? selectedProject?.config.project.root}
+          initialSheet={keysSheet}
+        />
       )}
       {currentView === 'settings' && <SettingsView />}
       {currentView === 'chat' && (

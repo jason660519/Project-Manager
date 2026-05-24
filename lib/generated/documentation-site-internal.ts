@@ -4,19 +4,19 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-05-23T21:59:49.000Z",
+    "generatedAt": "2026-05-24T03:03:36.000Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
     "manifestAudience": "internal",
-    "totalDocuments": 49,
+    "totalDocuments": 50,
     "totalFolders": 12,
     "publicDocuments": 8,
-    "internalDocuments": 40,
+    "internalDocuments": 41,
     "restrictedDocuments": 1,
     "publishableDocuments": 5,
-    "reviewRequiredDocuments": 27,
-    "warningCount": 56
+    "reviewRequiredDocuments": 28,
+    "warningCount": 58
   },
   "folders": [
     {
@@ -26,7 +26,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "sourcePath": "docs",
       "label": "All Docs",
       "title": "Documentation",
-      "summary": "49 documentation files indexed from docs.",
+      "summary": "50 documentation files indexed from docs.",
       "parentSlug": null,
       "folderSlugs": [
         "architecture",
@@ -44,14 +44,14 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       ],
       "classificationCounts": {
         "public": 8,
-        "internal": 40,
+        "internal": 41,
         "restricted": 1
       },
       "publishableCount": 5,
-      "reviewRequiredCount": 27,
+      "reviewRequiredCount": 28,
       "visibilityCounts": {
         "public": 8,
-        "internal": 40,
+        "internal": 41,
         "restricted": 1
       },
       "warnings": [
@@ -89,19 +89,20 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "architecture/adr-009-schema-v5-feature-readme-path",
         "architecture/adr-010-documentation-site-static-sync",
         "architecture/adr-011-schema-v6-located-section",
+        "architecture/adr-012-schema-v8-engineer-cron",
         "architecture/architecture-overview",
         "architecture/readme"
       ],
       "classificationCounts": {
         "public": 0,
-        "internal": 12,
+        "internal": 13,
         "restricted": 1
       },
       "publishableCount": 0,
-      "reviewRequiredCount": 5,
+      "reviewRequiredCount": 6,
       "visibilityCounts": {
         "public": 0,
-        "internal": 12,
+        "internal": 13,
         "restricted": 1
       },
       "warnings": [
@@ -818,6 +819,42 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       ],
       "warnings": [],
       "updatedAt": "2026-05-23T21:59:49.000Z"
+    },
+    {
+      "id": "architecture/adr-012-schema-v8-engineer-cron",
+      "slug": "architecture/adr-012-schema-v8-engineer-cron",
+      "route": "/documentation/architecture/adr-012-schema-v8-engineer-cron",
+      "sourcePath": "docs/architecture/ADR-012-schema-v8-engineer-cron.md",
+      "folderSlug": "architecture",
+      "folderPath": "docs/architecture",
+      "title": "ADR-012: Schema v8 — Engineer Cron Dispatch",
+      "summary": "`CronJob.action` has only ever supported `{ type: 'run-command' }`, which spawns a child process via the existing `spawnAgent` bridge. With F23 (Engineer Capability Framework) shipped, en...",
+      "content": "# ADR-012: Schema v8 — Engineer Cron Dispatch\n\n> **Created Date**: 2026-05-24\n> **Created By**: Jason\n> **Last Modified**: 2026-05-24\n> **Modified By**: Jason\n> **Status**: Accepted\n> **Decision Maker**: Jason\n> **Related**: [ADR-002 — Schema Versioning Strategy](./ADR-002-schema-versioning.md), [ADR-003 — Prompt Assembly Location](./ADR-003-prompt-assembly.md), [ADR-004 — API Call Security](./ADR-004-api-call-security.md)\n\n---\n\n## Background\n\n`CronJob.action` has only ever supported `{ type: 'run-command' }`, which spawns\na child process via the existing `spawnAgent` bridge. With F23 (Engineer\nCapability Framework) shipped, engineer roles now carry `capabilities`\n(eyes / voice / hands / recording) and a `primaryModel`, but **there is no\nscheduled-dispatch entry point** — engineers only run when a user clicks \"Run\"\nfrom a dispatch modal.\n\nThis blocks recurring engineer workloads such as \"every morning run the\nDocumentation Engineer on the current branch diff\" or \"every 4 hours have the\nWatchdog Engineer scan for stalled features\".\n\nA second motivation: `/cron-jobs` will gain a two-sheet layout\n(Engineers Cron Jobs / System Cron Jobs) so the two action types are visibly\nseparated. That UI change requires the schema split first.\n\n---\n\n## Decision\n\n1. Bump schema version from `7` to `8`.\n2. Change `CronAction` from a single `{ type: 'run-command' }` shape into a\n   discriminated union of `RunCommandAction | DispatchEngineerAction`,\n   discriminated by the existing `type` field.\n3. Add `DispatchEngineerAction` with fields:\n   - `type: 'dispatch-engineer'`\n   - `roleId: string` — references `EngineerRole.id` on the same project\n   - `promptTemplate: string` — raw text only in v8; variable substitution\n     (`{{branch}}`, `{{date}}`) deferred to a follow-up\n   - `modelOverride?: ModelFallbackEntry` — defaults to `role.primaryModel`\n     when absent\n4. Add observability fields the previous schema lacked:\n   - `CronJob.lastError?: { reason: string; message: string }`\n   - `CronRun.error?: { reason: string; message: string }`\n   - `CronRun.outputSnippet?: string` — first ~200 chars of LLM output, for\n     the run-history panel\n5. Add a `v7 -> v8` migration in `lib/storage/migrate.ts`. The migration is a\n   no-op on `action` (existing `run-command` rows already have `type` set),\n   so its only job is bumping `schemaVersion` and back-filling any\n   `cronJobs[].action.type` that is missing on legacy rows.\n\n---\n\n## Scheduler Location — Frontend, For Now\n\nThe cron scheduler currently runs in `app/ui/MainClient.tsx` as a 30-second\n`setInterval` heartbeat. It is **not** in Rust. This means:\n\n- Cron jobs only fire while the desktop app window is open.\n- `cronHistory` and the \"next run\" map live in React state — closing the app\n  resets both.\n\nThis ADR keeps scheduler-in-renderer for v8 because:\n\n- Moving to a Rust daemon is a separate, larger change (cross-platform\n  background process, OS-level scheduling, persistence of history) and would\n  bloat this PR beyond what review can absorb.\n- The frontend scheduler is the existing pattern; adding a `dispatch-engineer`\n  branch beside the existing `run-command` branch is mechanical.\n\nA follow-up ADR will revisit \"scheduler in Rust\" once the schema and UX are\nstable.\n\n---\n\n## Historical Note — v6 → v7 ADR Gap\n\nSchema v7 was introduced by F23 (Engineer Capabilities) without a dedicated\nADR. ADR-011 covers v6; this ADR covers v8. The implementation of v7 is\ncaptured in `lib/storage/migrate.ts:170` (`migrate_6_to_7`). This is a\nprocess debt — not corrected by this ADR, but noted so the gap is visible\nand future schema bumps land with an ADR per ADR-002.\n\n---\n\n## Rationale\n\n- A discriminated union on `type` keeps `CronAction` extensible without\n  adding a parallel `kind` discriminator that would duplicate information\n  (single-source-of-truth).\n- Naming `lastError` and `outputSnippet` at the type level (rather than free\n  text) forces the scheduler to classify failures, which directly counters\n  the existing \"silent failure\" smell where the cron error path only writes\n  `{ status: 'error' }` with no message.\n- Keeping prompt assembly in TypeScript respects ADR-003 — the new\n  `dispatch-engineer` action reuses the existing `callAnthropic` bridge\n  wrapper, with the prompt assembled on the renderer side from `roleId` +\n  `promptTemplate`.\n- The Anthropic key never leaves Rust because `callAnthropic` already loads\n  it from the keychain (release) or `dev_secrets` (debug) — ADR-004 holds.\n\n---\n\n## Risks and Mitigation\n\n| Risk | Mitigation |\n| --- | --- |\n| Stale `roleId` after a role is deleted | Scheduler classifies as `EngineerDispatchError { reason: 'role_missing' }`; UI surfaces via `lastError` on the row |\n| No Anthropic key on this machine | Scheduler classifies as `reason: 'no_api_key'`; UI links to `/keys` |\n| Two scheduler ticks fire for the same job (in-flight overlap) | In-flight `Set<jobId>` guard added in the PR2 scheduler change (out of scope for this PR) |\n| Engineer cron silently burns budget overnight | `maxRunsPerDay` and a `dryRun` mode are intentionally **deferred** to a follow-up; v8 ships the data model only |\n| Existing v7 configs on disk mid-upgrade | `migrate_7_to_8` is idempotent and only bumps version + back-fills `action.type` if absent |\n\n---\n\n## Consequences\n\n**Positive**\n- Engineers can be scheduled, unblocking automation workflows that F23 implied.\n- Cron failures stop being silent; every error has a `reason`.\n- `/cron-jobs` two-sheet UI (PR2) has a clean schema to render against.\n\n**Negative**\n- One more migration in the chain. The chain is now 7 hops long; per ADR-002\n  this is the threshold to start considering migration consolidation.\n- App-closed-no-fire limitation is now more visible because engineer cron\n  raises user expectations of \"set and forget\".\n\n---\n\n## References\n\n- `schema/project-manager.schema.json`\n- `lib/types/index.ts`\n- `lib/storage/migrate.ts`\n- `app/ui/MainClient.tsx` (scheduler heartbeat — modified in follow-up PR2)\n- `app/ui/views/CronJobsView.tsx` (two-sheet layout — PR2)\n- ADR-002 (schema versioning), ADR-003 (prompt assembly in TS), ADR-004 (Anthropic key in Rust)\n",
+      "contentHash": "0c423063645d7899",
+      "readingMinutes": 5,
+      "classification": "internal",
+      "classificationSource": "policy",
+      "classificationConfidence": 0.92,
+      "classificationReason": "Architecture decisions usually contain internal tradeoffs and implementation constraints.",
+      "matchedPolicyRule": "CLS-INTERNAL-ARCHITECTURE",
+      "publish": false,
+      "reviewStatus": "ai-classified",
+      "needsReview": true,
+      "visibility": "internal",
+      "audience": [
+        "engineers",
+        "technical-reviewers"
+      ],
+      "tags": [
+        "architecture",
+        "adr",
+        "table"
+      ],
+      "warnings": [
+        "Mentions local key storage",
+        "Mentions execution or command policy"
+      ],
+      "updatedAt": "2026-05-24T03:03:36.000Z"
     },
     {
       "id": "architecture/architecture-overview",
@@ -2116,6 +2153,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
     "architecture/adr-009-schema-v5-feature-readme-path",
     "architecture/adr-010-documentation-site-static-sync",
     "architecture/adr-011-schema-v6-located-section",
+    "architecture/adr-012-schema-v8-engineer-cron",
     "architecture/architecture-overview",
     "architecture/readme",
     "archive/archived-20260512-05-adr-tauri",

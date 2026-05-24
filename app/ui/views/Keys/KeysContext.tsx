@@ -2,8 +2,19 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import type { LlmProviderId } from '../../../../lib/keys/llmProviders';
+import type { KeysTab } from '../../../../lib/keys/sheetSlugs';
 
-export type KeysTab = 'api_config' | 'llm_arena' | 'vlm_arena';
+// Re-export slug helpers + KeysTab so existing imports from this module keep
+// working. The constants themselves live in a server-safe module so
+// `generateStaticParams` can spread them under RSC.
+export {
+  KEYS_SHEET_SLUGS,
+  DEFAULT_KEYS_SHEET_SLUG,
+  isKeysSheetSlug,
+  keysSheetSlugToTab,
+  keysTabToSheetSlug,
+} from '../../../../lib/keys/sheetSlugs';
+export type { KeysSheetSlug, KeysTab } from '../../../../lib/keys/sheetSlugs';
 
 interface ArenaState {
   systemPrompt: string;
@@ -46,8 +57,14 @@ const defaultVlmState: VlmArenaState = {
 
 const KeysContext = createContext<KeysContextType | null>(null);
 
-export function KeysProvider({ children }: { children: ReactNode }) {
-  const [activeTab, setActiveTab] = useState<KeysTab>('api_config');
+export function KeysProvider({
+  children,
+  initialTab = 'api_key_validation',
+}: {
+  children: ReactNode;
+  initialTab?: KeysTab;
+}) {
+  const [activeTab, setActiveTab] = useState<KeysTab>(initialTab);
   const [llmState, setLlmState] = useState<ArenaState>(defaultLlmState);
   const [vlmState, setVlmState] = useState<VlmArenaState>(defaultVlmState);
 

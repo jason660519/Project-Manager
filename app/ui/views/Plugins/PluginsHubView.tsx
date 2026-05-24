@@ -423,7 +423,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
 
   const installedIds = useMemo(() => new Set(catalog.plugins.map((p) => p.id)), [catalog]);
 
-  const pluginRows = useMemo(() => {
+  const allPluginRows = useMemo(() => {
     const ctx = { apiKeys, systemCommandStatus, mcpStatuses, resolvedInstallPaths };
     const installed = mapInstalledPlugins(catalog, ctx);
     const marketplace = MARKETPLACE.map((mp) =>
@@ -446,6 +446,15 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     return mergeAllManual(rows);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalog, apiKeys, systemCommandStatus, mcpStatuses, pluginsFilter, installedIds, manualVersion, resolvedInstallPaths]);
+
+  const pluginRows = useMemo(
+    () => allPluginRows.filter((r) => r.sheet === 'plugins'),
+    [allPluginRows],
+  );
+  const mcpRows = useMemo(
+    () => allPluginRows.filter((r) => r.sheet === 'mcp'),
+    [allPluginRows],
+  );
 
   const channelRows = useMemo(() => {
     const rows = channelCatalog.channels.map((ch) =>
@@ -492,17 +501,19 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     let rows =
       activeSheet === 'plugins'
         ? pluginRows
-        : activeSheet === 'skills'
-          ? skillsRowsMerged
-          : activeSheet === 'channels'
-            ? channelRows
-            : activeSheet === 'memory'
-              ? memoryRowsMerged
-              : activeSheet === 'commands'
-                ? commandRowsMerged
-                : activeSheet === 'connected-instances'
-                  ? connectedInstanceRows
-                  : [];
+        : activeSheet === 'mcp'
+          ? mcpRows
+          : activeSheet === 'skills'
+            ? skillsRowsMerged
+            : activeSheet === 'channels'
+              ? channelRows
+              : activeSheet === 'memory'
+                ? memoryRowsMerged
+                : activeSheet === 'commands'
+                  ? commandRowsMerged
+                  : activeSheet === 'connected-instances'
+                    ? connectedInstanceRows
+                    : [];
     if (categoryFilter !== 'all') {
       rows = rows.filter((r) => r.category1 === categoryFilter);
     }
@@ -510,6 +521,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
   }, [
     activeSheet,
     pluginRows,
+    mcpRows,
     skillsRowsMerged,
     channelRows,
     memoryRowsMerged,
@@ -798,6 +810,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
 
   const sheetTabs: ReadonlyArray<SheetTabItem<IntegrationSheet>> = [
     { key: 'plugins', label: t.integrations.sheetPlugins, badge: pluginRows.length },
+    { key: 'mcp', label: t.integrations.sheetMcp, badge: mcpRows.length },
     { key: 'skills', label: t.integrations.sheetSkills, badge: skillsRowsMerged.length },
     { key: 'channels', label: t.integrations.sheetChannels, badge: channelRows.length },
     { key: 'memory', label: t.integrations.sheetMemory, badge: memoryRowsMerged.length },
@@ -854,7 +867,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
           </option>
         ))}
       </select>
-      {activeSheet === 'plugins' && (
+      {(activeSheet === 'plugins' || activeSheet === 'mcp') && (
         <select
           value={pluginsFilter}
           onChange={(e) => setPluginsFilter(e.target.value as PluginsFilter)}
@@ -1073,11 +1086,19 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
                 errorMessage={activeSheetError}
                 frozenDataColCount={frozenDataColCount}
                 rowDensity={rowDensity}
-                onTestRow={activeSheet === 'plugins' ? handleTestPluginRow : undefined}
-                testResults={activeSheet === 'plugins' ? pluginTestResults : undefined}
-                testingKeys={activeSheet === 'plugins' ? pluginTestingKeys : undefined}
+                onTestRow={
+                  activeSheet === 'plugins' || activeSheet === 'mcp'
+                    ? handleTestPluginRow
+                    : undefined
+                }
+                testResults={
+                  activeSheet === 'plugins' || activeSheet === 'mcp' ? pluginTestResults : undefined
+                }
+                testingKeys={
+                  activeSheet === 'plugins' || activeSheet === 'mcp' ? pluginTestingKeys : undefined
+                }
                 onToggleEnabled={
-                  activeSheet === 'plugins'
+                  activeSheet === 'plugins' || activeSheet === 'mcp'
                     ? (row, _enabled) => {
                         if (row.sourceKind === 'plugin-installed') {
                           updateCatalog(togglePluginEnabled(catalog, row.sourceId));

@@ -281,6 +281,7 @@ export const zhHant: Translations = {
     title: '整合中心',
     subtitle: '插件、技能、頻道、Memory、Commands 統一清單；點選列開啟詳細設定。',
     sheetPlugins: '插件',
+    sheetMcp: 'MCP',
     sheetSkills: '技能',
     sheetChannels: '頻道',
     sheetMemory: 'Memory',

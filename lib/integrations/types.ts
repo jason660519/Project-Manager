@@ -2,6 +2,7 @@
 
 export const INTEGRATION_SHEETS = [
   'plugins',
+  'mcp',
   'skills',
   'channels',
   'memory',
