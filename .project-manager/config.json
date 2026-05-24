@@ -158,6 +158,28 @@
       "status": "in_progress",
       "updatedAt": "2026-05-24T11:30:00+10:00",
       "updatedBy": "claude"
+    },
+    {
+      "category": "Integrations/Runtime",
+      "createdAt": "2026-05-24T11:44:11+10:00",
+      "id": "F24",
+      "locatedSection": "integrations-hub",
+      "name": "Connected Instances Sheet",
+      "notes": "Add an Integrations Hub sheet that shows local, intranet, and external runtime instances with service endpoints, capability hints, reachability state, owner, and risk boundaries without exposing secrets.",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F24/",
+        "implementation": "app/ui/views/Plugins/",
+        "spec": ".project-manager/features/F24/feature-spec.md",
+        "tdd": ".project-manager/features/F24/tdd-spec.md",
+        "test": "__tests__/integrations.connectedInstances.test.ts"
+      },
+      "phase": "development",
+      "points": 3,
+      "progress": 100,
+      "readmePath": ".project-manager/features/F24/README.md",
+      "status": "done",
+      "updatedAt": "2026-05-24T11:58:00+10:00",
+      "updatedBy": "codex"
     }
   ],
   "id": "6be5e570-fb8a-4873-8c5c-a4f88055f157",
@@ -167,6 +189,6 @@
     "root": "/Volumes/KLEVV-4T-1/Project-Manager"
   },
   "schemaVersion": 6,
-  "updatedAt": "2026-05-24T11:00:00+10:00",
-  "updatedBy": "claude"
+  "updatedAt": "2026-05-24T11:58:00+10:00",
+  "updatedBy": "codex"
 }

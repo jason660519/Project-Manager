@@ -1,17 +1,21 @@
 /** Unified integration inventory row — shared across Integrations Hub sheets. */
 
-export type IntegrationSheet =
-  | 'plugins'
-  | 'skills'
-  | 'channels'
-  | 'memory'
-  | 'commands'
-  | 'connect'
-  | 'vla'
-  | 'tts'
-  | 'stt'
-  | 'hands'
-  | 'tools';
+export const INTEGRATION_SHEETS = [
+  'plugins',
+  'skills',
+  'channels',
+  'memory',
+  'commands',
+  'connected-instances',
+  'connect',
+  'vla',
+  'tts',
+  'stt',
+  'hands',
+  'tools',
+] as const;
+
+export type IntegrationSheet = typeof INTEGRATION_SHEETS[number];
 
 /** Sheets that surface F23 capability candidates (schema v7). */
 export const CAPABILITY_SHEETS = ['vla', 'tts', 'stt', 'hands', 'tools'] as const;
@@ -43,6 +47,7 @@ export type IntegrationSourceKind =
   | 'memory'
   | 'slash-command'
   | 'system-cli'
+  | 'connected-instance'
   | 'capability-candidate';
 
 export interface IntegrationManualFields {

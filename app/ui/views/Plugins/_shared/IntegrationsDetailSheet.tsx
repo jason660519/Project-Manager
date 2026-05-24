@@ -172,6 +172,7 @@ export function IntegrationsDetailSheet({
   const mapping = row.payload.mapping as CommandMapping | undefined;
   const skillPath = (row.payload.skill as { absPath?: string } | undefined)?.absPath ?? row.sourceId;
   const filePath = (row.payload.file as { absPath?: string } | undefined)?.absPath;
+  const instancePayload = row.sourceKind === 'connected-instance' ? row.payload : null;
 
   return (
     <>
@@ -519,8 +520,34 @@ export function IntegrationsDetailSheet({
             </section>
           )}
 
+          {instancePayload && (
+            <section className="border-t border-stone-200/12 pt-4 space-y-2">
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-stone-500">
+                Instance Metadata
+              </p>
+              <MetaRow label="kind" value={stringMeta(instancePayload.instanceKind)} />
+              <MetaRow label="owner" value={stringMeta(instancePayload.owner)} />
+              <MetaRow label="access" value={stringMeta(instancePayload.accessType)} />
+              <MetaRow label="risk" value={stringMeta(instancePayload.risk)} />
+              <MetaRow label="source" value={stringMeta(instancePayload.discoverySource)} />
+              <MetaRow label="services" value={arrayMeta(instancePayload.services)} />
+              <MetaRow label="capabilities" value={arrayMeta(instancePayload.capabilities)} />
+              <p className="text-[11px] text-stone-500">
+                {stringMeta(instancePayload.credentialBoundary)}
+              </p>
+            </section>
+          )}
+
         </div>
       </aside>
     </>
   );
+}
+
+function stringMeta(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function arrayMeta(value: unknown): string {
+  return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string').join(', ') : '';
 }

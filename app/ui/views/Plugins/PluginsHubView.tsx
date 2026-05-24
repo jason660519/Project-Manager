@@ -15,6 +15,7 @@ import {
 import { mapSkillRow } from '../../../../lib/integrations/mappers/skills';
 import { mapChannelRow, mapCommandMappingRow } from '../../../../lib/integrations/mappers/channels';
 import { mapSystemCliRow } from '../../../../lib/integrations/mappers/system-cli';
+import { buildConnectedInstanceRows } from '../../../../lib/integrations/mappers/connected-instances';
 import { loadMemoryRows, loadSlashCommandRows } from '../../../../lib/integrations/load-project-inventory';
 import { MARKETPLACE, buildFromMarketplace } from '../../../../lib/integrations/marketplace-catalog';
 import type { PluginCatalog, McpPlugin } from '../../../../lib/types/plugins';
@@ -457,6 +458,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
   const skillsRowsMerged = useMemo(() => mergeAllManual(skillRows), [skillRows, manualVersion]);
   const memoryRowsMerged = useMemo(() => mergeAllManual(memoryRows), [memoryRows, manualVersion]);
   const commandRowsMerged = useMemo(() => mergeAllManual(commandRows), [commandRows, manualVersion]);
+  const connectedInstanceRows = useMemo(() => mergeAllManual(buildConnectedInstanceRows()), [manualVersion]);
   const systemCliRows = useMemo(
     () => commandRowsMerged.filter((row) => row.sourceKind === 'system-cli'),
     [commandRowsMerged],
@@ -496,7 +498,11 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
             ? channelRows
             : activeSheet === 'memory'
               ? memoryRowsMerged
-              : commandRowsMerged;
+              : activeSheet === 'commands'
+                ? commandRowsMerged
+                : activeSheet === 'connected-instances'
+                  ? connectedInstanceRows
+                  : [];
     if (categoryFilter !== 'all') {
       rows = rows.filter((r) => r.category1 === categoryFilter);
     }
@@ -508,6 +514,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     channelRows,
     memoryRowsMerged,
     commandRowsMerged,
+    connectedInstanceRows,
     categoryFilter,
   ]);
 
@@ -795,6 +802,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     { key: 'channels', label: t.integrations.sheetChannels, badge: channelRows.length },
     { key: 'memory', label: t.integrations.sheetMemory, badge: memoryRowsMerged.length },
     { key: 'commands', label: t.integrations.sheetCommands, badge: commandRowsMerged.length },
+    { key: 'connected-instances', label: 'Connected Instances', badge: connectedInstanceRows.length },
     { key: 'vla', label: 'VLA (Eyes)' },
     { key: 'tts', label: 'TTS (Mouth)' },
     { key: 'stt', label: 'STT (Mouth)' },

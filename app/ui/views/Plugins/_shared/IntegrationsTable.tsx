@@ -11,6 +11,7 @@ import {
 } from '@tanstack/react-table';
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import type { IntegrationRow } from '../../../../../lib/integrations/types';
+import { connectedInstanceSearchText } from '../../../../../lib/integrations/mappers/connected-instances';
 import { StatusBadge } from './status-badge';
 
 export interface IntegrationRowTestResult {
@@ -306,13 +307,17 @@ export function IntegrationsTable({
       const q = String(filterValue).toLowerCase();
       if (!q) return true;
       const r = row.original;
+      if (r.sourceKind === 'connected-instance') {
+        return connectedInstanceSearchText(r).includes(q);
+      }
       return (
         r.name.toLowerCase().includes(q) ||
         r.company.toLowerCase().includes(q) ||
         r.category1.toLowerCase().includes(q) ||
         r.category2.toLowerCase().includes(q) ||
         r.installPath.toLowerCase().includes(q) ||
-        r.notes.toLowerCase().includes(q)
+        r.notes.toLowerCase().includes(q) ||
+        r.badges.some((badge) => badge.toLowerCase().includes(q))
       );
     },
     getCoreRowModel: getCoreRowModel(),

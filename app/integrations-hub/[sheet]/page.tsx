@@ -1,20 +1,8 @@
 import { notFound } from 'next/navigation';
 import { MainClient } from '../../ui/MainClient';
-import type { IntegrationSheet } from '../../../lib/integrations/types';
+import { INTEGRATION_SHEETS, type IntegrationSheet } from '../../../lib/integrations/types';
 
-const VALID_SHEETS: IntegrationSheet[] = [
-  'plugins',
-  'skills',
-  'channels',
-  'memory',
-  'commands',
-  'connect',
-  'vla',
-  'tts',
-  'stt',
-  'hands',
-  'tools',
-];
+const VALID_SHEETS = [...INTEGRATION_SHEETS];
 
 export const dynamicParams = false;
 
