@@ -160,10 +160,10 @@ export function LlmArenaSheet() {
       deepseek: 'deepseek-reasoner',
       grok: 'grok-2-latest',
       openrouter: 'anthropic/claude-3.5-sonnet',
-      perplexity: 'llama-3.1-sonar-huge-128k-online',
+      perplexity: 'sonar-pro',
       together: 'Qwen/Qwen2.5-72B-Instruct-Turbo',
       qwen: 'qwen-max',
-      kimi: 'moonshot-v1-128k',
+      kimi: 'kimi-k2.6',
       zhipu: 'glm-4-plus',
     };
 

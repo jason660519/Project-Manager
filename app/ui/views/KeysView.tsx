@@ -17,7 +17,7 @@ const KEY_TABS: ReadonlyArray<SheetTabItem<KeysTab>> = [
   { key: 'vlm_arena', label: 'VLM Arena' },
 ];
 
-function KeysViewContent() {
+function KeysViewContent({ projectRoot }: { projectRoot?: string }) {
   const { activeTab, setActiveTab } = useKeysContext();
   const [isTauri, setIsTauri] = useState(false);
 
@@ -40,7 +40,7 @@ function KeysViewContent() {
     >
       {/* Mounted in parallel + display toggled so per-tab state is preserved */}
       <div className={activeTab === 'api_config' ? 'h-full overflow-auto p-4' : 'hidden'}>
-        <ApiConfigSheet isTauri={isTauri} />
+        <ApiConfigSheet isTauri={isTauri} projectRoot={projectRoot} />
       </div>
       <div className={activeTab === 'llm_arena' ? 'h-full overflow-hidden p-4' : 'hidden'}>
         <LlmArenaSheet />
@@ -52,10 +52,10 @@ function KeysViewContent() {
   );
 }
 
-export function KeysView() {
+export function KeysView({ projectRoot }: { projectRoot?: string }) {
   return (
     <KeysProvider>
-      <KeysViewContent />
+      <KeysViewContent projectRoot={projectRoot} />
     </KeysProvider>
   );
 }

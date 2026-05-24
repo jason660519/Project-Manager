@@ -46,54 +46,15 @@ function writeJSON(key: string, value: unknown): void {
 const BUILT_IN_INSTALL_DATE = '1970-01-01T00:00:00.000Z';
 const nowIso = () => new Date().toISOString();
 
-const DEFAULT_PROVIDERS: ProviderPlugin[] = [
-  {
-    id: 'anthropic',
-    kind: 'provider',
-    name: 'Anthropic',
-    enabled: true,
-    installedAt: BUILT_IN_INSTALL_DATE,
-    baseUrl: 'https://api.anthropic.com',
-    defaultModel: 'claude-sonnet-4-6',
-    models: ['claude-opus-4-7', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'],
-  },
-  {
-    id: 'openai',
-    kind: 'provider',
-    name: 'OpenAI',
-    enabled: true,
-    installedAt: BUILT_IN_INSTALL_DATE,
-    baseUrl: 'https://api.openai.com/v1',
-    defaultModel: 'gpt-4o',
-    models: ['gpt-4o', 'gpt-4o-mini', 'o1', 'o3-mini'],
-  },
-  {
-    id: 'google',
-    kind: 'provider',
-    name: 'Google Gemini',
-    enabled: true,
-    installedAt: BUILT_IN_INSTALL_DATE,
-    baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
-    defaultModel: 'gemini-2.0-flash',
-    models: ['gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-pro'],
-  },
-  {
-    id: 'ollama',
-    kind: 'provider',
-    name: 'Ollama',
-    enabled: true,
-    installedAt: BUILT_IN_INSTALL_DATE,
-    baseUrl: 'http://localhost:11434',
-    defaultModel: 'llama3',
-    models: ['llama3', 'llama3:70b', 'mistral', 'codellama'],
-  },
-];
+// AI providers are owned by the Keys view (`lib/keys/*`). The plugin catalog
+// no longer seeds them so they stay out of the Plugins hub.
+const DEFAULT_PROVIDERS: ProviderPlugin[] = [];
 
 const DEFAULT_CLIS: CliPlugin[] = [
   {
     id: 'claude-code',
     kind: 'cli',
-    name: 'Claude Code',
+    name: 'Claude Code CLI',
     enabled: true,
     installedAt: BUILT_IN_INSTALL_DATE,
     command: 'claude',
@@ -113,7 +74,7 @@ const DEFAULT_CLIS: CliPlugin[] = [
   {
     id: 'hermes-agent',
     kind: 'cli',
-    name: 'Hermes Agent',
+    name: 'Hermes Agent CLI',
     enabled: false,
     installedAt: BUILT_IN_INSTALL_DATE,
     command: '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager/bin/hermes',
@@ -122,7 +83,7 @@ const DEFAULT_CLIS: CliPlugin[] = [
   {
     id: 'openclaw',
     kind: 'cli',
-    name: 'OpenClaw',
+    name: 'OpenClaw CLI',
     enabled: false,
     installedAt: BUILT_IN_INSTALL_DATE,
     command: '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager/bin/openclaw',
@@ -131,10 +92,10 @@ const DEFAULT_CLIS: CliPlugin[] = [
 ];
 
 const DEFAULT_EDITORS: EditorPlugin[] = [
-  { id: 'cursor', kind: 'editor', name: 'Cursor', enabled: true, installedAt: BUILT_IN_INSTALL_DATE, command: 'cursor' },
-  { id: 'vscode', kind: 'editor', name: 'VS Code', enabled: true, installedAt: BUILT_IN_INSTALL_DATE, command: 'code' },
-  { id: 'trae', kind: 'editor', name: 'Trae', enabled: true, installedAt: BUILT_IN_INSTALL_DATE, command: 'trae' },
-  { id: 'antigravity', kind: 'editor', name: 'Antigravity', enabled: true, installedAt: BUILT_IN_INSTALL_DATE, command: 'antigravity' },
+  { id: 'cursor', kind: 'editor', name: 'Cursor IDE App', enabled: true, installedAt: BUILT_IN_INSTALL_DATE, command: 'cursor' },
+  { id: 'vscode', kind: 'editor', name: 'VS Code IDE App', enabled: true, installedAt: BUILT_IN_INSTALL_DATE, command: 'code' },
+  { id: 'trae', kind: 'editor', name: 'Trae IDE App', enabled: true, installedAt: BUILT_IN_INSTALL_DATE, command: 'trae' },
+  { id: 'antigravity', kind: 'editor', name: 'Antigravity IDE App', enabled: true, installedAt: BUILT_IN_INSTALL_DATE, command: 'antigravity' },
 ];
 
 const DEFAULT_CATALOG: PluginCatalog = {
@@ -188,18 +149,46 @@ function isV1(raw: unknown): raw is PluginCatalogV1 {
   return Array.isArray(r.providers) || Array.isArray(r.agents) || Array.isArray(r.ides);
 }
 
+// Built-in CLI plugin id → legacy names that should be auto-renamed to today's
+// canonical CLI-suffixed names. Only matches when the persisted name is one of
+// the legacy literals, so user-customized names are left untouched.
+const BUILTIN_NAME_UPGRADES: Record<string, { from: string[]; to: string }> = {
+  'claude-code': { from: ['Claude Code'], to: 'Claude Code CLI' },
+  'hermes-agent': { from: ['Hermes Agent'], to: 'Hermes Agent CLI' },
+  openclaw: { from: ['OpenClaw'], to: 'OpenClaw CLI' },
+};
+
+function upgradeBuiltinNames(catalog: PluginCatalog): {
+  catalog: PluginCatalog;
+  changed: boolean;
+} {
+  let changed = false;
+  const plugins = catalog.plugins.map((p) => {
+    const rule = BUILTIN_NAME_UPGRADES[p.id];
+    if (rule && rule.from.includes(p.name) && p.name !== rule.to) {
+      changed = true;
+      return { ...p, name: rule.to };
+    }
+    return p;
+  });
+  return changed ? { catalog: { ...catalog, plugins }, changed } : { catalog, changed };
+}
+
 export function loadPluginCatalog(): PluginCatalog {
   const raw = readJSON<unknown>(KEY_SHARED_PLUGINS);
   if (!raw) return DEFAULT_CATALOG;
 
   if (isV2(raw)) {
-    return { schemaVersion: 2, plugins: raw.plugins };
+    const upgrade = upgradeBuiltinNames({ schemaVersion: 2, plugins: raw.plugins });
+    if (upgrade.changed) writeJSON(KEY_SHARED_PLUGINS, upgrade.catalog);
+    return upgrade.catalog;
   }
 
   if (isV1(raw)) {
     const migrated = migrateV1toV2(raw);
-    writeJSON(KEY_SHARED_PLUGINS, migrated);
-    return migrated;
+    const upgrade = upgradeBuiltinNames(migrated);
+    writeJSON(KEY_SHARED_PLUGINS, upgrade.catalog);
+    return upgrade.catalog;
   }
 
   return DEFAULT_CATALOG;

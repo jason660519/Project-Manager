@@ -10,10 +10,23 @@ import type {
 import { registryFor } from '../registry';
 import type { IntegrationRow, IntegrationScope, IntegrationStatus } from '../types';
 
+export interface ResolvedPluginPath {
+  /** Absolute path of the executable as found on PATH (null if missing). */
+  commandPath: string | null;
+  /** macOS .app bundle path when the editor's display name matches an installed app. */
+  appBundlePath: string | null;
+}
+
 export interface PluginMapperContext {
   apiKeys: Record<string, string>;
   systemCommandStatus: Record<string, boolean>;
   mcpStatuses: Map<string, McpRunStatus>;
+  /**
+   * Resolved real install paths keyed by plugin id. Populated by the host view
+   * after running `resolveInstallPath` over the marketplace + installed plugins.
+   * Missing entries fall back to `installPathFor(plugin)` (the raw command name).
+   */
+  resolvedInstallPaths?: Record<string, ResolvedPluginPath>;
 }
 
 function kindToCategory1(kind: AnyPlugin['kind']): string {
@@ -102,13 +115,27 @@ function resolveStatus(
   };
 }
 
-function installPathFor(plugin: AnyPlugin): string {
+function installPathFor(
+  plugin: AnyPlugin,
+  resolved?: ResolvedPluginPath,
+): string {
   if (plugin.kind === 'provider') return plugin.baseUrl;
   if (plugin.kind === 'mcp') {
+    if (resolved?.commandPath) {
+      const args = (plugin.args ?? []).join(' ');
+      return args ? `${resolved.commandPath} ${args}` : resolved.commandPath;
+    }
     const parts = [plugin.command, ...(plugin.args ?? [])].filter(Boolean);
     return parts.join(' ') || plugin.url || '';
   }
-  if (plugin.kind === 'cli' || plugin.kind === 'editor') return plugin.command;
+  if (plugin.kind === 'cli') {
+    return resolved?.commandPath ?? plugin.command;
+  }
+  if (plugin.kind === 'editor') {
+    // Prefer the .app bundle on macOS so users see where the IDE actually
+    // lives, fall back to the resolved CLI launcher, then the raw command.
+    return resolved?.appBundlePath ?? resolved?.commandPath ?? plugin.command;
+  }
   if (plugin.kind === 'skill') return plugin.installedPath;
   return '';
 }
@@ -146,7 +173,8 @@ function mapPlugin(plugin: AnyPlugin, ctx: PluginMapperContext): IntegrationRow 
     license: reg.license ?? '',
     scope,
     port: portFor(plugin, reg),
-    installPath: reg.installPathHint ?? installPathFor(plugin),
+    installPath:
+      reg.installPathHint ?? installPathFor(plugin, ctx.resolvedInstallPaths?.[plugin.id]),
     status,
     statusLabel,
     lastUpdated: plugin.installedAt?.slice(0, 10) ?? '',
@@ -161,8 +189,11 @@ export function mapInstalledPlugins(
   catalog: PluginCatalog,
   ctx: PluginMapperContext,
 ): IntegrationRow[] {
+  // Skills have their own sheet. Providers are owned by the Keys view and
+  // intentionally hidden from the Plugins hub even if they linger in older
+  // persisted catalogs.
   return catalog.plugins
-    .filter((p) => p.kind !== 'skill')
+    .filter((p) => p.kind !== 'skill' && p.kind !== 'provider')
     .map((p) => mapPlugin(p, ctx));
 }
 
@@ -176,8 +207,10 @@ export type MarketplaceEntry = {
 
 export function mapMarketplaceRow(
   entry: MarketplaceEntry & { installed: boolean },
+  resolved?: ResolvedPluginPath,
 ): IntegrationRow {
   const reg = registryFor(entry.id);
+  const detectedPath = resolved?.appBundlePath ?? resolved?.commandPath ?? '';
   return {
     rowKey: `marketplace:${entry.id}`,
     sheet: 'plugins',
@@ -193,7 +226,7 @@ export function mapMarketplaceRow(
     license: reg.license ?? '',
     scope: (reg.scope ?? '') as IntegrationScope,
     port: reg.port ?? '',
-    installPath: reg.installPathHint ?? '',
+    installPath: reg.installPathHint ?? detectedPath,
     status: entry.installed ? 'installed' : 'not_installed',
     statusLabel: entry.installed ? 'Installed' : 'Available',
     lastUpdated: '',

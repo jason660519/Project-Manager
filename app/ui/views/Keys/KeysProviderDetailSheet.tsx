@@ -28,6 +28,7 @@ import {
 
 import { loadProviderSecret } from '../../../../lib/keys/keychain';
 import {
+  classifyValidationFailure,
   formatRelativeTime,
   loadProviderMetadata,
   type ProviderMetadata,
@@ -83,9 +84,13 @@ function StatusBadge({ meta, hasKey }: { meta: ProviderMetadata | null; hasKey: 
         </span>
       );
     case 'fail':
+      const failure = classifyValidationFailure(meta.errorReason);
       return (
-        <span className="inline-flex items-center gap-1.5 border border-rose-300/40 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-rose-300">
-          <AlertTriangle size={11} /> Failed
+        <span
+          className="inline-flex items-center gap-1.5 border border-rose-300/40 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-rose-300"
+          title={`${failure.label}: ${failure.detail}`}
+        >
+          <AlertTriangle size={11} /> {failure.label}
         </span>
       );
     default:
@@ -104,7 +109,20 @@ export function KeysProviderDetailSheet({
   const [show, setShow] = useState(false);
   const [meta, setMeta] = useState<ProviderMetadata | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [feedback, setFeedback] = useState<{ kind: 'ok' | 'fail'; msg: string } | null>(null);
+
+  useEffect(() => {
+    if (phase === 'idle') {
+      setElapsedSeconds(0);
+      return;
+    }
+    const startedAt = Date.now();
+    const interval = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 250);
+    return () => window.clearInterval(interval);
+  }, [phase]);
 
   // Re-load secret + metadata when the sheet opens / switches provider.
   // `cancelled` guards against a stale write if the user closes / switches
@@ -168,16 +186,18 @@ export function KeysProviderDetailSheet({
           msg: `Validated · ${result.models.length} model${result.models.length === 1 ? '' : 's'} reachable`,
         });
       } else {
+        const failure = classifyValidationFailure(result.errorReason);
         setFeedback({
           kind: 'fail',
-          msg: result.errorReason ?? 'Validation failed',
+          msg: `${failure.label}: ${failure.hint}`,
         });
       }
     } catch (e: unknown) {
       console.error(`[KeysSheet] saveAndValidateKey(${provider.id}) threw:`, e);
+      const failure = classifyValidationFailure(e instanceof Error ? e.message : String(e));
       setFeedback({
         kind: 'fail',
-        msg: e instanceof Error ? e.message : String(e),
+        msg: `${failure.label}: ${failure.hint}`,
       });
     } finally {
       setPhase('idle');
@@ -197,13 +217,20 @@ export function KeysProviderDetailSheet({
               kind: 'ok',
               msg: `Validated · ${result.models.length} model${result.models.length === 1 ? '' : 's'} reachable`,
             }
-          : { kind: 'fail', msg: result.errorReason ?? 'Validation failed' },
+          : {
+              kind: 'fail',
+              msg: (() => {
+                const failure = classifyValidationFailure(result.errorReason);
+                return `${failure.label}: ${failure.hint}`;
+              })(),
+            },
       );
     } catch (e: unknown) {
       console.error(`[KeysSheet] revalidateStoredKey(${provider.id}) threw:`, e);
+      const failure = classifyValidationFailure(e instanceof Error ? e.message : String(e));
       setFeedback({
         kind: 'fail',
-        msg: e instanceof Error ? e.message : String(e),
+        msg: `${failure.label}: ${failure.hint}`,
       });
     } finally {
       setPhase('idle');
@@ -311,11 +338,11 @@ export function KeysProviderDetailSheet({
               <button
                 onClick={() => void handleSaveAndValidate()}
                 disabled={busy || !value || !isDirty || !supportsValidation}
-                className="inline-flex items-center gap-1.5 bg-stone-100 px-4 py-2 text-sm font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex min-w-[150px] items-center justify-center gap-1.5 bg-stone-100 px-4 py-2 text-sm font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {phase === 'saving' ? (
                   <>
-                    <Loader2 size={13} className="animate-spin" /> Validating…
+                    <Loader2 size={13} className="animate-spin" /> Validating {elapsedSeconds}s
                   </>
                 ) : (
                   'Save & Validate'
@@ -325,11 +352,11 @@ export function KeysProviderDetailSheet({
                 <button
                   onClick={() => void handleRevalidate()}
                   disabled={busy}
-                  className="inline-flex items-center gap-1.5 border border-stone-200/22 px-3 py-2 text-[11px] uppercase tracking-[0.14em] text-stone-200 hover:bg-stone-200/8 transition-colors disabled:opacity-40"
+                  className="inline-flex min-w-[150px] items-center justify-center gap-1.5 border border-stone-200/22 px-3 py-2 text-[11px] uppercase tracking-[0.14em] text-stone-200 hover:bg-stone-200/8 transition-colors disabled:opacity-40"
                 >
                   {phase === 'revalidating' ? (
                     <>
-                      <Loader2 size={11} className="animate-spin" /> Re-validating…
+                      <Loader2 size={11} className="animate-spin" /> Re-validating {elapsedSeconds}s
                     </>
                   ) : (
                     <>
@@ -379,6 +406,12 @@ export function KeysProviderDetailSheet({
                 }`}
               >
                 {feedback.msg}
+              </p>
+            )}
+            {busy && (
+              <p className="mt-2 inline-flex items-center gap-2 text-[11px] text-amber-100/85">
+                <Loader2 size={12} className="animate-spin" />
+                Contacting provider endpoint · elapsed {elapsedSeconds}s
               </p>
             )}
           </section>

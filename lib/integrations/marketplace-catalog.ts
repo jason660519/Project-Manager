@@ -22,35 +22,25 @@ export interface MarketplacePlugin {
   kind: MarketplaceKind;
   accentColor: string;
   initials: string;
+  /**
+   * macOS .app bundle name (without the `.app` suffix) used by
+   * `resolve_install_path` to locate the installed application. Differs from
+   * the launcher `command` (e.g. VS Code: command `code` / bundle "Visual
+   * Studio Code"). Only meaningful for `kind: 'editor'`.
+   */
+  appBundleName?: string;
   defaultProvider?: ProviderDefaults;
   defaultCli?: CliDefaults;
   defaultEditor?: EditorDefaults;
   defaultMcp?: McpDefaults;
 }
 
+// AI providers are managed exclusively from the Keys view (where keys are
+// validated against the real API). They intentionally do not appear in the
+// Plugins hub anymore.
 export const MARKETPLACE: MarketplacePlugin[] = [
   {
-    id: 'anthropic', name: 'Anthropic', description: 'Access Claude models including Opus, Sonnet, and Haiku.',
-    category: 'ai', kind: 'provider', accentColor: 'bg-[rgb(196_122_58)]', initials: 'AN',
-    defaultProvider: { baseUrl: 'https://api.anthropic.com', defaultModel: 'claude-sonnet-4-6', models: ['claude-opus-4-7', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'] },
-  },
-  {
-    id: 'openai', name: 'OpenAI', description: 'GPT-4o, o1, o3-mini and other OpenAI models.',
-    category: 'ai', kind: 'provider', accentColor: 'bg-[rgb(16_163_127)]', initials: 'OA',
-    defaultProvider: { baseUrl: 'https://api.openai.com/v1', defaultModel: 'gpt-4o', models: ['gpt-4o', 'gpt-4o-mini', 'o1', 'o3-mini'] },
-  },
-  {
-    id: 'google', name: 'Google Gemini', description: 'Gemini 2.5 Pro, Flash and Gemini 1.5 models.',
-    category: 'ai', kind: 'provider', accentColor: 'bg-[rgb(66_133_244)]', initials: 'GG',
-    defaultProvider: { baseUrl: 'https://generativelanguage.googleapis.com/v1beta', defaultModel: 'gemini-2.0-flash', models: ['gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-pro'] },
-  },
-  {
-    id: 'ollama', name: 'Ollama', description: 'Run Llama, Mistral, and other models locally on your machine.',
-    category: 'ai', kind: 'provider', accentColor: 'bg-stone-600', initials: 'OL',
-    defaultProvider: { baseUrl: 'http://localhost:11434', defaultModel: 'llama3', models: ['llama3', 'llama3:70b', 'mistral', 'codellama'] },
-  },
-  {
-    id: 'claude-code', name: 'Claude Code', description: 'Agentic CLI for software engineering tasks.',
+    id: 'claude-code', name: 'Claude Code CLI', description: 'Anthropic agentic CLI for software engineering tasks. (Distinct from Claude Code Desktop.)',
     category: 'dev', kind: 'cli', accentColor: 'bg-[rgb(196_122_58)]', initials: 'CC',
     defaultCli: { command: 'claude', argsTemplate: ['--cwd', '{root}', '{prompt}'], providerId: 'anthropic' },
   },
@@ -60,77 +50,82 @@ export const MARKETPLACE: MarketplacePlugin[] = [
     defaultCli: { command: 'codex', argsTemplate: ['exec', '--cwd', '{root}', '{prompt}'], providerId: 'openai' },
   },
   {
-    id: 'hermes-agent', name: 'Hermes Agent', description: 'Project-scoped Hermes CLI with isolated memory, sessions, skills, and dashboard state.',
+    id: 'hermes-agent', name: 'Hermes Agent CLI', description: 'Project-scoped Hermes agent CLI with isolated memory, sessions, skills, and dashboard state.',
     category: 'dev', kind: 'cli', accentColor: 'bg-amber-700', initials: 'HA',
     defaultCli: { command: '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager/bin/hermes', argsTemplate: ['chat', '-q', '{prompt}'] },
   },
   {
-    id: 'openclaw', name: 'OpenClaw', description: 'Project-scoped OpenClaw gateway and agent CLI with isolated state, workspace, updates, and rollback.',
+    id: 'openclaw', name: 'OpenClaw CLI', description: 'Project-scoped OpenClaw agent CLI (with local gateway) — isolated state, workspace, updates, and rollback.',
     category: 'dev', kind: 'cli', accentColor: 'bg-rose-700', initials: 'OC',
     defaultCli: { command: '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager/bin/openclaw', argsTemplate: ['agent', '--message', '{prompt}'] },
   },
   {
-    id: 'aider', name: 'Aider', description: 'AI pair programmer that edits code in your terminal.',
+    id: 'aider', name: 'Aider CLI', description: 'AI pair programmer that edits code in your terminal.',
     category: 'dev', kind: 'cli', accentColor: 'bg-violet-700', initials: 'AD',
     defaultCli: { command: 'aider', argsTemplate: ['--yes', '--message', '{prompt}'] },
   },
   {
-    id: 'cursor', name: 'Cursor', description: 'AI-first code editor built on VS Code.',
+    id: 'cursor', name: 'Cursor IDE App', description: 'AI-first code editor IDE built on VS Code (desktop application, not a CLI).',
     category: 'dev', kind: 'editor', accentColor: 'bg-[rgb(107_108_246)]', initials: 'CR',
+    appBundleName: 'Cursor',
     defaultEditor: { command: 'cursor' },
   },
   {
-    id: 'vscode', name: 'VS Code', description: 'Microsoft Visual Studio Code editor.',
+    id: 'vscode', name: 'VS Code IDE App', description: 'Microsoft Visual Studio Code IDE (desktop application, not the `code` CLI shim).',
     category: 'dev', kind: 'editor', accentColor: 'bg-[rgb(0_122_204)]', initials: 'VS',
+    appBundleName: 'Visual Studio Code',
     defaultEditor: { command: 'code' },
   },
   {
-    id: 'zed', name: 'Zed', description: 'High-performance multiplayer code editor.',
+    id: 'zed', name: 'Zed IDE App', description: 'High-performance multiplayer code editor IDE (desktop application).',
     category: 'dev', kind: 'editor', accentColor: 'bg-[rgb(8_76_205)]', initials: 'ZD',
+    appBundleName: 'Zed',
     defaultEditor: { command: 'zed' },
   },
   {
-    id: 'trae', name: 'Trae', description: 'ByteDance AI-native code editor.',
+    id: 'trae', name: 'Trae IDE App', description: 'ByteDance AI-native code editor IDE (desktop application).',
     category: 'dev', kind: 'editor', accentColor: 'bg-[rgb(26_107_92)]', initials: 'TR',
+    appBundleName: 'Trae',
     defaultEditor: { command: 'trae' },
   },
   {
-    id: 'antigravity', name: 'Antigravity', description: 'Antigravity AI-native IDE.',
+    id: 'antigravity', name: 'Antigravity IDE App', description: 'Antigravity AI-native IDE (desktop application).',
     category: 'dev', kind: 'editor', accentColor: 'bg-[rgb(43_37_64)]', initials: 'AG',
+    appBundleName: 'Antigravity',
     defaultEditor: { command: 'antigravity' },
   },
   {
-    id: 'mcp-filesystem', name: 'Filesystem MCP', description: 'Read and edit local files via the Model Context Protocol.',
+    id: 'mcp-filesystem', name: 'Filesystem MCP Server', description: 'MCP server that reads and edits local files via the Model Context Protocol.',
     category: 'dev', kind: 'mcp', accentColor: 'bg-violet-700', initials: 'FS',
     defaultMcp: { transport: 'stdio', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', '{root}'] },
   },
   {
-    id: 'mcp-chrome', name: 'Chrome MCP', description: 'Drive a Chrome browser so the AI can navigate, click, and read pages.',
+    id: 'mcp-chrome', name: 'Chrome MCP Server', description: 'MCP server that drives a Chrome browser so the AI can navigate, click, and read pages.',
     category: 'dev', kind: 'mcp', accentColor: 'bg-[rgb(66_133_244)]', initials: 'CM',
     defaultMcp: { transport: 'stdio', command: 'npx', args: ['-y', 'chrome-mcp-server'] },
   },
   {
-    id: 'mcp-slack', name: 'Slack MCP', description: 'Post messages and read channels via the Slack MCP server.',
+    id: 'mcp-slack', name: 'Slack MCP Server', description: 'MCP server that posts messages and reads channels via the Slack MCP integration.',
     category: 'notify', kind: 'mcp', accentColor: 'bg-[rgb(74_21_75)]', initials: 'SM',
     defaultMcp: { transport: 'stdio', command: 'npx', args: ['-y', '@modelcontextprotocol/server-slack'], env: { SLACK_BOT_TOKEN: '' } },
   },
   {
-    id: 'github', name: 'GitHub', description: 'Sync pull requests and issues to your projects.',
+    id: 'github', name: 'GitHub CLI', description: 'GitHub CLI (`gh`) — sync pull requests and issues to your projects. (Not GitHub Desktop.)',
     category: 'vcs', kind: 'cli', accentColor: 'bg-stone-700', initials: 'GH',
     defaultCli: { command: 'gh', argsTemplate: [] },
   },
   {
-    id: 'linear', name: 'Linear', description: 'Pull issues and cycles into Project Manager features.',
+    id: 'linear', name: 'Linear CLI', description: 'Linear CLI — pull issues and cycles into Project Manager features. (Not the Linear Desktop/Web app.)',
     category: 'pm', kind: 'cli', accentColor: 'bg-[rgb(94_106_210)]', initials: 'LN',
     defaultCli: { command: 'linear', argsTemplate: [] },
   },
   {
-    id: 'slack', name: 'Slack (CLI)', description: 'Slack CLI launcher (legacy — prefer the Slack MCP entry).',
+    id: 'slack', name: 'Slack CLI', description: 'Slack CLI launcher (legacy — prefer the Slack MCP entry).',
     category: 'notify', kind: 'cli', accentColor: 'bg-[rgb(74_21_75)]', initials: 'SL',
     defaultCli: { command: 'slack', argsTemplate: [] },
   },
   {
-    id: 'sentry', name: 'Sentry', description: 'Import recent errors as engineering tasks.',
+    id: 'sentry', name: 'Sentry CLI', description: 'Sentry CLI — import recent errors as engineering tasks. (Not the Sentry web dashboard.)',
     category: 'ci', kind: 'cli', accentColor: 'bg-[rgb(251_66_38)]', initials: 'SE',
     defaultCli: { command: 'sentry', argsTemplate: [] },
   },

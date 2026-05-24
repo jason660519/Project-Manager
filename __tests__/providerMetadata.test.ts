@@ -7,7 +7,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   clearProviderMetadata,
+  classifyValidationFailure,
   formatRelativeTime,
+  formatValidationFailure,
   loadAllProviderMetadata,
   loadProviderMetadata,
   maskKey,
@@ -147,5 +149,26 @@ describe('maskKey', () => {
 
   it('collapses short keys to first-char + ***', () => {
     expect(maskKey('short')).toBe('s***');
+  });
+});
+
+describe('validation failure classification', () => {
+  it('classifies invalid keys as auth failures', () => {
+    const failure = classifyValidationFailure('Provider 401: invalid_api_key');
+    expect(failure.category).toBe('auth');
+    expect(failure.label).toBe('API key rejected');
+    expect(formatValidationFailure('Provider 401: invalid_api_key')).toMatch(/API key rejected/);
+  });
+
+  it('classifies fetch failures as unreachable endpoints', () => {
+    const failure = classifyValidationFailure('fetch failed');
+    expect(failure.category).toBe('unreachable');
+    expect(failure.label).toBe('Provider endpoint unreachable');
+  });
+
+  it('classifies 404 errors as endpoint problems', () => {
+    const failure = classifyValidationFailure('Provider 404: Not Found');
+    expect(failure.category).toBe('endpoint');
+    expect(failure.label).toBe('Provider endpoint returned 404');
   });
 });

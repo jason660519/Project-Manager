@@ -1,10 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, FileText, Loader2, Upload, X } from 'lucide-react';
+import { AlertTriangle, FileText, Loader2, RefreshCw, Upload, X } from 'lucide-react';
 import { parseEnvText } from '../../../../lib/keys/envParser';
 import { detectProviders, type DetectedKey } from '../../../../lib/keys/detectProviders';
 import { saveProviderSecret } from '../../../../lib/keys/keychain';
+import { revalidateStoredKey } from '../../../../lib/keys/validation';
+import { formatValidationFailure } from '../../../../lib/keys/providerMetadata';
 import { scanEnvFiles, type EnvFileInfo } from '../../../../lib/bridge';
 
 interface EnvImportModalProps {
@@ -26,22 +28,49 @@ export function EnvImportModal({ projectRoot, onClose, onImported }: EnvImportMo
   const [scanError, setScanError] = useState('');
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [activeValidation, setActiveValidation] = useState<{ index: number; total: number; label: string } | null>(null);
   const [error, setError] = useState('');
+  const [importResult, setImportResult] = useState<{ ok: string[]; fail: string[] } | null>(null);
 
-  // Auto-scan on open when a project root is supplied.
-  useEffect(() => {
+  const runProjectScan = useCallback(async () => {
     if (!projectRoot) return;
     setScanning(true);
     setScanError('');
-    scanEnvFiles(projectRoot)
-      .then((files) => {
-        setScanFiles(files);
-        if (files.length > 0) setScanSelectedPath(files[0].path);
-        else setScanError('No .env files found in this project.');
-      })
-      .catch((e) => setScanError(e instanceof Error ? e.message : String(e)))
-      .finally(() => setScanning(false));
+    setScanFiles([]);
+    setScanSelectedPath('');
+    try {
+      const files = await scanEnvFiles(projectRoot);
+      setScanFiles(files);
+      if (files.length > 0) {
+        setScanSelectedPath(files[0].path);
+      } else {
+        setScanError('No .env files found in this project.');
+      }
+    } catch (e) {
+      setScanError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setScanning(false);
+    }
   }, [projectRoot]);
+
+  useEffect(() => {
+    if (!saving) {
+      setElapsedSeconds(0);
+      setActiveValidation(null);
+      return;
+    }
+    const startedAt = Date.now();
+    const interval = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 250);
+    return () => window.clearInterval(interval);
+  }, [saving]);
+
+  // Auto-scan on open when a project root is supplied.
+  useEffect(() => {
+    void runProjectScan();
+  }, [runProjectScan]);
 
   const sourceText = useMemo(() => {
     if (tab === 'paste') return pasteText;
@@ -72,10 +101,21 @@ export function EnvImportModal({ projectRoot, onClose, onImported }: EnvImportMo
     if (toSave.length === 0) return;
     setSaving(true);
     setError('');
+    setImportResult(null);
     try {
-      for (const d of toSave) {
+      const ok: string[] = [];
+      const fail: string[] = [];
+      for (const [index, d] of toSave.entries()) {
+        setActiveValidation({ index: index + 1, total: toSave.length, label: d.provider.label });
         await saveProviderSecret(d.provider, d.value);
+        const result = await revalidateStoredKey(d.provider);
+        if (result.ok) {
+          ok.push(`${d.envKey} (${result.models.length} models)`);
+        } else {
+          fail.push(`${d.envKey}: ${formatValidationFailure(result.errorReason)}`);
+        }
       }
+      setImportResult({ ok, fail });
       onImported(toSave.length);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -88,6 +128,12 @@ export function EnvImportModal({ projectRoot, onClose, onImported }: EnvImportMo
     () => detected.filter((d) => selected[d.provider.id]).length,
     [detected, selected],
   );
+
+  const availableProviderSummary = useMemo(() => {
+    const names = detected.map((d) => d.provider.label);
+    if (names.length <= 6) return names.join(', ');
+    return `${names.slice(0, 6).join(', ')} +${names.length - 6} more`;
+  }, [detected]);
 
   return (
     <div
@@ -143,54 +189,133 @@ GITHUB_TOKEN=ghp_..."
                 className="block w-full resize-y bg-transparent font-mono text-[12px] text-stone-100 outline-none placeholder:text-stone-600"
               />
             </div>
-          ) : scanning ? (
-            <div className="flex items-center gap-2 text-sm text-stone-400">
-              <Loader2 size={14} className="animate-spin" /> Scanning project root…
-            </div>
-          ) : scanError ? (
-            <p className="text-sm text-stone-400">{scanError}</p>
           ) : (
-            <div className="space-y-2">
-              <div className="text-[11px] uppercase tracking-[0.14em] text-stone-500">
-                Found {scanFiles.length} file{scanFiles.length === 1 ? '' : 's'}
+            <div className="space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[11px] uppercase tracking-[0.14em] text-stone-500">
+                    Project scan
+                  </div>
+                  {projectRoot && (
+                    <div
+                      className="mt-1 truncate font-mono text-[11px] text-stone-500"
+                      title={projectRoot}
+                    >
+                      {projectRoot}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void runProjectScan()}
+                  disabled={scanning || !projectRoot}
+                  className="inline-flex shrink-0 items-center gap-1.5 border border-stone-200/22 px-3 py-1.5 text-[11px] uppercase tracking-[0.14em] text-stone-200 hover:bg-stone-200/8 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {scanning ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <RefreshCw size={12} />
+                  )}
+                  Rescan
+                </button>
               </div>
-              <div className="space-y-1">
-                {scanFiles.map((f) => (
-                  <label
-                    key={f.path}
-                    className={`flex items-center gap-2 border px-2.5 py-2 text-sm cursor-pointer ${
-                      scanSelectedPath === f.path
-                        ? 'border-emerald-300/50 bg-emerald-300/5 text-stone-100'
-                        : 'border-stone-200/15 text-stone-300 hover:border-stone-200/30'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="env-file"
-                      checked={scanSelectedPath === f.path}
-                      onChange={() => setScanSelectedPath(f.path)}
-                      className="accent-emerald-400"
-                    />
-                    <FileText size={13} className="text-stone-500" />
-                    <span className="font-mono text-xs">{f.name}</span>
-                    <span className="ml-auto text-[10px] text-stone-500">
-                      {f.content.length} chars
-                    </span>
-                  </label>
-                ))}
-              </div>
+
+              {scanning ? (
+                <div className="flex items-center gap-2 border border-stone-200/15 bg-stone-200/5 px-3 py-3 text-sm text-stone-400">
+                  <Loader2 size={14} className="animate-spin" /> Scanning project root…
+                </div>
+              ) : scanError ? (
+                <div className="border border-stone-200/15 bg-stone-200/5 px-3 py-3">
+                  <p className="text-sm text-stone-300">{scanError}</p>
+                  <p className="mt-1 text-[11px] text-stone-500">
+                    Use Rescan after adding a top-level .env file, or switch to Paste / drop.
+                  </p>
+                </div>
+              ) : detected.length > 0 ? (
+                <div className="border border-emerald-300/25 bg-emerald-300/5 px-3 py-3">
+                  <p className="text-sm text-stone-100">
+                    Detected .env credentials for {detected.length} provider{detected.length === 1 ? '' : 's'}.
+                  </p>
+                  <p className="mt-1 text-[11px] text-stone-400">
+                    Available providers: {availableProviderSummary}. Review the selected providers, then import and validate.
+                  </p>
+                </div>
+              ) : (
+                <div className="border border-amber-300/25 bg-amber-300/5 px-3 py-3">
+                  <p className="text-sm text-stone-100">
+                    Found .env file, but no supported provider keys were detected.
+                  </p>
+                  <p className="mt-1 text-[11px] text-stone-500">
+                    PM looks for variables named ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, GITHUB_TOKEN, and other registered provider keys.
+                  </p>
+                </div>
+              )}
+
+              {scanFiles.length > 0 && (
+                <div className="space-y-2">
+                  <div className="text-[11px] uppercase tracking-[0.14em] text-stone-500">
+                    Found {scanFiles.length} file{scanFiles.length === 1 ? '' : 's'}
+                  </div>
+                  <div className="space-y-1">
+                    {scanFiles.map((f) => (
+                      <label
+                        key={f.path}
+                        className={`flex items-center gap-2 border px-2.5 py-2 text-sm cursor-pointer ${
+                          scanSelectedPath === f.path
+                            ? 'border-emerald-300/50 bg-emerald-300/5 text-stone-100'
+                            : 'border-stone-200/15 text-stone-300 hover:border-stone-200/30'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="env-file"
+                          checked={scanSelectedPath === f.path}
+                          onChange={() => setScanSelectedPath(f.path)}
+                          className="accent-emerald-400"
+                        />
+                        <FileText size={13} className="text-stone-500" />
+                        <span className="font-mono text-xs">{f.name}</span>
+                        <span className="ml-auto text-[10px] text-stone-500">
+                          {f.content.length} chars
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          <DetectionPreview
-            detected={detected}
-            selected={selected}
-            onToggle={(id) => setSelected((s) => ({ ...s, [id]: !s[id] }))}
-          />
+          {(tab === 'paste' || detected.length > 0) && (
+            <DetectionPreview
+              detected={detected}
+              selected={selected}
+              onToggle={(id) => setSelected((s) => ({ ...s, [id]: !s[id] }))}
+            />
+          )}
         </div>
 
         <footer className="flex items-center gap-3 border-t border-stone-200/12 px-5 py-3">
-          {error && <span className="text-[11px] text-red-400">{error}</span>}
+          <div className="min-w-0 flex-1">
+            {error && <span className="text-[11px] text-red-400">{error}</span>}
+            {saving && (
+              <span className="inline-flex items-center gap-2 text-[11px] text-amber-100">
+                <Loader2 size={12} className="animate-spin" />
+                {activeValidation
+                  ? `Validating ${activeValidation.index}/${activeValidation.total}: ${activeValidation.label}`
+                  : 'Preparing validation'}
+                <span className="font-mono text-stone-500">{elapsedSeconds}s</span>
+              </span>
+            )}
+            {importResult && !error && !saving && (
+              <span className="block truncate text-[11px] text-stone-400">
+                {importResult.ok.length > 0 ? `Validated: ${importResult.ok.join(', ')}` : ''}
+                {importResult.fail.length > 0
+                  ? `${importResult.ok.length > 0 ? ' · ' : ''}Failed: ${importResult.fail.join('; ')}`
+                  : ''}
+              </span>
+            )}
+          </div>
           <span className="ml-auto text-[11px] text-stone-500">
             {selectedCount} of {detected.length} selected
           </span>
@@ -203,9 +328,15 @@ GITHUB_TOKEN=ghp_..."
           <button
             onClick={() => void handleImport()}
             disabled={selectedCount === 0 || saving}
-            className="bg-stone-100 px-4 py-1.5 text-sm font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex min-w-[190px] items-center justify-center gap-2 bg-stone-100 px-4 py-1.5 text-sm font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {saving ? 'Importing…' : `Import ${selectedCount}`}
+            {saving ? (
+              <>
+                <Loader2 size={14} className="animate-spin" /> Validating {elapsedSeconds}s
+              </>
+            ) : (
+              `Import & validate ${selectedCount}`
+            )}
           </button>
         </footer>
       </div>

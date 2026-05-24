@@ -43,9 +43,10 @@ function staticModelsFor(providerId: string): string[] {
 
 interface ApiConfigSheetProps {
   isTauri: boolean;
+  projectRoot?: string;
 }
 
-export function ApiConfigSheet({ isTauri: _isTauri }: ApiConfigSheetProps) {
+export function ApiConfigSheet({ isTauri: _isTauri, projectRoot }: ApiConfigSheetProps) {
   const [secrets, setSecrets] = useState<Record<string, string>>({});
   const [metadata, setMetadata] = useState<ProviderMetadataMap>({});
   const [loaded, setLoaded] = useState(false);
@@ -145,8 +146,12 @@ export function ApiConfigSheet({ isTauri: _isTauri }: ApiConfigSheetProps) {
 
       {showImport && (
         <EnvImportModal
+          projectRoot={projectRoot}
           onClose={() => setShowImport(false)}
-          onImported={refresh}
+          onImported={(count) => {
+            refresh();
+            if (count > 0) window.setTimeout(() => setShowImport(false), 1500);
+          }}
         />
       )}
       {oauthProvider && (

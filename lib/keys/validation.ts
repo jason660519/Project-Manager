@@ -12,18 +12,18 @@
  */
 
 import {
-  revalidateProviderKey as bridgeRevalidate,
   validateProviderKey as bridgeValidate,
   type ProviderApiKind,
   type ValidateProviderKeyResult,
 } from '../bridge';
 import { listLlmProviders } from './llmProviders';
-import { saveProviderSecret } from './keychain';
+import { getProviderKey } from './providerKeyStore';
+import { loadProviderSecret, saveProviderSecret } from './keychain';
 import {
   clearProviderMetadata,
   saveProviderMetadata,
 } from './providerMetadata';
-import { KEYCHAIN_SERVICE, type ProviderSpec } from './registry';
+import type { ProviderSpec } from './registry';
 
 export interface ProviderApiContract {
   apiKind: ProviderApiKind;
@@ -113,12 +113,22 @@ export async function revalidateStoredKey(
     throw new Error(`No validation contract for provider: ${provider.id}`);
   }
 
-  const result = await bridgeRevalidate({
-    keychainService: KEYCHAIN_SERVICE,
-    keychainKey: provider.keychainKey,
-    apiKind: contract.apiKind,
-    baseUrl: contract.baseUrl,
-  });
+  const apiKey =
+    provider.category === 'ai'
+      ? await getProviderKey(provider.id as Parameters<typeof getProviderKey>[0])
+      : await loadProviderSecret(provider);
+
+  const result = apiKey
+    ? await bridgeValidate({
+        apiKind: contract.apiKind,
+        baseUrl: contract.baseUrl,
+        apiKey,
+      })
+    : {
+        ok: false,
+        models: [],
+        errorReason: 'No key configured',
+      };
 
   const now = new Date().toISOString();
   if (result.ok) {

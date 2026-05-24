@@ -236,6 +236,9 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, d
   }, []);
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId) ?? projects[0];
+  const projectManagerRoot =
+    projects.find((p) => p.id === 'project-manager')?.config.project.root ??
+    SEED_PROJECTS.find((p) => p.id === 'project-manager')?.config.project.root;
   const adapters = selectedProject ? listAdapters(selectedProject.config) : [];
   const selectedDashboardProjects = projects.filter((p) => selectedDashboardProjectIds.includes(p.id));
   const effectiveDashboardProjects =
@@ -1232,7 +1235,9 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, d
           onKillRun={handleKillRun}
         />
       )}
-      {currentView === 'keys' && <KeysView />}
+      {currentView === 'keys' && (
+        <KeysView projectRoot={projectManagerRoot ?? selectedProject?.config.project.root} />
+      )}
       {currentView === 'settings' && <SettingsView />}
       {currentView === 'chat' && (
         <ChatPageClient

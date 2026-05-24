@@ -15,10 +15,8 @@ export interface IntegrationRegistryEntry {
 }
 
 export const INTEGRATION_REGISTRY: Record<string, IntegrationRegistryEntry> = {
-  anthropic: { company: 'Anthropic', category1: 'AI Provider', category2: 'API', license: 'Commercial', scope: 'project', installPathHint: '.env' },
-  openai: { company: 'OpenAI', category1: 'AI Provider', category2: 'API', license: 'Commercial', scope: 'project', installPathHint: '.env' },
-  google: { company: 'Google', category1: 'AI Provider', category2: 'API', license: 'Commercial', scope: 'project', installPathHint: '.env' },
-  ollama: { company: 'Ollama', category1: 'AI Provider', category2: 'Local', license: 'MIT', scope: 'user', port: '11434', installPathHint: 'http://localhost:11434' },
+  // AI provider rows (anthropic, openai, google, ollama) intentionally omitted —
+  // those are surfaced from the Keys view, not the Plugins hub.
 
   'claude-code': { company: 'Anthropic', category1: 'Coding Editor/Orchestrator', category2: 'CLI', scope: 'user' },
   codex: { company: 'OpenAI', category1: 'Coding Editor/Orchestrator', category2: 'CLI', scope: 'user' },
@@ -34,7 +32,7 @@ export const INTEGRATION_REGISTRY: Record<string, IntegrationRegistryEntry> = {
   openclaw: {
     company: 'OpenAI',
     category1: 'Coding Editor/Orchestrator',
-    category2: 'Gateway',
+    category2: 'Agent CLI',
     license: 'MIT',
     scope: 'project',
     port: '18789',

@@ -32,7 +32,10 @@ import {
 } from '@tanstack/react-table';
 
 import type { ProviderSpec } from '../../../../lib/keys/registry';
-import { formatRelativeTime } from '../../../../lib/keys/providerMetadata';
+import {
+  classifyValidationFailure,
+  formatRelativeTime,
+} from '../../../../lib/keys/providerMetadata';
 
 export type KeysRowStatus = 'verified' | 'configured' | 'not_set' | 'failed';
 
@@ -60,6 +63,7 @@ function assertNever(value: never): never {
 }
 
 function StatusCell({ row }: { row: KeysRowData }) {
+  const failure = row.errorReason ? classifyValidationFailure(row.errorReason) : null;
   switch (row.status) {
     case 'verified':
       return (
@@ -72,12 +76,19 @@ function StatusCell({ row }: { row: KeysRowData }) {
       );
     case 'failed':
       return (
-        <span
-          className="inline-flex items-center gap-1.5 border border-rose-300/40 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-rose-300"
-          title={row.errorReason ?? undefined}
-        >
-          <AlertTriangle size={11} /> Failed
-        </span>
+        <div className="max-w-[220px]">
+          <span
+            className="inline-flex items-center gap-1.5 border border-rose-300/40 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-rose-300"
+            title={failure ? `${failure.label}: ${failure.detail}` : undefined}
+          >
+            <AlertTriangle size={11} /> Failed
+          </span>
+          {failure && (
+            <p className="mt-1 truncate text-[10px] normal-case tracking-0 text-rose-200/75" title={failure.detail}>
+              {failure.label}
+            </p>
+          )}
+        </div>
       );
     case 'configured':
       return (

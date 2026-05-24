@@ -9,8 +9,15 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table';
+import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import type { IntegrationRow } from '../../../../../lib/integrations/types';
 import { StatusBadge } from './status-badge';
+
+export interface IntegrationRowTestResult {
+  ok: boolean;
+  testedAt: number;
+  detail?: string;
+}
 
 export type ColumnVisibility = {
   lv: boolean;
@@ -50,6 +57,15 @@ interface IntegrationsTableProps {
   selectedRowKey: string | null;
   onRowClick: (row: IntegrationRow) => void;
   onToggleEnabled?: (row: IntegrationRow, enabled: boolean) => void;
+  /**
+   * When provided, renders a Test button on each row that calls back to verify
+   * availability/install path. Callers own the actual probe (e.g. checkCommandExists +
+   * resolveInstallPath) and refresh row data via state, so the table just shows the
+   * latest result reported in `testResults`.
+   */
+  onTestRow?: (row: IntegrationRow) => void | Promise<void>;
+  testResults?: Record<string, IntegrationRowTestResult>;
+  testingKeys?: ReadonlySet<string>;
   globalFilter: string;
   columnVisibility?: ColumnVisibility;
   isLoading?: boolean;
@@ -58,11 +74,18 @@ interface IntegrationsTableProps {
   rowDensity?: 'compact' | 'comfortable';
 }
 
+function isTestableRow(row: IntegrationRow): boolean {
+  return row.sourceKind === 'plugin-installed' || row.sourceKind === 'plugin-marketplace';
+}
+
 export function IntegrationsTable({
   rows,
   selectedRowKey,
   onRowClick,
   onToggleEnabled,
+  onTestRow,
+  testResults,
+  testingKeys,
   globalFilter,
   columnVisibility = DEFAULT_VISIBILITY,
   isLoading = false,
@@ -213,8 +236,61 @@ export function IntegrationsTable({
             }),
           ]
         : []),
+      ...(onTestRow
+        ? [
+            columnHelper.display({
+              id: 'col-test',
+              header: 'Test',
+              enableSorting: false,
+              size: 92,
+              cell: ({ row }) => {
+                const r = row.original;
+                if (!isTestableRow(r)) return emptyCell();
+                const result = testResults?.[r.rowKey];
+                const testing = testingKeys?.has(r.rowKey) ?? false;
+                return (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void onTestRow(r);
+                    }}
+                    disabled={testing}
+                    title={
+                      testing
+                        ? 'Testing…'
+                        : result
+                          ? `${result.ok ? 'Available' : 'Unavailable'}${
+                              result.detail ? ` — ${result.detail}` : ''
+                            } · ${new Date(result.testedAt).toLocaleTimeString()}`
+                          : 'Re-check availability'
+                    }
+                    className={`inline-flex h-6 items-center gap-1 border px-2 text-[10px] font-medium uppercase tracking-[0.08em] transition-colors ${
+                      testing
+                        ? 'cursor-wait border-stone-200/15 bg-stone-200/5 text-stone-400'
+                        : result?.ok === true
+                          ? 'border-emerald-300/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20'
+                          : result?.ok === false
+                            ? 'border-red-400/30 bg-red-500/10 text-red-200 hover:bg-red-500/20'
+                            : 'border-stone-200/25 bg-stone-200/5 text-stone-200 hover:bg-stone-200/10'
+                    }`}
+                  >
+                    {testing ? (
+                      <Loader2 size={11} className="animate-spin" />
+                    ) : result?.ok === true ? (
+                      <CheckCircle2 size={11} />
+                    ) : result?.ok === false ? (
+                      <XCircle size={11} />
+                    ) : null}
+                    Test
+                  </button>
+                );
+              },
+            }),
+          ]
+        : []),
     ],
-    [columnVisibility, onToggleEnabled],
+    [columnVisibility, onToggleEnabled, onTestRow, testResults, testingKeys],
   );
 
   const table = useReactTable({
@@ -276,9 +352,9 @@ export function IntegrationsTable({
   }
 
   return (
-    <div className="overflow-x-auto border border-stone-200/12 bg-[rgb(var(--pm-panel))]/72">
+    <div className="h-full overflow-auto border border-stone-200/12 bg-[rgb(var(--pm-panel))]/72">
       <table className="w-full min-w-[960px] border-collapse text-left text-sm">
-        <thead className="sticky top-0 z-10 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
+        <thead className="sticky top-0 z-30 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
           {table.getHeaderGroups().map((hg) => (
             <tr key={hg.id}>
               {hg.headers.map((h) => (
@@ -293,7 +369,7 @@ export function IntegrationsTable({
                     minWidth: h.column.getSize(),
                     left: h.column.getIndex() < clampedFrozenCols ? frozenLeftOffsets[h.column.getIndex()] : undefined,
                     position: h.column.getIndex() < clampedFrozenCols ? 'sticky' : undefined,
-                    zIndex: h.column.getIndex() < clampedFrozenCols ? 30 : undefined,
+                    zIndex: h.column.getIndex() < clampedFrozenCols ? 40 : undefined,
                     background:
                       h.column.getIndex() < clampedFrozenCols
                         ? 'rgb(var(--pm-panel))'
