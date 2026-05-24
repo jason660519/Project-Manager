@@ -2,6 +2,7 @@ import type {
   AnyPlugin,
   CliPlugin,
   EditorPlugin,
+  FrontendPlugin,
   McpPlugin,
   PluginCatalog,
   PluginCatalogV1,
@@ -98,10 +99,23 @@ const DEFAULT_EDITORS: EditorPlugin[] = [
   { id: 'antigravity', kind: 'editor', name: 'Antigravity IDE App', enabled: true, installedAt: BUILT_IN_INSTALL_DATE, command: 'antigravity' },
 ];
 
+const DEFAULT_FRONTEND: FrontendPlugin[] = [
+  {
+    id: 'monaco-editor',
+    kind: 'frontend',
+    name: 'Monaco Editor Workbench',
+    enabled: true,
+    installedAt: BUILT_IN_INSTALL_DATE,
+    packageName: '@monaco-editor/react',
+    implementationPath: 'app/ui/views/MonacoEditorWorkbench.tsx',
+  },
+];
+
 const DEFAULT_CATALOG: PluginCatalog = {
   schemaVersion: 2,
-  plugins: [...DEFAULT_PROVIDERS, ...DEFAULT_CLIS, ...DEFAULT_EDITORS],
+  plugins: [...DEFAULT_PROVIDERS, ...DEFAULT_CLIS, ...DEFAULT_EDITORS, ...DEFAULT_FRONTEND],
 };
+const REQUIRED_BUILTIN_PLUGINS: AnyPlugin[] = [...DEFAULT_FRONTEND];
 
 // One-shot migration from the v1 three-array layout to the v2 union.
 function migrateV1toV2(v1: PluginCatalogV1): PluginCatalog {
@@ -174,21 +188,36 @@ function upgradeBuiltinNames(catalog: PluginCatalog): {
   return changed ? { catalog: { ...catalog, plugins }, changed } : { catalog, changed };
 }
 
+function ensureRequiredBuiltins(catalog: PluginCatalog): {
+  catalog: PluginCatalog;
+  changed: boolean;
+} {
+  const existingIds = new Set(catalog.plugins.map((plugin) => plugin.id));
+  const missing = REQUIRED_BUILTIN_PLUGINS.filter((plugin) => !existingIds.has(plugin.id));
+  if (missing.length === 0) return { catalog, changed: false };
+  return {
+    catalog: { ...catalog, plugins: [...catalog.plugins, ...missing] },
+    changed: true,
+  };
+}
+
 export function loadPluginCatalog(): PluginCatalog {
   const raw = readJSON<unknown>(KEY_SHARED_PLUGINS);
   if (!raw) return DEFAULT_CATALOG;
 
   if (isV2(raw)) {
     const upgrade = upgradeBuiltinNames({ schemaVersion: 2, plugins: raw.plugins });
-    if (upgrade.changed) writeJSON(KEY_SHARED_PLUGINS, upgrade.catalog);
-    return upgrade.catalog;
+    const required = ensureRequiredBuiltins(upgrade.catalog);
+    if (upgrade.changed || required.changed) writeJSON(KEY_SHARED_PLUGINS, required.catalog);
+    return required.catalog;
   }
 
   if (isV1(raw)) {
     const migrated = migrateV1toV2(raw);
     const upgrade = upgradeBuiltinNames(migrated);
-    writeJSON(KEY_SHARED_PLUGINS, upgrade.catalog);
-    return upgrade.catalog;
+    const required = ensureRequiredBuiltins(upgrade.catalog);
+    writeJSON(KEY_SHARED_PLUGINS, required.catalog);
+    return required.catalog;
   }
 
   return DEFAULT_CATALOG;
@@ -214,6 +243,9 @@ export const selectMcpServers = (c: PluginCatalog): McpPlugin[] =>
 
 export const selectSkills = (c: PluginCatalog): SkillPlugin[] =>
   c.plugins.filter((p): p is SkillPlugin => p.kind === 'skill');
+
+export const selectFrontend = (c: PluginCatalog): FrontendPlugin[] =>
+  c.plugins.filter((p): p is FrontendPlugin => p.kind === 'frontend');
 
 // ── Updaters ─────────────────────────────────────────────────────────────────
 

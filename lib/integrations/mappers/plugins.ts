@@ -41,6 +41,8 @@ function kindToCategory1(kind: AnyPlugin['kind']): string {
       return 'MCP Server';
     case 'skill':
       return 'Skills';
+    case 'frontend':
+      return 'Frontend Plugin';
     default:
       return 'Plugin';
   }
@@ -58,6 +60,8 @@ function kindToCategory2(kind: AnyPlugin['kind']): string {
       return 'stdio/http';
     case 'skill':
       return 'Skill pack';
+    case 'frontend':
+      return 'Editor Component';
     default:
       return '';
   }
@@ -137,6 +141,7 @@ function installPathFor(
     return resolved?.appBundlePath ?? resolved?.commandPath ?? plugin.command;
   }
   if (plugin.kind === 'skill') return plugin.installedPath;
+  if (plugin.kind === 'frontend') return plugin.implementationPath || plugin.packageName;
   return '';
 }
 
@@ -182,7 +187,7 @@ function mapPlugin(plugin: AnyPlugin, ctx: PluginMapperContext): IntegrationRow 
     notes: '',
     lv: null,
     badges,
-    payload: { plugin },
+    payload: { plugin, runtime: reg.runtime },
   };
 }
 
@@ -235,7 +240,7 @@ export function mapMarketplaceRow(
     notes: entry.description,
     lv: null,
     badges: entry.installed ? ['Installed'] : [],
-    payload: { marketplaceId: entry.id },
+    payload: { marketplaceId: entry.id, runtime: reg.runtime },
   };
 }
 

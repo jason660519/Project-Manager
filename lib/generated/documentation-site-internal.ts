@@ -4,19 +4,19 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-05-24T05:52:37.000Z",
+    "generatedAt": "2026-05-24T21:07:49.000Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
     "manifestAudience": "internal",
-    "totalDocuments": 51,
+    "totalDocuments": 53,
     "totalFolders": 12,
     "publicDocuments": 8,
-    "internalDocuments": 42,
+    "internalDocuments": 44,
     "restrictedDocuments": 1,
     "publishableDocuments": 5,
-    "reviewRequiredDocuments": 29,
-    "warningCount": 59
+    "reviewRequiredDocuments": 30,
+    "warningCount": 61
   },
   "folders": [
     {
@@ -26,7 +26,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "sourcePath": "docs",
       "label": "All Docs",
       "title": "Documentation",
-      "summary": "51 documentation files indexed from docs.",
+      "summary": "53 documentation files indexed from docs.",
       "parentSlug": null,
       "folderSlugs": [
         "architecture",
@@ -44,14 +44,14 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       ],
       "classificationCounts": {
         "public": 8,
-        "internal": 42,
+        "internal": 44,
         "restricted": 1
       },
       "publishableCount": 5,
-      "reviewRequiredCount": 29,
+      "reviewRequiredCount": 30,
       "visibilityCounts": {
         "public": 8,
-        "internal": 42,
+        "internal": 44,
         "restricted": 1
       },
       "warnings": [
@@ -229,19 +229,20 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "engineering/storage-and-schema",
         "engineering/table-standards",
         "engineering/technical-documentation-audit",
+        "engineering/ui-components-report",
         "engineering/update-project-progress-dashboard-guide",
         "engineering/verification-runbook"
       ],
       "classificationCounts": {
         "public": 0,
-        "internal": 16,
+        "internal": 17,
         "restricted": 0
       },
       "publishableCount": 0,
       "reviewRequiredCount": 10,
       "visibilityCounts": {
         "public": 0,
-        "internal": 16,
+        "internal": 17,
         "restricted": 0
       },
       "warnings": [
@@ -385,7 +386,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "sourcePath": "docs/project-process",
       "label": "Project Process",
       "title": "Project Process",
-      "summary": "6 documentation files indexed from docs/project-process.",
+      "summary": "7 documentation files indexed from docs/project-process.",
       "parentSlug": "",
       "folderSlugs": [
         "project-process/commands"
@@ -394,18 +395,19 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "project-process/2026-05-12-dev-storage-abstraction",
         "project-process/2026-05-18-plugin-runtime-isolation",
         "project-process/2026-05-19-execution-target-dispatch-update",
-        "project-process/2026-05-24-commercial-readiness-status"
+        "project-process/2026-05-24-commercial-readiness-status",
+        "project-process/2026-05-25-commercial-readiness-update"
       ],
       "classificationCounts": {
         "public": 0,
-        "internal": 6,
+        "internal": 7,
         "restricted": 0
       },
       "publishableCount": 0,
-      "reviewRequiredCount": 5,
+      "reviewRequiredCount": 6,
       "visibilityCounts": {
         "public": 0,
-        "internal": 6,
+        "internal": 7,
         "restricted": 0
       },
       "warnings": [
@@ -924,7 +926,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "table"
       ],
       "warnings": [],
-      "updatedAt": "2026-05-23T21:59:49.000Z"
+      "updatedAt": "2026-05-24T18:10:48.000Z"
     },
     {
       "id": "archive/archived-20260512-05-adr-tauri",
@@ -1431,7 +1433,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "table"
       ],
       "warnings": [],
-      "updatedAt": "2026-05-23T21:59:49.000Z"
+      "updatedAt": "2026-05-24T18:10:48.000Z"
     },
     {
       "id": "engineering/table-standards",
@@ -1500,6 +1502,38 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "Mentions execution or command policy"
       ],
       "updatedAt": "2026-05-14T22:27:27.000Z"
+    },
+    {
+      "id": "engineering/ui-components-report",
+      "slug": "engineering/ui-components-report",
+      "route": "/documentation/engineering/ui-components-report",
+      "sourcePath": "docs/engineering/ui-components-report.md",
+      "folderSlug": "engineering",
+      "folderPath": "docs/engineering",
+      "title": "Project Manager — 主要 UI 元件報告",
+      "summary": "更新腳本： [update-ui-components-report.mjs](file:///Volumes/KLEVV-4T-1/Project-Manager/scripts/update-ui-components-report.mjs) 執行方式： node scripts/update-ui-components-report.mjs - [MainClien...",
+      "content": "# Project Manager — 主要 UI 元件報告\n\n更新腳本： [update-ui-components-report.mjs](file:///Volumes/KLEVV-4T-1/Project-Manager/scripts/update-ui-components-report.mjs)\n\n執行方式：\n\n```bash\nnode scripts/update-ui-components-report.mjs\n```\n\n## 核心 UI 架構（手動維護）\n\n- [MainClient](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/MainClient.tsx)：主 UI 容器，負責載入/同步本機狀態、選取專案、路由切換與組裝各個 View。\n- [AppShell](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/AppShell.tsx)：全域外殼（背景層、Sidebar、TopBar、主內容區），並包住 i18n Provider。\n- [Sidebar](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/Sidebar.tsx)：左側導覽與跨頁入口。\n- [TopBar](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/TopBar.tsx)：上方狀態/操作列（依當前 View 顯示資訊與入口）。\n\n## 工作站式版面（表格/Sheet 的硬規格）\n\n- [WorkstationFrame](file:///Volumes/KLEVV-4T-1/Project-Manager/components/layout/WorkstationFrame.tsx)：dashboard 類頁面版面容器，控制 header/toolbar/content/bottomTabs 的垂直堆疊與單一滾動源。\n- [BottomSheetTabs](file:///Volumes/KLEVV-4T-1/Project-Manager/components/sheets/BottomSheetTabs.tsx)：Excel 風格底部分頁條，放在 WorkstationFrame 的 bottomTabs 槽位。\n\n## 表格與派工入口（跨多 View 共用）\n\n- [TableCore](file:///Volumes/KLEVV-4T-1/Project-Manager/components/table/TableCore.tsx)：基礎 TanStack Table 表格殼，包含欄位渲染、狀態徽章與列點擊/派工按鈕。\n- [TaskDispatchModal](file:///Volumes/KLEVV-4T-1/Project-Manager/components/table/TaskDispatchModal.tsx)：派工對話框（dispatch 入口），承載 P/W/E 指派互動。\n- [BatchDispatchModal](file:///Volumes/KLEVV-4T-1/Project-Manager/components/table/BatchDispatchModal.tsx)：批次派工入口（多筆 feature 一次 dispatch）。\n\n## 專案進度儀表板（Project Progress Dashboard）\n\n- [ProjectProgressClient](file:///Volumes/KLEVV-4T-1/Project-Manager/app/project-progress-dashboard/ProjectProgressClient.tsx)：進度儀表板主 client，整合資料、分頁、表格與右側文件面板。\n- [PhaseTable](file:///Volumes/KLEVV-4T-1/Project-Manager/app/project-progress-dashboard/_components/PhaseTable.tsx)：分階段表格主體（欄位、列、互動）。\n- [SheetTabs](file:///Volumes/KLEVV-4T-1/Project-Manager/app/project-progress-dashboard/_components/SheetTabs.tsx)：儀表板內部的 sheet 分頁（對齊底部 tab 規範）。\n- [FeatureDocPanel](file:///Volumes/KLEVV-4T-1/Project-Manager/app/project-progress-dashboard/_components/FeatureDocPanel.tsx)：右側文件面板（README/spec/tdd/dev-log/notes 等固定標籤）。\n\n## Chat 與互動面板\n\n- [ChatPageClient](file:///Volumes/KLEVV-4T-1/Project-Manager/app/chat/ChatPageClient.tsx)：聊天頁 client，負責串接對話狀態、訊息渲染與輸入流程。\n- [ChatPanel](file:///Volumes/KLEVV-4T-1/Project-Manager/components/chat/ChatPanel.tsx)：聊天面板容器（訊息清單與輸入區的組裝點）。\n\n<!-- PM:UI_COMPONENTS:BEGIN -->\n自動生成時間：2026-05-24T19:24:15.603Z\n掃描範圍：app/ui, components, app/project-progress-dashboard\n元件檔案數（.tsx）：83\n### Project Progress Dashboard (app/project-progress-dashboard)\n\n- [AddRowModal](file:///Volumes/KLEVV-4T-1/Project-Manager/app/project-progress-dashboard/_components/AddRowModal.tsx)\n- [AgentOpsPanel](file:///Volumes/KLEVV-4T-1/Project-Manager/app/project-progress-dashboard/_components/AgentOpsPanel.tsx)\n- [CategoryColumnFilter](file:///Volumes/KLEVV-4T-1/Project-Manager/app/project-progress-dashboard/_components/CategoryColumnFilter.tsx)\n- [CronControlPanel](file:///Volumes/KLEVV-4T-1/Project-Manager/app/project-progress-dashboard/_components/CronControlPanel.tsx)\n- [DashboardPage](file:///Volumes/KLEVV-4T-1/Project-Manager/app/project-progress-dashboard/page.tsx)\n- [E2eCategoryField](file:///Volumes/KLEVV-4T-1/Project-Manager/app/project-progress-dashboard/_components/E2eCategoryField.tsx)\n- [ExportProgressDialog](file:///Volumes/KLEVV-4T-1/Project-Manager/app/project-progress-dashboard/_components/ExportProgressDialog.tsx)\n- [FeatureDocPanel](file:///Volumes/KLEVV-4T-1/Project-Manager/app/project-progress-dashboard/_components/FeatureDocPanel.tsx)\n- [IssuesTab](file:///Volumes/KLEVV-4T-1/Project-Manager/app/project-progress-dashboard/_components/IssuesTab.tsx)\n- [PhaseTabContent](file:///Volumes/KLEVV-4T-1/Project-Manager/app/project-progress-dashboard/_components/PhaseTabContent.tsx)\n- [PhaseTable](file:///Volumes/KLEVV-4T-1/Project-Manager/app/project-progress-dashboard/_components/PhaseTable.tsx)\n- [PhaseTableToolbar](file:///Volumes/KLEVV-4T-1/Project-Manager/app/project-progress-dashboard/_components/PhaseTableToolbar.tsx)\n- [ProjectProgressClient](file:///Volumes/KLEVV-4T-1/Project-Manager/app/project-progress-dashboard/ProjectProgressClient.tsx)\n- [PromptEngineerModal](file:///Volumes/KLEVV-4T-1/Project-Manager/app/project-progress-dashboard/_components/PromptEngineerModal.tsx)\n- [PromptTaskClient](file:///Volumes/KLEVV-4T-1/Project-Manager/app/project-progress-dashboard/task/PromptTaskClient.tsx)\n- [PromptTaskPage](file:///Volumes/KLEVV-4T-1/Project-Manager/app/project-progress-dashboard/task/page.tsx)\n- [SharedStatsCards](file:///Volumes/KLEVV-4T-1/Project-Manager/app/project-progress-dashboard/_components/SharedStatsCards.tsx)\n- [SheetTabs](file:///Volumes/KLEVV-4T-1/Project-Manager/app/project-progress-dashboard/_components/SheetTabs.tsx)\n- [StatCard](file:///Volumes/KLEVV-4T-1/Project-Manager/app/project-progress-dashboard/_components/StatCard.tsx)\n\n### Shared Components (components)\n\n- [BatchDispatchModal](file:///Volumes/KLEVV-4T-1/Project-Manager/components/table/BatchDispatchModal.tsx)\n- [BottomSheetTabs](file:///Volumes/KLEVV-4T-1/Project-Manager/components/sheets/BottomSheetTabs.tsx)\n- [ChatInput](file:///Volumes/KLEVV-4T-1/Project-Manager/components/chat/ChatInput.tsx)\n- [ChatMessage](file:///Volumes/KLEVV-4T-1/Project-Manager/components/chat/ChatMessage.tsx)\n- [ChatPanel](file:///Volumes/KLEVV-4T-1/Project-Manager/components/chat/ChatPanel.tsx)\n- [CodeEditor](file:///Volumes/KLEVV-4T-1/Project-Manager/components/CodeEditor.tsx)\n- [MermaidBlock](file:///Volumes/KLEVV-4T-1/Project-Manager/components/MermaidBlock.tsx)\n- [PluginGuidePanel](file:///Volumes/KLEVV-4T-1/Project-Manager/components/PluginGuidePanel.tsx)\n- [QuickActions](file:///Volumes/KLEVV-4T-1/Project-Manager/components/chat/QuickActions.tsx)\n- [TableCore](file:///Volumes/KLEVV-4T-1/Project-Manager/components/table/TableCore.tsx)\n- [TaskDispatchModal](file:///Volumes/KLEVV-4T-1/Project-Manager/components/table/TaskDispatchModal.tsx)\n- [WorkstationFrame](file:///Volumes/KLEVV-4T-1/Project-Manager/components/layout/WorkstationFrame.tsx)\n\n### Shell & UI Frame (app/ui)\n\n- [AppShell](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/AppShell.tsx)\n- [DashboardClient](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/DashboardClient.tsx)\n- [FeatureDetailPanel](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/FeatureDetailPanel.tsx)\n- [MainClient](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/MainClient.tsx)\n- [MetricStrip](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/MetricStrip.tsx)\n- [Sidebar](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/Sidebar.tsx)\n- [TopBar](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/TopBar.tsx)\n\n### UI Views (app/ui/views)\n\n- [ApiKeyValidationSheet](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Keys/ApiKeyValidationSheet.tsx)\n- [CapabilitySheetView](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Plugins/CapabilitySheetView.tsx)\n- [ChannelEditForm](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Plugins/_shared/ChannelEditForm.tsx)\n- [ChannelsView](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/ChannelsView.tsx)\n- [CommandMappingEditForm](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Plugins/_shared/CommandMappingEditForm.tsx)\n- [CompanyStandardsView](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/CompanyStandardsView.tsx)\n- [ConnectSheet](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Plugins/ConnectSheet.tsx)\n- [CronJobsView](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/CronJobsView.tsx)\n- [DocumentationView](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/DocumentationView.tsx)\n- [EngineersView](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/EngineersView.tsx)\n- [EnvImportModal](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/_components/EnvImportModal.tsx)\n- [FeaturesView](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/FeaturesView.tsx)\n- [IngestionView](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/IngestionView.tsx)\n- [IntegrationsDetailSheet](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Plugins/_shared/IntegrationsDetailSheet.tsx)\n- [IntegrationsTable](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Plugins/_shared/IntegrationsTable.tsx)\n- [KeyboardShortcutsView](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/KeyboardShortcutsView.tsx)\n- [KeysProvider](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Keys/KeysContext.tsx)\n- [KeysProviderDetailSheet](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Keys/KeysProviderDetailSheet.tsx)\n- [KeysProviderTable](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Keys/KeysProviderTable.tsx)\n- [KeysView](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/KeysView.tsx)\n- [LlmArenaDetailSheet](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Keys/LlmArenaDetailSheet.tsx)\n- [LlmArenaMatrixTable](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Keys/LlmArenaMatrixTable.tsx)\n- [LlmArenaMethodPanel](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Keys/LlmArenaMethodPanel.tsx)\n- [LlmArenaSheet](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Keys/LlmArenaSheet.tsx)\n- [LogsView](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/LogsView.tsx)\n- [McpLogsViewer](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Plugins/_shared/McpLogsViewer.tsx)\n- [OAuthDeviceModal](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/_components/OAuthDeviceModal.tsx)\n- [PluginsHubView](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Plugins/PluginsHubView.tsx)\n- [PluginsView](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/PluginsView.tsx)\n- [PostImportScanDialog](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/_components/PostImportScanDialog.tsx)\n- [ProjectFilesView](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/ProjectFilesView.tsx)\n- [ProjectsView](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/ProjectsView.tsx)\n- [ProviderConfigForm](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Plugins/_shared/plugin-config-forms.tsx)\n- [RunsView](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/RunsView.tsx)\n- [SessionsView](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/SessionsView.tsx)\n- [SettingsView](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/SettingsView.tsx)\n- [StatusBadge](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Plugins/_shared/status-badge.tsx)\n- [VlmArenaDetailSheet](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Keys/VlmArenaDetailSheet.tsx)\n- [VlmArenaExecutionCell](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Keys/VlmArenaExecutionCell.tsx)\n- [VlmArenaMatrixTable](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Keys/VlmArenaMatrixTable.tsx)\n- [VlmArenaMethodPanel](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Keys/VlmArenaMethodPanel.tsx)\n- [VlmArenaModelCell](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Keys/VlmArenaModelCell.tsx)\n- [VlmArenaPromptCell](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Keys/VlmArenaPromptCell.tsx)\n- [VlmArenaReviewCell](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Keys/VlmArenaReviewCell.tsx)\n- [VlmArenaSheet](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Keys/VlmArenaSheet.tsx)\n<!-- PM:UI_COMPONENTS:END -->\n",
+      "contentHash": "365be50730f219f2",
+      "readingMinutes": 2,
+      "classification": "internal",
+      "classificationSource": "policy",
+      "classificationConfidence": 0.95,
+      "classificationReason": "Engineering runbooks and implementation contracts are internal by default.",
+      "matchedPolicyRule": "CLS-INTERNAL-ENGINEERING",
+      "publish": false,
+      "reviewStatus": "ai-classified",
+      "needsReview": false,
+      "visibility": "internal",
+      "audience": [
+        "engineers",
+        "operators"
+      ],
+      "tags": [
+        "engineering",
+        "table"
+      ],
+      "warnings": [],
+      "updatedAt": "2026-05-24T19:25:03.000Z"
     },
     {
       "id": "engineering/update-project-progress-dashboard-guide",
@@ -2098,6 +2132,40 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "updatedAt": "2026-05-24T05:52:37.000Z"
     },
     {
+      "id": "project-process/2026-05-25-commercial-readiness-update",
+      "slug": "project-process/2026-05-25-commercial-readiness-update",
+      "route": "/documentation/project-process/2026-05-25-commercial-readiness-update",
+      "sourcePath": "docs/project-process/2026-05-25-commercial-readiness-update.md",
+      "folderSlug": "project-process",
+      "folderPath": "docs/project-process",
+      "title": "Project Manager Commercial Readiness Update",
+      "summary": "Gemini's pushed commits are present on `main` and the working tree was clean before this pass started. The checkpoint found one committed-state issue: the documentation-site generated man...",
+      "content": "# Project Manager Commercial Readiness Update\n\n> Date: 2026-05-25  \n> Owner: Codex  \n> Scope: Post-Gemini commit verification, packaged desktop build check, live browser-mode integration testing, and Tauri command-path smoke tests\n\n## Summary\n\nGemini's pushed commits are present on `main` and the working tree was clean before this pass started. The checkpoint found one committed-state issue: the documentation-site generated manifests were stale after the new UI components report was added. Running `npm run docs:site:sync` updated the generated manifests and `npm run docs:site:check` now passes.\n\nThe packaged desktop release blocker has moved from \"not verified\" to \"build verified locally\": `npm run tauri:build` completed and produced both a macOS `.app` bundle and an Apple Silicon `.dmg`.\n\nLive browser-mode testing also found and fixed two integration gaps:\n\n1. The web registry sync skipped existing non-empty project snapshots, so Project Manager stayed at 20 features in the UI even after `.project-manager/config.json` was updated to 24 features.\n2. The Issues tab treated browser-mode GitHub authorization as a renderer/localStorage concern even though `/api/github/sync` reads `GITHUB_TOKEN` from the server environment.\n\nBoth gaps now have regression coverage.\n\nTauri command-path testing also moved forward today: the Rust GitHub issue fetch path was verified with the real Project Manager repository and the local agent process path now has coverage for stdout streaming, stderr streaming, PID return, kill, and exit event propagation.\n\nDesktop UI testing with `tauri dev` verified the dashboard can hydrate Project Manager from disk as 24 features with its GitHub URL, and the Issues tab can sync issue `#7` through the desktop app. That pass also found a dispatch-source routing bug: an issue from Project Manager could open the dispatch modal with the currently selected project's execution target. The modal now receives the issue source project and uses that project's adapters, default IDE, engineer roles, and project root.\n\n## Verified Today\n\n| Check | Result | Notes |\n| --- | --- | --- |\n| `git fetch --prune && git status --short --branch` | Pass | Local `main` matched `origin/main`; no uncommitted changes at start. |\n| `.project-manager/config.json` feature inventory | Pass | 24 features: 12 `todo`, 10 `done`, 2 `in_progress`. |\n| `npm run docs:check` | Pass | Docs governance passed. |\n| `npm run docs:site:check` | Initially failed, then passed | Fixed by `npm run docs:site:sync`; manifests now include 53 internal-preview docs and 5 public docs. |\n| `npm run standards:check` | Pass with P2 advisory | Existing hard-coded color advisory remains; no P0/P1 failure. |\n| `npm run test -- --run __tests__/githubSyncRoute.test.ts` | Pass | 1 file / 3 tests. |\n| `npm run test -- --run __tests__/ProjectProgressClient.issue-dispatch.test.tsx __tests__/IssuesTab.test.tsx __tests__/MainClient.sync.test.tsx` | Pass | 3 files / 28 tests after live-test fixes. |\n| `npm run typecheck` | Pass | `next typegen` and `tsc --noEmit` passed. |\n| `cargo check --manifest-path src-tauri/Cargo.toml` | Pass | Rust dev-profile check passed. |\n| `npm run test` | Pass | 72 files / 546 tests. |\n| `npm run build` | Pass | Next production build generated 56 static pages. |\n| Shell syntax check | Pass | `start_project_manager.sh` plus launcher helper scripts passed `bash -n`. |\n| `npm run tauri:build` | Pass | Produced `src-tauri/target/release/bundle/macos/Project Manager.app` and `src-tauri/target/release/bundle/dmg/Project Manager_0.1.0_aarch64.dmg`. |\n| `PROJECT_MANAGER_NO_OPEN=1 ./start_project_manager.sh web` | Pass | Next dev server reached ready state on port `43187`; `/` and `/project-progress-dashboard` returned HTTP 200. |\n| Live `/api/github/sync` against `jason660519/Project-Manager` | Pass | Returned 1 closed issue and did not set truncation header. |\n| Live Issues tab sync in browser UI | Pass after fix | UI displayed issue `#7 plug in 尚未完成` and `Synced 1 repo(s) · 1 issues`. |\n| Rust `fetch_github_issues` against `jason660519/Project-Manager` | Pass | Ignored live test passed with `GITHUB_TOKEN`; confirmed issue `#7` is returned through the Rust command implementation. |\n| Rust `spawn_agent_process` lifecycle | Pass | Spawned a safe shell command, captured stdout/stderr, killed the process by PID, and observed exit code `-1`. |\n| `tauri dev` dashboard hydration | Pass | Desktop UI showed Project Manager with 24 features and `https://github.com/jason660519/Project-Manager`. |\n| `tauri dev` Issues tab sync | Pass | Desktop UI synced `#7 plug in 尚未完成` and showed `Synced 1 repo(s) · 1 issues`. |\n| Issue dispatch source routing | Pass after fix | Added regression coverage so issue dispatch uses the issue source project instead of the currently selected project. |\n| Live `/api/keys/validate` Anthropic | Pass | Returned 9 model IDs. |\n| Live `/api/keys/validate` GitHub | Pass | Token validation returned `ok: true`. |\n\n## New Finding\n\n`npm run tauri:build` prints a non-blocking Tauri warning:\n\n```text\nThe bundle identifier \"io.projectmanager.app\" set in \"tauri.conf.json\" identifier ends with \".app\".\nThis is not recommended because it conflicts with the application bundle extension on macOS.\n```\n\nThe build still succeeds. Context7 Tauri v2 docs confirm the identifier is the value used for macOS app identity and provisioning. Because changing it can affect app identity, signing, provisioning, and stored user state, this pass records the warning rather than changing it without an explicit product/release identity decision.\n\n## Current Commercial Blockers\n\n| Area | Status | Next Step |\n| --- | --- | --- |\n| Packaged desktop release | Locally build-verified | Decide whether to change the bundle identifier before signing/notarization; then run signed release packaging. |\n| Live AI provider initialization | Partially verified | Run a real provider-key initialization scan with operator-owned credentials. |\n| Live GitHub sync | Browser route and Rust command path verified | Still needs full packaged-app UI verification through Tauri IPC before beta. |\n| Live agent dispatch | Core Rust lifecycle and modal routing verified | Still needs an operator-approved full agent run from the Tauri UI with logs, PID display, and kill controls. |\n| Standards advisory | Open P2 | Tokenize hard-coded colors after runtime blockers are handled. |\n\n## Recommended Next Work\n\n1. Verify Tauri GitHub issue sync from the packaged or `tauri dev` app UI, now that the Rust command path has a live smoke test.\n2. Run an operator-approved Tauri UI dispatch against a safe configured target, now that the Rust lifecycle path and issue source routing have regression coverage.\n3. Run a real project initialization scan now that provider-key validation is confirmed.\n4. Decide the permanent Tauri bundle identifier before any signed/notarized beta.\n5. Clean the P2 hard-coded color advisory once runtime blockers are resolved.\n",
+      "contentHash": "a4cd9c521bc2140c",
+      "readingMinutes": 5,
+      "classification": "internal",
+      "classificationSource": "policy",
+      "classificationConfidence": 0.96,
+      "classificationReason": "Project process, logs, archive, and feature-tracking docs are internal operating records.",
+      "matchedPolicyRule": "CLS-INTERNAL-PROCESS",
+      "publish": false,
+      "reviewStatus": "ai-classified",
+      "needsReview": true,
+      "visibility": "internal",
+      "audience": [
+        "team",
+        "operators"
+      ],
+      "tags": [
+        "project-process"
+      ],
+      "warnings": [
+        "Mentions secrets, tokens, or credentials",
+        "Mentions execution or command policy"
+      ],
+      "updatedAt": "2026-05-24T21:07:49.000Z"
+    },
+    {
       "id": "project-process/commands/daily-report",
       "slug": "project-process/commands/daily-report",
       "route": "/documentation/project-process/commands/daily-report",
@@ -2129,7 +2197,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "Mentions secrets, tokens, or credentials",
         "Mentions roadmap, pricing, investor, or strategy material"
       ],
-      "updatedAt": "2026-05-23T21:59:49.000Z"
+      "updatedAt": "2026-05-24T18:10:48.000Z"
     },
     {
       "id": "project-process/commands/update-progress",
@@ -2207,6 +2275,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
     "engineering/storage-and-schema",
     "engineering/table-standards",
     "engineering/technical-documentation-audit",
+    "engineering/ui-components-report",
     "engineering/update-project-progress-dashboard-guide",
     "engineering/verification-runbook",
     "file-naming-standards",
@@ -2225,6 +2294,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
     "project-process/2026-05-18-plugin-runtime-isolation",
     "project-process/2026-05-19-execution-target-dispatch-update",
     "project-process/2026-05-24-commercial-readiness-status",
+    "project-process/2026-05-25-commercial-readiness-update",
     "project-process/commands/daily-report",
     "project-process/commands/update-progress"
   ]

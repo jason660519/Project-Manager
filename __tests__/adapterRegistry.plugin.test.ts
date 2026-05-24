@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createRuntimeAdapter, createRuntimeAdapterFromConfig, listAdapters } from '../lib/adapters/registry';
 import { KEY_SHARED_PLUGINS } from '../lib/storage/keys';
+import { loadPluginCatalog } from '../lib/storage/plugins';
 import { CURRENT_SCHEMA_VERSION } from '../lib/storage/migrate';
 import type { Feature, ProjectManagerConfig } from '../lib/types';
 import type { PluginCatalog } from '../lib/types/plugins';
@@ -96,6 +97,34 @@ describe('adapter registry plugin agents', () => {
     expect(listAdapters(config).map((adapter) => adapter.id)).not.toContain('hermes-agent');
     expect(createRuntimeAdapter(config, 'hermes-agent')).toBeNull();
   });
+
+  it('upgrades existing plugin catalogs with the built-in Monaco frontend plugin', () => {
+    saveCatalog({
+      schemaVersion: 2,
+      plugins: [
+        {
+          id: 'openclaw',
+          kind: 'cli',
+          name: 'OpenClaw CLI',
+          enabled: false,
+          installedAt: '2026-05-18T00:00:00.000Z',
+          command: '/tmp/project-manager/.project-manager/bin/openclaw',
+          argsTemplate: ['agent', '--message', '{prompt}'],
+        },
+      ],
+    });
+
+    const catalog = loadPluginCatalog();
+    const monaco = catalog.plugins.find((plugin) => plugin.id === 'monaco-editor');
+
+    expect(monaco).toMatchObject({
+      id: 'monaco-editor',
+      kind: 'frontend',
+      packageName: '@monaco-editor/react',
+      implementationPath: 'app/ui/views/MonacoEditorWorkbench.tsx',
+    });
+  });
+
 
   it('preserves IDE adapter fallback to the project root when a feature has no file path', async () => {
     const adapter = createRuntimeAdapterFromConfig({

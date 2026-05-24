@@ -2,17 +2,19 @@ import type {
   AnyPlugin,
   CliPlugin,
   EditorPlugin,
+  FrontendPlugin,
   McpPlugin,
   ProviderPlugin,
 } from '../types/plugins';
 
 export type MarketplaceCategory = 'ai' | 'dev' | 'vcs' | 'pm' | 'ci' | 'notify';
-export type MarketplaceKind = 'provider' | 'cli' | 'editor' | 'mcp';
+export type MarketplaceKind = 'provider' | 'cli' | 'editor' | 'mcp' | 'frontend';
 
 type ProviderDefaults = Pick<ProviderPlugin, 'baseUrl' | 'defaultModel' | 'models'>;
 type CliDefaults = Pick<CliPlugin, 'command' | 'argsTemplate' | 'providerId'>;
 type EditorDefaults = Pick<EditorPlugin, 'command'>;
 type McpDefaults = Pick<McpPlugin, 'transport' | 'command' | 'args' | 'env' | 'url' | 'headers'>;
+type FrontendDefaults = Pick<FrontendPlugin, 'packageName' | 'implementationPath'>;
 
 export interface MarketplacePlugin {
   id: string;
@@ -33,6 +35,7 @@ export interface MarketplacePlugin {
   defaultCli?: CliDefaults;
   defaultEditor?: EditorDefaults;
   defaultMcp?: McpDefaults;
+  defaultFrontend?: FrontendDefaults;
 }
 
 // AI providers are managed exclusively from the Keys view (where keys are
@@ -48,6 +51,11 @@ export const MARKETPLACE: MarketplacePlugin[] = [
     id: 'codex', name: 'Codex CLI', description: 'OpenAI Codex command-line agent for code tasks.',
     category: 'dev', kind: 'cli', accentColor: 'bg-[rgb(16_163_127)]', initials: 'CX',
     defaultCli: { command: 'codex', argsTemplate: ['exec', '--cwd', '{root}', '{prompt}'], providerId: 'openai' },
+  },
+  {
+    id: 'monaco-editor', name: 'Monaco Editor Workbench', description: 'Project-scoped frontend editor plugin for editing feature specs, tests, logs, and implementation files inside Project Manager.',
+    category: 'dev', kind: 'frontend', accentColor: 'bg-[rgb(0_122_204)]', initials: 'ME',
+    defaultFrontend: { packageName: '@monaco-editor/react', implementationPath: 'app/ui/views/MonacoEditorWorkbench.tsx' },
   },
   {
     id: 'hermes-agent', name: 'Hermes Agent CLI', description: 'Project-scoped Hermes agent CLI with isolated memory, sessions, skills, and dashboard state.',
@@ -144,6 +152,9 @@ export function buildFromMarketplace(mp: MarketplacePlugin): AnyPlugin | null {
   }
   if (mp.kind === 'mcp' && mp.defaultMcp) {
     return { ...base, kind: 'mcp', ...mp.defaultMcp };
+  }
+  if (mp.kind === 'frontend' && mp.defaultFrontend) {
+    return { ...base, kind: 'frontend', ...mp.defaultFrontend };
   }
   return null;
 }

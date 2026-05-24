@@ -2,7 +2,7 @@
 // The v1 shape (three parallel arrays: providers / agents / ides) is migrated
 // once on read by `loadPluginCatalog` and persisted in v2 form thereafter.
 
-export type PluginKind = 'provider' | 'cli' | 'editor' | 'mcp' | 'skill';
+export type PluginKind = 'provider' | 'cli' | 'editor' | 'mcp' | 'skill' | 'frontend';
 
 interface BasePlugin {
   id: string;
@@ -54,12 +54,19 @@ export interface SkillPlugin extends BasePlugin {
   version?: string;
 }
 
+export interface FrontendPlugin extends BasePlugin {
+  kind: 'frontend';
+  packageName: string;
+  implementationPath: string;
+}
+
 export type AnyPlugin =
   | ProviderPlugin
   | CliPlugin
   | EditorPlugin
   | McpPlugin
-  | SkillPlugin;
+  | SkillPlugin
+  | FrontendPlugin;
 
 export interface PluginCatalog {
   schemaVersion: 2;

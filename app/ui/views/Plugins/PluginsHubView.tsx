@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ExternalLink, FileText, MessageCircle, RotateCw, Snowflake, X } from 'lucide-react';
 import type { IntegrationRow, IntegrationSheet } from '../../../../lib/integrations/types';
 import { isCapabilitySheet } from '../../../../lib/integrations/types';
+import type { IntegrationRuntimeCommand } from '../../../../lib/integrations/registry';
 import { mergeAllManual } from '../../../../lib/integrations/manual-metadata';
 import {
   mapInstalledPlugins,
@@ -79,6 +80,7 @@ import {
   telegramStatusAll,
   telegramStopPoll,
   onTelegramStatus,
+  spawnTerminal,
 } from '../../../../lib/bridge';
 import { checkCommandExists } from '../../../../lib/adapters/availability';
 import { getSkillsDir } from '../../../../lib/storage/settings';
@@ -102,6 +104,7 @@ import { ConnectSheet } from './ConnectSheet';
 import { CapabilitySheetView } from './CapabilitySheetView';
 
 const EMPTY_CATALOG: PluginCatalog = { schemaVersion: 2, plugins: [] };
+const PROJECT_MANAGER_ROOT = '/Volumes/KLEVV-4T-1/Project-Manager';
 
 function newChannelId(): string {
   return typeof crypto !== 'undefined' ? crypto.randomUUID() : Math.random().toString(36).slice(2);
@@ -625,6 +628,14 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     updateCatalog(addPlugin(catalog, plugin));
     setPluginsFilter('installed');
   };
+
+  const handleRunRuntimeCommand = useCallback(async (command: IntegrationRuntimeCommand) => {
+    await spawnTerminal({
+      command: command.command,
+      args: command.args,
+      cwd: PROJECT_MANAGER_ROOT,
+    });
+  }, []);
 
   const mcpStart = async (plugin: McpPlugin) => {
     if (plugin.transport !== 'stdio' || !plugin.command) return;
@@ -1170,6 +1181,8 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
         }}
         mcpViewLogs={setLogsForId}
         onOpenPath={(path) => void openPath(path).catch(() => {})}
+        runtimeRootPath={PROJECT_MANAGER_ROOT}
+        onRunRuntimeCommand={handleRunRuntimeCommand}
         onSkillUninstall={async (path) => {
           if (!skillsDir) return;
           if (typeof window !== 'undefined' && !window.confirm(t.plugins.deleteSkillConfirm.replace('{path}', path))) return;

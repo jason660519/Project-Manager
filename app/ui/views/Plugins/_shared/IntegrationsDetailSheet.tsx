@@ -13,6 +13,10 @@ import {
   X,
 } from 'lucide-react';
 import type { IntegrationRow } from '../../../../../lib/integrations/types';
+import type {
+  IntegrationRuntimeCommand,
+  IntegrationRuntimeMetadata,
+} from '../../../../../lib/integrations/registry';
 import { saveManualFields } from '../../../../../lib/integrations/manual-metadata';
 import {
   isCliPlugin,
@@ -57,6 +61,21 @@ function MetaRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+function runtimeMeta(value: unknown): IntegrationRuntimeMetadata | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  return value as IntegrationRuntimeMetadata;
+}
+
+function resolveRuntimePath(rootPath: string, path: string): string {
+  if (!path) return '';
+  if (path.startsWith('/') || /^https?:\/\//.test(path)) return path;
+  return `${rootPath.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
+}
+
+function formatRuntimeCommand(command: IntegrationRuntimeCommand): string {
+  return [command.command, ...command.args].join(' ');
+}
+
 export interface IntegrationsDetailSheetProps {
   row: IntegrationRow | null;
   onClose: () => void;
@@ -73,6 +92,8 @@ export interface IntegrationsDetailSheetProps {
   mcpRestart?: (plugin: McpPlugin) => void;
   mcpViewLogs?: (id: string) => void;
   onOpenPath?: (path: string) => void;
+  runtimeRootPath?: string;
+  onRunRuntimeCommand?: (command: IntegrationRuntimeCommand) => Promise<void> | void;
   onSkillUninstall?: (absPath: string) => void;
   onSkillInstallUrl?: (url: string) => void;
   skillsInstallUrl?: string;
@@ -119,6 +140,8 @@ export function IntegrationsDetailSheet({
   mcpRestart,
   mcpViewLogs,
   onOpenPath,
+  runtimeRootPath = '/Volumes/KLEVV-4T-1/Project-Manager',
+  onRunRuntimeCommand,
   onSkillUninstall,
   onSkillInstallUrl,
   skillsInstallUrl = '',
@@ -140,12 +163,18 @@ export function IntegrationsDetailSheet({
   const [notes, setNotes] = useState('');
   const [lv, setLv] = useState('');
   const [showConfig, setShowConfig] = useState(true);
+  const [runtimeAction, setRuntimeAction] = useState<{
+    runningId: string | null;
+    message: string;
+    status: 'idle' | 'success' | 'error';
+  }>({ runningId: null, message: '', status: 'idle' });
 
   useEffect(() => {
     if (!row) return;
     setNotes(row.notes);
     setLv(row.lv != null ? String(row.lv) : '');
     setShowConfig(true);
+    setRuntimeAction({ runningId: null, message: '', status: 'idle' });
   }, [row?.rowKey]);
 
   useEffect(() => {
@@ -168,11 +197,31 @@ export function IntegrationsDetailSheet({
   if (!row) return null;
 
   const plugin = row.payload.plugin as AnyPlugin | undefined;
+  const runtime = runtimeMeta(row.payload.runtime);
   const channel = row.payload.channel as ChannelConfig | undefined;
   const mapping = row.payload.mapping as CommandMapping | undefined;
   const skillPath = (row.payload.skill as { absPath?: string } | undefined)?.absPath ?? row.sourceId;
   const filePath = (row.payload.file as { absPath?: string } | undefined)?.absPath;
   const instancePayload = row.sourceKind === 'connected-instance' ? row.payload : null;
+
+  const runRuntimeCommand = async (command: IntegrationRuntimeCommand) => {
+    if (!onRunRuntimeCommand) return;
+    setRuntimeAction({ runningId: command.id, message: '', status: 'idle' });
+    try {
+      await onRunRuntimeCommand(command);
+      setRuntimeAction({
+        runningId: null,
+        message: `Opened terminal for: ${formatRuntimeCommand(command)}`,
+        status: 'success',
+      });
+    } catch (error) {
+      setRuntimeAction({
+        runningId: null,
+        message: error instanceof Error ? error.message : 'Runtime command failed',
+        status: 'error',
+      });
+    }
+  };
 
   return (
     <>
@@ -295,6 +344,104 @@ export function IntegrationsDetailSheet({
                   </>
                 )}
               </div>
+              {runtime && (
+                <div className="space-y-3 border border-stone-200/12 bg-white/[0.025] p-3">
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-stone-500">
+                      Runtime Operations
+                    </p>
+                    <p className="mt-1 text-[11px] text-stone-400">
+                      Project-scoped sidecar state and lifecycle commands. Commands open in a terminal so logs and prompts stay visible.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-2">
+                    {runtime.dashboardUrl && (
+                      <MetaRow label="dashboard" value={runtime.dashboardUrl} />
+                    )}
+                    {runtime.sourcePath && (
+                      <MetaRow label="source" value={runtime.sourcePath} />
+                    )}
+                    {runtime.statePath && (
+                      <MetaRow label="state" value={runtime.statePath} />
+                    )}
+                    {runtime.logPath && (
+                      <MetaRow label="log" value={runtime.logPath} />
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {runtime.dashboardUrl && (
+                      <button
+                        type="button"
+                        onClick={() => window.open(runtime.dashboardUrl, '_blank', 'noopener,noreferrer')}
+                        className="flex items-center gap-1 border border-emerald-400/30 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-950/30"
+                      >
+                        <ExternalLink size={12} /> Open dashboard
+                      </button>
+                    )}
+                    {onOpenPath && runtime.docsPath && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenPath(resolveRuntimePath(runtimeRootPath, runtime.docsPath!))}
+                        className="flex items-center gap-1 border border-stone-200/20 px-2 py-1 text-xs text-stone-300 hover:bg-white/5"
+                      >
+                        <FileText size={12} /> Open runbook
+                      </button>
+                    )}
+                    {onOpenPath && runtime.logPath && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenPath(resolveRuntimePath(runtimeRootPath, runtime.logPath!))}
+                        className="flex items-center gap-1 border border-stone-200/20 px-2 py-1 text-xs text-stone-300 hover:bg-white/5"
+                      >
+                        <FileText size={12} /> Open log
+                      </button>
+                    )}
+                    {onOpenPath && runtime.statePath && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenPath(resolveRuntimePath(runtimeRootPath, runtime.statePath!))}
+                        className="flex items-center gap-1 border border-stone-200/20 px-2 py-1 text-xs text-stone-300 hover:bg-white/5"
+                      >
+                        <FolderOpen size={12} /> Open state
+                      </button>
+                    )}
+                  </div>
+
+                  {runtime.commands && runtime.commands.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-[10px] uppercase tracking-[0.14em] text-stone-500">
+                        Lifecycle commands
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {runtime.commands.map((command) => (
+                          <button
+                            key={command.id}
+                            type="button"
+                            onClick={() => void runRuntimeCommand(command)}
+                            disabled={!onRunRuntimeCommand || runtimeAction.runningId === command.id}
+                            title={`${command.description} (${formatRuntimeCommand(command)})`}
+                            className="flex items-center gap-1 border border-stone-200/20 px-2 py-1 text-xs text-stone-300 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {command.id.includes('start') ? <Play size={12} /> : <RotateCw size={12} />}
+                            {runtimeAction.runningId === command.id ? 'Opening...' : command.label}
+                          </button>
+                        ))}
+                      </div>
+                      {runtimeAction.message && (
+                        <p
+                          className={`text-[11px] ${
+                            runtimeAction.status === 'error' ? 'text-red-300' : 'text-emerald-300'
+                          }`}
+                        >
+                          {runtimeAction.message}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
               {showConfig && isProviderPlugin(plugin) && (
                 <ProviderConfigForm
                   entry={plugin}
