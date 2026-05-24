@@ -364,11 +364,41 @@ export interface CronSchedule {
   unit: 'minutes' | 'hours';
 }
 
-export interface CronAction {
+export interface RunCommandAction {
   type: 'run-command';
   command: string;
   args: string[];
   workingDir: string;
+}
+
+/**
+ * Dispatch an engineer role with an assembled prompt (schema v8, ADR-012).
+ * Prompt assembly stays in TS (ADR-003); the call routes through Rust
+ * call_anthropic (ADR-004).
+ */
+export interface DispatchEngineerAction {
+  type: 'dispatch-engineer';
+  /** References ProjectManagerConfig.engineerRoles[].id on the same project. */
+  roleId: string;
+  /** Raw prompt text. Variable substitution (e.g. {{branch}}, {{date}}) deferred. */
+  promptTemplate: string;
+  /** Optional model override; falls back to role.primaryModel when absent. */
+  modelOverride?: ModelFallbackEntry;
+}
+
+export type CronAction = RunCommandAction | DispatchEngineerAction;
+
+/** Classified cron failure (schema v8). `reason` is set by the scheduler. */
+export interface CronError {
+  reason:
+    | 'no_api_key'
+    | 'role_missing'
+    | 'provider_error'
+    | 'invalid_response'
+    | 'rate_limited'
+    | 'spawn_failed'
+    | 'unknown';
+  message: string;
 }
 
 export interface CronJob {
@@ -380,6 +410,8 @@ export interface CronJob {
   action: CronAction;
   lastRun?: string;
   lastStatus?: 'ok' | 'error';
+  /** Populated when lastStatus === 'error' (schema v8). */
+  lastError?: CronError;
   createdAt: string;
 }
 
@@ -389,6 +421,10 @@ export interface CronRun {
   firedAt: string;
   status: 'ok' | 'error';
   pid?: number;
+  /** Set when status === 'error' (schema v8). */
+  error?: CronError;
+  /** First ~200 chars of dispatch-engineer LLM output for run-history display (schema v8). */
+  outputSnippet?: string;
 }
 
 export interface GithubIssue {

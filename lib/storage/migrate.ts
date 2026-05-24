@@ -24,7 +24,7 @@ interface RawConfig {
   [key: string]: unknown;
 }
 
-export const CURRENT_SCHEMA_VERSION = 7;
+export const CURRENT_SCHEMA_VERSION = 8;
 
 export function migrateConfig(raw: unknown): ProjectManagerConfig {
   const cfg = (raw && typeof raw === 'object' ? (raw as RawConfig) : {}) as RawConfig;
@@ -36,6 +36,7 @@ export function migrateConfig(raw: unknown): ProjectManagerConfig {
   if (version < 5) next = migrate_4_to_5(next);
   if (version < 6) next = migrate_5_to_6(next);
   if (version < 7) next = migrate_6_to_7(next);
+  if (version < 8) next = migrate_7_to_8(next);
   // Cast through unknown: `RawConfig` is intentionally a permissive bag,
   // and the migration steps above are responsible for ensuring the result
   // matches `ProjectManagerConfig`.
@@ -202,6 +203,34 @@ function migrate_6_to_7(cfg: RawConfig): RawConfig {
   const out: RawConfig = { ...cfg, schemaVersion: 7, capabilityCandidates };
   if (engineerRoles !== undefined) out.engineerRoles = engineerRoles;
   if (adapters !== undefined) out.adapters = adapters as Record<string, unknown>;
+  return out;
+}
+
+/**
+ * v7 → v8 (ADR-012, Engineer Cron Dispatch): `CronAction` becomes a discriminated
+ * union (`run-command` | `dispatch-engineer`) and `CronJob`/`CronRun` gain
+ * classified-error fields. The migration is structurally a no-op on persisted
+ * data — every v7 cron job already shipped with `action.type: 'run-command'` —
+ * but we defensively back-fill `action.type` for any malformed legacy row so
+ * the union narrows cleanly downstream. Idempotent: re-running on a v8 config
+ * returns it unchanged.
+ */
+function migrate_7_to_8(cfg: RawConfig): RawConfig {
+  const jobsIn = cfg.cronJobs;
+  const cronJobs = Array.isArray(jobsIn)
+    ? (jobsIn as Array<Record<string, unknown>>).map((job) => {
+        const action = job.action && typeof job.action === 'object'
+          ? (job.action as Record<string, unknown>)
+          : undefined;
+        if (action && typeof action.type !== 'string') {
+          return { ...job, action: { ...action, type: 'run-command' } };
+        }
+        return job;
+      })
+    : undefined;
+
+  const out: RawConfig = { ...cfg, schemaVersion: 8 };
+  if (cronJobs !== undefined) out.cronJobs = cronJobs;
   return out;
 }
 

@@ -713,6 +713,11 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, d
   // synchronous and surfaced via the panel button.
   const handleRunCronJob = useCallback(
     async (job: CronJob): Promise<void> => {
+      if (job.action.type !== 'run-command') {
+        // dispatch-engineer execution lands in PR2 (ADR-012 follow-up).
+        console.warn(`[cron] manual run skipped: action.type=${job.action.type} not yet implemented`);
+        return;
+      }
       const { spawnAgent } = await import('../../lib/bridge');
       const pid = await spawnAgent({
         command: job.action.command,
@@ -1040,6 +1045,11 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, d
         if (!job.enabled) return;
         const next = cronNextRunRef.current[job.id];
         if (!next || next > now) return;
+        if (job.action.type !== 'run-command') {
+          // dispatch-engineer scheduling lands in PR2 (ADR-012 follow-up).
+          console.warn(`[cron] scheduled run skipped for ${job.id}: action.type=${job.action.type} not yet implemented`);
+          return;
+        }
 
         // Reschedule before firing so concurrent ticks don't double-fire.
         const ms =
@@ -1049,17 +1059,18 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, d
         cronNextRunRef.current[job.id] = now + ms;
 
         const firedAt = new Date().toISOString();
+        const action = job.action; // narrowed to RunCommandAction by guard above
 
         import('../../lib/bridge')
           .then(({ spawnAgent }) =>
             spawnAgent({
-              command: job.action.command,
-              args: job.action.args,
-              workingDir: job.action.workingDir,
+              command: action.command,
+              args: action.args,
+              workingDir: action.workingDir,
             }),
           )
           .then((pid) => {
-            handleRunStart(pid, `cron:${job.id}`, job.name, job.action.command, job.action.args);
+            handleRunStart(pid, `cron:${job.id}`, job.name, action.command, action.args);
             setCronHistory((h) =>
               [...h, { jobId: job.id, jobName: job.name, firedAt, status: 'ok' as const, pid }].slice(-100),
             );

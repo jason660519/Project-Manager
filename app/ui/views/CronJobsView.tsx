@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Clock, Pencil, Play, Plus, Timer, Trash2, XCircle } from 'lucide-react';
-import type { CronJob, CronRun } from '../../../lib/types';
+import type { CronJob, CronRun, RunCommandAction } from '../../../lib/types';
 import { useI18n } from '../../../lib/i18n';
 
 interface CronJobsViewProps {
@@ -11,7 +11,11 @@ interface CronJobsViewProps {
   onCronJobsChange: (jobs: CronJob[]) => void;
 }
 
-const BLANK_FORM: Omit<CronJob, 'id' | 'createdAt'> = {
+// PR1 (ADR-012): the inline form still only edits run-command jobs. A dedicated
+// EngineerCronForm replaces this in PR2 when dispatch-engineer becomes editable.
+type RunCommandFormShape = Omit<CronJob, 'id' | 'createdAt' | 'action'> & { action: RunCommandAction };
+
+const BLANK_FORM: RunCommandFormShape = {
   name: '',
   description: '',
   enabled: true,
@@ -76,6 +80,11 @@ export function CronJobsView({ cronJobs, cronHistory, onCronJobsChange }: CronJo
   }
 
   function openEdit(job: CronJob) {
+    if (job.action.type !== 'run-command') {
+      // dispatch-engineer editor lands in PR2 (ADR-012 follow-up).
+      console.warn(`[cron] edit skipped for ${job.id}: action.type=${job.action.type} not yet supported in this form`);
+      return;
+    }
     setEditingId(job.id);
     setForm({
       name: job.name,
@@ -213,7 +222,9 @@ export function CronJobsView({ cronJobs, cronHistory, onCronJobsChange }: CronJo
                     )}
                   </div>
                   <p className="mt-0.5 truncate font-mono text-xs text-stone-500">
-                    {job.action.command} {job.action.args.join(' ')}
+                    {job.action.type === 'run-command'
+                      ? `${job.action.command} ${job.action.args.join(' ')}`
+                      : `[engineer dispatch · role ${job.action.roleId}]`}
                   </p>
                 </div>
 
