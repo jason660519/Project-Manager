@@ -7,9 +7,16 @@
           "{root}",
           "{prompt}"
         ],
-        "command": "claude-code",
+        "command": "claude",
         "id": "claude-code",
         "name": "Claude Code",
+        "supports": [
+          "eyes",
+          "voice-tts",
+          "voice-stt",
+          "hands",
+          "recording"
+        ],
         "type": "agent"
       },
       {
@@ -21,174 +28,631 @@
         "command": "codex",
         "id": "codex",
         "name": "Codex",
+        "supports": [
+          "eyes",
+          "voice-tts",
+          "voice-stt",
+          "hands",
+          "recording"
+        ],
         "type": "agent"
       }
     ],
     "ides": [
       {
         "command": "cursor",
-        "id": "Cursor",
+        "id": "cursor",
         "name": "Cursor",
         "type": "ide"
       }
     ]
   },
-  "createdAt": "2026-05-23T21:50:02.617Z",
+  "capabilityCandidates": [
+    {
+      "id": "anthropic:claude-opus-4-7",
+      "label": "Claude Opus 4.7 (Anthropic)",
+      "modelId": "claude-opus-4-7",
+      "providerId": "anthropic",
+      "sheet": "vla",
+      "state": "not_tested"
+    },
+    {
+      "id": "anthropic:claude-sonnet-4-6",
+      "label": "Claude Sonnet 4.6 (Anthropic)",
+      "modelId": "claude-sonnet-4-6",
+      "providerId": "anthropic",
+      "sheet": "vla",
+      "state": "not_tested"
+    },
+    {
+      "id": "anthropic:claude-opus-4-1",
+      "label": "Claude Opus 4.1 (Anthropic)",
+      "modelId": "claude-opus-4-1",
+      "providerId": "anthropic",
+      "sheet": "vla",
+      "state": "not_tested"
+    },
+    {
+      "id": "anthropic:claude-haiku-4-5-20251001",
+      "label": "Claude Haiku 4.5 (Anthropic)",
+      "modelId": "claude-haiku-4-5-20251001",
+      "providerId": "anthropic",
+      "sheet": "vla",
+      "state": "not_tested"
+    },
+    {
+      "id": "openai:gpt-5.5",
+      "label": "GPT-5.5 (OpenAI)",
+      "modelId": "gpt-5.5",
+      "providerId": "openai",
+      "sheet": "vla",
+      "state": "not_tested"
+    },
+    {
+      "id": "openai:gpt-4o",
+      "label": "GPT-4o (OpenAI)",
+      "modelId": "gpt-4o",
+      "providerId": "openai",
+      "sheet": "vla",
+      "state": "not_tested"
+    },
+    {
+      "id": "gemini:gemini-2.5-pro",
+      "label": "Gemini 2.5 Pro (Google)",
+      "modelId": "gemini-2.5-pro",
+      "providerId": "gemini",
+      "sheet": "vla",
+      "state": "not_tested"
+    },
+    {
+      "id": "gemini:gemini-2.5-flash",
+      "label": "Gemini 2.5 Flash (Google)",
+      "modelId": "gemini-2.5-flash",
+      "providerId": "gemini",
+      "sheet": "vla",
+      "state": "not_tested"
+    },
+    {
+      "id": "macos:say",
+      "label": "macOS `say` (system TTS, offline)",
+      "sheet": "tts",
+      "state": "not_tested"
+    },
+    {
+      "config": {
+        "kind": "microphone"
+      },
+      "id": "tools:microphone:default-input",
+      "label": "Microphone (default input device)",
+      "sheet": "tools",
+      "state": "not_tested"
+    },
+    {
+      "id": "macos:synthetic-input",
+      "label": "macOS synthetic input (mouse + keyboard via enigo)",
+      "sheet": "hands",
+      "state": "not_tested"
+    }
+  ],
+  "createdAt": "2026-05-24T05:28:41.878Z",
   "features": [
     {
       "category": "Frontend/UI",
-      "createdAt": "2026-05-23T21:50:02.617Z",
+      "createdAt": "2026-05-24T05:28:41.878Z",
       "id": "F01",
-      "locatedSection": "ui",
-      "name": "Sidebar Navigation",
-      "paths": {
-        "implementation": "app/ui/Sidebar.tsx",
-        "spec": ".project-manager/features/F01/feature-spec.md"
+      "locatedSection": "/project-progress-dashboard",
+      "metadata": {
+        "evidencePaths": [
+          "app/project-progress-dashboard/_components/AddRowModal.tsx",
+          "app/project-progress-dashboard/_components/AgentOpsPanel.tsx",
+          "app/project-progress-dashboard/_components/CategoryColumnFilter.tsx",
+          "__tests__/progressDashboard.AddRowModal.test.tsx"
+        ],
+        "initializationConfidence": 0.94,
+        "initializationReview": {
+          "accepted": true,
+          "confidenceAfter": 1,
+          "confidenceBefore": 1
+        },
+        "initializationValidation": {
+          "confidence": 1,
+          "evidencePaths": [
+            "app/project-progress-dashboard",
+            "__tests__/dashboardClient.phaseTabs.test.tsx",
+            "app/project-progress-dashboard/_components/AddRowModal.tsx",
+            "app/project-progress-dashboard/_components/AgentOpsPanel.tsx",
+            "app/project-progress-dashboard/_components/CategoryColumnFilter.tsx",
+            "__tests__/progressDashboard.AddRowModal.test.tsx"
+          ],
+          "featureId": "F01",
+          "issues": [],
+          "needsReview": false
+        },
+        "reviewConfidence": 1
       },
-      "phase": "development",
-      "points": 1,
-      "progress": 100,
-      "status": "done",
-      "updatedAt": "2026-05-23T21:50:02.617Z"
-    },
-    {
-      "category": "Frontend/UX",
-      "createdAt": "2026-05-23T21:50:02.617Z",
-      "id": "F02",
-      "locatedSection": "ui",
-      "name": "Feature Filter Tabs",
+      "name": "Project dashboard and progress tracking",
+      "notes": "Removed non-existent path __tests__/progressDashboard.aggregations.test.tsx from evidencePaths.",
       "paths": {
-        "implementation": "app/ui/DashboardClient.tsx",
-        "spec": ".project-manager/features/F02/feature-spec.md",
-        "tdd": ".project-manager/features/F02/tdd-spec.md",
+        "implementation": "app/project-progress-dashboard",
+        "spec": "",
         "test": "__tests__/dashboardClient.phaseTabs.test.tsx"
       },
       "phase": "development",
       "points": 1,
-      "progress": 100,
-      "status": "done",
-      "updatedAt": "2026-05-23T21:50:02.617Z"
+      "progress": 45,
+      "status": "todo",
+      "updatedAt": "2026-05-24T05:28:41.878Z"
     },
     {
-      "category": "Frontend/Monitor",
-      "createdAt": "2026-05-23T21:50:02.617Z",
-      "id": "F03",
-      "locatedSection": "ui/views",
-      "name": "Live Run Inspector",
+      "category": "Frontend/UI",
+      "createdAt": "2026-05-24T05:28:41.878Z",
+      "id": "F02",
+      "locatedSection": "/chat",
+      "metadata": {
+        "evidencePaths": [
+          "app/chat/ChatPageClient.tsx",
+          "components/chat/ChatInput.tsx",
+          "components/chat/ChatMessage.tsx",
+          "components/chat/ChatPanel.tsx",
+          "__tests__/chat.input.test.tsx",
+          "__tests__/chat.message.test.tsx"
+        ],
+        "initializationConfidence": 0.97,
+        "initializationValidation": {
+          "confidence": 1,
+          "evidencePaths": [
+            "app/chat",
+            "__tests__/chat.pageclient.test.tsx",
+            "app/chat/ChatPageClient.tsx",
+            "components/chat/ChatInput.tsx",
+            "components/chat/ChatMessage.tsx",
+            "components/chat/ChatPanel.tsx",
+            "__tests__/chat.input.test.tsx",
+            "__tests__/chat.message.test.tsx"
+          ],
+          "featureId": "F02",
+          "issues": [],
+          "needsReview": false
+        }
+      },
+      "name": "Chat assistant interface",
+      "notes": "Includes chat page, panel, message rendering, and input interactions.",
       "paths": {
-        "implementation": "app/ui/views/RunsView.tsx",
+        "implementation": "app/chat",
+        "test": "__tests__/chat.pageclient.test.tsx"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 40,
+      "status": "todo",
+      "updatedAt": "2026-05-24T05:28:41.878Z"
+    },
+    {
+      "category": "Core/AI",
+      "createdAt": "2026-05-24T05:28:41.878Z",
+      "id": "F03",
+      "locatedSection": "/ai_assistants",
+      "metadata": {
+        "evidencePaths": [
+          "lib/agent-workflows/definitions.ts",
+          "lib/agent-workflows/index.ts",
+          "lib/chat/chatAgent.ts",
+          "__tests__/chat.agent.test.ts"
+        ],
+        "initializationConfidence": 0.89,
+        "initializationValidation": {
+          "confidence": 1,
+          "evidencePaths": [
+            "lib/agent-workflows",
+            "__tests__/agentWorkflows.test.ts",
+            "lib/agent-workflows/definitions.ts",
+            "lib/agent-workflows/index.ts",
+            "lib/chat/chatAgent.ts",
+            "__tests__/chat.agent.test.ts"
+          ],
+          "featureId": "F03",
+          "issues": [],
+          "needsReview": false
+        }
+      },
+      "name": "AI assistant and agent workflows",
+      "notes": "Workflow orchestration for AI-driven assistance and agent task handling.",
+      "paths": {
+        "implementation": "lib/agent-workflows",
         "test": "__tests__/agentWorkflows.test.ts"
       },
       "phase": "development",
       "points": 1,
-      "progress": 100,
-      "status": "done",
-      "updatedAt": "2026-05-23T21:50:02.617Z"
-    },
-    {
-      "category": "Core/Integration",
-      "createdAt": "2026-05-23T21:50:02.617Z",
-      "id": "F04",
-      "locatedSection": "api/anthropic",
-      "name": "Add Project by GitHub URL",
-      "paths": {
-        "implementation": "app/api/anthropic/route.ts",
-        "spec": ".project-manager/features/F04/feature-spec.md",
-        "tdd": ".project-manager/features/F04/tdd-spec.md"
-      },
-      "phase": "development",
-      "points": 1,
-      "progress": 85,
-      "status": "in_progress",
-      "updatedAt": "2026-05-23T21:50:02.617Z"
-    },
-    {
-      "category": "Core/AI",
-      "createdAt": "2026-05-23T21:50:02.617Z",
-      "id": "F05",
-      "locatedSection": "Core/AI",
-      "name": "Spec Ingestion Pipeline",
-      "paths": {},
-      "phase": "development",
-      "points": 1,
-      "progress": 0,
+      "progress": 35,
       "status": "todo",
-      "updatedAt": "2026-05-23T21:50:02.617Z"
+      "updatedAt": "2026-05-24T05:28:41.878Z"
     },
     {
-      "category": "Frontend/Secrets",
-      "createdAt": "2026-05-24T09:03:40+10:00",
-      "id": "F22",
-      "locatedSection": "keys",
-      "name": "Keys API Config Rebuild",
-      "notes": "Rebuilt /keys API key workflow: browser-mode .env scan/import/validate now works; stored-key revalidation uses bundled provider storage; E2E verified 13/15 providers from .env.",
-      "paths": {
-        "developmentLogSummaryFolder": ".project-manager/features/F22/",
-        "implementation": "app/ui/views/Keys/",
-        "spec": ".project-manager/features/F22/feature-spec.md",
-        "tdd": ".project-manager/features/F22/tdd-spec.md",
-        "test": "__tests__/keys.validation.test.ts"
+      "category": "Core/Platform",
+      "createdAt": "2026-05-24T05:28:41.878Z",
+      "id": "F04",
+      "locatedSection": "lib/capabilities",
+      "metadata": {
+        "evidencePaths": [
+          "lib/capabilities/registry.ts",
+          "lib/capabilities/state-machine.ts",
+          "lib/capabilities/test-runners/tools.ts",
+          "lib/capabilities/test-runners/vla.ts",
+          "__tests__/capabilities.stateMachine.test.ts"
+        ],
+        "initializationConfidence": 0.96,
+        "initializationValidation": {
+          "confidence": 1,
+          "evidencePaths": [
+            "lib/capabilities",
+            "__tests__/capabilities.registry.test.ts",
+            "lib/capabilities/registry.ts",
+            "lib/capabilities/state-machine.ts",
+            "lib/capabilities/test-runners/tools.ts",
+            "lib/capabilities/test-runners/vla.ts",
+            "__tests__/capabilities.stateMachine.test.ts"
+          ],
+          "featureId": "F04",
+          "issues": [],
+          "needsReview": false
+        }
       },
-      "phase": "development",
-      "points": 3,
-      "progress": 100,
-      "readmePath": ".project-manager/features/F22/README.md",
-      "status": "done",
-      "updatedAt": "2026-05-24T09:20:00+10:00",
-      "updatedBy": "codex"
-    },
-    {
-      "category": "Engineers/Capabilities",
-      "createdAt": "2026-05-24T11:00:00+10:00",
-      "id": "F23",
-      "locatedSection": "engineers",
-      "name": "Engineer Capabilities: Eyes/Voice/Hands/Recording",
-      "notes": "Qualification-gate model: 5 Integrations Hub sheets (VLA/TTS/STT/Hands/Tools), 5-state candidate machine (not_tested→testing→{passed|passed_disabled|failed}), role × adapter × passed-candidate intersection at dispatch. Schema bump v6→v7 (additive). Phase 1 (foundation + Eyes) is next — starts with types+state-machine, Tools/mic, VLA sheet, screenshot wiring.",
+      "name": "Capabilities registry and state machine",
+      "notes": "Central capability modeling, registration, and progression logic.",
       "paths": {
-        "developmentLogSummaryFolder": ".project-manager/features/F23/",
-        "implementation": "app/ui/views/EngineersView.tsx",
-        "spec": ".project-manager/features/F23/feature-spec.md",
-        "tdd": ".project-manager/features/F23/tdd-spec.md",
+        "implementation": "lib/capabilities",
         "test": "__tests__/capabilities.registry.test.ts"
       },
       "phase": "development",
-      "points": 8,
-      "progress": 30,
-      "readmePath": ".project-manager/features/F23/README.md",
-      "status": "in_progress",
-      "updatedAt": "2026-05-24T11:30:00+10:00",
-      "updatedBy": "claude"
+      "points": 1,
+      "progress": 50,
+      "status": "todo",
+      "updatedAt": "2026-05-24T05:28:41.878Z"
     },
     {
-      "category": "Integrations/Runtime",
-      "createdAt": "2026-05-24T11:44:11+10:00",
-      "id": "F24",
-      "locatedSection": "integrations-hub",
-      "name": "Connected Instances Sheet",
-      "notes": "Add an Integrations Hub sheet that shows local, intranet, and external runtime instances with service endpoints, capability hints, reachability state, owner, and risk boundaries without exposing secrets.",
+      "category": "DevOps/CI",
+      "createdAt": "2026-05-24T05:28:41.878Z",
+      "id": "F05",
+      "locatedSection": "lib/adapters",
+      "metadata": {
+        "evidencePaths": [
+          "lib/adapters/agent-adapter.ts",
+          "lib/adapters/availability.ts",
+          "lib/adapters/local-app-adapter.ts",
+          "lib/adapters/local-ide-adapter.ts",
+          "__tests__/providerOrder.test.ts",
+          "__tests__/providerOrderAutoEnable.test.ts"
+        ],
+        "initializationConfidence": 0.98,
+        "initializationValidation": {
+          "confidence": 1,
+          "evidencePaths": [
+            "lib/adapters",
+            "__tests__/adapterRegistry.plugin.test.ts",
+            "lib/adapters/agent-adapter.ts",
+            "lib/adapters/availability.ts",
+            "lib/adapters/local-app-adapter.ts",
+            "lib/adapters/local-ide-adapter.ts",
+            "__tests__/providerOrder.test.ts",
+            "__tests__/providerOrderAutoEnable.test.ts"
+          ],
+          "featureId": "F05",
+          "issues": [],
+          "needsReview": false
+        }
+      },
+      "name": "Local adapters for IDEs and agents",
+      "notes": "Adapter layer for spawning or integrating local IDEs and agent CLIs such as Claude Code and Codex.",
       "paths": {
-        "developmentLogSummaryFolder": ".project-manager/features/F24/",
-        "implementation": "app/ui/views/Plugins/",
-        "spec": ".project-manager/features/F24/feature-spec.md",
-        "tdd": ".project-manager/features/F24/tdd-spec.md",
-        "test": "__tests__/integrations.connectedInstances.test.ts"
+        "implementation": "lib/adapters",
+        "test": "__tests__/adapterRegistry.plugin.test.ts"
       },
       "phase": "development",
-      "points": 3,
-      "progress": 100,
-      "readmePath": ".project-manager/features/F24/README.md",
-      "status": "done",
-      "updatedAt": "2026-05-24T11:58:00+10:00",
-      "updatedBy": "codex"
+      "points": 1,
+      "progress": 55,
+      "status": "todo",
+      "updatedAt": "2026-05-24T05:28:41.878Z"
+    },
+    {
+      "category": "Backend/API",
+      "createdAt": "2026-05-24T05:28:41.878Z",
+      "id": "F06",
+      "locatedSection": "lib/bridge",
+      "metadata": {
+        "evidencePaths": [
+          "lib/bridge/index.ts",
+          "app/api/bridge/execute/route.ts",
+          "__tests__/dispatch.availability.test.ts",
+          "__tests__/dispatch.modal-states.test.ts"
+        ],
+        "initializationConfidence": 0.92,
+        "initializationValidation": {
+          "confidence": 1,
+          "evidencePaths": [
+            "lib/bridge",
+            "__tests__/dispatch.component.render.test.tsx",
+            "lib/bridge/index.ts",
+            "app/api/bridge/execute/route.ts",
+            "__tests__/dispatch.availability.test.ts",
+            "__tests__/dispatch.modal-states.test.ts"
+          ],
+          "featureId": "F06",
+          "issues": [],
+          "needsReview": false
+        }
+      },
+      "name": "API bridge and execution orchestration",
+      "notes": "Dry-run execution planning and bridge orchestration for dispatching actions.",
+      "paths": {
+        "implementation": "lib/bridge",
+        "test": "__tests__/dispatch.component.render.test.tsx"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 40,
+      "status": "todo",
+      "updatedAt": "2026-05-24T05:28:41.878Z"
+    },
+    {
+      "category": "Integration/API",
+      "createdAt": "2026-05-24T05:28:41.878Z",
+      "id": "F07",
+      "locatedSection": "app/api/github",
+      "metadata": {
+        "evidencePaths": [
+          "app/api/github/issues/route.ts",
+          "app/api/github/repo/route.ts",
+          "app/api/github/sync/route.ts",
+          "app/api/github/lib.ts"
+        ],
+        "initializationConfidence": 0.91,
+        "initializationReview": {
+          "accepted": true,
+          "confidenceAfter": 1,
+          "confidenceBefore": 0.91
+        },
+        "initializationValidation": {
+          "confidence": 1,
+          "evidencePaths": [
+            "app/api/github",
+            "__tests__/githubSyncRoute.test.ts",
+            "app/api/github/issues/route.ts",
+            "app/api/github/repo/route.ts",
+            "app/api/github/sync/route.ts",
+            "app/api/github/lib.ts"
+          ],
+          "featureId": "F07",
+          "issues": [],
+          "needsReview": false
+        },
+        "reviewConfidence": 0.91
+      },
+      "name": "GitHub repository and issue synchronization",
+      "notes": "Corrected locatedSection from invalid /api/github to module candidate app/api/github.",
+      "paths": {
+        "implementation": "app/api/github",
+        "spec": "",
+        "test": "__tests__/githubSyncRoute.test.ts"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 30,
+      "status": "todo",
+      "updatedAt": "2026-05-24T05:28:41.878Z"
+    },
+    {
+      "category": "Core/Security",
+      "createdAt": "2026-05-24T05:28:41.878Z",
+      "id": "F08",
+      "locatedSection": "/keys",
+      "metadata": {
+        "evidencePaths": [
+          "lib/keys/detectProviders.ts",
+          "lib/keys/envParser.ts",
+          "lib/keys/keychain.ts",
+          "lib/keys/llmProviders.ts",
+          "app/api/keys/validate/route.ts",
+          "app/api/keys/scan-env-files/route.ts"
+        ],
+        "initializationConfidence": 0.98,
+        "initializationValidation": {
+          "confidence": 1,
+          "evidencePaths": [
+            "lib/keys",
+            "__tests__/keys.validation.test.ts",
+            "lib/keys/detectProviders.ts",
+            "lib/keys/envParser.ts",
+            "lib/keys/keychain.ts",
+            "lib/keys/llmProviders.ts",
+            "app/api/keys/validate/route.ts",
+            "app/api/keys/scan-env-files/route.ts"
+          ],
+          "featureId": "F08",
+          "issues": [],
+          "needsReview": false
+        }
+      },
+      "name": "Keys and environment secret management",
+      "notes": "Provider detection, env parsing, validation, and keychain-backed storage.",
+      "paths": {
+        "implementation": "lib/keys",
+        "test": "__tests__/keys.validation.test.ts"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 55,
+      "status": "todo",
+      "updatedAt": "2026-05-24T05:28:41.878Z"
+    },
+    {
+      "category": "Documentation",
+      "createdAt": "2026-05-24T05:28:41.878Z",
+      "id": "F09",
+      "locatedSection": "/documentation/[[...slug]]",
+      "metadata": {
+        "evidencePaths": [
+          "app/documentation/[[...slug]]/page.tsx",
+          "lib/documentation/types.ts",
+          "lib/generated/documentation-site.ts",
+          "docs/guides/getting-started.md",
+          "docs/architecture/architecture-overview.md"
+        ],
+        "initializationConfidence": 0.95,
+        "initializationValidation": {
+          "confidence": 1,
+          "evidencePaths": [
+            "app/documentation/[[...slug]]",
+            "__tests__/documentationSiteManifest.test.ts",
+            "app/documentation/[[...slug]]/page.tsx",
+            "lib/documentation/types.ts",
+            "lib/generated/documentation-site.ts",
+            "docs/guides/getting-started.md",
+            "docs/architecture/architecture-overview.md"
+          ],
+          "featureId": "F09",
+          "issues": [],
+          "needsReview": false
+        }
+      },
+      "name": "Documentation site and public guides",
+      "notes": "Public documentation rendering backed by generated site manifests and markdown content.",
+      "paths": {
+        "implementation": "app/documentation/[[...slug]]",
+        "test": "__tests__/documentationSiteManifest.test.ts"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 60,
+      "status": "todo",
+      "updatedAt": "2026-05-24T05:28:41.878Z"
+    },
+    {
+      "category": "Core/Platform",
+      "createdAt": "2026-05-24T05:28:41.878Z",
+      "id": "F10",
+      "locatedSection": "lib/storage",
+      "metadata": {
+        "evidencePaths": [
+          "lib/storage/createProjectScaffold.ts",
+          "__tests__/projectSetup.test.ts",
+          "__tests__/mergeProjectFromDisk.test.ts"
+        ],
+        "initializationConfidence": 0.9,
+        "initializationValidation": {
+          "confidence": 1,
+          "evidencePaths": [
+            "lib/storage",
+            "__tests__/createProjectScaffold.test.ts",
+            "lib/storage/createProjectScaffold.ts",
+            "__tests__/projectSetup.test.ts",
+            "__tests__/mergeProjectFromDisk.test.ts"
+          ],
+          "featureId": "F10",
+          "issues": [],
+          "needsReview": false
+        }
+      },
+      "name": "Project scaffolding and setup",
+      "notes": "Creates and normalizes project structures from templates or disk.",
+      "paths": {
+        "implementation": "lib/storage",
+        "test": "__tests__/createProjectScaffold.test.ts"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 50,
+      "status": "todo",
+      "updatedAt": "2026-05-24T05:28:41.878Z"
+    },
+    {
+      "category": "Backend/API",
+      "createdAt": "2026-05-24T05:28:41.878Z",
+      "id": "F11",
+      "locatedSection": "lib/scanner",
+      "metadata": {
+        "evidencePaths": [
+          "lib/scanner/index.ts",
+          "lib/scanner/runProjectScan.ts",
+          "lib/scanner/modelSelection.ts",
+          "app/api/scan-project/route.ts",
+          "__tests__/scanValidation.test.ts",
+          "__tests__/scanReview.test.ts"
+        ],
+        "initializationConfidence": 0.97,
+        "initializationValidation": {
+          "confidence": 1,
+          "evidencePaths": [
+            "lib/scanner",
+            "__tests__/runProjectScanParallel.test.ts",
+            "lib/scanner/index.ts",
+            "lib/scanner/runProjectScan.ts",
+            "lib/scanner/modelSelection.ts",
+            "app/api/scan-project/route.ts",
+            "__tests__/scanValidation.test.ts",
+            "__tests__/scanReview.test.ts"
+          ],
+          "featureId": "F11",
+          "issues": [],
+          "needsReview": false
+        }
+      },
+      "name": "Scanning, ingestion, and project analysis",
+      "notes": "Runs project scans, selects models, validates results, and reviews extracted structure.",
+      "paths": {
+        "implementation": "lib/scanner",
+        "test": "__tests__/runProjectScanParallel.test.ts"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 45,
+      "status": "todo",
+      "updatedAt": "2026-05-24T05:28:41.878Z"
+    },
+    {
+      "category": "Frontend/UI",
+      "createdAt": "2026-05-24T05:28:41.878Z",
+      "id": "F12",
+      "locatedSection": "app/features",
+      "metadata": {
+        "evidencePaths": [
+          "__tests__/ProjectFilesView.test.tsx",
+          "__tests__/ProjectsView.add-project.test.tsx",
+          "__tests__/ProjectsView.reinit.test.tsx"
+        ],
+        "initializationConfidence": 0.76,
+        "initializationValidation": {
+          "confidence": 1,
+          "evidencePaths": [
+            "app/features",
+            "__tests__/ProjectFilesView.test.tsx",
+            "__tests__/ProjectsView.add-project.test.tsx",
+            "__tests__/ProjectsView.reinit.test.tsx"
+          ],
+          "featureId": "F12",
+          "issues": [],
+          "needsReview": false
+        }
+      },
+      "name": "Project files and workspace views",
+      "notes": "Workspace-centric views for browsing projects, files, and related project state.",
+      "paths": {
+        "implementation": "app/features",
+        "test": "__tests__/ProjectFilesView.test.tsx"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 35,
+      "status": "todo",
+      "updatedAt": "2026-05-24T05:28:41.878Z"
     }
   ],
-  "id": "6be5e570-fb8a-4873-8c5c-a4f88055f157",
+  "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",
   "project": {
     "defaultIDE": "Cursor",
-    "name": "Project Manager",
+    "githubUrl": "https://github.com/jason660519/Project-Manager",
+    "name": "@project-manager/app",
     "root": "/Volumes/KLEVV-4T-1/Project-Manager"
   },
-  "schemaVersion": 6,
-  "updatedAt": "2026-05-24T11:58:00+10:00",
-  "updatedBy": "codex"
+  "schemaVersion": 8,
+  "updatedAt": "2026-05-24T05:28:41.878Z"
 }

@@ -6,6 +6,10 @@ import { readdir, readFile, stat } from 'fs/promises';
 import type { Dirent } from 'fs';
 import { join, basename } from 'path';
 import {
+  buildSectionCandidatesFromNodes,
+  type SectionInventoryNode,
+} from './sectionInventory';
+import {
   AGENT_MARKERS,
   IDE_MARKERS,
   KEY_FILES,
@@ -88,6 +92,81 @@ async function buildTree(root: string, maxDepth = 3): Promise<string> {
   return lines.join('\n');
 }
 
+async function buildTreeNodes(
+  dir: string,
+  depth: number,
+  maxDepth: number,
+): Promise<SectionInventoryNode[]> {
+  if (depth > maxDepth) return [];
+
+  let entries: Dirent[];
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  entries.sort((a, b) => {
+    if (a.isDirectory() && !b.isDirectory()) return -1;
+    if (!a.isDirectory() && b.isDirectory()) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  const nodes: SectionInventoryNode[] = [];
+  for (const entry of entries) {
+    if (SKIP_DIRS.has(entry.name)) continue;
+    if (
+      entry.name.startsWith('.') &&
+      entry.name !== '.project-manager' &&
+      entry.name !== '.project-manager.json' &&
+      depth > 0
+    ) {
+      continue;
+    }
+
+    const path = joinExternalRoot(dir, entry.name);
+    if (entry.isDirectory()) {
+      nodes.push({
+        name: entry.name,
+        path,
+        isDir: true,
+        children: await buildTreeNodes(path, depth + 1, maxDepth),
+      });
+    } else {
+      nodes.push({
+        name: entry.name,
+        path,
+        isDir: false,
+        children: [],
+      });
+    }
+  }
+  return nodes;
+}
+
+function relativeToRoot(root: string, path: string): string {
+  const normalizedRoot = root.replace(/\\/g, '/').replace(/\/+$/, '');
+  const normalizedPath = path.replace(/\\/g, '/').replace(/\/+$/, '');
+  if (normalizedPath === normalizedRoot) return '';
+  if (normalizedPath.startsWith(`${normalizedRoot}/`)) {
+    return normalizedPath.slice(normalizedRoot.length + 1);
+  }
+  return normalizedPath.replace(/^\/+/, '');
+}
+
+function collectInventoryPaths(nodes: SectionInventoryNode[], root: string): string[] {
+  const out = new Set<string>();
+  function walk(entries: SectionInventoryNode[]) {
+    for (const entry of entries) {
+      const rel = relativeToRoot(root, entry.path);
+      if (rel) out.add(rel);
+      if (entry.isDir && entry.children?.length) walk(entry.children);
+    }
+  }
+  walk(nodes);
+  return [...out].sort((a, b) => a.localeCompare(b));
+}
+
 async function safeReadFile(path: string, maxBytes = 4096): Promise<string | null> {
   try {
     const s = await stat(path);
@@ -101,6 +180,9 @@ async function safeReadFile(path: string, maxBytes = 4096): Promise<string | nul
 
 export async function buildProjectContext(root: string): Promise<ProjectContext> {
   const directoryTree = await buildTree(root, 3);
+  const treeNodes = await buildTreeNodes(root, 0, 6);
+  const sectionCandidates = buildSectionCandidatesFromNodes(treeNodes, root);
+  const inventoryPaths = collectInventoryPaths(treeNodes, root);
 
   const keyFiles: Record<string, string> = {};
   for (const file of KEY_FILES) {
@@ -159,6 +241,8 @@ export async function buildProjectContext(root: string): Promise<ProjectContext>
     source: root,
     projectName,
     directoryTree,
+    sectionCandidates,
+    inventoryPaths,
     keyFiles,
     detectedIDEs,
     detectedAgents,

@@ -27,6 +27,7 @@ interface GitHubApiIssue {
   updated_at: string;
   html_url: string;
   user: { login: string } | null;
+  pull_request?: unknown;
 }
 
 /**
@@ -61,27 +62,34 @@ export async function POST(request: NextRequest) {
   const repo = parts[parts.length - 1];
 
   try {
-    // Fetch open issues from GitHub REST API
-    const res = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/issues?state=all&per_page=100&sort=updated&direction=desc`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'User-Agent': 'ProjectManager/0.1.0',
-          Accept: 'application/vnd.github.v3+json',
+    const data: GitHubApiIssue[] = [];
+    let page = 1;
+
+    while (true) {
+      const res = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/issues?state=all&per_page=100&page=${page}&sort=updated&direction=desc`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'User-Agent': 'ProjectManager/0.1.0',
+            Accept: 'application/vnd.github.v3+json',
+          },
         },
-      },
-    );
-
-    if (!res.ok) {
-      const text = await res.text();
-      return NextResponse.json(
-        { error: `GitHub API ${res.status}: ${text}` },
-        { status: res.status },
       );
-    }
 
-    const data = (await res.json()) as GitHubApiIssue[];
+      if (!res.ok) {
+        const text = await res.text();
+        return NextResponse.json(
+          { error: `GitHub API ${res.status}: ${text}` },
+          { status: res.status },
+        );
+      }
+
+      const pageData = (await res.json()) as GitHubApiIssue[];
+      data.push(...pageData);
+      if (pageData.length < 100) break;
+      page += 1;
+    }
 
     // Map REST API to our GithubIssue shape
     // Filter out pull requests (GitHub REST API returns PRs alongside issues)

@@ -77,14 +77,14 @@ describe('feature location inference', () => {
     expect(inferLocatedSection(f)).toBe('progressDashboard-editing-test');
   });
 
-  it('falls back to category when no paths are present', () => {
+  it('does not fall back to category when no paths are present', () => {
     const f = feature({ category: 'Frontend/UI', paths: {} });
-    expect(inferLocatedSection(f)).toBe('Frontend/UI');
+    expect(inferLocatedSection(f)).toBeUndefined();
   });
 
-  it('falls back to feature name when paths and category are empty', () => {
+  it('does not fall back to feature name when paths and category are empty', () => {
     const f = feature({ name: 'Dispatch Controls', category: '', paths: {} });
-    expect(inferLocatedSection(f)).toBe('Dispatch Controls');
+    expect(inferLocatedSection(f)).toBeUndefined();
   });
 
   it('returns undefined only when no signal exists', () => {
@@ -103,6 +103,48 @@ describe('feature location inference', () => {
     expect(once[1].locatedSection).toBe('storage');
     expect(twice).toEqual(once);
   });
+
+  it('uses detected section candidates for canonical locatedSection labels', () => {
+    const f = feature({
+      locatedSection: 'made up area',
+      paths: { implementation: 'app/superadmin/properties/page.tsx' },
+    });
+    expect(
+      normalizeFeatureLocatedSection(f, {
+        preserveExisting: false,
+        sectionCandidates: [
+          {
+            id: 'route:superadmin/properties',
+            label: '/superadmin/properties',
+            kind: 'route',
+            path: 'app/superadmin/properties/page.tsx',
+            evidencePaths: ['app/superadmin/properties/page.tsx'],
+          },
+        ],
+      }).locatedSection,
+    ).toBe('/superadmin/properties');
+  });
+
+  it('drops hallucinated locatedSection values when scan candidates cannot validate them', () => {
+    const f = feature({
+      locatedSection: 'wrong generated section',
+      paths: { implementation: 'app/unknown/path.tsx' },
+    });
+    expect(
+      normalizeFeatureLocatedSection(f, {
+        preserveExisting: false,
+        sectionCandidates: [
+          {
+            id: 'module:app/dashboard',
+            label: 'app/dashboard',
+            kind: 'module',
+            path: 'app/dashboard',
+            evidencePaths: ['app/dashboard/page.tsx'],
+          },
+        ],
+      }).locatedSection,
+    ).toBeUndefined();
+  });
 });
 
 describe('scan initialization integration', () => {
@@ -120,9 +162,19 @@ describe('scan initialization integration', () => {
       }),
     ]);
 
-    const next = await applyScanConfigToProject(project, scanned);
+    const next = await applyScanConfigToProject(project, scanned, {
+      sectionCandidates: [
+        {
+          id: 'module:app/ui',
+          label: 'app/ui',
+          kind: 'module',
+          path: 'app/ui',
+          evidencePaths: ['app/ui/MainClient.tsx'],
+        },
+      ],
+    });
 
-    expect(next.config.features[0].locatedSection).toBe('ui');
+    expect(next.config.features[0].locatedSection).toBe('app/ui');
     expect(writeConfigMock).toHaveBeenCalledTimes(1);
   });
 
@@ -144,6 +196,35 @@ describe('scan initialization integration', () => {
     const next = await applyScanConfigToProject(project, scanned);
     expect(next.config.features[0].locatedSection).toBe('custom/section');
   });
+
+  it('applyScanConfigToProject removes invalid scan locatedSection when candidates are known', async () => {
+    writeConfigMock.mockClear();
+    const project: ProjectEntry = {
+      id: 'proj-3',
+      configPath: '/tmp/demo/.project-manager/config.json',
+      config: config([]),
+    };
+    const scanned = config([
+      feature({
+        id: 'F12',
+        locatedSection: 'hallucinated dashboard',
+        paths: { implementation: 'app/not-present/page.tsx' },
+      }),
+    ]);
+
+    const next = await applyScanConfigToProject(project, scanned, {
+      sectionCandidates: [
+        {
+          id: 'module:app/ui',
+          label: 'app/ui',
+          kind: 'module',
+          path: 'app/ui',
+          evidencePaths: ['app/ui/MainClient.tsx'],
+        },
+      ],
+    });
+    expect(next.config.features[0].locatedSection).toBeUndefined();
+  });
 });
 
 describe('scan prompt contract', () => {
@@ -152,12 +233,22 @@ describe('scan prompt contract', () => {
       source: '/tmp/demo',
       projectName: 'Demo',
       directoryTree: 'app/\nlib/\n',
+      sectionCandidates: [
+        {
+          id: 'module:app/ui',
+          label: 'app/ui',
+          kind: 'module',
+          path: 'app/ui',
+          evidencePaths: ['app/ui/MainClient.tsx'],
+        },
+      ],
       keyFiles: {},
       detectedIDEs: ['Cursor'],
       detectedAgents: ['Codex CLI'],
     });
     expect(prompt).toContain('"locatedSection"');
-    expect(prompt).toContain('route, module, workflow area, or subsystem');
+    expect(prompt).toContain('Section Candidates');
+    expect(prompt).toContain('app/ui [module]');
+    expect(prompt).toContain('Do not invent section names');
   });
 });
-

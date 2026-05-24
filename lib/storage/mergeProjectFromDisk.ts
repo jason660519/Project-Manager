@@ -24,5 +24,12 @@ export function mergeProjectConfigFromDisk(
     disk.features.length > 0
       ? mergeFeaturesById(disk.features, localConfig.features)
       : localConfig.features;
-  return { ...disk, features };
+  return {
+    ...disk,
+    project: {
+      ...disk.project,
+      githubUrl: disk.project.githubUrl ?? localConfig.project.githubUrl,
+    },
+    features,
+  };
 }

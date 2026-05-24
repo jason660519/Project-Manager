@@ -32,6 +32,10 @@
       "properties": {
         "name": { "type": "string" },
         "root": { "type": "string", "description": "Absolute path to project root" },
+        "githubUrl": {
+          "type": "string",
+          "description": "GitHub repository URL used for issue and PR sync, e.g. https://github.com/owner/repo"
+        },
         "defaultIDE": {
           "type": "string",
           "enum": ["Cursor", "VSCode", "Trae", "Antigravity", "Kiro"],

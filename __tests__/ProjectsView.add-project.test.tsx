@@ -20,6 +20,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Capture every readConfig call so we can assert on the path it received.
 const readConfigMock = vi.fn();
 const pickProjectFoldersMock = vi.fn();
+const detectGithubRepoUrlMock = vi.fn();
+const writeConfigMock = vi.fn();
 const migrateProjectLayoutMock = vi.fn(async (projectRoot: string) => ({
   migrated: false,
   configPath: `${projectRoot}/.project-manager/config.json`,
@@ -29,9 +31,11 @@ vi.mock('../lib/bridge', () => ({
   getGithubToken: async () => '',
   setGithubToken: async () => {},
   readConfig: (path: string) => readConfigMock(path),
+  detectGithubRepoUrl: (projectRoot: string) => detectGithubRepoUrlMock(projectRoot),
   fetchGithubRepo: async () => [],
   pickProjectFolders: (opts?: { multiple?: boolean }) => pickProjectFoldersMock(opts),
   migrateProjectLayout: (root: string) => migrateProjectLayoutMock(root),
+  writeConfig: (path: string, config: unknown) => writeConfigMock(path, config),
 }));
 
 import { ProjectsView } from '../app/ui/views/ProjectsView';
@@ -40,8 +44,60 @@ import { ProjectsView } from '../app/ui/views/ProjectsView';
 beforeEach(() => {
   readConfigMock.mockReset();
   pickProjectFoldersMock.mockReset();
+  detectGithubRepoUrlMock.mockReset();
+  detectGithubRepoUrlMock.mockResolvedValue(null);
+  writeConfigMock.mockReset();
+  writeConfigMock.mockResolvedValue(undefined);
   migrateProjectLayoutMock.mockClear();
   (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {};
+});
+
+describe('Projects list — GitHub repository URL editing', () => {
+  it('saves a normalized GitHub URL to local project config', async () => {
+    const onUpdateProject = vi.fn();
+    const user = userEvent.setup();
+    renderModal({
+      projects: [
+        {
+          id: 'p1',
+          configPath: '/Volumes/Projects/alpha/.project-manager/config.json',
+          config: {
+            schemaVersion: 7,
+            id: 'cfg-1',
+            project: { name: 'Alpha', root: '/Volumes/Projects/alpha', defaultIDE: 'Cursor' },
+            features: [],
+            adapters: { ides: [], agents: [] },
+          },
+          configMissing: false,
+        },
+      ],
+      selectedProjectId: 'p1',
+      onUpdateProject,
+    });
+
+    await user.click(screen.getByRole('button', { name: /add url/i }));
+    await user.type(
+      screen.getByPlaceholderText('https://github.com/owner/repo'),
+      'git@github.com:org/alpha.git',
+    );
+    await user.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => {
+      expect(writeConfigMock).toHaveBeenCalledWith(
+        '/Volumes/Projects/alpha/.project-manager/config.json',
+        expect.objectContaining({
+          project: expect.objectContaining({ githubUrl: 'https://github.com/org/alpha' }),
+        }),
+      );
+      expect(onUpdateProject).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            project: expect.objectContaining({ githubUrl: 'https://github.com/org/alpha' }),
+          }),
+        }),
+      );
+    });
+  });
 });
 
 function renderModal(overrides: Partial<Parameters<typeof ProjectsView>[0]> = {}) {
@@ -115,6 +171,40 @@ describe('Add Project modal — manual add path normalization', () => {
     expect(entry.configPath).toBe(
       '/Volumes/KLEVV-4T-1/Realestate_Management_Apps/.project-manager/config.json',
     );
+  });
+
+  it('auto-detects a local GitHub origin when importing a local project', async () => {
+    readConfigMock.mockResolvedValueOnce({
+      schemaVersion: 2,
+      id: 'fixture-id',
+      project: { name: 'Project Manager', root: '/Volumes/KLEVV-4T-1/Project-Manager', defaultIDE: 'Cursor' },
+      features: [],
+      adapters: { ides: [], agents: [] },
+    });
+    detectGithubRepoUrlMock.mockResolvedValueOnce('https://github.com/jason660519/Project-Manager');
+
+    const user = userEvent.setup();
+    const { onAddProject } = renderModal();
+    await openAddModal(user);
+
+    await user.type(
+      screen.getByPlaceholderText('/path/to/project (auto-detects .project-manager/)'),
+      '/Volumes/KLEVV-4T-1/Project-Manager',
+    );
+    await user.click(getModalSubmit());
+
+    await waitFor(() => {
+      expect(detectGithubRepoUrlMock).toHaveBeenCalledWith('/Volumes/KLEVV-4T-1/Project-Manager');
+      expect(onAddProject).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            project: expect.objectContaining({
+              githubUrl: 'https://github.com/jason660519/Project-Manager',
+            }),
+          }),
+        }),
+      );
+    });
   });
 
   it('passes through a path that already ends with .project-manager/config.json', async () => {

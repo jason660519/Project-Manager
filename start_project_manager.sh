@@ -199,6 +199,94 @@ normalize_browser_url() {
   printf '%s\n' "$url"
 }
 
+canonicalize_browser_host() {
+  local host="$1"
+  host="${host#[}"
+  host="${host%]}"
+  host="$(printf '%s' "$host" | tr '[:upper:]' '[:lower:]')"
+
+  case "$host" in
+    localhost|127.0.0.1|::1)
+      printf 'localhost\n'
+      ;;
+    *)
+      printf '%s\n' "$host"
+      ;;
+  esac
+}
+
+is_local_browser_url() {
+  local url
+  url="$(normalize_browser_url "$1")"
+
+  if [[ "$url" =~ ^([a-zA-Z][a-zA-Z0-9+.-]*)://([^/]+) ]]; then
+    local authority="${BASH_REMATCH[2]}"
+    local host=""
+
+    if [[ "$authority" == \[*\]* ]]; then
+      host="${authority%%]*}"
+      host="${host#[}"
+    else
+      if [[ "$authority" == *:* ]]; then
+        host="${authority%%:*}"
+      else
+        host="$authority"
+      fi
+    fi
+
+    case "$(canonicalize_browser_host "$host")" in
+      localhost)
+        return 0
+        ;;
+    esac
+  fi
+
+  return 1
+}
+
+url_origin_key() {
+  local url
+  url="$(normalize_browser_url "$1")"
+
+  if [[ "$url" =~ ^([a-zA-Z][a-zA-Z0-9+.-]*)://([^/]+) ]]; then
+    local scheme="${BASH_REMATCH[1]}"
+    local authority="${BASH_REMATCH[2]}"
+    local host=""
+    local port=""
+
+    if [[ "$authority" == \[*\]* ]]; then
+      host="${authority%%]*}"
+      host="${host#[}"
+      local remainder="${authority#*]}"
+      if [[ "$remainder" == :* ]]; then
+        port="${remainder#:}"
+      fi
+    else
+      if [[ "$authority" == *:* ]]; then
+        host="${authority%%:*}"
+        port="${authority##*:}"
+      else
+        host="$authority"
+      fi
+    fi
+
+    scheme="$(printf '%s' "$scheme" | tr '[:upper:]' '[:lower:]')"
+    host="$(canonicalize_browser_host "$host")"
+
+    if [[ -z "$port" ]]; then
+      case "$scheme" in
+        http) port="80" ;;
+        https) port="443" ;;
+      esac
+    fi
+
+    printf '%s://%s:%s\n' "$scheme" "$host" "$port"
+    return 0
+  fi
+
+  printf '%s\n' "$url"
+}
+
 browser_has_url_open() {
   local url="$1"
 
@@ -211,6 +299,13 @@ browser_has_url_open() {
 
   local target_url
   target_url="$(normalize_browser_url "$url")"
+  local target_origin
+  target_origin="$(url_origin_key "$url")"
+  local local_origin_dedup="${PROJECT_MANAGER_LOCAL_ORIGIN_DEDUP:-1}"
+  local target_is_local=0
+  if is_local_browser_url "$url"; then
+    target_is_local=1
+  fi
 
   local result
   result="$(osascript - 2>/dev/null <<'APPLESCRIPT' || true
@@ -253,8 +348,19 @@ APPLESCRIPT
   local open_url
   while IFS= read -r open_url; do
     [[ -n "$open_url" ]] || continue
-    if [[ "$(normalize_browser_url "$open_url")" == "$target_url" ]]; then
+    local normalized_open
+    normalized_open="$(normalize_browser_url "$open_url")"
+    if [[ "$normalized_open" == "$target_url" ]]; then
       return 0
+    fi
+
+    # For local services, treat same origin as duplicate regardless of path.
+    if [[ "$local_origin_dedup" == "1" && "$target_is_local" == "1" ]] && is_local_browser_url "$open_url"; then
+      local open_origin
+      open_origin="$(url_origin_key "$open_url")"
+      if [[ "$open_origin" == "$target_origin" ]]; then
+        return 0
+      fi
     fi
   done <<< "$result"
 
@@ -768,8 +874,19 @@ cmd_update() {
 
 cmd_start() {
   header "Project Manager — Start"
+  start_project_manager "foreground"
+}
+
+cmd_start_background() {
+  header "Project Manager — Start (background)"
+  start_project_manager "background"
+}
+
+start_project_manager() {
+  local mode="${1:-foreground}"
   local pm_url="http://localhost:${DEV_PORT}/"
   local dev_server_running=0
+  local log_file="$SCRIPT_DIR/.project-manager/dev-logs/project-manager-desktop.log"
 
   if is_port_listening "$DEV_PORT"; then
     dev_server_running=1
@@ -789,6 +906,20 @@ cmd_start() {
   cd "$SCRIPT_DIR"
   ensure_dev_port_available
   maybe_open_local_url "$pm_url" "$dev_server_running"
+
+  if [[ "$mode" == "background" ]]; then
+    if is_port_listening "$DEV_PORT" && [[ "$dev_server_running" == "1" ]]; then
+      success "Project Manager web app already running on port $DEV_PORT"
+    fi
+    start_background_service \
+      "Project Manager desktop app" \
+      "$log_file" \
+      npm run tauri:dev
+    wait_for_port "$DEV_PORT" "Project Manager web app" || true
+    print_app_success "Project Manager desktop app" "$DEV_PORT" "$pm_url" "$log_file"
+    return 0
+  fi
+
   echo -e "${CYAN}Launching Project Manager desktop app…${RESET}"
   echo -e "${CYAN}(Next.js will start on port ${DEV_PORT}, Tauri window will open shortly)${RESET}"
   echo ""
@@ -941,23 +1072,20 @@ cmd_all() {
     cmd_install
   fi
 
-  cmd_hermes
+  cmd_start_background
   cmd_openclaw
+  cmd_hermes
   cmd_aux
 
   header "Launch Summary"
-  success "Project-scoped apps are ready"
-  echo "  Project Manager Desktop: starting next (Next.js dev port $DEV_PORT)"
+  success "Project-scoped apps are ready (PM -> OpenClaw -> Hermes -> Aux)"
+  echo "  Project Manager Desktop: started (Next.js dev port $DEV_PORT)"
   echo "  Hermes Agent Dashboard:  http://127.0.0.1:${HERMES_PORT}"
   echo "  OpenClaw Dashboard:      http://127.0.0.1:${OPENCLAW_PORT}/"
   echo "  Ollama API:              $OLLAMA_URL"
   echo "  Open WebUI:              $OPENWEBUI_URL"
   echo "  ComfyUI:                 $COMFYUI_URL"
   echo "  Logs:                    .project-manager/dev-logs/"
-  echo ""
-
-  # Finally start PM
-  cmd_start
 }
 
 cmd_core() {
@@ -972,20 +1100,17 @@ cmd_core() {
     cmd_install
   fi
 
-  cmd_hermes
+  cmd_start_background
   cmd_openclaw
+  cmd_hermes
 
   header "Launch Summary"
-  success "Core apps are ready"
-  echo "  Project Manager Desktop: starting next (Next.js dev port $DEV_PORT)"
+  success "Core apps are ready (PM -> OpenClaw -> Hermes)"
+  echo "  Project Manager Desktop: started (Next.js dev port $DEV_PORT)"
   echo "  Project Manager Web App: http://localhost:${DEV_PORT}/"
   echo "  Hermes Agent Dashboard:  http://127.0.0.1:${HERMES_PORT}"
   echo "  OpenClaw Dashboard:      http://127.0.0.1:${OPENCLAW_PORT}/"
   echo "  Logs:                    .project-manager/dev-logs/"
-  echo ""
-
-  # Finally start PM
-  cmd_start
 }
 
 cmd_stop() {

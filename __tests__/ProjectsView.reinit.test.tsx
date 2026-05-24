@@ -5,9 +5,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProjectsView } from '../app/ui/views/ProjectsView';
 import type { Feature, ProjectEntry, ProjectManagerConfig } from '../lib/types';
 import type { ScanResult } from '../lib/scanner/shared';
+import type { RunProjectScanOptions } from '../lib/scanner/runProjectScan';
 
 const { runProjectScanMock, applyScanConfigToProjectMock } = vi.hoisted(() => ({
-  runProjectScanMock: vi.fn<(root: string) => Promise<ScanResult>>(),
+  runProjectScanMock: vi.fn<(root: string, options?: RunProjectScanOptions) => Promise<ScanResult>>(),
   applyScanConfigToProjectMock: vi.fn(),
 }));
 
@@ -21,7 +22,7 @@ vi.mock('../lib/keys/loadProviderKey', () => ({
 }));
 
 vi.mock('../lib/scanner/runProjectScan', () => ({
-  runProjectScan: (root: string) => runProjectScanMock(root),
+  runProjectScan: (root: string, options?: RunProjectScanOptions) => runProjectScanMock(root, options),
 }));
 
 vi.mock('../lib/storage', async () => {
@@ -133,10 +134,80 @@ describe('ProjectsView initialize actions', () => {
     await user.click(button);
 
     await waitFor(() => {
-      expect(runProjectScanMock).toHaveBeenCalledWith('/tmp/ready-project-2');
+      expect(runProjectScanMock).toHaveBeenCalledWith(
+        '/tmp/ready-project-2',
+        expect.objectContaining({ onProgress: expect.any(Function) }),
+      );
     });
-    expect(applyScanConfigToProjectMock).toHaveBeenCalledWith(readyProject, scanned);
+    expect(applyScanConfigToProjectMock).toHaveBeenCalledWith(readyProject, scanned, {
+      sectionCandidates: undefined,
+      inventoryPaths: undefined,
+    });
     expect(onUpdateProject).toHaveBeenCalledWith(updatedEntry);
   });
-});
 
+  it('shows initialization trace events and clearer fallback notice', async () => {
+    const user = userEvent.setup();
+    const readyProject = entry('ready-3', 'ready-project-3', { features: [feature('F03')] });
+    const scanned = config('ready-project-3', [feature('F03')]);
+    const updatedEntry: ProjectEntry = {
+      ...readyProject,
+      config: scanned,
+    };
+
+    runProjectScanMock.mockImplementation(async (_root, options) => {
+      options?.onProgress?.({
+        stage: 'scan_files',
+        status: 'running',
+        message: 'Scanning project files and key documents',
+        timestamp: '2026-05-24T00:00:00.000Z',
+      });
+      options?.onProgress?.({
+        stage: 'provider_attempt',
+        status: 'warning',
+        message: 'gemini/gemini-pro failed',
+        timestamp: '2026-05-24T00:00:01.000Z',
+        provider: 'gemini',
+        modelId: 'gemini-pro',
+        outcome: 'retryable',
+        error: 'model not found',
+      });
+      options?.onProgress?.({
+        stage: 'provider_attempt',
+        status: 'success',
+        message: 'perplexity/sonar produced 1 feature',
+        timestamp: '2026-05-24T00:00:02.000Z',
+        provider: 'perplexity',
+        modelId: 'sonar',
+        outcome: 'success',
+        featureCount: 1,
+      });
+      return {
+        success: true,
+        config: scanned,
+        providerUsed: 'perplexity',
+        usedModelId: 'sonar',
+        attempts: [
+          { provider: 'gemini', modelId: 'gemini-pro', outcome: 'retryable', error: 'model not found' },
+          { provider: 'openai', modelId: 'gpt-4o', outcome: 'fatal', error: 'insufficient quota' },
+          { provider: 'perplexity', modelId: 'sonar', outcome: 'success' },
+        ],
+      } as unknown as ScanResult;
+    });
+    applyScanConfigToProjectMock.mockResolvedValue(updatedEntry);
+
+    renderView([readyProject]);
+    await user.click(await screen.findByRole('button', { name: /re-init/i }));
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Initialization Trace/i).length).toBeGreaterThan(0);
+    });
+    expect(screen.getByText(/Scanning project files and key documents/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/model not found/i).length).toBeGreaterThan(0);
+    expect(
+      await screen.findByText(/initialized successfully with perplexity\/sonar/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/gemini\/gemini-pro \(model not found\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/openai\/gpt-4o \(Rate limit or quota issue\)/i)).toBeInTheDocument();
+  });
+});

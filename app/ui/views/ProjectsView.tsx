@@ -26,7 +26,16 @@ import {
   projectNeedsScan,
   setupStatusLabel,
 } from '../../../lib/projectSetup';
-import { runProjectScan } from '../../../lib/scanner/runProjectScan';
+import {
+  runProjectScan,
+  type ProviderAttempt,
+  type ScanProgressEvent,
+} from '../../../lib/scanner/runProjectScan';
+import {
+  formatAttemptFailure,
+  formatProviderAttempt,
+  summarizeScanError,
+} from '../../../lib/scanner/errorSummary';
 import {
   applyScanConfigToProject,
   buildProjectEntryFromPath,
@@ -53,6 +62,83 @@ function isMissingConfigError(message: string): boolean {
   return /No such file or directory|Is a directory|os error 2\b|os error 21\b|CONFIG_EXISTS/i.test(
     message,
   );
+}
+
+function normalizeGithubRepoUrlInput(value: string): string {
+  const trimmed = value.trim().replace(/\/+$/, '').replace(/\.git$/, '');
+  if (!trimmed) return '';
+
+  let path = '';
+  if (trimmed.startsWith('git@github.com:')) {
+    path = trimmed.slice('git@github.com:'.length);
+  } else if (trimmed.startsWith('ssh://git@github.com/')) {
+    path = trimmed.slice('ssh://git@github.com/'.length);
+  } else if (trimmed.startsWith('https://github.com/')) {
+    path = trimmed.slice('https://github.com/'.length);
+  } else if (trimmed.startsWith('http://github.com/')) {
+    path = trimmed.slice('http://github.com/'.length);
+  }
+
+  const [owner, repo] = path.split('/');
+  if (!owner || !repo) {
+    throw new Error('Use a GitHub repository URL like https://github.com/owner/repo.');
+  }
+  return `https://github.com/${owner}/${repo.replace(/\.git$/, '')}`;
+}
+
+type InitTraceStatus = 'running' | 'success' | 'warning' | 'failed';
+
+interface InitTraceEntry {
+  id: string;
+  status: InitTraceStatus;
+  label: string;
+  detail?: string;
+  timestamp: string;
+  provider?: LlmProviderId;
+  modelId?: string;
+}
+
+/**
+ * Result of one full Initialize run — used by the row to display fallback
+ * notices and the trace panel.
+ */
+interface InitializeOutcome {
+  entry: ProjectEntry;
+  providerUsed?: LlmProviderId;
+  usedModelId?: string;
+  fallbacks: ProviderAttempt[];
+}
+
+function shortError(raw: string | undefined): string | undefined {
+  const oneLine = summarizeScanError(raw);
+  if (!oneLine) return undefined;
+  return oneLine.length > 180 ? `${oneLine.slice(0, 177)}...` : oneLine;
+}
+
+function scanProgressToTrace(event: ScanProgressEvent): InitTraceEntry {
+  const status: InitTraceStatus =
+    event.status === 'pending' ? 'running' : event.status;
+  return {
+    id: `${event.timestamp}-${event.stage}-${event.provider ?? ''}-${event.modelId ?? ''}-${event.status}`,
+    status,
+    label: event.message,
+    detail: shortError(event.error),
+    timestamp: event.timestamp,
+    provider: event.provider,
+    modelId: event.modelId,
+  };
+}
+
+function buildFallbackNotice(projectName: string, outcome: InitializeOutcome): string | null {
+  if (!outcome.providerUsed || outcome.fallbacks.length === 0) return null;
+  const successful = outcome.usedModelId
+    ? `${outcome.providerUsed}/${outcome.usedModelId}`
+    : outcome.providerUsed;
+  const failedCount = outcome.fallbacks.length;
+  const failures = outcome.fallbacks.map(formatAttemptFailure).join('; ');
+  return `${projectName}: initialized successfully with ${successful}. ${failedCount} earlier model attempt${
+    failedCount === 1 ? '' : 's'
+  } failed: ${failures}. Open the initialization trace for the full sanitized details.`;
 }
 
 export function ProjectsView({
@@ -87,12 +173,17 @@ export function ProjectsView({
   const [pickingFolders, setPickingFolders] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncDone, setSyncDone] = useState(false);
+  const [repoEditProjectId, setRepoEditProjectId] = useState<string | null>(null);
+  const [repoUrlDraft, setRepoUrlDraft] = useState('');
+  const [repoUrlBusyId, setRepoUrlBusyId] = useState<string | null>(null);
+  const [repoUrlErrors, setRepoUrlErrors] = useState<Record<string, string>>({});
   const [postImportScanQueue, setPostImportScanQueue] = useState<ProjectEntry[] | null>(null);
   const [batchScanning, setBatchScanning] = useState(false);
   // Per-row Initialize state. One project at a time can be busy initializing;
   // any failures land in initErrors keyed by project id and surface below the row.
   const [initializingIds, setInitializingIds] = useState<Set<string>>(new Set());
   const [initErrors, setInitErrors] = useState<Record<string, string>>({});
+  const [initTrace, setInitTrace] = useState<Record<string, InitTraceEntry[]>>({});
   /**
    * Three-colour notice (success / warning / error) replacing the old single
    * emerald string. Same slot in the UI, but the kind decides the colour so
@@ -158,9 +249,10 @@ export function ProjectsView({
     setAddError('');
     try {
       const { fetchGithubRepo } = await import('../../../lib/bridge');
-      const ghFeatures = await fetchGithubRepo(githubToken, githubUrl);
+      const normalizedGithubUrl = normalizeGithubRepoUrlInput(githubUrl);
+      const ghFeatures = await fetchGithubRepo(githubToken, normalizedGithubUrl);
 
-      const repoName = githubUrl.trim().replace(/\/$/, '').split('/').slice(-2).join('/');
+      const repoName = normalizedGithubUrl.split('/').slice(-2).join('/');
       const features: Feature[] = ghFeatures.map((f) => ({
         id: f.id,
         name: f.name,
@@ -173,12 +265,17 @@ export function ProjectsView({
 
       const config: ProjectManagerConfig = migrateConfig({
         schemaVersion: 2,
-        project: { name: repoName, root: githubUrl.trim(), defaultIDE: 'Cursor' },
+        project: {
+          name: repoName,
+          root: normalizedGithubUrl,
+          githubUrl: normalizedGithubUrl,
+          defaultIDE: 'Cursor',
+        },
         features,
         adapters: { ides: [], agents: [] },
       });
 
-      onAddProject({ id: `gh-${Date.now()}`, config, configPath: githubUrl.trim() });
+      onAddProject({ id: `gh-${Date.now()}`, config, configPath: normalizedGithubUrl });
       setShowAddModal(false);
       setGithubUrl('');
     } catch (e) {
@@ -201,6 +298,90 @@ export function ProjectsView({
       onAddProject(entry);
     }
     return entry;
+  };
+
+  const beginRepoUrlEdit = (project: ProjectEntry) => {
+    setRepoEditProjectId(project.id);
+    setRepoUrlDraft(project.config.project.githubUrl ?? '');
+    setRepoUrlErrors((prev) => {
+      if (!(project.id in prev)) return prev;
+      const next = { ...prev };
+      delete next[project.id];
+      return next;
+    });
+  };
+
+  const saveProjectRepoUrl = async (project: ProjectEntry, rawUrl: string) => {
+    setRepoUrlBusyId(project.id);
+    setRepoUrlErrors((prev) => {
+      if (!(project.id in prev)) return prev;
+      const next = { ...prev };
+      delete next[project.id];
+      return next;
+    });
+    try {
+      const normalized = normalizeGithubRepoUrlInput(rawUrl);
+      const updatedConfig: ProjectManagerConfig = {
+        ...project.config,
+        updatedAt: new Date().toISOString(),
+        updatedBy: 'project-manager',
+        project: {
+          ...project.config.project,
+          githubUrl: normalized || undefined,
+        },
+      };
+      const updatedEntry: ProjectEntry = { ...project, config: updatedConfig };
+      if (isTauri && !project.configPath.startsWith('https://') && !project.configMissing) {
+        const { writeConfig } = await import('../../../lib/bridge');
+        await writeConfig(project.configPath, updatedConfig);
+      }
+      onUpdateProject(updatedEntry);
+      setRepoEditProjectId(null);
+      setRepoUrlDraft('');
+      setNotice({
+        kind: normalized ? 'success' : 'warning',
+        text: normalized
+          ? `${project.config.project.name}: GitHub repository URL saved.`
+          : `${project.config.project.name}: GitHub repository URL cleared.`,
+      });
+    } catch (e) {
+      setRepoUrlErrors((prev) => ({
+        ...prev,
+        [project.id]: e instanceof Error ? e.message : String(e),
+      }));
+    } finally {
+      setRepoUrlBusyId(null);
+    }
+  };
+
+  const detectAndSaveProjectRepoUrl = async (project: ProjectEntry) => {
+    if (!isTauri || project.config.project.root.startsWith('https://')) return;
+    setRepoUrlBusyId(project.id);
+    setRepoUrlErrors((prev) => {
+      if (!(project.id in prev)) return prev;
+      const next = { ...prev };
+      delete next[project.id];
+      return next;
+    });
+    try {
+      const { detectGithubRepoUrl } = await import('../../../lib/bridge');
+      const detected = await detectGithubRepoUrl(project.config.project.root);
+      if (!detected) {
+        setRepoUrlErrors((prev) => ({
+          ...prev,
+          [project.id]: 'No GitHub origin remote was found for this local project.',
+        }));
+        return;
+      }
+      await saveProjectRepoUrl(project, detected);
+    } catch (e) {
+      setRepoUrlErrors((prev) => ({
+        ...prev,
+        [project.id]: e instanceof Error ? e.message : String(e),
+      }));
+    } finally {
+      setRepoUrlBusyId(null);
+    }
   };
 
   const handleAddLocal = async () => {
@@ -330,23 +511,87 @@ export function ProjectsView({
   const formatScanError = (raw: string): string =>
     raw === 'NO_PROVIDER_CONFIGURED'
       ? 'No AI provider is configured. Open Keys to save at least one API key, then enable it in Settings.'
-      : raw;
+      : summarizeScanError(raw) ?? raw;
 
-  /**
-   * Result of one full Initialize run — used by the row to display the
-   * fallback notice ("Initialized via OpenAI — Anthropic failed: …").
-   */
-  interface InitializeOutcome {
-    entry: ProjectEntry;
-    providerUsed?: LlmProviderId;
-    fallbacks: { provider: LlmProviderId; error: string }[];
-  }
+  const resetInitTrace = (projectId: string) => {
+    setInitTrace((prev) => ({ ...prev, [projectId]: [] }));
+  };
+
+  const appendInitTrace = (projectId: string, entry: InitTraceEntry) => {
+    setInitTrace((prev) => ({
+      ...prev,
+      [projectId]: [...(prev[projectId] ?? []), entry].slice(-40),
+    }));
+  };
+
+  const persistInitializationRun = async (
+    project: ProjectEntry,
+    result: Awaited<ReturnType<typeof runProjectScan>>,
+    trace: InitTraceEntry[],
+  ) => {
+    if (!isTauri || project.config.project.root.startsWith('https://')) return;
+    try {
+      const { writeFile } = await import('../../../lib/bridge');
+      const now = new Date().toISOString();
+      const fileSafeNow = now.replace(/[:.]/g, '-');
+      const payload = {
+        schemaVersion: 1,
+        project: {
+          name: project.config.project.name,
+          root: project.config.project.root,
+        },
+        startedAt: trace[0]?.timestamp ?? now,
+        completedAt: now,
+        success: result.success,
+        providerUsed: result.providerUsed,
+        usedModelId: result.usedModelId,
+        attempts: result.attempts?.map((attempt) => ({
+          provider: attempt.provider,
+          modelId: attempt.modelId,
+          outcome: attempt.outcome,
+          error: shortError(attempt.error),
+        })),
+        contextSummary: result.context
+          ? {
+              sectionCandidateCount: result.context.sectionCandidates?.length ?? 0,
+              inventoryPathCount: result.context.inventoryPaths?.length ?? 0,
+              featureCount: result.config?.features.length ?? 0,
+            }
+          : undefined,
+        validationReport: result.validationReport,
+        reviewSummary: result.reviewSummary,
+        quorumSummary: result.quorumSummary,
+        trace: trace.map((entry) => ({
+          status: entry.status,
+          label: entry.label,
+          detail: entry.detail,
+          timestamp: entry.timestamp,
+          provider: entry.provider,
+          modelId: entry.modelId,
+        })),
+      };
+      await writeFile(
+        `${project.config.project.root.replace(/\/+$/, '')}/.project-manager/initialization-runs/${fileSafeNow}.json`,
+        JSON.stringify(payload, null, 2),
+      );
+    } catch {
+      // Trace persistence is best-effort; it should never make initialization fail.
+    }
+  };
 
   const runScanForProject = async (project: ProjectEntry): Promise<InitializeOutcome> => {
     const root = project.config.project.root;
     if (!root?.trim()) throw new Error('Project root is missing');
-    const result = await runProjectScan(root);
+    const trace: InitTraceEntry[] = [];
+    const recordTrace = (entry: InitTraceEntry) => {
+      trace.push(entry);
+      appendInitTrace(project.id, entry);
+    };
+    const result = await runProjectScan(root, {
+      onProgress: (event) => recordTrace(scanProgressToTrace(event)),
+    });
     if (!result.success || !result.config) {
+      await persistInitializationRun(project, result, trace);
       const err = result.error || 'AI Scan failed';
       if (err === 'NO_PROVIDER_CONFIGURED') {
         // Surface the key state to the rest of the view so the banner appears
@@ -355,12 +600,40 @@ export function ProjectsView({
       }
       throw new Error(err);
     }
-    const entry = await applyScanConfigToProject(project, result.config);
+    recordTrace({
+      id: `${Date.now()}-validate`,
+      status: 'running',
+      label: 'Validating located sections and evidence paths',
+      timestamp: new Date().toISOString(),
+    });
+    const entry = await applyScanConfigToProject(project, result.config, {
+      sectionCandidates: result.context?.sectionCandidates,
+      inventoryPaths: result.context?.inventoryPaths,
+    });
+    const validationReport = result.validationReport;
+    recordTrace({
+      id: `${Date.now()}-write`,
+      status: validationReport && validationReport.reviewCount > 0 ? 'warning' : 'success',
+      label: `Wrote ${entry.config.features.length} feature${
+        entry.config.features.length === 1 ? '' : 's'
+      } to .project-manager/config.json${
+        validationReport
+          ? ` (${validationReport.highConfidenceCount} high confidence, ${validationReport.reviewCount} need review)`
+          : ''
+      }`,
+      timestamp: new Date().toISOString(),
+    });
+    await persistInitializationRun(project, result, trace);
     const fallbacks =
       result.attempts
         ?.filter((a) => a.outcome !== 'success' && a.error)
-        .map((a) => ({ provider: a.provider, error: a.error! })) ?? [];
-    return { entry, providerUsed: result.providerUsed, fallbacks };
+        ?? [];
+    return {
+      entry,
+      providerUsed: result.providerUsed,
+      usedModelId: result.usedModelId,
+      fallbacks,
+    };
   };
 
   /**
@@ -373,6 +646,13 @@ export function ProjectsView({
       setInitErrors((prev) => ({ ...prev, [project.id]: 'NO_PROVIDER_CONFIGURED' }));
       return;
     }
+    resetInitTrace(project.id);
+    appendInitTrace(project.id, {
+      id: `${Date.now()}-queued`,
+      status: 'running',
+      label: 'Initializing project scan',
+      timestamp: new Date().toISOString(),
+    });
     setInitializingIds((prev) => new Set(prev).add(project.id));
     setInitErrors((prev) => {
       if (!(project.id in prev)) return prev;
@@ -383,14 +663,16 @@ export function ProjectsView({
     try {
       const outcome = await runScanForProject(project);
       onUpdateProject(outcome.entry);
-      if (outcome.fallbacks.length > 0 && outcome.providerUsed) {
-        // Tell the user the chain actually saved them — e.g. Anthropic
-        // rate-limited but OpenAI succeeded.
+      const fallbackNotice = buildFallbackNotice(project.config.project.name, outcome);
+      if (fallbackNotice) {
         setNotice({
           kind: 'warning',
-          text: `${project.config.project.name}: initialized via ${outcome.providerUsed} after ${outcome.fallbacks
-            .map((f) => f.provider)
-            .join(', ')} failed.`,
+          text: fallbackNotice,
+        });
+      } else {
+        setNotice({
+          kind: 'success',
+          text: `${project.config.project.name}: initialized successfully.`,
         });
       }
     } catch (e) {
@@ -425,6 +707,13 @@ export function ProjectsView({
     let succeeded = 0;
     for (const project of targets) {
       try {
+        resetInitTrace(project.id);
+        appendInitTrace(project.id, {
+          id: `${Date.now()}-batch-queued`,
+          status: 'running',
+          label: 'Queued by batch AI Scan',
+          timestamp: new Date().toISOString(),
+        });
         const outcome = await runScanForProject(project);
         onUpdateProject(outcome.entry);
         succeeded++;
@@ -524,6 +813,12 @@ export function ProjectsView({
     success: 'border-emerald-200/25 bg-emerald-500/10 text-emerald-100',
     warning: 'border-amber-200/30 bg-amber-500/10 text-amber-100',
     error: 'border-red-400/30 bg-red-500/10 text-red-200',
+  };
+  const traceStatusClasses: Record<InitTraceStatus, string> = {
+    running: 'border-cyan-300/35 bg-cyan-400/15 text-cyan-100',
+    success: 'border-emerald-300/35 bg-emerald-400/15 text-emerald-100',
+    warning: 'border-amber-300/35 bg-amber-400/15 text-amber-100',
+    failed: 'border-red-300/35 bg-red-400/15 text-red-100',
   };
 
   // Show the preflight banner once we've confirmed the key is missing AND the
@@ -652,9 +947,14 @@ export function ProjectsView({
           const isDashboardSelected = selectedDashboardProjectIds.includes(project.id);
           const isInitializing = initializingIds.has(project.id);
           const initError = initErrors[project.id];
+          const initTraceEntries = initTrace[project.id] ?? [];
           const isGithub = project.configPath?.startsWith('https://github.com/') ?? false;
           const setupStatus = getProjectSetupStatus(project);
           const isReady = setupStatus === 'ready';
+          const repoUrl = project.config.project.githubUrl?.trim() ?? '';
+          const isEditingRepoUrl = repoEditProjectId === project.id;
+          const repoUrlBusy = repoUrlBusyId === project.id;
+          const repoUrlError = repoUrlErrors[project.id];
           // GitHub repos have their own feature-sync path — the Initialize
           // button doesn't apply to them. Local projects always show the
           // button, but it's disabled in the browser dev shell because
@@ -817,6 +1117,138 @@ export function ProjectsView({
                   </div>
                 </div>
               </div>
+              <div
+                className="flex flex-wrap items-center gap-2 border-t border-stone-200/10 bg-black/10 px-4 py-2 text-[11px]"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Github size={12} className={repoUrl ? 'text-emerald-300' : 'text-amber-300'} />
+                <span className="shrink-0 uppercase tracking-[0.12em] text-stone-500">
+                  GitHub
+                </span>
+                {isEditingRepoUrl ? (
+                  <>
+                    <input
+                      value={repoUrlDraft}
+                      onChange={(e) => setRepoUrlDraft(e.target.value)}
+                      placeholder="https://github.com/owner/repo"
+                      className="min-w-[220px] flex-1 border border-stone-200/20 bg-[rgb(var(--pm-input))] px-2 py-1 font-mono text-[11px] text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/30"
+                    />
+                    <button
+                      type="button"
+                      disabled={repoUrlBusy}
+                      onClick={() => void saveProjectRepoUrl(project, repoUrlDraft)}
+                      className="inline-flex h-7 items-center gap-1 border border-emerald-300/35 bg-emerald-500/15 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-emerald-100 hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {repoUrlBusy ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      disabled={repoUrlBusy}
+                      onClick={() => {
+                        setRepoEditProjectId(null);
+                        setRepoUrlDraft('');
+                      }}
+                      className="inline-flex h-7 items-center gap-1 border border-stone-200/20 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-stone-300 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <X size={12} />
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span
+                      className={`min-w-0 flex-1 break-all font-mono ${
+                        repoUrl ? 'text-stone-300' : 'text-amber-200'
+                      }`}
+                    >
+                      {repoUrl || 'No GitHub repository URL configured'}
+                    </span>
+                    {!repoUrl && isTauri && !project.config.project.root.startsWith('https://') && (
+                      <button
+                        type="button"
+                        disabled={repoUrlBusy}
+                        onClick={() => void detectAndSaveProjectRepoUrl(project)}
+                        className="inline-flex h-7 items-center gap-1 border border-cyan-300/35 bg-cyan-500/15 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-cyan-100 hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {repoUrlBusy ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                        Detect
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      disabled={repoUrlBusy}
+                      onClick={() => beginRepoUrlEdit(project)}
+                      className="inline-flex h-7 items-center gap-1 border border-stone-200/20 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-stone-300 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {repoUrl ? 'Edit URL' : 'Add URL'}
+                    </button>
+                  </>
+                )}
+                {repoUrlError && (
+                  <span className="basis-full text-[11px] text-red-200">
+                    GitHub URL error: {repoUrlError}
+                  </span>
+                )}
+              </div>
+              {initTraceEntries.length > 0 && (
+                <div
+                  className="border-t border-stone-200/10 bg-black/15 px-4 py-3"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      {isInitializing ? (
+                        <Loader2 size={13} className="animate-spin text-cyan-200" />
+                      ) : initError ? (
+                        <AlertTriangle size={13} className="text-red-200" />
+                      ) : (
+                        <Check size={13} className="text-emerald-200" />
+                      )}
+                      <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-stone-300">
+                        Initialization Trace
+                      </span>
+                    </div>
+                    <span className="text-[10px] uppercase tracking-[0.12em] text-stone-500">
+                      {initTraceEntries.length} events
+                    </span>
+                  </div>
+                  <ol className="max-h-56 space-y-1 overflow-auto">
+                    {initTraceEntries.slice(-12).map((entry) => (
+                      <li
+                        key={entry.id}
+                        className="grid grid-cols-[72px_minmax(0,1fr)] gap-2 text-[11px] leading-5"
+                      >
+                        <span
+                          className={`inline-flex h-5 items-center justify-center border px-1.5 text-[9px] font-medium uppercase tracking-[0.08em] ${
+                            traceStatusClasses[entry.status]
+                          }`}
+                        >
+                          {entry.status}
+                        </span>
+                        <span className="min-w-0 text-stone-300">
+                          <span>{entry.label}</span>
+                          {(entry.provider || entry.modelId) && (
+                            <span className="ml-2 font-mono text-stone-500">
+                              {entry.provider
+                                ? formatProviderAttempt({
+                                    provider: entry.provider,
+                                    modelId: entry.modelId,
+                                  })
+                                : entry.modelId}
+                            </span>
+                          )}
+                          {entry.detail && (
+                            <span className="block break-words text-[10px] text-stone-500">
+                              {entry.detail}
+                            </span>
+                          )}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
               {initError && (
                 <div className="flex flex-wrap items-start gap-2 border-t border-violet-500/25 bg-violet-900/15 px-4 py-2 text-[11px] text-violet-200">
                   <AlertTriangle size={12} className="mt-0.5 shrink-0" />

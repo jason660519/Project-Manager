@@ -32,6 +32,57 @@ const DASHBOARD_DIR_NAME: &str = ".project-manager";
 const CONFIG_FILENAME: &str = "config.json";
 const LEGACY_CONFIG_FILENAME: &str = ".project-manager.json";
 
+fn normalize_github_remote_url(remote_url: &str) -> Option<String> {
+    let trimmed = remote_url
+        .trim()
+        .trim_end_matches('/')
+        .trim_end_matches(".git");
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let repo_path = if let Some(path) = trimmed.strip_prefix("git@github.com:") {
+        path
+    } else if let Some(path) = trimmed.strip_prefix("ssh://git@github.com/") {
+        path
+    } else if let Some(path) = trimmed.strip_prefix("https://github.com/") {
+        path
+    } else if let Some(path) = trimmed.strip_prefix("http://github.com/") {
+        path
+    } else {
+        return None;
+    };
+
+    let parts: Vec<&str> = repo_path.split('/').collect();
+    if parts.len() < 2 {
+        return None;
+    }
+    let owner = parts[0].trim();
+    let repo = parts[1].trim().trim_end_matches(".git");
+    if owner.is_empty() || repo.is_empty() {
+        return None;
+    }
+
+    Some(format!("https://github.com/{owner}/{repo}"))
+}
+
+#[tauri::command]
+async fn detect_github_repo_url(project_root: String) -> Result<Option<String>, String> {
+    let output = tokio::process::Command::new("git")
+        .args(["-C", project_root.as_str(), "remote", "get-url", "origin"])
+        .output()
+        .await
+        .map_err(|e| format!("Cannot run git remote detection for {project_root}: {e}"))?;
+
+    if !output.status.success() {
+        return Ok(None);
+    }
+
+    let remote = String::from_utf8(output.stdout)
+        .map_err(|e| format!("Git remote URL was not valid UTF-8: {e}"))?;
+    Ok(normalize_github_remote_url(&remote))
+}
+
 /// Read and parse the dashboard config JSON file.
 #[tauri::command]
 async fn read_config(path: String) -> Result<serde_json::Value, String> {
@@ -819,9 +870,9 @@ struct AnthropicResponse {
 
 /// Call any OpenAI-compatible chat-completions endpoint (OpenAI itself,
 /// DeepSeek, Grok, Kimi, OpenRouter, Perplexity, Together, Zhipu, Qwen…).
-/// Bearer-auth + the standard `{messages, model, max_tokens}` body covers
-/// every provider in this family — the only thing that changes between
-/// them is `base_url`.
+/// Bearer-auth + the standard chat-completions body covers every provider in
+/// this family. OpenAI's own endpoint now prefers `max_completion_tokens`;
+/// most compatible providers still expect `max_tokens`.
 ///
 /// Response shape matches `call_anthropic` so the scanner fallback chain
 /// can swap providers without per-provider handling. Session persistence
@@ -838,15 +889,20 @@ async fn call_openai_compatible(
 ) -> Result<AnthropicResponse, String> {
     let client = reqwest::Client::new();
 
+    let is_openai_api = base_url.trim_end_matches('/') == "https://api.openai.com/v1";
+    let token_limit_key = if is_openai_api { "max_completion_tokens" } else { "max_tokens" };
+
     let mut body = serde_json::json!({
         "model": model,
-        "max_tokens": max_tokens,
         "messages": messages,
     });
     if let Some(temp) = temperature {
         if let Some(obj) = body.as_object_mut() {
             obj.insert("temperature".to_string(), serde_json::json!(temp));
         }
+    }
+    if let Some(obj) = body.as_object_mut() {
+        obj.insert(token_limit_key.to_string(), serde_json::json!(max_tokens));
     }
 
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
@@ -1839,41 +1895,61 @@ async fn fetch_github_repo(token: String, repo_url: String) -> Result<Vec<GitHub
 #[tauri::command]
 async fn fetch_github_issues(token: String, repo_url: String) -> Result<Vec<GithubIssue>, String> {
     let (owner, repo) = parse_github_owner_repo(&repo_url)?;
-
-    let body = serde_json::json!({
-        "query": "query($owner:String!,$repo:String!){ repository(owner:$owner,name:$repo){ issues(first:50,states:[OPEN,CLOSED],orderBy:{field:UPDATED_AT,direction:DESC}){ nodes{ id number title body state createdAt updatedAt url author{login} labels(first:10){ nodes{ name } } } } } }",
-        "variables": { "owner": owner, "repo": repo }
-    });
-
     let client = reqwest::Client::new();
-    let res = client
-        .post("https://api.github.com/graphql")
-        .header("Authorization", format!("Bearer {token}"))
-        .header("User-Agent", "ProjectManager/0.1.0")
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("Network error: {e}"))?;
-
-    if !res.status().is_success() {
-        let status = res.status();
-        let text = res.text().await.unwrap_or_default();
-        return Err(format!("GitHub API {status}: {text}"));
-    }
-
-    let data: serde_json::Value = res.json().await.map_err(|e| format!("JSON parse: {e}"))?;
-
-    if let Some(errors) = data["errors"].as_array() {
-        let msg: Vec<&str> = errors.iter().filter_map(|e| e["message"].as_str()).collect();
-        return Err(format!("GitHub GraphQL: {}", msg.join(", ")));
-    }
-
     let mut issues: Vec<GithubIssue> = Vec::new();
+    let mut after: Option<String> = None;
 
-    if let Some(issue_nodes) = data["data"]["repository"]["issues"]["nodes"].as_array() {
-        for issue_data in issue_nodes {
-            // GitHub GraphQL "node id" is base64-encoded and not surfaced to the UI.
-            issues.push(map_graphql_issue(issue_data));
+    loop {
+        let body = serde_json::json!({
+            "query": "query($owner:String!,$repo:String!,$after:String){ repository(owner:$owner,name:$repo){ issues(first:100,after:$after,states:[OPEN,CLOSED],orderBy:{field:UPDATED_AT,direction:DESC}){ nodes{ id number title body state createdAt updatedAt url author{login} labels(first:10){ nodes{ name } } } pageInfo{ hasNextPage endCursor } } } }",
+            "variables": { "owner": owner, "repo": repo, "after": after.clone() }
+        });
+
+        let res = client
+            .post("https://api.github.com/graphql")
+            .header("Authorization", format!("Bearer {token}"))
+            .header("User-Agent", "ProjectManager/0.1.0")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("Network error: {e}"))?;
+
+        if !res.status().is_success() {
+            let status = res.status();
+            let text = res.text().await.unwrap_or_default();
+            return Err(format!("GitHub API {status}: {text}"));
+        }
+
+        let data: serde_json::Value = res.json().await.map_err(|e| format!("JSON parse: {e}"))?;
+
+        if let Some(errors) = data["errors"].as_array() {
+            let msg: Vec<&str> = errors
+                .iter()
+                .filter_map(|e| e["message"].as_str())
+                .collect();
+            return Err(format!("GitHub GraphQL: {}", msg.join(", ")));
+        }
+
+        let issue_page = &data["data"]["repository"]["issues"];
+        if let Some(issue_nodes) = issue_page["nodes"].as_array() {
+            for issue_data in issue_nodes {
+                // GitHub GraphQL "node id" is base64-encoded and not surfaced to the UI.
+                issues.push(map_graphql_issue(issue_data));
+            }
+        }
+
+        if issue_page["pageInfo"]["hasNextPage"]
+            .as_bool()
+            .unwrap_or(false)
+        {
+            after = issue_page["pageInfo"]["endCursor"]
+                .as_str()
+                .map(String::from);
+            if after.is_none() {
+                break;
+            }
+        } else {
+            break;
         }
     }
 
@@ -4177,6 +4253,7 @@ pub fn run() {
             list_registry,
             add_to_registry,
             remove_from_registry,
+            detect_github_repo_url,
             scan_projects,
             spawn_agent,
             spawn_terminal,

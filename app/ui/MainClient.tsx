@@ -42,9 +42,6 @@ import { CronJobsView } from './views/CronJobsView';
 import { LogsView } from './views/LogsView';
 import { SessionsView } from './views/SessionsView';
 import { KeysView } from './views/KeysView';
-import { EnvImportModal } from './views/_components/EnvImportModal';
-import { parseEnvText } from '../../lib/keys/envParser';
-import { detectProviders } from '../../lib/keys/detectProviders';
 import { SettingsView } from './views/SettingsView';
 import { DocumentationView } from './views/DocumentationView';
 import { CompanyStandardsView } from './views/CompanyStandardsView';
@@ -356,14 +353,32 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
     if (!isTauri || !storageInitialized) return;
     let cancelled = false;
     (async () => {
-      const { readConfig } = await import('../../lib/bridge');
+      const { detectGithubRepoUrl, readConfig, writeConfig } = await import('../../lib/bridge');
       const localProjects = projects.filter(
         (p) => p.configPath && !p.configPath.startsWith('https://'),
       );
       const reads = await Promise.all(
         localProjects.map(async (p) => {
           try {
-            const disk = await readConfig(p.configPath);
+            let disk = await readConfig(p.configPath);
+            if (!disk.project.githubUrl) {
+              const root =
+                disk.project.root ||
+                p.config.project.root ||
+                p.configPath
+                  .replace(/\/\.project-manager\/config\.json$/, '')
+                  .replace(/\/\.project-manager\.json$/, '');
+              const detected = root ? await detectGithubRepoUrl(root).catch(() => null) : null;
+              if (detected) {
+                disk = {
+                  ...disk,
+                  updatedAt: new Date().toISOString(),
+                  updatedBy: 'project-manager-git-origin',
+                  project: { ...disk.project, githubUrl: detected },
+                };
+                await writeConfig(p.configPath, disk).catch(() => {});
+              }
+            }
             return { path: p.configPath, config: disk };
           } catch {
             return null;
@@ -734,11 +749,6 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
     [handleRunStart],
   );
 
-  // Surfaces the .env import modal after a project is added when its root
-  // contains real credentials we recognise. Skipped for GitHub-sourced
-  // projects (no FS) and dev mode (no Tauri scan command).
-  const [pendingEnvImportRoot, setPendingEnvImportRoot] = useState<string>('');
-
   const handleUpdateProject = useCallback((entry: ProjectEntry) => {
     setProjects((prev) => prev.map((p) => (p.id === entry.id ? entry : p)));
   }, []);
@@ -763,24 +773,6 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
       void (async () => {
         const { addToRegistry } = await import('../../lib/bridge');
         await addToRegistry(entry.configPath).catch(() => {});
-      })();
-      // Pre-flight scan so we only open the modal when there's actually
-      // something worth importing. Anything that fails (no .env, parse error,
-      // no provider match) silently drops the prompt.
-      void (async () => {
-        try {
-          const { scanEnvFiles } = await import('../../lib/bridge');
-          const files = await scanEnvFiles(root);
-          for (const f of files) {
-            const detected = detectProviders(parseEnvText(f.content));
-            if (detected.some((d) => d.status !== 'empty')) {
-              setPendingEnvImportRoot(root);
-              return;
-            }
-          }
-        } catch {
-          /* silent — pre-flight is best-effort */
-        }
       })();
     },
     [isTauri],
@@ -1292,13 +1284,6 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
         />
       )}
       {currentView === 'company-standards' && <CompanyStandardsView />}
-      {pendingEnvImportRoot && (
-        <EnvImportModal
-          projectRoot={pendingEnvImportRoot}
-          onClose={() => setPendingEnvImportRoot('')}
-          onImported={() => setPendingEnvImportRoot('')}
-        />
-      )}
     </AppShell>
   );
 }

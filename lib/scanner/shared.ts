@@ -4,11 +4,18 @@
  */
 
 import type { ProjectManagerConfig } from '../types';
+import {
+  formatSectionCandidatesForPrompt,
+  type SectionCandidate,
+} from './sectionInventory';
 
 export interface ProjectContext {
   source: string;
   projectName: string;
   directoryTree: string;
+  sectionCandidates?: SectionCandidate[];
+  /** Relative file and directory paths discovered during deterministic inventory. */
+  inventoryPaths?: string[];
   keyFiles: Record<string, string>;
   detectedIDEs: string[];
   detectedAgents: string[];
@@ -56,6 +63,9 @@ export function buildScanPrompt(context: ProjectContext): string {
   const keyFilesBlock = Object.entries(context.keyFiles)
     .map(([name, content]) => `### ${name}\n\`\`\`\n${content}\n\`\`\``)
     .join('\n\n');
+  const sectionCandidatesBlock = formatSectionCandidatesForPrompt(
+    context.sectionCandidates ?? [],
+  );
 
   return `You are a project analyst for Project Manager, a developer productivity tool.
 Analyse the following project structure and generate a Project Manager configuration file.
@@ -75,7 +85,7 @@ Return ONLY a valid JSON object (no markdown fences, no commentary). The JSON mu
       "id": "<short unique id, e.g. F01>",
       "name": "<descriptive feature name>",
       "category": "<e.g. Frontend/UI, Backend/API, Core/Auth, DevOps/CI>",
-      "locatedSection": "<optional: route/module/area where this feature lives>",
+      "locatedSection": "<optional: exact label from Section Candidates below>",
       "status": "<todo|in_progress|done|on_hold>",
       "progress": <0-100>,
       "paths": {
@@ -83,6 +93,10 @@ Return ONLY a valid JSON object (no markdown fences, no commentary). The JSON mu
         "tdd": "<optional: relative path to TDD doc>",
         "test": "<optional: relative path to tests>",
         "implementation": "<optional: relative path to implementation>"
+      },
+      "metadata": {
+        "initializationConfidence": "<optional number 0-1>",
+        "evidencePaths": ["<optional: relative paths supporting this feature>"]
       },
       "notes": "<optional: brief description or context>"
     }
@@ -103,8 +117,11 @@ Return ONLY a valid JSON object (no markdown fences, no commentary). The JSON mu
 3. **project.defaultIDE**: Detected IDEs: ${context.detectedIDEs.length > 0 ? context.detectedIDEs.join(', ') : 'none detected, default to "Cursor"'}. Pick the first detected, or "Cursor" as fallback.
 4. **features**: Identify 3–15 features from the directory structure, README, and docs. Each feature should correspond to a real functional area of the project.
    - Map paths to actual files/directories that exist in the tree.
-   - Populate "locatedSection" whenever possible. It can be a route, module, workflow area, or subsystem label (not only pages).
-   - Prefer deriving "locatedSection" from implementation paths first, then spec/test paths when implementation is absent.
+   - Populate "locatedSection" only with an exact label from Section Candidates. Do not invent section names.
+   - Prefer route/module candidates backed by implementation paths, then docs/test candidates when implementation is absent.
+   - Leave "locatedSection" empty when no Section Candidate clearly matches the feature.
+   - Put any supporting file paths in metadata.evidencePaths. Use only paths that exist in the tree.
+   - If confidence is unclear, set metadata.initializationConfidence below 0.75 rather than guessing.
    - Set status to "todo" by default unless there is clear evidence of completion or progress.
    - Only use paths that actually appear in the directory tree.
 5. **adapters.ides**: Include entries for detected IDEs. Always include at least one.
@@ -115,6 +132,12 @@ Return ONLY a valid JSON object (no markdown fences, no commentary). The JSON mu
 ### Directory Tree
 \`\`\`
 ${context.directoryTree}
+\`\`\`
+
+### Section Candidates
+Use these exact labels for "locatedSection"; if none match, leave it empty.
+\`\`\`
+${sectionCandidatesBlock}
 \`\`\`
 
 ### Detected IDEs

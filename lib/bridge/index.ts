@@ -137,6 +137,12 @@ export async function scanProjects(root: string): Promise<string[]> {
   return invoke<string[]>('scan_projects', { root });
 }
 
+/** Detect a local Git repository's GitHub origin URL. Returns null when no GitHub origin exists. */
+export async function detectGithubRepoUrl(projectRoot: string): Promise<string | null> {
+  if (!isTauri()) return null;
+  return invoke<string | null>('detect_github_repo_url', { projectRoot });
+}
+
 // ── Project registry — desktop ↔ web sync ────────────────────────────────────
 
 export interface RegistryEntry {

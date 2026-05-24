@@ -1,4 +1,5 @@
 import type { FileNode } from '../bridge';
+import { buildSectionCandidatesFromNodes } from './sectionInventory';
 import { AGENT_MARKERS, IDE_MARKERS, KEY_FILES, type ProjectContext } from './shared';
 
 const MAX_TREE_LINES = 300;
@@ -16,6 +17,29 @@ function baseName(path: string): string {
   const trimmed = path.replace(/\/+$/, '');
   const idx = trimmed.lastIndexOf('/');
   return idx >= 0 ? trimmed.slice(idx + 1) : trimmed;
+}
+
+function relativeToRoot(root: string, path: string): string {
+  const normalizedRoot = root.replace(/\\/g, '/').replace(/\/+$/, '');
+  const normalizedPath = path.replace(/\\/g, '/').replace(/\/+$/, '');
+  if (normalizedPath === normalizedRoot) return '';
+  if (normalizedPath.startsWith(`${normalizedRoot}/`)) {
+    return normalizedPath.slice(normalizedRoot.length + 1);
+  }
+  return normalizedPath.replace(/^\/+/, '');
+}
+
+function collectInventoryPaths(nodes: FileNode[], root: string): string[] {
+  const out = new Set<string>();
+  function walk(entries: FileNode[]) {
+    for (const entry of entries) {
+      const rel = relativeToRoot(root, entry.path);
+      if (rel) out.add(rel);
+      if (entry.isDir && entry.children?.length) walk(entry.children);
+    }
+  }
+  walk(nodes);
+  return [...out].sort((a, b) => a.localeCompare(b));
 }
 
 /** Render a FileNode forest as a text tree (matches server-side buildTree style). */
@@ -66,11 +90,13 @@ export async function buildProjectContextBridge(root: string): Promise<ProjectCo
   let directoryTree = `${baseName(normalizedRoot)}/\n(unable to list directory)`;
   let rootEntries: FileNode[] = [];
   try {
-    rootEntries = await listProjectFiles(normalizedRoot, 3);
+    rootEntries = await listProjectFiles(normalizedRoot, 6);
     directoryTree = renderFileTree(rootEntries, baseName(normalizedRoot));
   } catch {
     /* keep fallback tree label */
   }
+  const sectionCandidates = buildSectionCandidatesFromNodes(rootEntries, normalizedRoot);
+  const inventoryPaths = collectInventoryPaths(rootEntries, normalizedRoot);
 
   const keyFiles: Record<string, string> = {};
   for (const file of KEY_FILES) {
@@ -130,6 +156,8 @@ export async function buildProjectContextBridge(root: string): Promise<ProjectCo
     source: normalizedRoot,
     projectName,
     directoryTree,
+    sectionCandidates,
+    inventoryPaths,
     keyFiles,
     detectedIDEs,
     detectedAgents,

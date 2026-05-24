@@ -97,13 +97,13 @@ export function PostImportScanDialog({
             <div className="flex items-start gap-2 border border-amber-200/35 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100">
               <KeyRound size={13} className="mt-0.5 shrink-0 text-amber-200" />
               <span>
-                AI Scan requires an Anthropic API key. Save one in Keys, then re-open this prompt.
+                AI Scan requires at least one enabled AI provider key. Save one in Keys, then re-open this prompt.
                 You can also dismiss and run Scan later from each project row.
               </span>
             </div>
           ) : (
             <p className="text-[11px] text-stone-500">
-              You can also run Scan later from each project row. Requires an Anthropic API key in Keys.
+              You can also run Scan later from each project row. Requires at least one enabled AI provider key in Keys.
             </p>
           )}
         </div>
@@ -131,7 +131,7 @@ export function PostImportScanDialog({
             type="button"
             onClick={() => void onScanProjects(selectedProjects)}
             disabled={scanning || selectedProjects.length === 0 || keyMissing}
-            title={keyMissing ? 'Anthropic API key not configured' : undefined}
+            title={keyMissing ? 'No enabled AI provider key configured' : undefined}
             className="flex items-center gap-2 bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {scanning ? (

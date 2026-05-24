@@ -1,10 +1,12 @@
 import { buildProjectScaffold } from './createProjectScaffold';
 import { resolveProjectRoot } from './dashboardLayout';
 import { normalizeFeaturesLocatedSection } from './featureLocationInference';
+import { attachScanValidationMetadata } from '../scanner/scanValidation';
 import { migrateConfig } from './migrate';
 import { mergeProjectConfigFromDisk } from './mergeProjectFromDisk';
 import { resolveConfigPath } from './resolveConfigPath';
 import type { ProjectEntry, ProjectManagerConfig } from '../types';
+import type { SectionCandidate } from '../scanner/sectionInventory';
 
 function newProjectId(): string {
   return `proj-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -14,6 +16,30 @@ function isMissingConfigError(message: string): boolean {
   return /No such file or directory|Is a directory|os error 2\b|os error 21\b|CONFIG_EXISTS/i.test(
     message,
   );
+}
+
+async function addDetectedGithubUrl(
+  config: ProjectManagerConfig,
+  options: { isTauri: boolean },
+): Promise<ProjectManagerConfig> {
+  if (!options.isTauri || config.project.githubUrl) return config;
+  const root = config.project.root?.trim();
+  if (!root || root.startsWith('https://')) return config;
+
+  try {
+    const { detectGithubRepoUrl } = await import('../bridge');
+    const detected = await detectGithubRepoUrl(root);
+    if (!detected) return config;
+    return {
+      ...config,
+      project: {
+        ...config.project,
+        githubUrl: detected,
+      },
+    };
+  } catch {
+    return config;
+  }
 }
 
 /**
@@ -51,7 +77,10 @@ export async function buildProjectEntryFromPath(
     try {
       const disk = await readConfig(resolvedPath);
       const local = options.existing?.config ?? migrateConfig(disk);
-      const config = mergeProjectConfigFromDisk(local, disk, resolvedPath);
+      const config = await addDetectedGithubUrl(
+        mergeProjectConfigFromDisk(local, disk, resolvedPath),
+        options,
+      );
       return {
         id,
         config,
@@ -65,7 +94,7 @@ export async function buildProjectEntryFromPath(
     }
   } else {
     // Web preview: register folder; scan requires dev API or desktop app.
-    const config = buildProjectScaffold(root);
+    const config = await addDetectedGithubUrl(buildProjectScaffold(root), options);
     return {
       id,
       config,
@@ -74,7 +103,7 @@ export async function buildProjectEntryFromPath(
     };
   }
 
-  const config = buildProjectScaffold(root);
+  const config = await addDetectedGithubUrl(buildProjectScaffold(root), options);
   return {
     id,
     config,
@@ -87,19 +116,29 @@ export async function buildProjectEntryFromPath(
 export async function applyScanConfigToProject(
   project: ProjectEntry,
   scanned: ProjectManagerConfig,
+  options: { sectionCandidates?: SectionCandidate[]; inventoryPaths?: string[] } = {},
 ): Promise<ProjectEntry> {
   const { writeConfig } = await import('../bridge');
   const root = project.config.project.root.replace(/\/+$/, '');
   const configPath = resolveConfigPath(root);
-  const config = migrateConfig({
+  let config = migrateConfig({
     ...scanned,
     project: {
       ...scanned.project,
       root,
       name: scanned.project.name || project.config.project.name,
+      githubUrl: scanned.project.githubUrl ?? project.config.project.githubUrl,
     },
   });
-  config.features = normalizeFeaturesLocatedSection(config.features);
+  config = await addDetectedGithubUrl(config, { isTauri: true });
+  config.features = normalizeFeaturesLocatedSection(config.features, {
+    sectionCandidates: options.sectionCandidates,
+    preserveExisting: false,
+  });
+  config = attachScanValidationMetadata(config, {
+    sectionCandidates: options.sectionCandidates,
+    inventoryPaths: options.inventoryPaths,
+  }).config;
   await writeConfig(configPath, config);
   return {
     ...project,

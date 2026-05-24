@@ -12,6 +12,7 @@ vi.stubGlobal('__TAURI_INTERNALS__', {});
 const mockGetGithubToken = vi.fn().mockResolvedValue('');
 const mockFetchGithubIssues = vi.fn();
 const mockFetchGithubIssueComments = vi.fn().mockResolvedValue([]);
+const mockOnGithubUpdated = vi.fn().mockResolvedValue(() => {});
 const mockCommentGithubIssue = vi.fn();
 const mockCloseGithubIssueWithComment = vi.fn();
 const mockReopenGithubIssueWithComment = vi.fn();
@@ -27,6 +28,7 @@ vi.mock('../lib/bridge', () => ({
   getGithubToken: (...args: any[]) => mockGetGithubToken(...args),
   fetchGithubIssues: (...args: any[]) => mockFetchGithubIssues(...args),
   fetchGithubIssueComments: (...args: any[]) => mockFetchGithubIssueComments(...args),
+  onGithubUpdated: (...args: any[]) => mockOnGithubUpdated(...args),
   commentGithubIssue: (...args: any[]) => mockCommentGithubIssue(...args),
   closeGithubIssueWithComment: (...args: any[]) => mockCloseGithubIssueWithComment(...args),
   reopenGithubIssueWithComment: (...args: any[]) => mockReopenGithubIssueWithComment(...args),
@@ -139,6 +141,8 @@ describe('IssuesTab', () => {
     mockFetch.mockReset();
     mockFetchGithubIssues.mockReset();
     mockFetchGithubIssueComments.mockResolvedValue([]);
+    mockOnGithubUpdated.mockClear();
+    mockOnGithubUpdated.mockResolvedValue(() => {});
     mockCommentGithubIssue.mockResolvedValue(OPEN_ISSUE);
     mockCloseGithubIssueWithComment.mockResolvedValue({ ...OPEN_ISSUE, state: 'closed' });
     mockReopenGithubIssueWithComment.mockResolvedValue({ ...CLOSED_ISSUE, state: 'open' });
