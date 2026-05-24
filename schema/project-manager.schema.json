@@ -5,7 +5,7 @@
   "properties": {
     "schemaVersion": {
       "type": "integer",
-      "description": "Schema version. Increment when making breaking changes to the config structure. Current: 7.",
+      "description": "Schema version. Increment when making breaking changes to the config structure. Current: 8.",
       "minimum": 1
     },
     "id": {
@@ -51,7 +51,7 @@
     },
     "cronJobs": {
       "type": "array",
-      "description": "Scheduled jobs that run commands on a recurring interval while the app is open.",
+      "description": "Scheduled jobs run on a recurring interval while the app is open. Each job either runs a shell command (system cron) or dispatches an engineer role with a prompt (engineer cron). See ADR-012 for the v8 split.",
       "items": { "$ref": "#/definitions/cronJob" }
     },
     "adapters": {
@@ -141,21 +141,50 @@
           },
           "required": ["type", "value", "unit"]
         },
-        "action": {
-          "type": "object",
-          "properties": {
-            "type":       { "const": "run-command" },
-            "command":    { "type": "string" },
-            "args":       { "type": "array", "items": { "type": "string" } },
-            "workingDir": { "type": "string" }
-          },
-          "required": ["type", "command", "args", "workingDir"]
-        },
+        "action":     { "$ref": "#/definitions/cronAction" },
         "lastRun":    { "type": "string", "format": "date-time" },
         "lastStatus": { "type": "string", "enum": ["ok", "error"] },
+        "lastError": {
+          "type": "object",
+          "description": "Set when lastStatus === 'error'. Classified failure reason + human-readable message (v8).",
+          "properties": {
+            "reason":  { "type": "string" },
+            "message": { "type": "string" }
+          },
+          "required": ["reason", "message"]
+        },
         "createdAt":  { "type": "string", "format": "date-time" }
       },
       "required": ["id", "name", "enabled", "schedule", "action", "createdAt"]
+    },
+    "cronAction": {
+      "description": "Discriminated by `type` (v8). Either a system shell command or an engineer-role dispatch.",
+      "oneOf": [
+        { "$ref": "#/definitions/runCommandAction" },
+        { "$ref": "#/definitions/dispatchEngineerAction" }
+      ]
+    },
+    "runCommandAction": {
+      "type": "object",
+      "description": "Run an arbitrary shell command (system cron). The frontend scheduler invokes the existing spawnAgent bridge.",
+      "properties": {
+        "type":       { "const": "run-command" },
+        "command":    { "type": "string" },
+        "args":       { "type": "array", "items": { "type": "string" } },
+        "workingDir": { "type": "string" }
+      },
+      "required": ["type", "command", "args", "workingDir"]
+    },
+    "dispatchEngineerAction": {
+      "type": "object",
+      "description": "Dispatch an engineer role with an assembled prompt (engineer cron, v8). Prompt assembly stays in TS per ADR-003; the call routes through Rust call_anthropic per ADR-004.",
+      "properties": {
+        "type":           { "const": "dispatch-engineer" },
+        "roleId":         { "type": "string", "description": "References ProjectManagerConfig.engineerRoles[].id on the same project." },
+        "promptTemplate": { "type": "string", "description": "Raw prompt text. Variable substitution (e.g. {{branch}}, {{date}}) is deferred to a follow-up." },
+        "modelOverride":  { "$ref": "#/definitions/modelFallbackEntry", "description": "Optional model override; falls back to role.primaryModel when absent." }
+      },
+      "required": ["type", "roleId", "promptTemplate"]
     },
     "modelFallbackEntry": {
       "type": "object",

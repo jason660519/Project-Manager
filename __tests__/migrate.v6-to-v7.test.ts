@@ -32,14 +32,12 @@ const baseV6 = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('migrate v6 → v7 (F23 engineer capabilities)', () => {
-  // T-01 + bump verification
-  it('exposes 7 as the current schema version', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(7);
-  });
-
-  it('bumps schemaVersion to 7 on a v6 document', () => {
+  // migrateConfig runs every migration in sequence, so a v6 input now ends up
+  // at the latest schema version (currently 8). v7-specific behaviour is still
+  // asserted by inspecting the migrated fields directly.
+  it('bumps a v6 document past v6 (to the current schema version)', () => {
     const out = migrateConfig(baseV6());
-    expect(out.schemaVersion).toBe(7);
+    expect(out.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
   });
 
   it('adds capabilities:[] to every engineer role', () => {
@@ -69,12 +67,11 @@ describe('migrate v6 → v7 (F23 engineer capabilities)', () => {
     expect(cand.every((c: CapabilityCandidate) => c.state === 'not_tested')).toBe(true);
   });
 
-  // T-02
-  it('is idempotent on a v7 document', () => {
-    const v7 = migrateConfig(baseV6()) as ProjectManagerConfig;
-    const v7Again = migrateConfig(v7) as ProjectManagerConfig;
-    expect(v7Again.schemaVersion).toBe(7);
-    expect(v7Again.capabilityCandidates?.length).toBe(v7.capabilityCandidates?.length);
+  it('is idempotent on the migrated result', () => {
+    const first  = migrateConfig(baseV6()) as ProjectManagerConfig;
+    const second = migrateConfig(first) as ProjectManagerConfig;
+    expect(second.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(second.capabilityCandidates?.length).toBe(first.capabilityCandidates?.length);
   });
 
   it('does not overwrite an existing supports preset on an adapter', () => {
@@ -118,6 +115,6 @@ describe('migrate v6 → v7 (F23 engineer capabilities)', () => {
     const cfg = baseV6();
     delete (cfg as Record<string, unknown>).engineerRoles;
     const out = migrateConfig(cfg);
-    expect(out.schemaVersion).toBe(7);
+    expect(out.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
   });
 });
