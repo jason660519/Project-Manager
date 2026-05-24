@@ -7,6 +7,13 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["next", "dev", "--port", "43187"],
       "port": 43187
+    },
+    {
+      "name": "Project Manager Web (claude preview)",
+      "autoPort": false,
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "dev", "--port", "43188"],
+      "port": 43188
     }
   ]
 }
