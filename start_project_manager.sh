@@ -381,6 +381,19 @@ start_background_service() {
   success "$name started (PID $pid)"
 }
 
+running_pid_from_file() {
+  local pid_file="$1"
+  [[ -f "$pid_file" ]] || return 1
+  local pid
+  pid="$(tr -dc '0-9' < "$pid_file" 2>/dev/null || true)"
+  [[ -n "$pid" ]] || return 1
+  if kill -0 "$pid" 2>/dev/null; then
+    printf '%s\n' "$pid"
+    return 0
+  fi
+  return 1
+}
+
 print_app_success() {
   local name="$1"
   local port="$2"
@@ -905,9 +918,18 @@ start_project_manager() {
 
   cd "$SCRIPT_DIR"
   ensure_dev_port_available
-  maybe_open_local_url "$pm_url" "$dev_server_running"
 
   if [[ "$mode" == "background" ]]; then
+    local existing_desktop_pid
+    existing_desktop_pid="$(running_pid_from_file "${log_file}.pid" || true)"
+    if [[ -n "$existing_desktop_pid" ]]; then
+      success "Project Manager desktop app already running (PID $existing_desktop_pid)"
+      wait_for_port "$DEV_PORT" "Project Manager web app" || true
+      maybe_open_local_url "$pm_url" "$dev_server_running"
+      print_app_success "Project Manager desktop app" "$DEV_PORT" "$pm_url" "$log_file"
+      return 0
+    fi
+
     if is_port_listening "$DEV_PORT" && [[ "$dev_server_running" == "1" ]]; then
       success "Project Manager web app already running on port $DEV_PORT"
     fi
@@ -916,10 +938,12 @@ start_project_manager() {
       "$log_file" \
       npm run tauri:dev
     wait_for_port "$DEV_PORT" "Project Manager web app" || true
+    maybe_open_local_url "$pm_url" "$dev_server_running"
     print_app_success "Project Manager desktop app" "$DEV_PORT" "$pm_url" "$log_file"
     return 0
   fi
 
+  maybe_open_local_url "$pm_url" "$dev_server_running"
   echo -e "${CYAN}Launching Project Manager desktop app…${RESET}"
   echo -e "${CYAN}(Next.js will start on port ${DEV_PORT}, Tauri window will open shortly)${RESET}"
   echo ""
