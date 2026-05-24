@@ -22,6 +22,7 @@ export const KEY_PERSONAL_SEEDED = 'projectManager.personal.seeded';
 
 export const KEY_SHARED_PLUGINS = 'projectManager.shared.plugins';
 export const KEY_SHARED_CHANNELS = 'projectManager.shared.channels';
+export const KEY_SHARED_CAPABILITIES = 'projectManager.shared.capabilities';
 export const KEY_SHARED_SKILLS_DIR = 'projectManager.shared.skillsDir';
 export const KEY_PERSONAL_SYSTEM_CLI_EXPOSURE = 'projectManager.personal.systemCliExposure';
 export const KEY_PERSONAL_AI_CLI_PRESET_ALLOWLIST = 'projectManager.personal.aiCliPresetAllowlist';

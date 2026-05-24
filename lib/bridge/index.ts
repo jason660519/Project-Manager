@@ -329,10 +329,74 @@ export async function openPath(path: string): Promise<void> {
   return invoke<void>('open_path', { path });
 }
 
+// ── Editor integration ───────────────────────────────────────────────────────
+
+export interface OpenInEditorOptions {
+  /** Editor CLI name, e.g. "codium", "code", "cursor" */
+  editor: string;
+  /** Absolute path to the file or directory to open */
+  path: string;
+  /** Optional line number (1-based) for --goto protocol */
+  line?: number;
+}
+
+/**
+ * Open a file or directory in an external editor (VSCodium, Cursor, VS Code,
+ * etc). Supports optional line number for `--goto` (`-g`) protocol.
+ * No-op outside Tauri (browser dev mode).
+ */
+export async function openInEditor(opts: OpenInEditorOptions): Promise<void> {
+  if (!isTauri()) {
+    console.warn('[bridge] openInEditor: not available in browser mode', opts);
+    return;
+  }
+  return invoke<void>('open_in_editor', {
+    editor: opts.editor,
+    path: opts.path,
+    line: opts.line ?? null,
+  });
+}
+
+/**
+ * Write content to a plain-text file. Creates parent directories if needed.
+ * Throws outside Tauri (no FS access in browser dev mode).
+ */
+export async function writeFile(path: string, content: string): Promise<void> {
+  if (!isTauri()) throw new Error('writeFile requires Tauri runtime');
+  return invoke<void>('write_file', { path, content });
+}
+
 /** Check if a command exists in the user's system PATH. */
 export async function checkCommandExistsTauri(command: string): Promise<boolean> {
   if (!isTauri()) return false;
   return invoke<boolean>('check_command_exists', { command });
+}
+
+export interface ResolvedInstallPath {
+  /** Absolute path of the executable as found via PATH lookup. */
+  commandPath: string | null;
+  /** macOS .app bundle path when `appName` resolves to an installed application. */
+  appBundlePath: string | null;
+}
+
+/**
+ * Resolve a CLI command to its absolute path (via `which`) and, on macOS, look
+ * up an .app bundle for the supplied application name. Returns null fields when
+ * not found. Outside Tauri runtime both fields are null.
+ */
+export async function resolveInstallPath(
+  command: string,
+  appName?: string,
+): Promise<ResolvedInstallPath> {
+  if (!isTauri()) return { commandPath: null, appBundlePath: null };
+  const raw = await invoke<{
+    commandPath?: string | null;
+    appBundlePath?: string | null;
+  }>('resolve_install_path', { command, appName: appName ?? null });
+  return {
+    commandPath: raw.commandPath ?? null,
+    appBundlePath: raw.appBundlePath ?? null,
+  };
 }
 
 export interface GlobalCliInventoryEntry {
@@ -862,6 +926,20 @@ export async function setGithubToken(value: string): Promise<void> {
   }
 }
 
+// ── Capability runtime (F23 schema v7) ────────────────────────────────────
+
+/**
+ * Capture a PNG screenshot via the Rust `capture_screenshot` command.
+ * Returns base64 PNG bytes (without the `data:image/png;base64,` prefix).
+ * Browser-mode (no Tauri) throws — screenshots require the desktop app.
+ */
+export async function captureScreenshot(): Promise<string> {
+  if (!isTauri()) {
+    throw new Error('Screenshots require the desktop app — not available in browser mode.');
+  }
+  return invoke<string>('capture_screenshot');
+}
+
 // ── Anthropic API (via Rust — key never touches renderer) ────────────────────
 
 export interface AnthropicMessage {
@@ -1021,7 +1099,23 @@ export async function validateProviderKey(opts: {
   baseUrl?: string;
 }): Promise<ValidateProviderKeyResult> {
   if (!isTauri()) {
-    throw new Error('validateProviderKey requires Tauri runtime');
+    const res = await fetch('/api/keys/validate', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        apiKind: opts.apiKind,
+        baseUrl: opts.baseUrl ?? null,
+        apiKey: opts.apiKey,
+      }),
+    });
+    const body = (await res.json().catch(() => null)) as
+      | ValidateProviderKeyResult
+      | { error?: string }
+      | null;
+    if (!res.ok) {
+      throw new Error(body && 'error' in body && body.error ? body.error : `Validation failed: ${res.status}`);
+    }
+    return body as ValidateProviderKeyResult;
   }
   return invoke<ValidateProviderKeyResult>('validate_provider_key', {
     apiKind: opts.apiKind,
@@ -1261,7 +1355,20 @@ export interface EnvFileInfo {
  * 256 KB are skipped on the Rust side. Returns `[]` outside Tauri (no FS).
  */
 export async function scanEnvFiles(root: string): Promise<EnvFileInfo[]> {
-  if (!isTauri()) return [];
+  if (!isTauri()) {
+    const res = await fetch('/api/keys/scan-env-files', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ root }),
+    });
+    const body = (await res.json().catch(() => null)) as
+      | { files?: EnvFileInfo[]; error?: string }
+      | null;
+    if (!res.ok) {
+      throw new Error(body?.error ?? `Cannot scan .env files: ${res.status}`);
+    }
+    return body?.files ?? [];
+  }
   return invoke<EnvFileInfo[]>('scan_env_files', { root });
 }
 

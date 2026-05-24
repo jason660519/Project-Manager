@@ -9,6 +9,11 @@ const VALID_SHEETS: IntegrationSheet[] = [
   'memory',
   'commands',
   'connect',
+  'vla',
+  'tts',
+  'stt',
+  'hands',
+  'tools',
 ];
 
 export const dynamicParams = false;

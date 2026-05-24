@@ -399,6 +399,20 @@ async fn read_file(path: String) -> Result<String, String> {
         .map_err(|e| format!("Cannot read {path}: {e}"))
 }
 
+/// Write content back to a plain-text file. Creates parent directories if needed.
+#[tauri::command]
+async fn write_file(path: String, content: String) -> Result<(), String> {
+    let target = std::path::Path::new(&path);
+    if let Some(parent) = target.parent() {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| format!("Cannot create directory {}: {e}", parent.display()))?;
+    }
+    tokio::fs::write(target, content)
+        .await
+        .map_err(|e| format!("Cannot write {path}: {e}"))
+}
+
 #[derive(Serialize, Clone)]
 struct EnvFileInfo {
     path: String,
@@ -1028,6 +1042,31 @@ async fn validate_openai_compatible_models(
     base_url: &str,
     api_key: &str,
 ) -> Result<Vec<String>, String> {
+    let normalized_base_url = base_url.trim_end_matches('/');
+    if normalized_base_url == "https://api.perplexity.ai" {
+        return validate_perplexity_models(api_key).await;
+    }
+
+    let mut attempts = vec![normalized_base_url.to_string()];
+    if let Some(alternate_base_url) = alternate_moonshot_base_url(normalized_base_url) {
+        attempts.push(alternate_base_url.to_string());
+    }
+
+    let mut last_error = None;
+    for attempt_base_url in attempts {
+        match fetch_openai_compatible_models(&attempt_base_url, api_key).await {
+            Ok(models) => return Ok(models),
+            Err(reason) => last_error = Some(reason),
+        }
+    }
+
+    Err(last_error.unwrap_or_else(|| "Provider validation failed".to_string()))
+}
+
+async fn fetch_openai_compatible_models(
+    base_url: &str,
+    api_key: &str,
+) -> Result<Vec<String>, String> {
     let client = reqwest::Client::new();
     let url = format!("{}/models", base_url.trim_end_matches('/'));
     let res = client
@@ -1057,6 +1096,44 @@ async fn validate_openai_compatible_models(
         })
         .unwrap_or_default();
     Ok(models)
+}
+
+async fn validate_perplexity_models(api_key: &str) -> Result<Vec<String>, String> {
+    let client = reqwest::Client::new();
+    let res = client
+        .post("https://api.perplexity.ai/v1/sonar")
+        .bearer_auth(api_key)
+        .header("content-type", "application/json")
+        .json(&serde_json::json!({
+            "model": "sonar",
+            "max_tokens": 16,
+            "messages": [{ "role": "user", "content": "ping" }],
+        }))
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {e}"))?;
+
+    if !res.status().is_success() {
+        let status = res.status();
+        let text = res.text().await.unwrap_or_default();
+        return Err(format!("Perplexity {status}: {}", truncate_error(&text)));
+    }
+
+    Ok(vec![
+        "sonar".to_string(),
+        "sonar-pro".to_string(),
+        "sonar-deep-research".to_string(),
+        "sonar-reasoning".to_string(),
+        "sonar-reasoning-pro".to_string(),
+    ])
+}
+
+fn alternate_moonshot_base_url(base_url: &str) -> Option<&'static str> {
+    match base_url {
+        "https://api.moonshot.ai/v1" => Some("https://api.moonshot.cn/v1"),
+        "https://api.moonshot.cn/v1" => Some("https://api.moonshot.ai/v1"),
+        _ => None,
+    }
 }
 
 async fn validate_gemini_models(api_key: &str) -> Result<Vec<String>, String> {
@@ -2790,6 +2867,93 @@ async fn check_command_exists(command: String) -> Result<bool, String> {
     Ok(false)
 }
 
+#[derive(Serialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+struct ResolvedInstallPath {
+    /// Absolute path of the executable resolved via PATH lookup (`which`).
+    command_path: Option<String>,
+    /// macOS .app bundle path when `app_name` matches a real application.
+    app_bundle_path: Option<String>,
+}
+
+#[tauri::command]
+async fn resolve_install_path(
+    command: String,
+    app_name: Option<String>,
+) -> Result<ResolvedInstallPath, String> {
+    let mut resolved = ResolvedInstallPath::default();
+
+    let trimmed = command.trim();
+    if !trimmed.is_empty() {
+        let direct = std::path::Path::new(trimmed);
+        if direct.is_absolute() && direct.is_file() {
+            resolved.command_path = Some(trimmed.to_string());
+        } else if let Some(path_var) = std::env::var_os("PATH") {
+            'outer: for path in std::env::split_paths(&path_var) {
+                let candidate = path.join(trimmed);
+                if candidate.is_file() {
+                    resolved.command_path = Some(candidate.to_string_lossy().to_string());
+                    break 'outer;
+                }
+                #[cfg(target_os = "windows")]
+                {
+                    for ext in &["exe", "cmd", "bat"] {
+                        let ext_candidate = path.join(format!("{}.{}", trimmed, ext));
+                        if ext_candidate.is_file() {
+                            resolved.command_path =
+                                Some(ext_candidate.to_string_lossy().to_string());
+                            break 'outer;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(raw_name) = app_name.as_deref() {
+            let cleaned = raw_name.trim();
+            if !cleaned.is_empty() {
+                let home = std::env::var("HOME").unwrap_or_default();
+                let direct_candidates = [
+                    format!("/Applications/{}.app", cleaned),
+                    format!("{}/Applications/{}.app", home, cleaned),
+                ];
+                for candidate in &direct_candidates {
+                    if std::path::Path::new(candidate).is_dir() {
+                        resolved.app_bundle_path = Some(candidate.clone());
+                        break;
+                    }
+                }
+                if resolved.app_bundle_path.is_none() {
+                    let escaped = cleaned.replace('\\', "\\\\").replace('"', "\\\"");
+                    let script =
+                        format!("POSIX path of (path to application \"{}\")", escaped);
+                    if let Ok(output) = std::process::Command::new("osascript")
+                        .args(["-e", &script])
+                        .output()
+                    {
+                        if output.status.success() {
+                            let stdout = String::from_utf8_lossy(&output.stdout)
+                                .trim()
+                                .trim_end_matches('/')
+                                .to_string();
+                            if !stdout.is_empty() {
+                                resolved.app_bundle_path = Some(stdout);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = app_name;
+
+    Ok(resolved)
+}
+
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct GlobalCliEntry {
@@ -2898,6 +3062,69 @@ async fn list_global_cli_inventory() -> Result<Vec<GlobalCliEntry>, String> {
     let mut rows: Vec<GlobalCliEntry> = by_command.into_values().collect();
     rows.sort_by(|a, b| a.command.to_ascii_lowercase().cmp(&b.command.to_ascii_lowercase()));
     Ok(rows)
+}
+
+/// Capture a screenshot of the current display as a PNG and return it as
+/// base64 bytes (no `data:` prefix). macOS only in Phase 1 (F23) — other
+/// platforms return a clear error so the test runner UI can surface it.
+///
+/// Used by the F23 Eyes capability: the dispatch path attaches the result
+/// as an Anthropic image content block when the role's eyes capability is
+/// in the effective set.
+#[tauri::command]
+async fn capture_screenshot() -> Result<String, String> {
+    #[cfg(target_os = "macos")]
+    {
+        use base64::Engine as _;
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        let tmp = std::env::temp_dir().join(format!("pm-screenshot-{timestamp}.png"));
+        let tmp_str = tmp.to_string_lossy().to_string();
+        let status = tokio::process::Command::new("screencapture")
+            .args(["-x", "-T", "0", "-t", "png", &tmp_str])
+            .status()
+            .await
+            .map_err(|e| format!("Failed to invoke screencapture: {e}"))?;
+        if !status.success() {
+            let _ = std::fs::remove_file(&tmp);
+            return Err(format!("screencapture exited with status {status}"));
+        }
+        let bytes = std::fs::read(&tmp).map_err(|e| format!("Failed to read screenshot: {e}"))?;
+        let _ = std::fs::remove_file(&tmp);
+        Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err(
+            "Screenshot capture is macOS-only in Phase 1 (F23). Windows/Linux support lands in a later phase."
+                .to_string(),
+        )
+    }
+}
+
+// ── Editor integration ───────────────────────────────────────────────────────
+
+/// Open a file or directory in an external editor (VSCodium, Cursor, VS Code,
+/// etc). Supports optional `line` for `--goto` (`-g`) protocol:
+///   `editor -g /path/to/file.ts:42`
+/// Spawns the editor as a detached process — PM does not track its lifecycle.
+#[tauri::command]
+async fn open_in_editor(
+    editor: String,
+    path: String,
+    line: Option<u32>,
+) -> Result<(), String> {
+    let mut cmd = std::process::Command::new(&editor);
+    if let Some(l) = line {
+        cmd.arg("-g").arg(format!("{path}:{l}"));
+    } else {
+        cmd.arg(&path);
+    }
+    cmd.spawn()
+        .map_err(|e| format!("Failed to open {editor}: {e}"))?;
+    Ok(())
 }
 
 /// Open a file or directory in the OS handler. Markdown files on macOS use
@@ -3975,6 +4202,7 @@ pub fn run() {
             start_github_poll,
             list_project_files,
             read_file,
+            write_file,
             scan_env_files,
             github_oauth_device_start,
             github_oauth_device_poll,
@@ -3988,7 +4216,10 @@ pub fn run() {
             mcp_logs_dir,
             write_mcp_config,
             open_path,
+            open_in_editor,
+            capture_screenshot,
             check_command_exists,
+            resolve_install_path,
             list_global_cli_inventory,
             skill_default_dir,
             skill_list,

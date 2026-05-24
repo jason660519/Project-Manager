@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { CURRENT_SCHEMA_VERSION, migrateConfig } from '../lib/storage/migrate';
 
-describe('migrateConfig v2 → v3 → v4 → v5 → v6', () => {
-  it('exposes 6 as the current schema version', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(6);
+describe('migrateConfig v2 → v3 → v4 → v5 → v6 → v7', () => {
+  it('exposes 7 as the current schema version', () => {
+    expect(CURRENT_SCHEMA_VERSION).toBe(7);
   });
 
-  it('bumps schemaVersion to 6 on a v2 document', () => {
+  it('bumps schemaVersion to 7 on a v2 document', () => {
     const v2 = {
       schemaVersion: 2,
       id: 'aaa',
@@ -15,7 +15,7 @@ describe('migrateConfig v2 → v3 → v4 → v5 → v6', () => {
       adapters: { ides: [], agents: [] },
     };
     const out = migrateConfig(v2);
-    expect(out.schemaVersion).toBe(6);
+    expect(out.schemaVersion).toBe(7);
   });
 
   it('defaults every feature to phase=development and points=1 when missing', () => {
@@ -80,7 +80,7 @@ describe('migrateConfig v2 → v3 → v4 → v5 → v6', () => {
       adapters: { ides: [], agents: [] },
     });
 
-    expect(out.schemaVersion).toBe(6);
+    expect(out.schemaVersion).toBe(7);
     expect(out.features[0].readmePath).toBe('.project-manager/features/F01/README.md');
     expect(out.features[0].notes).toBe('Short summary');
     expect(out.features[0].paths.spec).toBeUndefined();
@@ -113,7 +113,7 @@ describe('migrateConfig v2 → v3 → v4 → v5 → v6', () => {
       features: [{ id: 'F01', name: 'f', category: 'c', status: 'todo', progress: 0, paths: {} }],
       adapters: { ides: [], agents: [] },
     });
-    expect(out.schemaVersion).toBe(6);
+    expect(out.schemaVersion).toBe(7);
     expect(out.features[0].phase).toBe('development');
     expect(out.features[0].points).toBe(1);
     // v2 sync fields were also added during the v1 → v2 step.
@@ -152,7 +152,7 @@ describe('migrateConfig v2 → v3 → v4 → v5 → v6', () => {
       adapters: { ides: [], agents: [] },
     });
 
-    expect(out.schemaVersion).toBe(6);
+    expect(out.schemaVersion).toBe(7);
     expect(out.features[0].locatedSection).toBe('/dashboard/settings');
     expect((out.features[0] as { locatedPage?: string }).locatedPage).toBeUndefined();
   });

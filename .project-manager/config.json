@@ -114,6 +114,50 @@
       "progress": 0,
       "status": "todo",
       "updatedAt": "2026-05-23T21:50:02.617Z"
+    },
+    {
+      "category": "Frontend/Secrets",
+      "createdAt": "2026-05-24T09:03:40+10:00",
+      "id": "F22",
+      "locatedSection": "keys",
+      "name": "Keys API Config Rebuild",
+      "notes": "Rebuilt /keys API key workflow: browser-mode .env scan/import/validate now works; stored-key revalidation uses bundled provider storage; E2E verified 13/15 providers from .env.",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F22/",
+        "implementation": "app/ui/views/Keys/",
+        "spec": ".project-manager/features/F22/feature-spec.md",
+        "tdd": ".project-manager/features/F22/tdd-spec.md",
+        "test": "__tests__/keys.validation.test.ts"
+      },
+      "phase": "development",
+      "points": 3,
+      "progress": 100,
+      "readmePath": ".project-manager/features/F22/README.md",
+      "status": "done",
+      "updatedAt": "2026-05-24T09:20:00+10:00",
+      "updatedBy": "codex"
+    },
+    {
+      "category": "Engineers/Capabilities",
+      "createdAt": "2026-05-24T11:00:00+10:00",
+      "id": "F23",
+      "locatedSection": "engineers",
+      "name": "Engineer Capabilities: Eyes/Voice/Hands/Recording",
+      "notes": "Qualification-gate model: 5 Integrations Hub sheets (VLA/TTS/STT/Hands/Tools), 5-state candidate machine (not_tested→testing→{passed|passed_disabled|failed}), role × adapter × passed-candidate intersection at dispatch. Schema bump v6→v7 (additive). Phase 1 (foundation + Eyes) is next — starts with types+state-machine, Tools/mic, VLA sheet, screenshot wiring.",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F23/",
+        "implementation": "app/ui/views/EngineersView.tsx",
+        "spec": ".project-manager/features/F23/feature-spec.md",
+        "tdd": ".project-manager/features/F23/tdd-spec.md",
+        "test": "__tests__/capabilities.registry.test.ts"
+      },
+      "phase": "development",
+      "points": 8,
+      "progress": 30,
+      "readmePath": ".project-manager/features/F23/README.md",
+      "status": "in_progress",
+      "updatedAt": "2026-05-24T11:30:00+10:00",
+      "updatedBy": "claude"
     }
   ],
   "id": "6be5e570-fb8a-4873-8c5c-a4f88055f157",
@@ -123,5 +167,6 @@
     "root": "/Volumes/KLEVV-4T-1/Project-Manager"
   },
   "schemaVersion": 6,
-  "updatedAt": "2026-05-23T21:50:02.617Z"
+  "updatedAt": "2026-05-24T11:00:00+10:00",
+  "updatedBy": "claude"
 }

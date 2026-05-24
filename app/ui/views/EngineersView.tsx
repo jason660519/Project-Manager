@@ -1,13 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Bot, FolderLock, Loader2, Play, Plus, RefreshCw, Sparkles, Trash2, Users2, X } from 'lucide-react';
+import { Bot, Camera, Eye, FolderLock, Loader2, Play, Plus, RefreshCw, Sparkles, Trash2, Users2, X } from 'lucide-react';
 import { DEFAULT_ENGINEER_ROLES } from '../../../lib/defaults/engineerRoles';
 import { listLlmProviders, type LlmProviderId } from '../../../lib/keys/llmProviders';
 import { hasProviderKey, loadProviderKey } from '../../../lib/keys/loadProviderKey';
 import { loadProviderOrder, type ProviderOrderEntry } from '../../../lib/keys/providerOrder';
 import { callSingleProvider } from '../../../lib/scanner/runProjectScan';
-import type { AnyAdapterConfig, EngineerRole, ModelFallbackEntry, WorkingScope } from '../../../lib/types';
+import type { AnyAdapterConfig, CapabilityKind, EngineerRole, ModelFallbackEntry, RoleCapability, WorkingScope } from '../../../lib/types';
+import { sheetForKind } from '../../../lib/capabilities/registry';
+import { listPassedCandidates, loadCapabilityCatalog, type CapabilityCatalog } from '../../../lib/storage/capabilities';
+import { callAnthropic, captureScreenshot } from '../../../lib/bridge';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -53,6 +56,7 @@ interface FormState {
   scopePaths: string[];
   scopeMode: 'soft' | 'strict';
   scopeInput: string;
+  capabilities: RoleCapability[];
 }
 
 function roleToForm(role: EngineerRole): FormState {
@@ -73,6 +77,7 @@ function roleToForm(role: EngineerRole): FormState {
     scopePaths: role.workingScope?.allowedPaths ?? [],
     scopeMode: role.workingScope?.mode ?? 'soft',
     scopeInput: '',
+    capabilities: role.capabilities ?? [],
   };
 }
 
@@ -99,6 +104,7 @@ function formToRole(id: string, form: FormState, existing: EngineerRole): Engine
     testProviderId: form.testProviderId || undefined,
     testModel: form.testModel || undefined,
     testPrompt: form.testPrompt || undefined,
+    capabilities: form.capabilities.length > 0 ? form.capabilities : undefined,
   };
 }
 
@@ -168,6 +174,17 @@ function DetailPanel({ role, agents, onSave, onDelete }: DetailPanelProps) {
   const [testResult, setTestResult] = useState<PlaygroundResult | null>(null);
   const [orderEntries, setOrderEntries] = useState<ProviderOrderEntry[]>([]);
   const [keyAvail, setKeyAvail] = useState<Record<string, boolean>>({});
+  const [capabilityCatalog, setCapabilityCatalog] = useState<CapabilityCatalog>({ schemaVersion: 1, candidates: [] });
+  const [attachScreenshot, setAttachScreenshot] = useState(false);
+
+  // Load + refresh capability catalog so /integrations-hub state changes propagate when the user returns.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setCapabilityCatalog(loadCapabilityCatalog());
+    const refresh = () => setCapabilityCatalog(loadCapabilityCatalog());
+    window.addEventListener('focus', refresh);
+    return () => window.removeEventListener('focus', refresh);
+  }, []);
 
   const providers = listLlmProviders();
 
@@ -276,6 +293,39 @@ function DetailPanel({ role, agents, onSave, onDelete }: DetailPanelProps) {
         throw new Error(`No API key saved for ${resolvedSpec.label}. Add one in the Keys page.`);
       }
       const promptToUse = form.testPrompt.trim() || buildDefaultTestPrompt(form);
+
+      // F23 Eyes-capability path: when the checkbox is on AND the provider is Anthropic,
+      // capture a screenshot and send it as a multimodal content block. Other providers
+      // fall through to the text-only path below.
+      if (attachScreenshot && resolvedProviderId === 'anthropic') {
+        const screenshot = await captureScreenshot();
+        const modelId = resolvedModel || resolvedSpec.defaultModel;
+        const response = await callAnthropic({
+          apiKey,
+          model: modelId,
+          maxTokens: 2048,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'image', source: { type: 'base64', media_type: 'image/png', data: screenshot } },
+                { type: 'text', text: promptToUse },
+              ] as unknown as string,
+            },
+          ],
+        });
+        setTestResult({
+          content: response.content,
+          latencyMs: Math.round(performance.now() - start),
+          inputTokens: response.inputTokens,
+          outputTokens: response.outputTokens,
+          model: modelId,
+          provider: 'anthropic',
+          at: Date.now(),
+        });
+        return;
+      }
+
       const r = await callSingleProvider(
         resolvedProviderId,
         apiKey,
@@ -494,6 +544,71 @@ function DetailPanel({ role, agents, onSave, onDelete }: DetailPanelProps) {
         />
       </FormField>
 
+      {/* ── Capabilities (F23 schema v7) ─────────────────────────────────── */}
+      <div className="space-y-3 border border-violet-300/15 bg-[rgb(var(--pm-card-3))]/45 p-3">
+        <div className="flex items-center gap-2">
+          <Eye size={13} className="text-violet-300/80" />
+          <span className="text-[11px] uppercase tracking-[0.14em] text-violet-200/85">
+            Capabilities
+          </span>
+          <span className="ml-auto text-[10px] text-stone-500">
+            Assign passed candidates from the Integrations Hub
+          </span>
+        </div>
+
+        {(['eyes', 'voice-tts', 'voice-stt', 'hands', 'recording'] as readonly CapabilityKind[]).map((kind) => {
+          const sheet = sheetForKind(kind);
+          const passed = listPassedCandidates(capabilityCatalog, sheet);
+          const current = form.capabilities.find((c) => c.kind === kind);
+          const selectedAdapter = agents.find((a) => a.id === form.defaultAgentId);
+          const adapterSupports =
+            !form.defaultAgentId || (selectedAdapter?.supports ?? []).includes(kind);
+          const statusLabel = !adapterSupports
+            ? `Adapter does not support ${kind}`
+            : passed.length === 0
+              ? 'No passed candidate yet'
+              : current
+                ? 'Active'
+                : 'Not assigned';
+          const statusClass =
+            statusLabel === 'Active'
+              ? 'text-emerald-300'
+              : statusLabel.startsWith('Adapter')
+                ? 'text-amber-300'
+                : 'text-stone-500';
+          return (
+            <div key={kind} className="grid grid-cols-[110px_1fr_auto] items-center gap-2">
+              <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-stone-400">
+                {kind}
+              </span>
+              <select
+                value={current?.candidateId ?? ''}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setForm((prev) => {
+                    const others = prev.capabilities.filter((c) => c.kind !== kind);
+                    const next = id ? [...others, { kind, candidateId: id }] : others;
+                    return { ...prev, capabilities: next };
+                  });
+                  setDirty(true);
+                }}
+                disabled={passed.length === 0 || !adapterSupports}
+                className={`${inputCls} text-xs`}
+              >
+                <option value="">— Not assigned —</option>
+                {passed.map((c) => (
+                  <option key={c.id} value={c.id}>{c.label}</option>
+                ))}
+              </select>
+              <span className={`text-[10px] ${statusClass}`}>{statusLabel}</span>
+            </div>
+          );
+        })}
+        <p className="text-[10px] text-stone-600">
+          Only candidates with state <code className="font-mono">passed</code> appear here. Qualify new ones in the Integrations Hub VLA / TTS / STT / Hands / Tools sheets.
+        </p>
+      </div>
+
       {/* ── AI Provider Test ──────────────────────────────────────────────── */}
       <div className="space-y-3 border border-cyan-300/15 bg-[rgb(var(--pm-card-3))]/55 p-3">
         <div className="flex items-center gap-2">
@@ -567,6 +682,19 @@ function DetailPanel({ role, agents, onSave, onDelete }: DetailPanelProps) {
         </FormField>
 
         <div className="flex flex-wrap items-center gap-2">
+          <label
+            className="flex items-center gap-1.5 text-[10px] text-stone-400"
+            title="F23 Eyes capability — captures the desktop screenshot and sends it as an Anthropic image content block."
+          >
+            <input
+              type="checkbox"
+              checked={attachScreenshot}
+              onChange={(e) => setAttachScreenshot(e.target.checked)}
+              disabled={!isTauri || resolvedProviderId !== 'anthropic'}
+            />
+            <Camera size={11} />
+            Attach screenshot (vision)
+          </label>
           <button
             type="button"
             onClick={() => void handleRunTest()}

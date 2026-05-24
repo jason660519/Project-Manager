@@ -5,8 +5,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ExternalLink, FileText, MessageCircle, RotateCw, Snowflake, X } from 'lucide-react';
 import type { IntegrationRow, IntegrationSheet } from '../../../../lib/integrations/types';
+import { isCapabilitySheet } from '../../../../lib/integrations/types';
 import { mergeAllManual } from '../../../../lib/integrations/manual-metadata';
-import { mapInstalledPlugins, mapMarketplaceRow } from '../../../../lib/integrations/mappers/plugins';
+import {
+  mapInstalledPlugins,
+  mapMarketplaceRow,
+  type ResolvedPluginPath,
+} from '../../../../lib/integrations/mappers/plugins';
 import { mapSkillRow } from '../../../../lib/integrations/mappers/skills';
 import { mapChannelRow, mapCommandMappingRow } from '../../../../lib/integrations/mappers/channels';
 import { mapSystemCliRow } from '../../../../lib/integrations/mappers/system-cli';
@@ -64,6 +69,7 @@ import {
   openPath,
   readFile,
   listGlobalCliInventory,
+  resolveInstallPath,
   skillInstallFromUrl,
   skillList,
   skillUninstall,
@@ -78,14 +84,21 @@ import { getSkillsDir } from '../../../../lib/storage/settings';
 import { parseCategorySlug, parseFrontmatter } from '../../../../lib/skills/utils';
 import { useI18n } from '../../../../lib/i18n';
 import PluginGuidePanel from '../../../../components/PluginGuidePanel';
+import { WorkstationFrame } from '../../../../components/layout/WorkstationFrame';
+import {
+  BottomSheetTabs,
+  type SheetTabItem,
+} from '../../../../components/sheets/BottomSheetTabs';
 import {
   IntegrationsTable,
   DEFAULT_VISIBILITY,
   type ColumnVisibility,
+  type IntegrationRowTestResult,
 } from './_shared/IntegrationsTable';
 import { IntegrationsDetailSheet } from './_shared/IntegrationsDetailSheet';
 import { McpLogsViewer } from './_shared/McpLogsViewer';
 import { ConnectSheet } from './ConnectSheet';
+import { CapabilitySheetView } from './CapabilitySheetView';
 
 const EMPTY_CATALOG: PluginCatalog = { schemaVersion: 2, plugins: [] };
 
@@ -147,6 +160,9 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
   const [commandsError, setCommandsError] = useState<string | null>(null);
   const [systemCliExposure, setSystemCliExposure] = useState<Record<string, boolean>>({});
   const [systemCommandStatus, setSystemCommandStatus] = useState<Record<string, boolean>>({});
+  const [resolvedInstallPaths, setResolvedInstallPaths] = useState<Record<string, ResolvedPluginPath>>({});
+  const [pluginTestResults, setPluginTestResults] = useState<Record<string, IntegrationRowTestResult>>({});
+  const [pluginTestingKeys, setPluginTestingKeys] = useState<ReadonlySet<string>>(new Set());
   const [logsForId, setLogsForId] = useState<string | null>(null);
   const [skillsInstallUrl, setSkillsInstallUrl] = useState('');
   const [isGuideOpen, setIsGuideOpen] = useState(false);
@@ -293,22 +309,37 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     let cancelled = false;
     const scan = async () => {
       const status: Record<string, boolean> = {};
+      const paths: Record<string, ResolvedPluginPath> = {};
       await Promise.all(
         MARKETPLACE.map(async (mp) => {
           let command = '';
+          let appBundleName: string | undefined;
           if (mp.kind === 'cli' && mp.defaultCli?.command) command = mp.defaultCli.command;
-          else if (mp.kind === 'editor' && mp.defaultEditor?.command) command = mp.defaultEditor.command;
-          if (command) {
-            const baseName = command.split('/').pop() || command;
-            try {
-              status[mp.id] = await checkCommandExists(baseName);
-            } catch {
-              status[mp.id] = false;
+          else if (mp.kind === 'editor' && mp.defaultEditor?.command) {
+            command = mp.defaultEditor.command;
+            appBundleName = mp.appBundleName;
+          } else if (mp.kind === 'mcp' && mp.defaultMcp?.command) command = mp.defaultMcp.command;
+          if (!command) return;
+          const baseName = command.split('/').pop() || command;
+          try {
+            status[mp.id] = await checkCommandExists(baseName);
+          } catch {
+            status[mp.id] = false;
+          }
+          try {
+            const resolved = await resolveInstallPath(command, appBundleName);
+            if (resolved.commandPath || resolved.appBundlePath) {
+              paths[mp.id] = resolved;
             }
+          } catch {
+            // Tauri may be unavailable in the web preview; skip silently.
           }
         }),
       );
-      if (!cancelled) setSystemCommandStatus(status);
+      if (!cancelled) {
+        setSystemCommandStatus(status);
+        setResolvedInstallPaths(paths);
+      }
     };
     void scan();
     return () => {
@@ -392,17 +423,20 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
   const installedIds = useMemo(() => new Set(catalog.plugins.map((p) => p.id)), [catalog]);
 
   const pluginRows = useMemo(() => {
-    const ctx = { apiKeys, systemCommandStatus, mcpStatuses };
+    const ctx = { apiKeys, systemCommandStatus, mcpStatuses, resolvedInstallPaths };
     const installed = mapInstalledPlugins(catalog, ctx);
     const marketplace = MARKETPLACE.map((mp) =>
-      mapMarketplaceRow({
-        id: mp.id,
-        name: mp.name,
-        description: mp.description,
-        category: mp.category,
-        kind: mp.kind,
-        installed: installedIds.has(mp.id),
-      }),
+      mapMarketplaceRow(
+        {
+          id: mp.id,
+          name: mp.name,
+          description: mp.description,
+          category: mp.category,
+          kind: mp.kind,
+          installed: installedIds.has(mp.id),
+        },
+        resolvedInstallPaths[mp.id],
+      ),
     );
     let rows: IntegrationRow[] = [];
     if (pluginsFilter === 'installed') rows = installed;
@@ -410,7 +444,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     else rows = [...installed, ...marketplace.filter((r) => !installedIds.has(r.sourceId))];
     return mergeAllManual(rows);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catalog, apiKeys, systemCommandStatus, mcpStatuses, pluginsFilter, installedIds, manualVersion]);
+  }, [catalog, apiKeys, systemCommandStatus, mcpStatuses, pluginsFilter, installedIds, manualVersion, resolvedInstallPaths]);
 
   const channelRows = useMemo(() => {
     const rows = channelCatalog.channels.map((ch) =>
@@ -481,6 +515,83 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     const set = new Set(activeRows.map((r) => r.category1));
     return ['all', ...Array.from(set).sort()];
   }, [activeRows]);
+
+  const handleTestPluginRow = useCallback(
+    async (row: IntegrationRow) => {
+      if (row.sourceKind !== 'plugin-installed' && row.sourceKind !== 'plugin-marketplace') return;
+      const marketplaceEntry = MARKETPLACE.find((mp) => mp.id === row.sourceId);
+      const installedPlugin = catalog.plugins.find((p) => p.id === row.sourceId);
+
+      let command = '';
+      let appBundleName: string | undefined;
+      if (marketplaceEntry?.kind === 'cli' && marketplaceEntry.defaultCli?.command) {
+        command = marketplaceEntry.defaultCli.command;
+      } else if (marketplaceEntry?.kind === 'editor' && marketplaceEntry.defaultEditor?.command) {
+        command = marketplaceEntry.defaultEditor.command;
+        appBundleName = marketplaceEntry.appBundleName;
+      } else if (marketplaceEntry?.kind === 'mcp' && marketplaceEntry.defaultMcp?.command) {
+        command = marketplaceEntry.defaultMcp.command;
+      } else if (installedPlugin && (installedPlugin.kind === 'cli' || installedPlugin.kind === 'editor' || installedPlugin.kind === 'mcp')) {
+        command = installedPlugin.command ?? '';
+      }
+
+      if (!command) {
+        setPluginTestResults((prev) => ({
+          ...prev,
+          [row.rowKey]: { ok: false, testedAt: Date.now(), detail: 'No probe command for this row' },
+        }));
+        return;
+      }
+
+      setPluginTestingKeys((prev) => {
+        const next = new Set(prev);
+        next.add(row.rowKey);
+        return next;
+      });
+
+      const baseName = command.split('/').pop() || command;
+      let exists = false;
+      let resolved: ResolvedPluginPath = { commandPath: null, appBundlePath: null };
+      let detail: string | undefined;
+      try {
+        exists = await checkCommandExists(baseName);
+      } catch (err) {
+        detail = err instanceof Error ? err.message : 'checkCommandExists failed';
+      }
+      try {
+        resolved = await resolveInstallPath(command, appBundleName);
+      } catch (err) {
+        if (!detail) {
+          detail = err instanceof Error ? err.message : 'resolveInstallPath failed';
+        }
+      }
+
+      const ok = exists || Boolean(resolved.appBundlePath || resolved.commandPath);
+      const summary = ok
+        ? resolved.appBundlePath ?? resolved.commandPath ?? `${baseName} on PATH`
+        : detail ?? 'Command not found on PATH; no .app bundle detected';
+
+      setSystemCommandStatus((prev) => ({ ...prev, [row.sourceId]: exists }));
+      setResolvedInstallPaths((prev) => {
+        if (resolved.commandPath || resolved.appBundlePath) {
+          return { ...prev, [row.sourceId]: resolved };
+        }
+        const next = { ...prev };
+        delete next[row.sourceId];
+        return next;
+      });
+      setPluginTestResults((prev) => ({
+        ...prev,
+        [row.rowKey]: { ok, testedAt: Date.now(), detail: summary },
+      }));
+      setPluginTestingKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(row.rowKey);
+        return next;
+      });
+    },
+    [catalog],
+  );
 
   const handleApiKeyChange = async (id: string, key: string) => {
     await setProviderApiKey(id, key);
@@ -678,14 +789,25 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     }
   };
 
-  const sheets: { id: IntegrationSheet; label: string; count: number | null }[] = [
-    { id: 'plugins', label: t.integrations.sheetPlugins, count: pluginRows.length },
-    { id: 'skills', label: t.integrations.sheetSkills, count: skillsRowsMerged.length },
-    { id: 'channels', label: t.integrations.sheetChannels, count: channelRows.length },
-    { id: 'memory', label: t.integrations.sheetMemory, count: memoryRowsMerged.length },
-    { id: 'commands', label: t.integrations.sheetCommands, count: commandRowsMerged.length },
-    { id: 'connect', label: 'Connect', count: null },
+  const sheetTabs: ReadonlyArray<SheetTabItem<IntegrationSheet>> = [
+    { key: 'plugins', label: t.integrations.sheetPlugins, badge: pluginRows.length },
+    { key: 'skills', label: t.integrations.sheetSkills, badge: skillsRowsMerged.length },
+    { key: 'channels', label: t.integrations.sheetChannels, badge: channelRows.length },
+    { key: 'memory', label: t.integrations.sheetMemory, badge: memoryRowsMerged.length },
+    { key: 'commands', label: t.integrations.sheetCommands, badge: commandRowsMerged.length },
+    { key: 'vla', label: 'VLA (Eyes)' },
+    { key: 'tts', label: 'TTS (Mouth)' },
+    { key: 'stt', label: 'STT (Mouth)' },
+    { key: 'hands', label: 'Hands' },
+    { key: 'tools', label: 'Tools' },
+    { key: 'connect', label: 'Connect' },
   ];
+
+  const handleSheetSelect = (key: IntegrationSheet) => {
+    setSelectedRow(null);
+    setCategoryFilter('all');
+    router.push(`/integrations-hub/${key}`);
+  };
 
   const activeSheetLoading =
     activeSheet === 'skills'
@@ -705,307 +827,299 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
           ? commandsError
           : null;
 
-  return (
-    <div className="mx-auto flex h-[calc(100vh-8rem)] min-h-0 max-w-[1400px] flex-col gap-3 overflow-hidden">
-      <div className="shrink-0 flex flex-col gap-3 border-b border-stone-200/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">
-            {t.integrations.title}
-          </h1>
-          <p className="mt-1 text-xs text-stone-400">{t.integrations.subtitle}</p>
-        </div>
-        <button
-          type="button"
-          onClick={() =>
-            void openPath('/Volumes/KLEVV-4T-1/Project-Manager/docs/engineering/plugin-guide.md').catch(
-              () => {},
-            )
-          }
-          className="flex items-center gap-2 self-start border border-emerald-500/20 bg-emerald-950/25 px-3 py-1.5 text-xs text-emerald-400 sm:self-center"
-        >
-          <FileText size={13} />
-          Plugin Guide
-          <ExternalLink size={11} />
-        </button>
-      </div>
-
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
-        {!projectRoot && activeSheet === 'memory' && (
-          <p className="border border-amber-400/25 bg-amber-950/25 px-3 py-2 text-xs text-amber-200/90">
-            {t.integrations.selectProjectHint}
-          </p>
-        )}
-
-        {activeSheet !== 'connect' && <div className="shrink-0 flex flex-wrap items-center gap-2 border-b border-stone-200/10 pb-2">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={t.integrations.searchPlaceholder}
-          className="min-w-[200px] flex-1 border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72 px-3 py-2 text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/25"
-        />
+  const toolbar = activeSheet === 'connect' || isCapabilitySheet(activeSheet) ? null : (
+    <div className="flex flex-wrap items-center gap-2 border-b border-stone-200/10 px-4 py-2">
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder={t.integrations.searchPlaceholder}
+        className="min-w-[200px] flex-1 border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72 px-3 py-2 text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/25"
+      />
+      <select
+        value={categoryFilter}
+        onChange={(e) => setCategoryFilter(e.target.value)}
+        className="border border-stone-200/18 bg-[rgb(var(--pm-panel))] px-2 py-2 text-xs text-stone-200"
+      >
+        {categoryOptions.map((c) => (
+          <option key={c} value={c}>
+            {c === 'all' ? t.integrations.filterAllCategories : c}
+          </option>
+        ))}
+      </select>
+      {activeSheet === 'plugins' && (
         <select
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
+          value={pluginsFilter}
+          onChange={(e) => setPluginsFilter(e.target.value as PluginsFilter)}
           className="border border-stone-200/18 bg-[rgb(var(--pm-panel))] px-2 py-2 text-xs text-stone-200"
         >
-          {categoryOptions.map((c) => (
-            <option key={c} value={c}>
-              {c === 'all' ? t.integrations.filterAllCategories : c}
-            </option>
-          ))}
+          <option value="all">{t.integrations.filterAllPlugins}</option>
+          <option value="installed">{t.plugins.installed}</option>
+          <option value="marketplace">{t.plugins.marketplace}</option>
         </select>
-        {activeSheet === 'plugins' && (
-          <select
-            value={pluginsFilter}
-            onChange={(e) => setPluginsFilter(e.target.value as PluginsFilter)}
-            className="border border-stone-200/18 bg-[rgb(var(--pm-panel))] px-2 py-2 text-xs text-stone-200"
-          >
-            <option value="all">{t.integrations.filterAllPlugins}</option>
-            <option value="installed">{t.plugins.installed}</option>
-            <option value="marketplace">{t.plugins.marketplace}</option>
-          </select>
-        )}
-        {activeSheet === 'skills' && (
-          <>
-            <button
-              type="button"
-              onClick={() => void loadSkills()}
-              className="flex items-center gap-1 border border-stone-200/20 px-2 py-2 text-xs text-stone-300"
-            >
-              <RotateCw size={12} /> {t.plugins.rescan}
-            </button>
-            <Link href="/settings" className="text-xs text-emerald-300/80 hover:text-emerald-200">
-              {t.plugins.settings}
-            </Link>
-          </>
-        )}
-        {(activeSheet === 'memory' || activeSheet === 'commands') && (activeSheet !== 'memory' || projectRoot) && (
+      )}
+      {activeSheet === 'skills' && (
+        <>
           <button
             type="button"
-            onClick={() => {
-              if (activeSheet === 'memory') void loadMemory();
-              else void loadCommands();
-            }}
+            onClick={() => void loadSkills()}
             className="flex items-center gap-1 border border-stone-200/20 px-2 py-2 text-xs text-stone-300"
           >
             <RotateCw size={12} /> {t.plugins.rescan}
           </button>
-        )}
-        {activeSheet === 'commands' && projectRoot && (
+          <Link href="/settings" className="text-xs text-emerald-300/80 hover:text-emerald-200">
+            {t.plugins.settings}
+          </Link>
+        </>
+      )}
+      {(activeSheet === 'memory' || activeSheet === 'commands') && (activeSheet !== 'memory' || projectRoot) && (
+        <button
+          type="button"
+          onClick={() => {
+            if (activeSheet === 'memory') void loadMemory();
+            else void loadCommands();
+          }}
+          className="flex items-center gap-1 border border-stone-200/20 px-2 py-2 text-xs text-stone-300"
+        >
+          <RotateCw size={12} /> {t.plugins.rescan}
+        </button>
+      )}
+      {activeSheet === 'commands' && projectRoot && (
+        <button
+          type="button"
+          onClick={() => void openPath(`${projectRoot.replace(/\/+$/, '')}/.claude/commands`).catch(() => {})}
+          className="border border-stone-200/20 px-2 py-2 text-xs text-stone-300"
+        >
+          {t.integrations.openCommandsFolder}
+        </button>
+      )}
+      {activeSheet === 'commands' && (
+        <>
           <button
             type="button"
-            onClick={() => void openPath(`${projectRoot.replace(/\/+$/, '')}/.claude/commands`).catch(() => {})}
-            className="border border-stone-200/20 px-2 py-2 text-xs text-stone-300"
+            onClick={() => applySystemCliPolicyPreset('allow-all')}
+            className="border border-emerald-400/30 bg-emerald-950/20 px-2 py-2 text-xs text-emerald-300"
           >
-            {t.integrations.openCommandsFolder}
+            {t.integrations.commandsAllowAllSystemCli}
           </button>
-        )}
-        {activeSheet === 'commands' && (
-          <>
-            <button
-              type="button"
-              onClick={() => applySystemCliPolicyPreset('allow-all')}
-              className="border border-emerald-400/30 bg-emerald-950/20 px-2 py-2 text-xs text-emerald-300"
-            >
-              {t.integrations.commandsAllowAllSystemCli}
-            </button>
-            <button
-              type="button"
-              onClick={() => applySystemCliPolicyPreset('block-all')}
-              className="border border-red-400/30 bg-red-950/20 px-2 py-2 text-xs text-red-300"
-            >
-              {t.integrations.commandsBlockAllSystemCli}
-            </button>
-            <button
-              type="button"
-              onClick={() => applySystemCliPolicyPreset('ai-defaults')}
-              className="border border-cyan-400/30 bg-cyan-950/20 px-2 py-2 text-xs text-cyan-200"
-            >
-              {t.integrations.commandsAiDefaultsPreset}
-            </button>
-          </>
-        )}
-        {activeSheet === 'channels' && (
-          <div className="flex flex-wrap gap-1">
-            {CHANNEL_QUICK_ADD.map(({ platform, label }) => (
-              <button
-                key={platform}
-                type="button"
-                onClick={() => {
-                  const ch: ChannelConfig = {
-                    id: newChannelId(),
-                    platform,
-                    label,
-                    enabled: true,
-                    webhookMode: platform === 'telegram' ? 'polling' : 'webhook',
-                    credentials: {},
-                  };
-                  updateChannels({
-                    ...channelCatalog,
-                    channels: [...channelCatalog.channels, ch],
-                  });
-                  setSelectedRow(mapChannelRow(ch, pollStatuses, false));
-                }}
-                className="border border-stone-200/18 px-2 py-1.5 text-xs text-stone-300 hover:border-emerald-300/30"
-              >
-                + {label}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => setAddCommandOpen(true)}
-              className="border border-emerald-400/30 bg-emerald-950/15 px-2 py-1.5 text-xs text-emerald-300 hover:bg-emerald-950/35"
-            >
-              + Add command
-            </button>
-          </div>
-        )}
-        <label className="flex items-center gap-1 text-[10px] text-stone-500">
-          <input
-            type="checkbox"
-            checked={columnVisibility.installPath}
-            onChange={(e) =>
-              setColumnVisibility((v) => ({ ...v, installPath: e.target.checked }))
-            }
-          />
-          Path
-        </label>
-        <label className="flex items-center gap-1 text-[10px] text-stone-500">
-          <input
-            type="checkbox"
-            checked={columnVisibility.notes}
-            onChange={(e) => setColumnVisibility((v) => ({ ...v, notes: e.target.checked }))}
-          />
-          Notes
-        </label>
-          <div className="ml-2 flex items-center gap-1 border-l border-stone-200/15 pl-2">
-            <Snowflake size={12} className="text-cyan-300" />
-            <label className="text-[10px] text-stone-400">Freeze cols</label>
-            <input
-              type="number"
-              min={0}
-              max={4}
-              value={frozenDataColCount}
-              onChange={(e) => setFrozenDataColCount(Math.max(0, Math.min(4, Number(e.target.value) || 0)))}
-              className="h-7 w-12 rounded border border-stone-200/18 bg-[rgb(var(--pm-panel))] px-1 text-center text-xs text-stone-100"
-            />
-          </div>
-          <select
-            value={rowDensity}
-            onChange={(e) => setRowDensity(e.target.value as PluginsRowDensity)}
-            className="border border-stone-200/18 bg-[rgb(var(--pm-panel))] px-2 py-2 text-xs text-stone-200"
-            title="Row density"
+          <button
+            type="button"
+            onClick={() => applySystemCliPolicyPreset('block-all')}
+            className="border border-red-400/30 bg-red-950/20 px-2 py-2 text-xs text-red-300"
           >
-            <option value="compact">Compact Rows</option>
-            <option value="comfortable">Comfortable Rows</option>
-          </select>
-        </div>}
+            {t.integrations.commandsBlockAllSystemCli}
+          </button>
+          <button
+            type="button"
+            onClick={() => applySystemCliPolicyPreset('ai-defaults')}
+            className="border border-cyan-400/30 bg-cyan-950/20 px-2 py-2 text-xs text-cyan-200"
+          >
+            {t.integrations.commandsAiDefaultsPreset}
+          </button>
+        </>
+      )}
+      {activeSheet === 'channels' && (
+        <div className="flex flex-wrap gap-1">
+          {CHANNEL_QUICK_ADD.map(({ platform, label }) => (
+            <button
+              key={platform}
+              type="button"
+              onClick={() => {
+                const ch: ChannelConfig = {
+                  id: newChannelId(),
+                  platform,
+                  label,
+                  enabled: true,
+                  webhookMode: platform === 'telegram' ? 'polling' : 'webhook',
+                  credentials: {},
+                };
+                updateChannels({
+                  ...channelCatalog,
+                  channels: [...channelCatalog.channels, ch],
+                });
+                setSelectedRow(mapChannelRow(ch, pollStatuses, false));
+              }}
+              className="border border-stone-200/18 px-2 py-1.5 text-xs text-stone-300 hover:border-emerald-300/30"
+            >
+              + {label}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setAddCommandOpen(true)}
+            className="border border-emerald-400/30 bg-emerald-950/15 px-2 py-1.5 text-xs text-emerald-300 hover:bg-emerald-950/35"
+          >
+            + Add command
+          </button>
+        </div>
+      )}
+      <label className="flex items-center gap-1 text-[10px] text-stone-500">
+        <input
+          type="checkbox"
+          checked={columnVisibility.installPath}
+          onChange={(e) =>
+            setColumnVisibility((v) => ({ ...v, installPath: e.target.checked }))
+          }
+        />
+        Path
+      </label>
+      <label className="flex items-center gap-1 text-[10px] text-stone-500">
+        <input
+          type="checkbox"
+          checked={columnVisibility.notes}
+          onChange={(e) => setColumnVisibility((v) => ({ ...v, notes: e.target.checked }))}
+        />
+        Notes
+      </label>
+      <div className="ml-2 flex items-center gap-1 border-l border-stone-200/15 pl-2">
+        <Snowflake size={12} className="text-cyan-300" />
+        <label className="text-[10px] text-stone-400">Freeze cols</label>
+        <input
+          type="number"
+          min={0}
+          max={4}
+          value={frozenDataColCount}
+          onChange={(e) => setFrozenDataColCount(Math.max(0, Math.min(4, Number(e.target.value) || 0)))}
+          className="h-7 w-12 rounded border border-stone-200/18 bg-[rgb(var(--pm-panel))] px-1 text-center text-xs text-stone-100"
+        />
+      </div>
+      <select
+        value={rowDensity}
+        onChange={(e) => setRowDensity(e.target.value as PluginsRowDensity)}
+        className="border border-stone-200/18 bg-[rgb(var(--pm-panel))] px-2 py-2 text-xs text-stone-200"
+        title="Row density"
+      >
+        <option value="compact">Compact Rows</option>
+        <option value="comfortable">Comfortable Rows</option>
+      </select>
+    </div>
+  );
 
-        {activeSheet === 'commands' && (
-          <div className="border border-cyan-400/20 bg-cyan-950/20 px-3 py-2 text-xs text-cyan-100/90">
-            {t.integrations.commandsInventorySummary
-              .replace('{detected}', String(systemCliRows.length))
-              .replace('{exposed}', String(exposedSystemCliCount))
-              .replace('{whitelisted}', String(exposedSystemCliConfigured))}
-          </div>
-        )}
-
-        <div className="min-h-0 flex-1 overflow-auto">
-          {activeSheet === 'connect' ? (
-            <ConnectSheet />
-          ) : (
-          <div className="space-y-4">
-            <IntegrationsTable
-              rows={activeRows}
-              selectedRowKey={selectedRow?.rowKey ?? null}
-              onRowClick={setSelectedRow}
-              globalFilter={search}
-              columnVisibility={columnVisibility}
-              isLoading={activeSheetLoading}
-              errorMessage={activeSheetError}
-              frozenDataColCount={frozenDataColCount}
-              rowDensity={rowDensity}
-              onToggleEnabled={
-                activeSheet === 'plugins'
-                  ? (row, _enabled) => {
-                      if (row.sourceKind === 'plugin-installed') {
-                        updateCatalog(togglePluginEnabled(catalog, row.sourceId));
-                      }
-                    }
-                  : activeSheet === 'channels'
-                    ? (row, enabled) => {
-                        if (row.sourceKind !== 'channel') return;
-                        updateChannels({
-                          ...channelCatalog,
-                          channels: channelCatalog.channels.map((c) =>
-                            c.id === row.sourceId ? { ...c, enabled } : c,
-                          ),
-                        });
-                      }
-                    : activeSheet === 'commands'
-                      ? (row, enabled) => {
-                          if (row.sourceKind === 'command-mapping') {
-                            updateChannels({
-                              ...channelCatalog,
-                              commandMappings: channelCatalog.commandMappings.map((m) =>
-                                m.id === row.sourceId ? { ...m, enabled } : m,
-                              ),
-                            });
-                          } else if (row.sourceKind === 'system-cli') {
-                            setSystemCliExposed(row.sourceId, enabled);
-                            setSystemCliExposure((prev) => ({ ...prev, [row.sourceId]: enabled }));
-                          } else {
-                            return;
-                          }
-                          void loadCommands();
-                        }
-                      : undefined
+  return (
+    <>
+      <WorkstationFrame
+        className="mx-auto w-full max-w-[1400px]"
+        header={
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">
+                {t.integrations.title}
+              </h1>
+              <p className="mt-1 text-xs text-stone-400">{t.integrations.subtitle}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                void openPath('/Volumes/KLEVV-4T-1/Project-Manager/docs/engineering/plugin-guide.md').catch(
+                  () => {},
+                )
               }
-            />
+              className="flex items-center gap-2 self-start border border-emerald-500/20 bg-emerald-950/25 px-3 py-1.5 text-xs text-emerald-400 sm:self-center"
+            >
+              <FileText size={13} />
+              Plugin Guide
+              <ExternalLink size={11} />
+            </button>
+          </div>
+        }
+        panelClassName="border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72"
+        toolbar={toolbar}
+        scrollChildren={false}
+        bottomTabs={
+          <BottomSheetTabs<IntegrationSheet>
+            tabs={sheetTabs}
+            activeKey={activeSheet}
+            onSelect={handleSheetSelect}
+          />
+        }
+      >
+        {activeSheet === 'connect' ? (
+          <div className="h-full overflow-auto p-4">
+            <ConnectSheet />
+          </div>
+        ) : isCapabilitySheet(activeSheet) ? (
+          <CapabilitySheetView sheet={activeSheet} />
+        ) : (
+          <div className="flex h-full min-h-0 flex-col gap-3 p-4">
+            {!projectRoot && activeSheet === 'memory' && (
+              <p className="shrink-0 border border-amber-400/25 bg-amber-950/25 px-3 py-2 text-xs text-amber-200/90">
+                {t.integrations.selectProjectHint}
+              </p>
+            )}
+            {activeSheet === 'commands' && (
+              <div className="shrink-0 border border-cyan-400/20 bg-cyan-950/20 px-3 py-2 text-xs text-cyan-100/90">
+                {t.integrations.commandsInventorySummary
+                  .replace('{detected}', String(systemCliRows.length))
+                  .replace('{exposed}', String(exposedSystemCliCount))
+                  .replace('{whitelisted}', String(exposedSystemCliConfigured))}
+              </div>
+            )}
+
+            <div className="min-h-0 flex-1">
+              <IntegrationsTable
+                rows={activeRows}
+                selectedRowKey={selectedRow?.rowKey ?? null}
+                onRowClick={setSelectedRow}
+                globalFilter={search}
+                columnVisibility={columnVisibility}
+                isLoading={activeSheetLoading}
+                errorMessage={activeSheetError}
+                frozenDataColCount={frozenDataColCount}
+                rowDensity={rowDensity}
+                onTestRow={activeSheet === 'plugins' ? handleTestPluginRow : undefined}
+                testResults={activeSheet === 'plugins' ? pluginTestResults : undefined}
+                testingKeys={activeSheet === 'plugins' ? pluginTestingKeys : undefined}
+                onToggleEnabled={
+                  activeSheet === 'plugins'
+                    ? (row, _enabled) => {
+                        if (row.sourceKind === 'plugin-installed') {
+                          updateCatalog(togglePluginEnabled(catalog, row.sourceId));
+                        }
+                      }
+                    : activeSheet === 'channels'
+                      ? (row, enabled) => {
+                          if (row.sourceKind !== 'channel') return;
+                          updateChannels({
+                            ...channelCatalog,
+                            channels: channelCatalog.channels.map((c) =>
+                              c.id === row.sourceId ? { ...c, enabled } : c,
+                            ),
+                          });
+                        }
+                      : activeSheet === 'commands'
+                        ? (row, enabled) => {
+                            if (row.sourceKind === 'command-mapping') {
+                              updateChannels({
+                                ...channelCatalog,
+                                commandMappings: channelCatalog.commandMappings.map((m) =>
+                                  m.id === row.sourceId ? { ...m, enabled } : m,
+                                ),
+                              });
+                            } else if (row.sourceKind === 'system-cli') {
+                              setSystemCliExposed(row.sourceId, enabled);
+                              setSystemCliExposure((prev) => ({ ...prev, [row.sourceId]: enabled }));
+                            } else {
+                              return;
+                            }
+                            void loadCommands();
+                          }
+                        : undefined
+                }
+              />
+            </div>
 
             {activeSheet === 'channels' && (
-              <ChannelsActivityAndGuide
-                channels={channelCatalog.channels}
-                messages={recentMessages}
-                guideOpen={showChannelGuide}
-                onToggleGuide={() => setShowChannelGuide((v) => !v)}
-              />
+              <div className="shrink-0 max-h-[40%] overflow-y-auto">
+                <ChannelsActivityAndGuide
+                  channels={channelCatalog.channels}
+                  messages={recentMessages}
+                  guideOpen={showChannelGuide}
+                  onToggleGuide={() => setShowChannelGuide((v) => !v)}
+                />
+              </div>
             )}
           </div>
-          )}
-        </div>
-
-        <div className="shrink-0 flex items-end gap-0 overflow-x-auto border-t border-stone-200/15 bg-[rgb(var(--pm-rail))]/70">
-          {sheets.map((s) => {
-            const isActive = activeSheet === s.id;
-            return (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => {
-                  setSelectedRow(null);
-                  setCategoryFilter('all');
-                  router.push(`/integrations-hub/${s.id}`);
-                }}
-                className={`relative flex items-center gap-1.5 border-r border-stone-200/15 px-4 py-2.5 text-xs font-medium uppercase tracking-[0.08em] ${
-                  isActive
-                    ? 'bg-emerald-600/85 text-white shadow-sm'
-                    : 'text-stone-300/85 hover:bg-white/5 hover:text-stone-100'
-                }`}
-              >
-                <span>{s.label}</span>
-                {s.count !== null && (
-                  <span className={`rounded px-1.5 py-0.5 text-[10px] ${isActive ? 'bg-white/25' : 'bg-stone-200/15'}`}>
-                    {s.count}
-                  </span>
-                )}
-                {isActive && <span className="absolute left-0 right-0 top-0 h-0.5 bg-white/60" />}
-              </button>
-            );
-          })}
-          <div className="min-w-[20px] flex-1" />
-        </div>
-      </div>
+        )}
+      </WorkstationFrame>
 
       <IntegrationsDetailSheet
         row={selectedRow}
@@ -1066,7 +1180,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
           onClose={() => setAddCommandOpen(false)}
         />
       )}
-    </div>
+    </>
   );
 }
 

@@ -1,4 +1,5 @@
-import type { ProjectManagerConfig, Feature } from '../types';
+import type { CapabilityCandidate, ProjectManagerConfig, Feature } from '../types';
+import { BUILT_IN_ADAPTER_SUPPORTS, mergeSeedCandidates } from '../capabilities/registry';
 
 /**
  * Pure migration pipeline for dashboard config JSON documents
@@ -23,7 +24,7 @@ interface RawConfig {
   [key: string]: unknown;
 }
 
-export const CURRENT_SCHEMA_VERSION = 6;
+export const CURRENT_SCHEMA_VERSION = 7;
 
 export function migrateConfig(raw: unknown): ProjectManagerConfig {
   const cfg = (raw && typeof raw === 'object' ? (raw as RawConfig) : {}) as RawConfig;
@@ -34,6 +35,7 @@ export function migrateConfig(raw: unknown): ProjectManagerConfig {
   if (version < 4) next = migrate_3_to_4(next);
   if (version < 5) next = migrate_4_to_5(next);
   if (version < 6) next = migrate_5_to_6(next);
+  if (version < 7) next = migrate_6_to_7(next);
   // Cast through unknown: `RawConfig` is intentionally a permissive bag,
   // and the migration steps above are responsible for ensuring the result
   // matches `ProjectManagerConfig`.
@@ -162,6 +164,56 @@ function migrate_5_to_6(cfg: RawConfig): RawConfig {
     schemaVersion: 6,
     features,
   };
+}
+
+/**
+ * v6 → v7 (F23 Engineer Capabilities): introduces `capabilities` on engineer
+ * roles, `supports`/`traits` on adapters, and a top-level `capabilityCandidates`
+ * array surfaced in the Integrations Hub VLA / TTS / STT / Hands / Tools sheets.
+ * Purely additive — existing roles get `capabilities: []` and continue to function.
+ */
+function migrate_6_to_7(cfg: RawConfig): RawConfig {
+  const rolesIn = cfg.engineerRoles;
+  const engineerRoles = Array.isArray(rolesIn)
+    ? (rolesIn as Array<Record<string, unknown>>).map((r) => ({
+        ...r,
+        capabilities: Array.isArray(r.capabilities) ? r.capabilities : [],
+      }))
+    : undefined;
+
+  const adaptersIn =
+    cfg.adapters && typeof cfg.adapters === 'object'
+      ? (cfg.adapters as { ides?: unknown; agents?: unknown; apps?: unknown })
+      : undefined;
+  const adapters = adaptersIn
+    ? {
+        ...adaptersIn,
+        ides:   annotateAdapterSupports(adaptersIn.ides),
+        agents: annotateAdapterSupports(adaptersIn.agents),
+        apps:   annotateAdapterSupports(adaptersIn.apps),
+      }
+    : adaptersIn;
+
+  const existing = Array.isArray(cfg.capabilityCandidates)
+    ? (cfg.capabilityCandidates as CapabilityCandidate[])
+    : [];
+  const capabilityCandidates = mergeSeedCandidates(existing);
+
+  const out: RawConfig = { ...cfg, schemaVersion: 7, capabilityCandidates };
+  if (engineerRoles !== undefined) out.engineerRoles = engineerRoles;
+  if (adapters !== undefined) out.adapters = adapters as Record<string, unknown>;
+  return out;
+}
+
+function annotateAdapterSupports(rows: unknown): unknown {
+  if (!Array.isArray(rows)) return rows;
+  return rows.map((row) => {
+    if (!row || typeof row !== 'object') return row;
+    const r = row as Record<string, unknown>;
+    const id = typeof r.id === 'string' ? r.id : '';
+    const preset = BUILT_IN_ADAPTER_SUPPORTS[id];
+    return preset && !Array.isArray(r.supports) ? { ...r, supports: preset } : r;
+  });
 }
 
 function looksLikeReadmePath(value: string): boolean {

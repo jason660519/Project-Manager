@@ -5,7 +5,7 @@
   "properties": {
     "schemaVersion": {
       "type": "integer",
-      "description": "Schema version. Increment when making breaking changes to the config structure. Current: 6.",
+      "description": "Schema version. Increment when making breaking changes to the config structure. Current: 7.",
       "minimum": 1
     },
     "id": {
@@ -66,7 +66,9 @@
               "name": { "type": "string" },
               "type": { "const": "ide" },
               "targetKind": { "type": "string", "enum": ["ide"] },
-              "command": { "type": "string", "description": "IDE CLI command" }
+              "command": { "type": "string", "description": "IDE CLI command" },
+              "supports": { "type": "array", "items": { "$ref": "#/definitions/capabilityKind" }, "description": "Declared capability kinds (schema v7)." },
+              "traits":   { "type": "array", "items": { "$ref": "#/definitions/adapterTrait" }, "description": "Adapter trait flags (schema v7)." }
             },
             "required": ["id", "name", "type", "command"]
           }
@@ -85,7 +87,9 @@
                 "type": "array",
                 "items": { "type": "string" },
                 "description": "Supports {prompt}, {featureId}, {root} placeholders"
-              }
+              },
+              "supports": { "type": "array", "items": { "$ref": "#/definitions/capabilityKind" }, "description": "Declared capability kinds (schema v7)." },
+              "traits":   { "type": "array", "items": { "$ref": "#/definitions/adapterTrait" }, "description": "Adapter trait flags (schema v7)." }
             },
             "required": ["id", "name", "type", "command", "argsTemplate"]
           }
@@ -104,12 +108,19 @@
                 "type": "array",
                 "items": { "type": "string" },
                 "description": "Supports {prompt}, {featureId}, {root} placeholders when the app target supports them"
-              }
+              },
+              "supports": { "type": "array", "items": { "$ref": "#/definitions/capabilityKind" }, "description": "Declared capability kinds (schema v7)." },
+              "traits":   { "type": "array", "items": { "$ref": "#/definitions/adapterTrait" }, "description": "Adapter trait flags (schema v7)." }
             },
             "required": ["id", "name", "type", "command", "argsTemplate"]
           }
         }
       }
+    },
+    "capabilityCandidates": {
+      "type": "array",
+      "description": "Qualification candidates surfaced in Integrations Hub VLA/TTS/STT/Hands/Tools sheets (schema v7).",
+      "items": { "$ref": "#/definitions/capabilityCandidate" }
     }
   },
   "required": ["schemaVersion", "id", "project", "features", "adapters"],
@@ -171,6 +182,11 @@
           "type": "array",
           "items": { "$ref": "#/definitions/modelFallbackEntry" },
           "description": "Ordered fallback chain tried when primaryModel fails (direct LLM calls only)"
+        },
+        "capabilities": {
+          "type": "array",
+          "description": "Capability assignments per role (schema v7). Each references a `passed` candidate from the matching sheet.",
+          "items": { "$ref": "#/definitions/roleCapability" }
         }
       },
       "required": ["id", "name", "slug", "skills", "commands", "systemPrompt", "referenceFiles"]
@@ -320,6 +336,79 @@
         "passes": { "type": "boolean" }
       },
       "required": ["id", "description", "passes"]
+    },
+    "capabilityKind": {
+      "type": "string",
+      "enum": ["eyes", "voice-tts", "voice-stt", "hands", "recording"],
+      "description": "Top-level capability kinds an engineer role may request (schema v7)."
+    },
+    "adapterTrait": {
+      "type": "string",
+      "enum": ["direct-access"],
+      "description": "Optional adapter trait flags that bend dependency rules (schema v7)."
+    },
+    "candidateSheet": {
+      "type": "string",
+      "enum": ["vla", "tts", "stt", "hands", "tools"],
+      "description": "Which Integrations Hub sheet a candidate lives in (schema v7)."
+    },
+    "candidateState": {
+      "type": "string",
+      "enum": ["not_tested", "testing", "passed", "passed_disabled", "failed"],
+      "description": "Lifecycle state of a single capability candidate (schema v7)."
+    },
+    "candidateRef": {
+      "type": "object",
+      "properties": {
+        "sheet": { "$ref": "#/definitions/candidateSheet" },
+        "id":    { "type": "string" }
+      },
+      "required": ["sheet", "id"]
+    },
+    "capabilityCandidate": {
+      "type": "object",
+      "properties": {
+        "id":            { "type": "string" },
+        "sheet":         { "$ref": "#/definitions/candidateSheet" },
+        "label":         { "type": "string" },
+        "providerId":    { "type": "string" },
+        "modelId":       { "type": "string" },
+        "state":         { "$ref": "#/definitions/candidateState" },
+        "lastTestedAt":  { "type": "string", "format": "date-time" },
+        "lastTestResult": {
+          "type": "object",
+          "properties": {
+            "ok":         { "type": "boolean" },
+            "durationMs": { "type": "number", "minimum": 0 },
+            "message":    { "type": "string" }
+          },
+          "required": ["ok", "durationMs", "message"]
+        },
+        "requires": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/candidateRef" }
+        },
+        "config": { "type": "object" }
+      },
+      "required": ["id", "sheet", "label", "state"]
+    },
+    "roleCapability": {
+      "type": "object",
+      "properties": {
+        "kind":        { "$ref": "#/definitions/capabilityKind" },
+        "candidateId": { "type": "string" },
+        "config": {
+          "type": "object",
+          "properties": {
+            "ttsVoice":             { "type": "string" },
+            "sttCorrectionModelId": { "type": "string" },
+            "handsConfirmMode":     { "type": "string", "enum": ["per-action", "session-trust"] },
+            "handsRequiresEyes":    { "type": "boolean" },
+            "recordingDir":         { "type": "string" }
+          }
+        }
+      },
+      "required": ["kind", "candidateId"]
     }
   }
 }

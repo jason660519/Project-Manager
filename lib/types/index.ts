@@ -136,6 +136,10 @@ export interface AdapterDescriptor {
   type: AdapterType;
   /** UI/behavior class for dispatch targets. Defaults from `type` when omitted. */
   targetKind?: ExecutionTargetKind;
+  /** Declared capability kinds this adapter can drive (schema v7). Technical ceiling — actual dispatch is further gated by candidate state. */
+  supports?: CapabilityKind[];
+  /** Adapter trait flags that bend capability dependency rules (schema v7). */
+  traits?: AdapterTrait[];
 }
 
 export interface IDEAdapterConfig extends AdapterDescriptor {
@@ -187,7 +191,7 @@ export interface ExecutionResult {
 export type AnyAdapterConfig = IDEAdapterConfig | AgentAdapterConfig | AgentAppAdapterConfig;
 
 export interface ProjectManagerConfig {
-  /** Increment when making breaking changes to the config structure. Current: 6 */
+  /** Increment when making breaking changes to the config structure. Current: 7 */
   schemaVersion: number;
   engineerRoles?: EngineerRole[];
   // ── Sync identity + audit fields (schema v2, ADR-006) ──────────────────
@@ -203,6 +207,8 @@ export interface ProjectManagerConfig {
   features: Feature[];
   adapters: AdapterConfig;
   cronJobs?: CronJob[];
+  /** Qualification candidates surfaced in Integrations Hub sheets (schema v7). */
+  capabilityCandidates?: CapabilityCandidate[];
 }
 
 // ── App navigation & run-store types ─────────────────────────────────────────
@@ -223,6 +229,76 @@ export interface ModelFallbackEntry {
   providerId: string;
   /** Exact model identifier passed to the provider API, e.g. "gpt-5.5". */
   modelId: string;
+}
+
+// ── Engineer Capabilities (schema v7, F23) ───────────────────────────────────
+
+/** Top-level capability kinds an engineer role may request. */
+export type CapabilityKind = 'eyes' | 'voice-tts' | 'voice-stt' | 'hands' | 'recording';
+
+/** Optional adapter trait flags that bend capability dependency rules. */
+export type AdapterTrait = 'direct-access';
+
+/** Which Integrations Hub sheet a capability candidate lives in. */
+export type CandidateSheet = 'vla' | 'tts' | 'stt' | 'hands' | 'tools';
+
+/**
+ * Lifecycle state of a single candidate row in the Integrations Hub.
+ * Only `passed` candidates appear in engineer-role dropdowns.
+ */
+export type CandidateState =
+  | 'not_tested'
+  | 'testing'
+  | 'passed'
+  | 'passed_disabled'
+  | 'failed';
+
+export interface CandidateRef {
+  sheet: CandidateSheet;
+  id: string;
+}
+
+export interface CandidateTestResult {
+  ok: boolean;
+  durationMs: number;
+  /** Success summary or failure reason — surfaced to the user. */
+  message: string;
+}
+
+export interface CapabilityCandidate {
+  /** Unique within the candidate registry, e.g. "anthropic:claude-sonnet-4-6", "macos:say". */
+  id: string;
+  sheet: CandidateSheet;
+  /** Human-readable label shown in the sheet and in role dropdowns. */
+  label: string;
+  /** Set for model-backed sheets (VLA / TTS / STT). */
+  providerId?: string;
+  modelId?: string;
+  state: CandidateState;
+  /** ISO 8601 timestamp of the most recent test run. */
+  lastTestedAt?: string;
+  lastTestResult?: CandidateTestResult;
+  /** Cross-sheet dependencies blocking this candidate from `testing` until refs are `passed`. */
+  requires?: CandidateRef[];
+  /** Free-form per-candidate config (e.g. STT model preset, microphone device id). */
+  config?: Record<string, unknown>;
+}
+
+export interface RoleCapabilityConfig {
+  ttsVoice?: string;
+  /** Candidate id (from VLA sheet) used as a second-pass transcript cleaner for STT. */
+  sttCorrectionModelId?: string;
+  handsConfirmMode?: 'per-action' | 'session-trust';
+  /** Defaults to true; auto-relaxed when the active adapter has the `direct-access` trait. */
+  handsRequiresEyes?: boolean;
+  recordingDir?: string;
+}
+
+export interface RoleCapability {
+  kind: CapabilityKind;
+  /** Must reference a candidate from the matching sheet whose state is `passed`. */
+  candidateId: string;
+  config?: RoleCapabilityConfig;
 }
 
 export interface EngineerRole {
@@ -246,6 +322,8 @@ export interface EngineerRole {
   testModel?: string;
   /** User-edited test prompt. Empty = auto-generate from name + skills + systemPrompt. */
   testPrompt?: string;
+  /** Capability assignments (schema v7). Each references a `passed` candidate from the matching sheet. */
+  capabilities?: RoleCapability[];
 }
 
 export type ViewId = 'dashboard' | 'features' | 'coding-editor' | 'integrations-hub' | 'settings' | 'engineers' | 'channels' | 'sessions' | 'cron-jobs' | 'logs' | 'keys' | 'documentation' | 'company-standards' | 'chat' | 'keyboard-shortcuts';

@@ -6,7 +6,20 @@ export type IntegrationSheet =
   | 'channels'
   | 'memory'
   | 'commands'
-  | 'connect';
+  | 'connect'
+  | 'vla'
+  | 'tts'
+  | 'stt'
+  | 'hands'
+  | 'tools';
+
+/** Sheets that surface F23 capability candidates (schema v7). */
+export const CAPABILITY_SHEETS = ['vla', 'tts', 'stt', 'hands', 'tools'] as const;
+export type CapabilitySheet = typeof CAPABILITY_SHEETS[number];
+
+export function isCapabilitySheet(s: IntegrationSheet): s is CapabilitySheet {
+  return (CAPABILITY_SHEETS as readonly string[]).includes(s);
+}
 
 export type IntegrationStatus =
   | 'installed'
@@ -29,7 +42,8 @@ export type IntegrationSourceKind =
   | 'command-mapping'
   | 'memory'
   | 'slash-command'
-  | 'system-cli';
+  | 'system-cli'
+  | 'capability-candidate';
 
 export interface IntegrationManualFields {
   lv?: number;
