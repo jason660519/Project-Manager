@@ -30,6 +30,22 @@ interface GitHubApiIssue {
   pull_request?: unknown;
 }
 
+const GITHUB_ISSUE_PAGE_SIZE = 100;
+const GITHUB_ISSUE_PAGE_LIMIT = 10;
+
+function parseGithubOwnerRepo(repoUrl: string): { owner: string; repo: string } | null {
+  const normalizedRepoUrl = repoUrl.trim().replace(/\/+$/, '').replace(/\.git$/, '');
+  try {
+    const parsed = new URL(normalizedRepoUrl);
+    if (parsed.hostname !== 'github.com') return null;
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    if (parts.length < 2) return null;
+    return { owner: parts[0], repo: parts[1] };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Proxy GitHub Issues REST API call from the Next.js server layer so
  * the GITHUB_TOKEN never touches browser JS. Used only in browser/dev mode.
@@ -49,25 +65,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'repoUrl is required' }, { status: 400 });
   }
 
-  // Parse owner/repo from the URL
-  const normalizedRepoUrl = body.repoUrl.trim().replace(/\/+$/, '').replace(/\.git$/, '');
-  const parts = normalizedRepoUrl.split('/');
-  if (parts.length < 2) {
+  const parsedRepo = parseGithubOwnerRepo(body.repoUrl);
+  if (!parsedRepo) {
     return NextResponse.json(
-      { error: `Invalid GitHub URL: ${body.repoUrl}` },
+      { error: `Invalid GitHub URL: ${body.repoUrl}. Use https://github.com/owner/repo.` },
       { status: 400 },
     );
   }
-  const owner = parts[parts.length - 2];
-  const repo = parts[parts.length - 1];
+  const { owner, repo } = parsedRepo;
 
   try {
     const data: GitHubApiIssue[] = [];
     let page = 1;
+    let truncated = false;
 
     while (true) {
       const res = await fetch(
-        `https://api.github.com/repos/${owner}/${repo}/issues?state=all&per_page=100&page=${page}&sort=updated&direction=desc`,
+        `https://api.github.com/repos/${owner}/${repo}/issues?state=all&per_page=${GITHUB_ISSUE_PAGE_SIZE}&page=${page}&sort=updated&direction=desc`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -87,7 +101,11 @@ export async function POST(request: NextRequest) {
 
       const pageData = (await res.json()) as GitHubApiIssue[];
       data.push(...pageData);
-      if (pageData.length < 100) break;
+      if (pageData.length < GITHUB_ISSUE_PAGE_SIZE) break;
+      if (page >= GITHUB_ISSUE_PAGE_LIMIT) {
+        truncated = true;
+        break;
+      }
       page += 1;
     }
 
@@ -108,7 +126,9 @@ export async function POST(request: NextRequest) {
         user: item.user?.login ?? undefined,
       }));
 
-    return NextResponse.json(issues);
+    return NextResponse.json(issues, {
+      headers: truncated ? { 'X-Project-Manager-Truncated': 'true' } : undefined,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     return NextResponse.json({ error: `GitHub request failed: ${message}` }, { status: 500 });

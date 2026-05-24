@@ -84,4 +84,37 @@ describe('github sync API route', () => {
       expect.objectContaining({ number: 2, state: 'closed' }),
     ]);
   });
+
+  it('rejects non-GitHub repository URLs before calling the GitHub API', async () => {
+    const res = await POST(request({ repoUrl: 'https://example.com/org/repo' }));
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toContain('Use https://github.com/owner/repo');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('caps browser-mode issue pagination to avoid unbounded sync runs', async () => {
+    const fullPage = Array.from({ length: 100 }, (_, index) => ({
+      number: index + 1,
+      title: `Issue ${index + 1}`,
+      body: null,
+      state: 'open',
+      labels: [],
+      created_at: '2026-05-01T00:00:00Z',
+      updated_at: '2026-05-02T00:00:00Z',
+      html_url: `https://github.com/org/repo/issues/${index + 1}`,
+      user: null,
+    }));
+    for (let index = 0; index < 12; index += 1) {
+      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(fullPage), { status: 200 }));
+    }
+
+    const res = await POST(request({ repoUrl: 'https://github.com/org/repo' }));
+    const body = await res.json();
+
+    expect(fetchMock).toHaveBeenCalledTimes(10);
+    expect(res.headers.get('X-Project-Manager-Truncated')).toBe('true');
+    expect(body).toHaveLength(1000);
+  });
 });
