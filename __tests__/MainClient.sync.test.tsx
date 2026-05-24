@@ -12,10 +12,12 @@
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DASHBOARD_SELECTED_PROJECTS_STORAGE_KEY } from '../lib/dashboardStorage';
 import {
+  KEY_PERSONAL_DASHBOARD_PROJECT_IDS,
   KEY_PERSONAL_SEEDED,
+  KEY_PERSONAL_SELECTED_PROJECT_ID,
   KEY_SHARED_PROJECTS,
 } from '../lib/storage/keys';
 
@@ -134,6 +136,10 @@ function getStoredDashboardIds(): string[] {
 
 beforeEach(() => {
   localStorage.clear();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('checkbox toggle → localStorage sync', () => {
@@ -292,5 +298,73 @@ describe('empty project list', () => {
     await flushEffects();
 
     expect(screen.getByTestId('projects')).toBeInTheDocument();
+  });
+});
+
+describe('web registry sync', () => {
+  it('merges newer disk features into an existing non-empty project snapshot', async () => {
+    const oldFeatures = Array.from({ length: 20 }, (_, index) => ({
+      id: `F${String(index + 1).padStart(2, '0')}`,
+      name: `Feature ${index + 1}`,
+      status: 'todo',
+      progress: 10,
+      category: 'Development',
+    }));
+    const diskFeatures = [
+      ...oldFeatures,
+      ...Array.from({ length: 4 }, (_, index) => ({
+        id: `F${String(index + 21).padStart(2, '0')}`,
+        name: `Feature ${index + 21}`,
+        status: 'done',
+        progress: 100,
+        category: 'Development',
+      })),
+    ];
+    const configPath = '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager/config.json';
+    const baseConfig = {
+      schemaVersion: 6,
+      project: {
+        name: 'Project Manager',
+        root: '/Volumes/KLEVV-4T-1/Project-Manager',
+        defaultIDE: 'Cursor',
+        githubUrl: 'https://github.com/jason660519/Project-Manager',
+      },
+      features: oldFeatures,
+      adapters: { ides: [], agents: [] },
+    };
+
+    localStorage.setItem(KEY_PERSONAL_SEEDED, 'true');
+    localStorage.setItem(KEY_PERSONAL_SELECTED_PROJECT_ID, 'project-manager');
+    localStorage.setItem(KEY_PERSONAL_DASHBOARD_PROJECT_IDS, JSON.stringify(['project-manager']));
+    localStorage.setItem(
+      KEY_SHARED_PROJECTS,
+      JSON.stringify([
+        {
+          id: 'project-manager',
+          configPath,
+          config: baseConfig,
+        },
+      ]),
+    );
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          configPath,
+          config: {
+            ...baseConfig,
+            features: diskFeatures,
+          },
+        },
+      ],
+    } as Response);
+
+    render(<MainClient currentView="dashboard" />);
+
+    await screen.findByTestId('dashboard');
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('dashboard')).toHaveAttribute('data-feature-count', '24');
+    });
   });
 });

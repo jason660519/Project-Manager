@@ -225,6 +225,8 @@ export function CodeEditor({
   const [contents, setContents] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadErrors, setLoadErrors] = useState<Record<number, string>>({});
+  const [saveError, setSaveError] = useState('');
   const [expanded, setExpanded] = useState(false);
   const [dirty, setDirty] = useState<Record<number, boolean>>({});
   const [showGoToLine, setShowGoToLine] = useState(false);
@@ -236,6 +238,7 @@ export function CodeEditor({
   const activeFile = files[activeIndex];
   const activeLang = activeFile ? detectLanguage(activeFile.path, activeFile.language) : 'plaintext';
   const isDirty = activeFile && dirty[activeIndex];
+  const activeLoadError = loadErrors[activeIndex];
 
   // ── Load file content ─────────────────────────────────────────────────────
 
@@ -245,6 +248,7 @@ export function CodeEditor({
     async function load() {
       setLoading(true);
       const loaded: Record<number, string> = {};
+      const errors: Record<number, string> = {};
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
         if (f.content !== undefined) {
@@ -252,13 +256,17 @@ export function CodeEditor({
         } else {
           try {
             loaded[i] = (await readFile(f.path)) || '';
-          } catch {
-            loaded[i] = `// Unable to read: ${f.path}`;
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            loaded[i] = '';
+            errors[i] = `Unable to read ${f.path}: ${msg}`;
           }
         }
       }
       if (!cancelled) {
         setContents(loaded);
+        setLoadErrors(errors);
+        setSaveError('');
         setLoading(false);
       }
     }
@@ -315,6 +323,7 @@ export function CodeEditor({
   const handleChange = useCallback(
     (value: string | undefined) => {
       if (value === undefined) return;
+      setSaveError('');
       setContents((prev) => ({ ...prev, [activeIndex]: value }));
       setDirty((prev) => ({ ...prev, [activeIndex]: true }));
     },
@@ -326,6 +335,7 @@ export function CodeEditor({
   const handleSave = useCallback(async () => {
     if (!activeFile || contents[activeIndex] === undefined) return;
     setSaving(true);
+    setSaveError('');
     try {
       await writeFile(activeFile.path, contents[activeIndex]);
       setDirty((prev) => ({ ...prev, [activeIndex]: false }));
@@ -333,6 +343,7 @@ export function CodeEditor({
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[CodeEditor] Save failed: ${msg}`);
+      setSaveError(`Unable to save ${activeFile.path}: ${msg}`);
     } finally {
       setSaving(false);
     }
@@ -621,6 +632,12 @@ export function CodeEditor({
             )}
           </div>
         </div>
+
+        {(activeLoadError || saveError) && (
+          <div className="border-b border-[#3a2a14] bg-[#2b2113] px-4 py-2 text-xs text-[#f0c36a]">
+            {saveError || activeLoadError}
+          </div>
+        )}
 
         {/* ── Editor body ────────────────────────────────────────────────── */}
         <div className="flex-1 min-h-0">

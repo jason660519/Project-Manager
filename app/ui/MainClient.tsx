@@ -437,7 +437,7 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
               // PM-side edits or churn re-renders.
               const local = prev[idx];
               const diskFeatures = Array.isArray(diskConfig.features) ? diskConfig.features : [];
-              if (local.config.features.length > 0 || diskFeatures.length === 0) {
+              if (diskFeatures.length === 0) {
                 if (local.configMissing) {
                   const next = [...prev];
                   next[idx] = { ...local, configMissing: false };
@@ -446,6 +446,9 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
                 return prev;
               }
               const merged = mergeProjectConfigFromDisk(local.config, diskConfig, entry.configPath);
+              if (!local.configMissing && JSON.stringify(local.config) === JSON.stringify(merged)) {
+                return prev;
+              }
               const next = [...prev];
               next[idx] = { ...local, config: merged, configMissing: false };
               return next;

@@ -1,7 +1,17 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { ProjectFilesView } from '../app/ui/views/ProjectFilesView';
 import type { ProjectEntry, ProjectManagerConfig } from '../lib/types';
+
+vi.mock('../components/CodeEditor', () => ({
+  CodeEditor: ({ files }: { files: Array<{ path: string; label?: string }> }) => (
+    <div data-testid="mock-code-editor">
+      {files.map((file) => (
+        <span key={file.path}>{file.label ?? file.path}</span>
+      ))}
+    </div>
+  ),
+}));
 
 function projectEntry(id: string, name: string, root: string, featureId: string, filePath: string): ProjectEntry {
   const config: ProjectManagerConfig = {
@@ -87,10 +97,9 @@ describe('ProjectFilesView', () => {
       />,
     );
 
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'F01' } });
+    fireEvent.change(screen.getByRole('combobox', { name: /Feature filter/i }), { target: { value: 'F01' } });
 
-    const table = screen.getByRole('table');
-    expect(within(table).getByText('src/alpha.ts')).toBeInTheDocument();
-    expect(within(table).getAllByText('F01').length).toBeGreaterThan(0);
+    expect(screen.getByText('src/alpha.ts')).toBeInTheDocument();
+    expect(screen.getAllByText('F01').length).toBeGreaterThan(0);
   });
 });
