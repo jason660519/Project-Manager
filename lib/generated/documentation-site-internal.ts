@@ -4,19 +4,19 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-05-24T03:03:36.000Z",
+    "generatedAt": "2026-05-24T05:52:37.000Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
     "manifestAudience": "internal",
-    "totalDocuments": 50,
+    "totalDocuments": 51,
     "totalFolders": 12,
     "publicDocuments": 8,
-    "internalDocuments": 41,
+    "internalDocuments": 42,
     "restrictedDocuments": 1,
     "publishableDocuments": 5,
-    "reviewRequiredDocuments": 28,
-    "warningCount": 58
+    "reviewRequiredDocuments": 29,
+    "warningCount": 59
   },
   "folders": [
     {
@@ -26,7 +26,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "sourcePath": "docs",
       "label": "All Docs",
       "title": "Documentation",
-      "summary": "50 documentation files indexed from docs.",
+      "summary": "51 documentation files indexed from docs.",
       "parentSlug": null,
       "folderSlugs": [
         "architecture",
@@ -44,14 +44,14 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       ],
       "classificationCounts": {
         "public": 8,
-        "internal": 41,
+        "internal": 42,
         "restricted": 1
       },
       "publishableCount": 5,
-      "reviewRequiredCount": 28,
+      "reviewRequiredCount": 29,
       "visibilityCounts": {
         "public": 8,
-        "internal": 41,
+        "internal": 42,
         "restricted": 1
       },
       "warnings": [
@@ -385,7 +385,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "sourcePath": "docs/project-process",
       "label": "Project Process",
       "title": "Project Process",
-      "summary": "5 documentation files indexed from docs/project-process.",
+      "summary": "6 documentation files indexed from docs/project-process.",
       "parentSlug": "",
       "folderSlugs": [
         "project-process/commands"
@@ -393,18 +393,19 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "docIds": [
         "project-process/2026-05-12-dev-storage-abstraction",
         "project-process/2026-05-18-plugin-runtime-isolation",
-        "project-process/2026-05-19-execution-target-dispatch-update"
+        "project-process/2026-05-19-execution-target-dispatch-update",
+        "project-process/2026-05-24-commercial-readiness-status"
       ],
       "classificationCounts": {
         "public": 0,
-        "internal": 5,
+        "internal": 6,
         "restricted": 0
       },
       "publishableCount": 0,
-      "reviewRequiredCount": 4,
+      "reviewRequiredCount": 5,
       "visibilityCounts": {
         "public": 0,
-        "internal": 5,
+        "internal": 6,
         "restricted": 0
       },
       "warnings": [
@@ -1336,8 +1337,8 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "folderPath": "docs/engineering",
       "title": "Runtime Bridge",
       "summary": "Project Manager has two runtime modes: Browser mode must never be treated as production. It exists to keep UI development and tests fast. All renderer code must call wrappers in `lib/brid...",
-      "content": "# Runtime Bridge\n\n> Status: Active  \n> Last updated: 2026-05-20  \n> Primary files: `lib/bridge/index.ts`, `src-tauri/src/lib.rs`, `app/api/bridge/execute/route.ts`, `app/api/anthropic/route.ts`\n\n---\n\n## English Version\n\n## 1. Runtime Modes\n\nProject Manager has two runtime modes:\n\n| Mode | Detection | Intended Use | OS Access |\n| --- | --- | --- | --- |\n| Browser mode | `__TAURI_INTERNALS__` missing | `npm run dev`, browser preview, component testing | Limited to Next.js server routes |\n| Tauri mode | `__TAURI_INTERNALS__` present | Desktop app and production behavior | Rust Tauri commands |\n\nBrowser mode must never be treated as production. It exists to keep UI development and tests fast.\n\n## 2. Bridge Discipline\n\nAll renderer code must call wrappers in `lib/bridge/index.ts`. Components must not import `@tauri-apps/api/core` directly.\n\nReasons:\n\n1. Browser fallback behavior stays centralized.\n2. Tauri command signatures have one typed TypeScript contract.\n3. Schema migration and secret boundaries stay enforceable.\n4. Tests can mock one module instead of every component.\n\n## 3. Command Contract\n\n| Wrapper | Tauri Command | Browser Behavior | Notes |\n| --- | --- | --- | --- |\n| `readConfig(path)` | `read_config` | Throws | Output is piped through `migrateConfig()`. |\n| `writeConfig(path, config)` | `write_config` | Throws | Writes pretty JSON. |\n| `scanProjects(root)` | `scan_projects` | Throws | Finds direct child folders containing `.project-manager.json`. |\n| `listProjectFiles(root, maxDepth)` | `list_project_files` | Throws | Prunes common build and cache folders. |\n| `spawnAgent(opts)` | `spawn_agent` | Calls `/api/bridge/execute` dry run | Returns real PID only in Tauri. |\n| `killProcess(pid)` | `kill_process` | No-op | Uses platform kill command. |\n| `watchConfig(path)` | `watch_config` | No-op | Rust polls every two seconds. |\n| `fetchGithubRepo(token, repoUrl)` | `fetch_github_repo` | Throws | Maps PRs and issues to feature-like rows. |\n| `fetchGithubIssues(token, repoUrl)` | `fetch_github_issues` | Throws | Returns raw issue payloads. |\n| `startGithubPoll(token, repoUrl, intervalSecs)` | `start_github_poll` | No-op | Emits `github-updated`. |\n| `setSecret(service, key, value)` | `set_secret` | Throws | Release: OS Keychain. Debug: `~/.project-manager/dev-secrets.json` (see `PM_DEV_PLAINTEXT_SECRETS`). |\n| `getSecret(service, key)` | `get_secret` | Throws | Same backends as `set_secret`; returns `null` when missing. |\n| `getSecretsStorageBackend()` | `secrets_storage_backend` | Returns `localStorage` | Label for Keys/Settings UI (`keychain` vs `dev-file`). |\n| `callAnthropic(opts)` | `call_anthropic` | Calls `/api/anthropic` | Browser route reads server env; Tauri uses Rust request. |\n| `listSessions(sessionsDir)` | `list_sessions` | Returns `[]` | Reads JSON sessions. |\n| `readSession(sessionsDir, sessionId)` | `read_session` | Throws | Reads a single JSON session. |\n| `saveSession(sessionsDir, session)` | `save_session` | No-op | Writes session JSON. |\n| `readFile(path)` | `read_file` | Returns empty string | Plain text only. |\n\n## 4. Event Contract\n\n| Event | Payload | Emitted By | Consumer |\n| --- | --- | --- | --- |\n| `agent-stdout` | `{ pid, line }` | `spawn_agent` stdout task | Runs, logs, sessions UI |\n| `agent-stderr` | `{ pid, line }` | `spawn_agent` stderr task | Runs, logs, sessions UI |\n| `agent-exit` | `{ pid, code }` | process wait task | Run completion state |\n| `config-changed` | `{ path, config }` | `watch_config` poll loop | Project config refresh |\n| `github-updated` | `{ repoUrl, features }` | `start_github_poll` | GitHub project refresh |\n\nEvent listeners must unsubscribe on component cleanup. In browser mode, event listeners should not be registered unless the caller has already confirmed Tauri mode.\n\n## 5. Safety Notes\n\n`spawn_agent` currently accepts command, args, and working directory from the renderer wrapper. Before broader beta usage, Project Manager needs a formal allowlist and approval policy. Until then:\n\n1. Dispatch UI must show command, args, project root, and dry-run or live status.\n2. Browser mode must remain dry-run only.\n3. Tauri mode command execution must stay behind explicit user actions.\n4. Logs should be preserved when a process fails or is killed.\n\n---\n\n## 中文版本\n\n## 1. Runtime Modes\n\nProject Manager 有兩種執行模式：\n\n| 模式 | 偵測方式 | 用途 | OS Access |\n| --- | --- | --- | --- |\n| Browser mode | 沒有 `__TAURI_INTERNALS__` | `npm run dev`、browser preview、component testing | 只能透過 Next.js server routes |\n| Tauri mode | 有 `__TAURI_INTERNALS__` | Desktop app 與 production behavior | Rust Tauri commands |\n\nBrowser mode 不能視為正式 production，只用來讓 UI 開發與測試更快。\n\n## 2. Bridge Discipline\n\n所有 renderer code 都必須呼叫 `lib/bridge/index.ts` 內的 wrapper。Component 不可直接 import `@tauri-apps/api/core`。\n\n原因：\n\n1. Browser fallback 行為集中管理。\n2. Tauri command signature 有單一 TypeScript contract。\n3. Schema migration 與 secret boundary 可被集中維護。\n4. 測試只要 mock 單一 module。\n\n## 3. Command Contract\n\n| Wrapper | Tauri Command | Browser 行為 | 說明 |\n| --- | --- | --- | --- |\n| `readConfig(path)` | `read_config` | Throws | 輸出會先通過 `migrateConfig()`。 |\n| `writeConfig(path, config)` | `write_config` | Throws | 寫入 pretty JSON。 |\n| `scanProjects(root)` | `scan_projects` | Throws | 找出直接子資料夾內的 `.project-manager.json`。 |\n| `listProjectFiles(root, maxDepth)` | `list_project_files` | Throws | 排除常見 build 與 cache folders。 |\n| `spawnAgent(opts)` | `spawn_agent` | 呼叫 `/api/bridge/execute` dry run | 只有 Tauri 回傳真實 PID。 |\n| `killProcess(pid)` | `kill_process` | No-op | 使用平台 kill command。 |\n| `watchConfig(path)` | `watch_config` | No-op | Rust 每兩秒輪詢。 |\n| `fetchGithubRepo(token, repoUrl)` | `fetch_github_repo` | Throws | 將 PR 與 issue 映射成 feature-like rows。 |\n| `fetchGithubIssues(token, repoUrl)` | `fetch_github_issues` | Throws | 回傳 issue payloads。 |\n| `startGithubPoll(token, repoUrl, intervalSecs)` | `start_github_poll` | No-op | 發出 `github-updated`。 |\n| `setSecret(service, key, value)` | `set_secret` | Throws | Release：OS Keychain。Debug：`~/.project-manager/dev-secrets.json`（見 `PM_DEV_PLAINTEXT_SECRETS`）。 |\n| `getSecret(service, key)` | `get_secret` | Throws | 與 `set_secret` 相同 backend；找不到時回傳 `null`。 |\n| `getSecretsStorageBackend()` | `secrets_storage_backend` | 回傳 `localStorage` | Keys/Settings UI 用（`keychain` vs `dev-file`）。 |\n| `callAnthropic(opts)` | `call_anthropic` | 呼叫 `/api/anthropic` | Browser route 讀 server env；Tauri 走 Rust request。 |\n| `listSessions(sessionsDir)` | `list_sessions` | 回傳 `[]` | 讀取 JSON sessions。 |\n| `readSession(sessionsDir, sessionId)` | `read_session` | Throws | 讀單一 JSON session。 |\n| `saveSession(sessionsDir, session)` | `save_session` | No-op | 寫入 session JSON。 |\n| `readFile(path)` | `read_file` | 回傳空字串 | 僅支援 plain text。 |\n\n## 4. Event Contract\n\n| Event | Payload | Emitted By | Consumer |\n| --- | --- | --- | --- |\n| `agent-stdout` | `{ pid, line }` | `spawn_agent` stdout task | Runs、logs、sessions UI |\n| `agent-stderr` | `{ pid, line }` | `spawn_agent` stderr task | Runs、logs、sessions UI |\n| `agent-exit` | `{ pid, code }` | process wait task | Run completion state |\n| `config-changed` | `{ path, config }` | `watch_config` poll loop | Project config refresh |\n| `github-updated` | `{ repoUrl, features }` | `start_github_poll` | GitHub project refresh |\n\nEvent listener 必須在 component cleanup 時 unsubscribe。Browser mode 下，除非 caller 已確認 Tauri mode，否則不應註冊 event listeners。\n\n## 5. Safety Notes\n\n`spawn_agent` 目前接受 renderer wrapper 傳入的 command、args、working directory。擴大 beta 使用前，需要正式 allowlist 與 approval policy。在那之前：\n\n1. Dispatch UI 必須顯示 command、args、project root，以及 dry-run 或 live 狀態。\n2. Browser mode 必須維持 dry-run only。\n3. Tauri mode command execution 必須由使用者明確動作觸發。\n4. 程序失敗或被 kill 時，logs 必須保留。\n",
-      "contentHash": "6523ca88aff06569",
+      "content": "# Runtime Bridge\n\n> Status: Active  \n> Last updated: 2026-05-24  \n> Primary files: `lib/bridge/index.ts`, `src-tauri/src/lib.rs`, `app/api/bridge/execute/route.ts`, `app/api/anthropic/route.ts`\n\n---\n\n## English Version\n\n## 1. Runtime Modes\n\nProject Manager has two runtime modes:\n\n| Mode | Detection | Intended Use | OS Access |\n| --- | --- | --- | --- |\n| Browser mode | `__TAURI_INTERNALS__` missing | `npm run dev`, browser preview, component testing | Limited to Next.js server routes |\n| Tauri mode | `__TAURI_INTERNALS__` present | Desktop app and production behavior | Rust Tauri commands |\n\nBrowser mode must never be treated as production. It exists to keep UI development and tests fast.\n\n## 2. Bridge Discipline\n\nAll renderer code must call wrappers in `lib/bridge/index.ts`. Components must not import `@tauri-apps/api/core` directly.\n\nReasons:\n\n1. Browser fallback behavior stays centralized.\n2. Tauri command signatures have one typed TypeScript contract.\n3. Schema migration and secret boundaries stay enforceable.\n4. Tests can mock one module instead of every component.\n\n## 3. Command Contract\n\n| Wrapper | Tauri Command | Browser Behavior | Notes |\n| --- | --- | --- | --- |\n| `readConfig(path)` | `read_config` | Throws | Output is piped through `migrateConfig()`. |\n| `writeConfig(path, config)` | `write_config` | Throws | Writes pretty JSON. |\n| `scanProjects(root)` | `scan_projects` | Throws | Finds direct child folders containing `.project-manager.json`. |\n| `detectGithubRepoUrl(projectRoot)` | `detect_github_repo_url` | Returns `null` | Reads local `git remote get-url origin` and normalizes GitHub remotes. |\n| `listProjectFiles(root, maxDepth)` | `list_project_files` | Throws | Prunes common build and cache folders. |\n| `spawnAgent(opts)` | `spawn_agent` | Calls `/api/bridge/execute` dry run | Returns real PID only in Tauri. |\n| `killProcess(pid)` | `kill_process` | No-op | Uses platform kill command. |\n| `watchConfig(path)` | `watch_config` | No-op | Rust polls every two seconds. |\n| `fetchGithubRepo(token, repoUrl)` | `fetch_github_repo` | Throws | Maps PRs and issues to feature-like rows. |\n| `fetchGithubIssues(token, repoUrl)` | `fetch_github_issues` | Throws | Returns raw issue payloads. |\n| `startGithubPoll(token, repoUrl, intervalSecs)` | `start_github_poll` | No-op | Emits `github-updated`. |\n| `setSecret(service, key, value)` | `set_secret` | Throws | Release: OS Keychain. Debug: `~/.project-manager/dev-secrets.json` (see `PM_DEV_PLAINTEXT_SECRETS`). |\n| `getSecret(service, key)` | `get_secret` | Throws | Same backends as `set_secret`; returns `null` when missing. |\n| `getSecretsStorageBackend()` | `secrets_storage_backend` | Returns `localStorage` | Label for Keys/Settings UI (`keychain` vs `dev-file`). |\n| `callAnthropic(opts)` | `call_anthropic` | Calls `/api/anthropic` | Browser route reads server env; Tauri uses Rust request. |\n| `listSessions(sessionsDir)` | `list_sessions` | Returns `[]` | Reads JSON sessions. |\n| `readSession(sessionsDir, sessionId)` | `read_session` | Throws | Reads a single JSON session. |\n| `saveSession(sessionsDir, session)` | `save_session` | No-op | Writes session JSON. |\n| `readFile(path)` | `read_file` | Returns empty string | Plain text only. |\n\n## 4. Event Contract\n\n| Event | Payload | Emitted By | Consumer |\n| --- | --- | --- | --- |\n| `agent-stdout` | `{ pid, line }` | `spawn_agent` stdout task | Runs, logs, sessions UI |\n| `agent-stderr` | `{ pid, line }` | `spawn_agent` stderr task | Runs, logs, sessions UI |\n| `agent-exit` | `{ pid, code }` | process wait task | Run completion state |\n| `config-changed` | `{ path, config }` | `watch_config` poll loop | Project config refresh |\n| `github-updated` | `{ repoUrl, features }` | `start_github_poll` | GitHub project refresh |\n\nEvent listeners must unsubscribe on component cleanup. In browser mode, event listeners should not be registered unless the caller has already confirmed Tauri mode.\n\n## 5. Safety Notes\n\n`spawn_agent` currently accepts command, args, and working directory from the renderer wrapper. Before broader beta usage, Project Manager needs a formal allowlist and approval policy. Until then:\n\n1. Dispatch UI must show command, args, project root, and dry-run or live status.\n2. Browser mode must remain dry-run only.\n3. Tauri mode command execution must stay behind explicit user actions.\n4. Logs should be preserved when a process fails or is killed.\n\n---\n\n## 中文版本\n\n## 1. Runtime Modes\n\nProject Manager 有兩種執行模式：\n\n| 模式 | 偵測方式 | 用途 | OS Access |\n| --- | --- | --- | --- |\n| Browser mode | 沒有 `__TAURI_INTERNALS__` | `npm run dev`、browser preview、component testing | 只能透過 Next.js server routes |\n| Tauri mode | 有 `__TAURI_INTERNALS__` | Desktop app 與 production behavior | Rust Tauri commands |\n\nBrowser mode 不能視為正式 production，只用來讓 UI 開發與測試更快。\n\n## 2. Bridge Discipline\n\n所有 renderer code 都必須呼叫 `lib/bridge/index.ts` 內的 wrapper。Component 不可直接 import `@tauri-apps/api/core`。\n\n原因：\n\n1. Browser fallback 行為集中管理。\n2. Tauri command signature 有單一 TypeScript contract。\n3. Schema migration 與 secret boundary 可被集中維護。\n4. 測試只要 mock 單一 module。\n\n## 3. Command Contract\n\n| Wrapper | Tauri Command | Browser 行為 | 說明 |\n| --- | --- | --- | --- |\n| `readConfig(path)` | `read_config` | Throws | 輸出會先通過 `migrateConfig()`。 |\n| `writeConfig(path, config)` | `write_config` | Throws | 寫入 pretty JSON。 |\n| `scanProjects(root)` | `scan_projects` | Throws | 找出直接子資料夾內的 `.project-manager.json`。 |\n| `detectGithubRepoUrl(projectRoot)` | `detect_github_repo_url` | 回傳 `null` | 讀取本機 `git remote get-url origin` 並正規化 GitHub remote。 |\n| `listProjectFiles(root, maxDepth)` | `list_project_files` | Throws | 排除常見 build 與 cache folders。 |\n| `spawnAgent(opts)` | `spawn_agent` | 呼叫 `/api/bridge/execute` dry run | 只有 Tauri 回傳真實 PID。 |\n| `killProcess(pid)` | `kill_process` | No-op | 使用平台 kill command。 |\n| `watchConfig(path)` | `watch_config` | No-op | Rust 每兩秒輪詢。 |\n| `fetchGithubRepo(token, repoUrl)` | `fetch_github_repo` | Throws | 將 PR 與 issue 映射成 feature-like rows。 |\n| `fetchGithubIssues(token, repoUrl)` | `fetch_github_issues` | Throws | 回傳 issue payloads。 |\n| `startGithubPoll(token, repoUrl, intervalSecs)` | `start_github_poll` | No-op | 發出 `github-updated`。 |\n| `setSecret(service, key, value)` | `set_secret` | Throws | Release：OS Keychain。Debug：`~/.project-manager/dev-secrets.json`（見 `PM_DEV_PLAINTEXT_SECRETS`）。 |\n| `getSecret(service, key)` | `get_secret` | Throws | 與 `set_secret` 相同 backend；找不到時回傳 `null`。 |\n| `getSecretsStorageBackend()` | `secrets_storage_backend` | 回傳 `localStorage` | Keys/Settings UI 用（`keychain` vs `dev-file`）。 |\n| `callAnthropic(opts)` | `call_anthropic` | 呼叫 `/api/anthropic` | Browser route 讀 server env；Tauri 走 Rust request。 |\n| `listSessions(sessionsDir)` | `list_sessions` | 回傳 `[]` | 讀取 JSON sessions。 |\n| `readSession(sessionsDir, sessionId)` | `read_session` | Throws | 讀單一 JSON session。 |\n| `saveSession(sessionsDir, session)` | `save_session` | No-op | 寫入 session JSON。 |\n| `readFile(path)` | `read_file` | 回傳空字串 | 僅支援 plain text。 |\n\n## 4. Event Contract\n\n| Event | Payload | Emitted By | Consumer |\n| --- | --- | --- | --- |\n| `agent-stdout` | `{ pid, line }` | `spawn_agent` stdout task | Runs、logs、sessions UI |\n| `agent-stderr` | `{ pid, line }` | `spawn_agent` stderr task | Runs、logs、sessions UI |\n| `agent-exit` | `{ pid, code }` | process wait task | Run completion state |\n| `config-changed` | `{ path, config }` | `watch_config` poll loop | Project config refresh |\n| `github-updated` | `{ repoUrl, features }` | `start_github_poll` | GitHub project refresh |\n\nEvent listener 必須在 component cleanup 時 unsubscribe。Browser mode 下，除非 caller 已確認 Tauri mode，否則不應註冊 event listeners。\n\n## 5. Safety Notes\n\n`spawn_agent` 目前接受 renderer wrapper 傳入的 command、args、working directory。擴大 beta 使用前，需要正式 allowlist 與 approval policy。在那之前：\n\n1. Dispatch UI 必須顯示 command、args、project root，以及 dry-run 或 live 狀態。\n2. Browser mode 必須維持 dry-run only。\n3. Tauri mode command execution 必須由使用者明確動作觸發。\n4. 程序失敗或被 kill 時，logs 必須保留。\n",
+      "contentHash": "ea72193ae451db4d",
       "readingMinutes": 6,
       "classification": "internal",
       "classificationSource": "policy",
@@ -1361,7 +1362,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "Mentions local key storage",
         "Mentions execution or command policy"
       ],
-      "updatedAt": "2026-05-20T00:01:56.000Z"
+      "updatedAt": "2026-05-24T05:50:14.000Z"
     },
     {
       "id": "engineering/security-and-secrets",
@@ -2064,6 +2065,39 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "updatedAt": "2026-05-19T02:40:39.000Z"
     },
     {
+      "id": "project-process/2026-05-24-commercial-readiness-status",
+      "slug": "project-process/2026-05-24-commercial-readiness-status",
+      "route": "/documentation/project-process/2026-05-24-commercial-readiness-status",
+      "sourcePath": "docs/project-process/2026-05-24-commercial-readiness-status.md",
+      "folderSlug": "project-process",
+      "folderPath": "docs/project-process",
+      "title": "Project Manager Commercial Readiness Status",
+      "summary": "Project Manager is not yet commercial-release ready, but the local development baseline is healthy. The current codebase now includes commercial-readiness work around AI project initializ...",
+      "content": "# Project Manager Commercial Readiness Status\n\n> Date: 2026-05-24  \n> Owner: Codex  \n> Scope: Local desktop/browser development readiness for Project Manager\n\n## Current Status\n\nProject Manager is not yet commercial-release ready, but the local development baseline is healthy. The current codebase now includes commercial-readiness work around AI project initialization, section/evidence validation, GitHub URL detection, GitHub issue sync pagination, and launcher automation.\n\n## Verified Baseline\n\nThe following checks passed in this commercial-readiness checkpoint:\n\n| Check | Result |\n| --- | --- |\n| `npm run typecheck` | Pass |\n| `npm run test` | Pass, 71 files / 543 tests |\n| `npm run docs:check` | Pass |\n| `npm run docs:site:check` | Pass |\n| `bash -n start_project_manager.sh` | Pass |\n| `bash -n scripts/next-dev-if-needed.sh scripts/hermes-agent.sh scripts/openclaw.sh scripts/sync-openclaw-env.sh scripts/install-openclaw.sh scripts/install-hermes-agent.sh` | Pass |\n| `cargo check --manifest-path src-tauri/Cargo.toml` | Pass |\n| `npm run build` | Pass |\n| `npm run standards:check` | Pass with one existing P2 advisory for hard-coded colors |\n| `PROJECT_MANAGER_NO_OPEN=1 ./start_project_manager.sh web` | Pass outside the sandbox; reused the existing Next.js dev server on port `43187` without opening a browser |\n\n## Commercial-Readiness Checkpoints\n\n1. Runtime correctness: keep AI initialization honest with provider fallback traces, model selection safeguards, validation metadata, and persisted initialization run evidence.\n2. Startup reliability: keep `start_project_manager.sh` idempotent, browser-safe, and clear about PM, Hermes, OpenClaw, and helper-page status.\n3. Core workflow validation: verify add/import project, initialize project scan, GitHub URL detection/editing, GitHub issue sync, dashboard tab flows, and dispatch/run visibility.\n4. Error and empty states: show missing provider keys, malformed scan output, low-confidence feature locations, missing GitHub remotes, and blocked startup states without implying success.\n5. Documentation alignment: keep bridge/runtime docs, verification runbook, README launcher notes, and project-process status current whenever command contracts or startup behavior change.\n\n## Known Commercial Blockers\n\n| Area | Status | Evidence / Next Step |\n| --- | --- | --- |\n| Packaged desktop release | Not verified | `npm run tauri:build` has not been run in this checkpoint. Required before a release candidate. |\n| Live AI provider initialization | Partially verified | Unit tests cover fallback, validation, and model selection. A real provider-key scan still needs an operator-owned credential check. |\n| Live GitHub sync | Partially verified | Browser route and Rust paths are covered by tests/typecheck. A real GitHub token sync should be run before release. |\n| Live agent dispatch | Not reverified | Existing UI/run tests pass, but a full Tauri dispatch with logs, PID, and kill path should be rechecked before commercial beta. |\n| Standards advisory | Open | `verification-runbook.md` already records the P2 hard-coded color advisory from `standards:check`. |\n\n## Next Recommended Checkpoint\n\nRun launcher-safe local startup validation with `PROJECT_MANAGER_NO_OPEN=1`, then perform a short manual workflow pass in browser mode: add local project, edit/detect GitHub URL, open Project Progress Dashboard, sync GitHub issues with a test token, and confirm initialization failure states are understandable when provider keys are missing.\n",
+      "contentHash": "173ad1dd4347eb86",
+      "readingMinutes": 3,
+      "classification": "internal",
+      "classificationSource": "policy",
+      "classificationConfidence": 0.96,
+      "classificationReason": "Project process, logs, archive, and feature-tracking docs are internal operating records.",
+      "matchedPolicyRule": "CLS-INTERNAL-PROCESS",
+      "publish": false,
+      "reviewStatus": "ai-classified",
+      "needsReview": true,
+      "visibility": "internal",
+      "audience": [
+        "team",
+        "operators"
+      ],
+      "tags": [
+        "project-process"
+      ],
+      "warnings": [
+        "Mentions secrets, tokens, or credentials"
+      ],
+      "updatedAt": "2026-05-24T05:52:37.000Z"
+    },
+    {
       "id": "project-process/commands/daily-report",
       "slug": "project-process/commands/daily-report",
       "route": "/documentation/project-process/commands/daily-report",
@@ -2190,6 +2224,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
     "project-process/2026-05-12-dev-storage-abstraction",
     "project-process/2026-05-18-plugin-runtime-isolation",
     "project-process/2026-05-19-execution-target-dispatch-update",
+    "project-process/2026-05-24-commercial-readiness-status",
     "project-process/commands/daily-report",
     "project-process/commands/update-progress"
   ]
