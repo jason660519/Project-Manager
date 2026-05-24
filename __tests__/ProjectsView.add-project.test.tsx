@@ -16,6 +16,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ProjectEntry, ProjectManagerConfig } from '../lib/types';
 
 // Capture every readConfig call so we can assert on the path it received.
 const readConfigMock = vi.fn();
@@ -26,10 +27,16 @@ const migrateProjectLayoutMock = vi.fn(async (projectRoot: string) => ({
   migrated: false,
   configPath: `${projectRoot}/.project-manager/config.json`,
 }));
+const { runProjectScanMock, applyScanConfigToProjectMock } = vi.hoisted(() => ({
+  runProjectScanMock: vi.fn(),
+  applyScanConfigToProjectMock: vi.fn(),
+}));
 
 vi.mock('../lib/bridge', () => ({
   getGithubToken: async () => '',
   setGithubToken: async () => {},
+  getSecret: async () => '',
+  setSecret: async () => {},
   readConfig: (path: string) => readConfigMock(path),
   detectGithubRepoUrl: (projectRoot: string) => detectGithubRepoUrlMock(projectRoot),
   fetchGithubRepo: async () => [],
@@ -37,6 +44,22 @@ vi.mock('../lib/bridge', () => ({
   migrateProjectLayout: (root: string) => migrateProjectLayoutMock(root),
   writeConfig: (path: string, config: unknown) => writeConfigMock(path, config),
 }));
+
+vi.mock('../lib/keys/loadProviderKey', () => ({
+  hasProviderKey: vi.fn(async () => true),
+}));
+
+vi.mock('../lib/scanner/runProjectScan', () => ({
+  runProjectScan: (root: string, options?: unknown) => runProjectScanMock(root, options),
+}));
+
+vi.mock('../lib/storage', async () => {
+  const actual = await vi.importActual<typeof import('../lib/storage')>('../lib/storage');
+  return {
+    ...actual,
+    applyScanConfigToProject: (...args: unknown[]) => applyScanConfigToProjectMock(...args),
+  };
+});
 
 import { ProjectsView } from '../app/ui/views/ProjectsView';
 
@@ -49,6 +72,8 @@ beforeEach(() => {
   writeConfigMock.mockReset();
   writeConfigMock.mockResolvedValue(undefined);
   migrateProjectLayoutMock.mockClear();
+  runProjectScanMock.mockReset();
+  applyScanConfigToProjectMock.mockReset();
   (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {};
 });
 
@@ -117,6 +142,39 @@ function renderModal(overrides: Partial<Parameters<typeof ProjectsView>[0]> = {}
     />,
   );
   return { onAddProject };
+}
+
+function renderStatefulProjectsView() {
+  function StatefulProjectsView() {
+    const [projects, setProjects] = React.useState<ProjectEntry[]>([]);
+    const [selectedProjectId, setSelectedProjectId] = React.useState('');
+    const [selectedDashboardProjectIds, setSelectedDashboardProjectIds] = React.useState<string[]>([]);
+
+    return (
+      <ProjectsView
+        projects={projects}
+        selectedProjectId={selectedProjectId}
+        selectedDashboardProjectIds={selectedDashboardProjectIds}
+        onSelectProject={setSelectedProjectId}
+        onToggleDashboardProject={(id, selected) =>
+          setSelectedDashboardProjectIds((prev) =>
+            selected ? [...prev, id] : prev.filter((projectId) => projectId !== id),
+          )
+        }
+        onAddProject={(entry) => {
+          setProjects((prev) => [...prev, entry]);
+          setSelectedProjectId((prev) => prev || entry.id);
+        }}
+        onUpdateProject={(entry) =>
+          setProjects((prev) => prev.map((project) => (project.id === entry.id ? entry : project)))
+        }
+        onRemoveProject={() => {}}
+        runHistory={[]}
+      />
+    );
+  }
+
+  render(<StatefulProjectsView />);
 }
 
 async function openAddModal(user: ReturnType<typeof userEvent.setup>) {
@@ -412,5 +470,66 @@ describe('Add Project modal — Finder folder picker', () => {
       expect(onAddProject).toHaveBeenCalledTimes(2);
     });
     expect(screen.getByText(/Generate project data/i)).toBeInTheDocument();
+  });
+
+  it('closes the post-import prompt and reveals row scan progress after Scan selected', async () => {
+    const user = userEvent.setup();
+    const scannedConfig: ProjectManagerConfig = {
+      schemaVersion: 6,
+      id: 'empty-one-scan',
+      project: { name: 'Empty One', root: '/Volumes/Projects/empty-1', defaultIDE: 'Cursor' },
+      features: [
+        {
+          id: 'F01',
+          name: 'Detected feature',
+          category: 'Core',
+          status: 'todo',
+          progress: 0,
+          paths: {},
+        },
+      ],
+      adapters: { ides: [], agents: [] },
+    };
+
+    pickProjectFoldersMock.mockResolvedValue({
+      status: 'ok',
+      paths: ['/Volumes/Projects/empty-1'],
+    });
+    readConfigMock.mockRejectedValue(
+      new Error('Cannot read config: No such file or directory (os error 2)'),
+    );
+    runProjectScanMock.mockImplementation(async (_root: string, options?: { onProgress?: (event: unknown) => void }) => {
+      options?.onProgress?.({
+        stage: 'scan_files',
+        status: 'running',
+        message: 'Scanning project files and key documents',
+        timestamp: '2026-05-25T00:00:00.000Z',
+      });
+      return {
+        success: true,
+        config: scannedConfig,
+        providerUsed: 'openai',
+        attempts: [{ provider: 'openai', outcome: 'success' }],
+      };
+    });
+    applyScanConfigToProjectMock.mockImplementation(async (project: ProjectEntry) => ({
+      ...project,
+      config: scannedConfig,
+      configMissing: false,
+    }));
+
+    renderStatefulProjectsView();
+    await openAddModal(user);
+    await user.click(screen.getByRole('button', { name: /choose from finder/i }));
+
+    await screen.findByText(/Generate project data/i);
+    await user.click(screen.getByRole('button', { name: /scan selected/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Generate project data/i)).not.toBeInTheDocument();
+    });
+    expect(await screen.findByText(/Initialization Trace/i)).toBeInTheDocument();
+    expect(screen.getByText(/Queued by batch AI Scan/i)).toBeInTheDocument();
+    expect(screen.getByText(/Scanning project files and key documents/i)).toBeInTheDocument();
   });
 });

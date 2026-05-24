@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   AlertTriangle,
@@ -199,6 +199,7 @@ export function ProjectsView({
    * errors. (Provider order itself is honoured by the scanner.)
    */
   const [anyProviderKeyPresent, setAnyProviderKeyPresent] = useState<boolean | null>(null);
+  const projectRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const router = useRouter();
 
   useEffect(() => {
@@ -524,6 +525,17 @@ export function ProjectsView({
     }));
   };
 
+  const revealProjectProgress = (projectId: string) => {
+    onSelectProject(projectId);
+    if (typeof window === 'undefined') return;
+    window.requestAnimationFrame(() => {
+      projectRowRefs.current[projectId]?.scrollIntoView({
+        block: 'center',
+        behavior: 'smooth',
+      });
+    });
+  };
+
   const persistInitializationRun = async (
     project: ProjectEntry,
     result: Awaited<ReturnType<typeof runProjectScan>>,
@@ -691,11 +703,12 @@ export function ProjectsView({
 
   const handleBatchScan = async (targets: ProjectEntry[]) => {
     if (targets.length === 0) return;
+    setPostImportScanQueue(null);
+    revealProjectProgress(targets[0].id);
     // Preflight: short-circuit the whole batch instead of firing N identical
     // "no provider" errors. Banner + dialog already point users at Keys.
     if (anyProviderKeyPresent === false) {
       setBatchScanning(false);
-      setPostImportScanQueue(null);
       setNotice({
         kind: 'warning',
         text: 'AI Scan blocked — no AI provider is configured. Open Keys to save a key, then retry.',
@@ -706,6 +719,8 @@ export function ProjectsView({
     const errors: { name: string; message: string }[] = [];
     let succeeded = 0;
     for (const project of targets) {
+      revealProjectProgress(project.id);
+      setInitializingIds((prev) => new Set(prev).add(project.id));
       try {
         resetInitTrace(project.id);
         appendInitTrace(project.id, {
@@ -721,10 +736,15 @@ export function ProjectsView({
         const raw = e instanceof Error ? e.message : String(e);
         errors.push({ name: project.config.project.name, message: formatScanError(raw) });
         if (raw === 'NO_PROVIDER_CONFIGURED') break; // No point hammering the same failure.
+      } finally {
+        setInitializingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(project.id);
+          return next;
+        });
       }
     }
     setBatchScanning(false);
-    setPostImportScanQueue(null);
     if (errors.length === 0) {
       setNotice({
         kind: 'success',
@@ -964,6 +984,9 @@ export function ProjectsView({
           return (
             <div
               key={project.id}
+              ref={(node) => {
+                projectRowRefs.current[project.id] = node;
+              }}
               className={`group border bg-[rgb(var(--pm-panel))]/72 transition-colors ${
                 isSelected
                   ? 'border-emerald-200/35'
