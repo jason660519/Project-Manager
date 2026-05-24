@@ -860,6 +860,46 @@
       "progress": 100,
       "status": "done",
       "updatedAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "category": "Frontend/Editor",
+      "createdAt": "2026-05-25T00:00:00.000Z",
+      "id": "F25",
+      "locatedSection": "/coding-editor",
+      "name": "Monaco Editor Workbench",
+      "notes": "Replace the table-first /coding-editor flow with a project-scoped Monaco-first editor workbench.",
+      "paths": {
+        "implementation": "app/ui/views/MonacoEditorWorkbench.tsx",
+        "spec": ".project-manager/features/F25/feature-spec.md",
+        "test": "__tests__/monacoEditorWorkbench.test.tsx",
+        "tdd": ".project-manager/features/F25/tdd-spec.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F25"
+      },
+      "phase": "development",
+      "points": 2,
+      "progress": 100,
+      "readmePath": ".project-manager/features/F25/README.md",
+      "status": "done",
+      "updatedAt": "2026-05-25T08:25:30.000+10:00",
+      "updatedBy": "codex"
+    },
+    {
+      "id": "F26",
+      "name": "PWE Dispatch Harness (Three-Role Sheet Dispatch)",
+      "category": "Dispatch",
+      "status": "in_progress",
+      "progress": 5,
+      "phase": "development",
+      "points": 8,
+      "locatedSection": "components/table/TaskDispatchModal",
+      "readmePath": ".project-manager/features/F26/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F26/",
+        "spec": ".project-manager/features/F26/feature-spec.md",
+        "tdd": ".project-manager/features/F26/tdd-spec.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F26/",
+        "implementation": "components/table/TaskDispatchModal.tsx"
+      }
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",
