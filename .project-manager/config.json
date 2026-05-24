@@ -644,6 +644,222 @@
       "progress": 35,
       "status": "todo",
       "updatedAt": "2026-05-24T05:28:41.878Z"
+    },
+    {
+      "category": "Frontend/Dispatch",
+      "createdAt": "2026-05-25T00:00:00.000Z",
+      "id": "F13",
+      "locatedSection": "/project-progress-dashboard",
+      "name": "Dispatch UX Improvements & Bug Fixes",
+      "notes": "",
+      "paths": {
+        "implementation": "components/table",
+        "spec": "",
+        "test": "__tests__/dispatch.component.render.test.tsx"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "category": "Frontend/UI",
+      "createdAt": "2026-05-25T00:00:00.000Z",
+      "id": "F14",
+      "locatedSection": "/chat",
+      "name": "Sidebar Chatbot & Full-Page Chat Assistant",
+      "notes": "",
+      "paths": {
+        "implementation": "app/chat",
+        "spec": "",
+        "test": "__tests__/chat.agent.test.ts"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "category": "Core/Integration",
+      "createdAt": "2026-05-25T00:00:00.000Z",
+      "id": "F15",
+      "locatedSection": "/project-progress-dashboard",
+      "name": "GitHub Issues Dashboard Tab",
+      "notes": "",
+      "paths": {
+        "implementation": "app/project-progress-dashboard/_components/IssuesTab.tsx",
+        "spec": "",
+        "test": "__tests__/IssuesTab.test.tsx"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "category": "Core/Security",
+      "createdAt": "2026-05-25T00:00:00.000Z",
+      "id": "F16",
+      "locatedSection": "/keys",
+      "name": "Keys Page Redesign (3 Sheets)",
+      "notes": "",
+      "paths": {
+        "implementation": "app/keys",
+        "spec": "",
+        "test": "__tests__/keys.detectProviders.test.ts"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "category": "Frontend/UI",
+      "createdAt": "2026-05-25T00:00:00.000Z",
+      "id": "F17",
+      "locatedSection": "components/MermaidBlock",
+      "name": "Decoupled Mermaid Integration",
+      "notes": "",
+      "paths": {
+        "implementation": "components/MermaidBlock.tsx",
+        "spec": "",
+        "test": "__tests__/mermaidBlock.rendering.test.tsx"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "category": "Documentation",
+      "createdAt": "2026-05-25T00:00:00.000Z",
+      "id": "F18",
+      "locatedSection": "/documentation",
+      "name": "Documentation Site Publishing & Classification",
+      "notes": "",
+      "paths": {
+        "implementation": "lib/generated/documentation-site-public.ts",
+        "spec": "",
+        "test": "__tests__/documentationSiteManifest.test.ts"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "category": "Frontend/Integrations",
+      "createdAt": "2026-05-25T00:00:00.000Z",
+      "id": "F19",
+      "locatedSection": "/plugins",
+      "name": "Plugins → Connect Sheet",
+      "notes": "",
+      "paths": {
+        "implementation": "app/integrations-hub",
+        "spec": "",
+        "test": "__tests__/integrations.connectedInstances.test.ts"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "category": "Integration/API",
+      "createdAt": "2026-05-25T00:00:00.000Z",
+      "id": "F20",
+      "locatedSection": "/plugins",
+      "name": "Channels (Multi-platform Messaging)",
+      "notes": "",
+      "paths": {
+        "implementation": "app/integrations-hub",
+        "spec": "",
+        "test": ""
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 60,
+      "status": "in_progress",
+      "updatedAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "category": "Core/AI",
+      "createdAt": "2026-05-25T00:00:00.000Z",
+      "id": "F21",
+      "locatedSection": "lib/storage",
+      "name": "Initialize Located Section Inference",
+      "notes": "",
+      "paths": {
+        "implementation": "lib/storage/featureLocationInference.ts",
+        "spec": "",
+        "test": "__tests__/featureLocationInference.test.ts"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "category": "Core/Security",
+      "createdAt": "2026-05-25T00:00:00.000Z",
+      "id": "F22",
+      "locatedSection": "/keys",
+      "name": "Keys API Config Rebuild",
+      "notes": "",
+      "paths": {
+        "implementation": "lib/keys",
+        "spec": "",
+        "test": "__tests__/keys.envImportModal.test.tsx"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "category": "Core/Platform",
+      "createdAt": "2026-05-25T00:00:00.000Z",
+      "id": "F23",
+      "locatedSection": "lib/capabilities",
+      "name": "Engineer Capabilities: Eyes / Voice / Hands / Recording",
+      "notes": "",
+      "paths": {
+        "implementation": "lib/capabilities",
+        "spec": "",
+        "test": "__tests__/capabilities.stateMachine.test.ts"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 5,
+      "status": "in_progress",
+      "updatedAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "category": "Frontend/Integrations",
+      "createdAt": "2026-05-25T00:00:00.000Z",
+      "id": "F24",
+      "locatedSection": "/plugins",
+      "name": "Connected Instances Sheet",
+      "notes": "",
+      "paths": {
+        "implementation": "app/integrations-hub",
+        "spec": "",
+        "test": "__tests__/integrations.connectedInstances.test.ts"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-25T00:00:00.000Z"
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",
@@ -654,5 +870,5 @@
     "root": "/Volumes/KLEVV-4T-1/Project-Manager"
   },
   "schemaVersion": 8,
-  "updatedAt": "2026-05-24T05:28:41.878Z"
+  "updatedAt": "2026-05-25T00:00:00.000Z"
 }
