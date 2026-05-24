@@ -1286,17 +1286,25 @@ export function TaskDispatchModal({
 
                 {selectedAdapter && (
                   <div className="border border-stone-200/12 bg-[rgb(var(--pm-input))]/50 px-3 py-2 text-[11px] text-stone-400">
+                    <p className="mb-1 text-[10px] uppercase tracking-[0.16em] text-stone-500">
+                      {d.runtimeLabel}
+                    </p>
                     <span className="text-stone-300">Target: </span>
                     {selectedAdapter.name}
-                    {selectedPreflight && selectedPreflight.status !== 'available' && (
+                    {selectedPreflight && (
                       <span className={[
                         'ml-2',
-                        selectedPreflight.status === 'missing' || selectedPreflight.status === 'blocked'
-                          ? 'text-red-400/80'
-                          : 'text-amber-400/80',
+                        selectedPreflight.status === 'available'
+                          ? 'text-emerald-400/80'
+                          : selectedPreflight.status === 'missing' || selectedPreflight.status === 'blocked'
+                            ? 'text-red-400/80'
+                            : 'text-amber-400/80',
                       ].join(' ')}>
-                        ⚠ {selectedPreflight.label} — {selectedPreflight.description}
+                        {selectedPreflight.status === 'available' ? '✓' : '⚠'} {selectedPreflight.label} — {selectedPreflight.description}
                       </span>
+                    )}
+                    {selectedPreflight?.managementLabel && (
+                      <p className="mt-1 text-[10px] text-stone-500">{selectedPreflight.managementLabel}</p>
                     )}
                   </div>
                 )}

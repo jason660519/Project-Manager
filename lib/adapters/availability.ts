@@ -22,6 +22,9 @@ export async function checkCommandAvailability(command: string): Promise<Command
   const normalized = command.trim();
   if (!normalized) return { status: 'missing', canVerify: true };
 
+  const cached = commandPreflightCache.get(normalized);
+  if (cached) return cached;
+
   // Check if we are in Tauri runtime (frontend)
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
   if (isTauri) {

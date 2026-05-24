@@ -140,7 +140,7 @@ describe('TaskDispatchModal [render]', () => {
       </I18nProvider>,
     );
 
-    expect(await screen.findByText('Target available')).toBeInTheDocument();
+    expect(await screen.findByText(/Target available/)).toBeInTheDocument();
     expect(screen.getByText(/External IDE/)).toBeInTheDocument();
   });
 });

@@ -41,7 +41,9 @@ describe('checkCommandExists', () => {
 
   it('uses the Tauri bridge when running inside Tauri', async () => {
     setTauriRuntime();
-    invokeMock.mockResolvedValueOnce(false);
+    // availability.ts first calls list_global_cli_inventory to detect
+    // system-shadowed CLIs, then check_command_exists.
+    invokeMock.mockResolvedValueOnce([]).mockResolvedValueOnce(false);
 
     await expect(checkCommandExists('nonexistent-tool')).resolves.toBe(false);
     expect(invokeMock).toHaveBeenCalledWith('check_command_exists', { command: 'nonexistent-tool' });
@@ -49,7 +51,7 @@ describe('checkCommandExists', () => {
 
   it('returns available or missing preflight status in Tauri', async () => {
     setTauriRuntime();
-    invokeMock.mockResolvedValueOnce(true);
+    invokeMock.mockResolvedValueOnce([]).mockResolvedValueOnce(true);
 
     await expect(checkCommandAvailability('codex')).resolves.toEqual({
       status: 'available',
@@ -60,11 +62,13 @@ describe('checkCommandExists', () => {
 
   it('caches Tauri bridge results', async () => {
     setTauriRuntime();
-    invokeMock.mockResolvedValueOnce(true);
+    // Only the first call hits invoke twice (inventory + check); the
+    // second call should hit the cache and not invoke at all.
+    invokeMock.mockResolvedValueOnce([]).mockResolvedValueOnce(true);
 
     await expect(checkCommandExists('cursor')).resolves.toBe(true);
     await expect(checkCommandExists('cursor')).resolves.toBe(true);
-    expect(invokeMock).toHaveBeenCalledTimes(1);
+    expect(invokeMock).toHaveBeenCalledTimes(2);
   });
 
   it('returns false for an empty command', async () => {
