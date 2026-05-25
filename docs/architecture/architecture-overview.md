@@ -51,7 +51,7 @@ Purpose: execute OS-level commands safely outside browser limits.
 | Area | Frontend Entry | Bridge Command | Notes |
 |---|---|---|---|
 | Config read/write | `lib/bridge/index.ts` | `read_config`, `write_config` | Read path runs schema migration before returning to UI. |
-| Project scan | `ProjectsView`, `ProjectFilesView` | `scan_projects`, `list_project_files` | Browser mode shows virtual paths only. |
+| Project scan | `ProjectsView` | `scan_projects`, `list_project_files` | Browser mode shows virtual paths only. |
 | Agent execution | `TaskDispatchModal`, `BatchDispatchModal` | `spawn_agent`, `kill_process` | Tauri mode streams stdout, stderr, and exit events. |
 | AI calls | `callAnthropic` wrapper | `call_anthropic` | Browser mode uses `/api/anthropic`; shipped Tauri app uses Rust. |
 | Secrets | `KeysView`, plugin storage | `set_secret`, `get_secret`, `secrets_storage_backend` | Tauri release: OS Keychain. Tauri debug: `~/.project-manager/dev-secrets.json` (no Keychain prompts). |
@@ -146,7 +146,7 @@ Detailed operating notes live under `docs/engineering/`:
 | 區域 | 前端入口 | Bridge Command | 說明 |
 |---|---|---|---|
 | 設定讀寫 | `lib/bridge/index.ts` | `read_config`, `write_config` | 讀取後先跑 schema migration 再回 UI。 |
-| 專案掃描 | `ProjectsView`, `ProjectFilesView` | `scan_projects`, `list_project_files` | Browser mode 只顯示虛擬路徑。 |
+| 專案掃描 | `ProjectsView` | `scan_projects`, `list_project_files` | Browser mode 只顯示虛擬路徑。 |
 | Agent 執行 | `TaskDispatchModal`, `BatchDispatchModal` | `spawn_agent`, `kill_process` | Tauri mode 會串流 stdout、stderr 與 exit events。 |
 | AI 呼叫 | `callAnthropic` wrapper | `call_anthropic` | Browser mode 走 `/api/anthropic`，正式 Tauri app 走 Rust。 |
 | Secrets | `KeysView`, plugin storage | `set_secret`, `get_secret`, `secrets_storage_backend` | Tauri release：OS Keychain。Tauri debug：`~/.project-manager/dev-secrets.json`（免 Keychain 彈窗）。 |

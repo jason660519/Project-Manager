@@ -5,7 +5,7 @@
  *   - In the Dashboard Projects sheet, checking the project-manager checkbox should:
  *     1. Show the DASHBOARD badge next to project-manager's name
  *     2. Bump "Dashboard scope: N" to 2
- *     3. Persist to localStorage so /project-progress-dashboard sees both
+ *     3. Persist to localStorage so a fresh dashboard mount sees both
  */
 
 import { act, render, screen } from '@testing-library/react';
@@ -32,12 +32,6 @@ vi.mock('../app/project-progress-dashboard/ProjectProgressClient', async () => {
 
 vi.mock('../app/ui/views/FeaturesView', () => ({
   FeaturesView: () => <div data-testid="features" />,
-}));
-
-vi.mock('../app/ui/views/ProjectFilesView', () => ({
-  ProjectFilesView: ({ selectedDashboardProjectIds }: { selectedDashboardProjectIds: string[] }) => (
-    <div data-testid="coding-editor" data-selected={JSON.stringify(selectedDashboardProjectIds)} />
-  ),
 }));
 
 vi.mock('../app/ui/views/SettingsView', () => ({
@@ -112,7 +106,7 @@ describe('real ProjectsView checkbox behavior', () => {
     expect(screen.getByText(/Dashboard scope:\s*2/)).toBeInTheDocument();
   });
 
-  it('persists selection to namespaced localStorage so other routes see it', async () => {
+  it('persists selection to namespaced localStorage so fresh dashboard mounts see it', async () => {
     const { MainClient, getProjectsRepository } = await freshImport();
     const user = userEvent.setup();
     const { unmount } = render(<MainClient currentView="dashboard" />);
@@ -127,14 +121,11 @@ describe('real ProjectsView checkbox behavior', () => {
     expect(stored).toContain('project-manager');
     unmount();
 
-    // Mount a fresh /coding-editor instance — it should see both projects.
-    render(<MainClient currentView="coding-editor" />);
+    // Mount a fresh dashboard instance — it should see both projects.
+    render(<MainClient currentView="dashboard" />);
     await flushEffects();
 
-    const panel = screen.getByTestId('coding-editor');
-    const selected: string[] = JSON.parse(panel.getAttribute('data-selected') ?? '[]');
-    expect(selected).toContain('project-manager');
-    expect(selected).toContain('owner-property');
+    expect(screen.getByText(/Dashboard scope:\s*2/)).toBeInTheDocument();
   });
 
   it('unchecks project-manager when toggled off (does not stick like the first project)', async () => {

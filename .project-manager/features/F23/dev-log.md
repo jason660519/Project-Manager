@@ -140,7 +140,7 @@ Stops at end of step 8 for a verification gate before Phase 2a.
 | --- | --- |
 | `npm run typecheck` (next typegen + tsc --noEmit) | Passed |
 | `vitest run` on 3 new + 1 updated test file | Passed: 4 files / 38 tests |
-| Regression `vitest run` on 7 existing test files that use v6 fixtures (adapterRegistry.plugin, chat.agent, chat.panel, featureLocationInference, projectEntryNormalization, ProjectsView.reinit, ProjectFilesView) | Passed: 7 files / 38 tests |
+| Regression `vitest run` on existing test files that use v6 fixtures (adapterRegistry.plugin, chat.agent, chat.panel, featureLocationInference, projectEntryNormalization, ProjectsView.reinit) | Passed |
 | Schema JSON parse | Valid |
 
 T-01..T-15 covered. Phase 1 Step 1 complete; checkpoint before Step 2.

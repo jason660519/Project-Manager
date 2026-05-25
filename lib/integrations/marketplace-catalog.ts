@@ -53,11 +53,6 @@ export const MARKETPLACE: MarketplacePlugin[] = [
     defaultCli: { command: 'codex', argsTemplate: ['exec', '--cwd', '{root}', '{prompt}'], providerId: 'openai' },
   },
   {
-    id: 'ide-bridge', name: 'IDE Bridge', description: 'Project-scoped frontend bridge for launching user-installed desktop IDEs with the selected project or file path.',
-    category: 'dev', kind: 'frontend', accentColor: 'bg-[rgb(0_122_204)]', initials: 'IB',
-    defaultFrontend: { packageName: 'internal-tauri-ide-bridge', implementationPath: 'app/ui/views/IdeBridgeView.tsx' },
-  },
-  {
     id: 'hermes-agent', name: 'Hermes Agent CLI', description: 'Project-scoped Hermes agent CLI with isolated memory, sessions, skills, and dashboard state.',
     category: 'dev', kind: 'cli', accentColor: 'bg-amber-700', initials: 'HA',
     defaultCli: { command: '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager/bin/hermes', argsTemplate: ['chat', '-q', '{prompt}'] },

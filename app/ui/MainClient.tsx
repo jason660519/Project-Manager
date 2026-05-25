@@ -35,7 +35,6 @@ import { ProjectProgressClient } from '../project-progress-dashboard/ProjectProg
 import { FeaturesView } from './views/FeaturesView';
 import { EngineersView } from './views/EngineersView';
 import { PluginsView } from './views/PluginsView';
-import { ProjectFilesView } from './views/ProjectFilesView';
 import { ProjectsView } from './views/ProjectsView';
 import { ChannelsView } from './views/ChannelsView';
 import { CronJobsView } from './views/CronJobsView';
@@ -1271,13 +1270,6 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
           roles={selectedProject.config.engineerRoles ?? []}
           agents={adapters}
           onRolesChange={handleRolesUpdate}
-        />
-      )}
-      {currentView === 'coding-editor' && (
-        <ProjectFilesView
-          projects={projects}
-          selectedDashboardProjectIds={selectedDashboardProjectIds}
-          selectedProjectId={selectedProjectId}
         />
       )}
       {currentView === 'documentation' && (

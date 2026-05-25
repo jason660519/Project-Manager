@@ -10,7 +10,6 @@ export const en: Translations = {
   navItems: {
     projects: 'Projects',
     dashboard: 'Project Dashboard',
-    codingEditor: 'Coding Editor',
     engineers: 'Engineers',
     integrationsHub: 'Integrations Hub',
     channels: 'Channels',

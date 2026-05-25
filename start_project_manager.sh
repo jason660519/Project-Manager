@@ -78,6 +78,13 @@ is_port_listening() {
   lsof -nP -iTCP:"$port" -sTCP:LISTEN -t &>/dev/null
 }
 
+is_dev_server_healthy() {
+  local url="http://127.0.0.1:${DEV_PORT}/project-progress-dashboard"
+  local status
+  status="$(curl -fsS -o /dev/null -w '%{http_code}' --max-time 5 "$url" 2>/dev/null || true)"
+  [[ "$status" == "200" ]]
+}
+
 wait_for_port() {
   local port="$1"
   local label="$2"
@@ -618,8 +625,12 @@ ensure_dev_port_available() {
   done
 
   if [[ "$all_next" == "1" && "$force_kill" != "1" ]]; then
-    success "Reusing Next.js dev server on port $DEV_PORT (PID ${pids[0]})"
-    return 0
+    if is_dev_server_healthy; then
+      success "Reusing healthy Next.js dev server on port $DEV_PORT (PID ${pids[0]})"
+      return 0
+    fi
+    warn "Next.js dev server on port $DEV_PORT is listening but not healthy. Restarting it…"
+    force_kill="1"
   fi
 
   warn "Port $DEV_PORT is currently in use. Resolving conflict…"
@@ -897,7 +908,7 @@ cmd_start_background() {
 
 start_project_manager() {
   local mode="${1:-foreground}"
-  local pm_url="http://localhost:${DEV_PORT}/"
+  local pm_url="http://localhost:${DEV_PORT}/project-progress-dashboard"
   local dev_server_running=0
   local log_file="$SCRIPT_DIR/.project-manager/dev-logs/project-manager-desktop.log"
 
@@ -952,7 +963,7 @@ start_project_manager() {
 
 cmd_web() {
   header "Project Manager — Web Server (Next.js only)"
-  local pm_url="http://localhost:${DEV_PORT}/"
+  local pm_url="http://localhost:${DEV_PORT}/project-progress-dashboard"
 
   if ! is_installed; then
     warn "First run detected — running install first…"
@@ -966,9 +977,12 @@ cmd_web() {
   local existing_pid
   existing_pid="$(lsof -nP -iTCP:"$DEV_PORT" -sTCP:LISTEN -t 2>/dev/null | head -1 || true)"
   if [[ -n "$existing_pid" ]] && is_next_process "$existing_pid"; then
-    success "Next.js dev server already running — http://localhost:${DEV_PORT}  (PID ${existing_pid})"
-    maybe_open_local_url "$pm_url" "1"
-    return 0
+    if is_dev_server_healthy; then
+      success "Next.js dev server already running — http://localhost:${DEV_PORT}  (PID ${existing_pid})"
+      maybe_open_local_url "$pm_url" "1"
+      return 0
+    fi
+    warn "Existing Next.js dev server is not serving the dashboard correctly. Restarting…"
   fi
 
   ensure_dev_port_available

@@ -12,7 +12,6 @@ export interface Translations {
   navItems: {
     projects: string;
     dashboard: string;
-    codingEditor: string;
     engineers: string;
     integrationsHub: string;
     channels: string;

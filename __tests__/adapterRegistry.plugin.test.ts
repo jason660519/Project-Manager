@@ -98,7 +98,7 @@ describe('adapter registry plugin agents', () => {
     expect(createRuntimeAdapter(config, 'hermes-agent')).toBeNull();
   });
 
-  it('upgrades existing plugin catalogs with the built-in IDE Bridge frontend plugin', () => {
+  it('does not inject a built-in frontend plugin', () => {
     saveCatalog({
       schemaVersion: 2,
       plugins: [
@@ -115,14 +115,9 @@ describe('adapter registry plugin agents', () => {
     });
 
     const catalog = loadPluginCatalog();
-    const ideBridge = catalog.plugins.find((plugin) => plugin.id === 'ide-bridge');
+    const frontendPlugins = catalog.plugins.filter((plugin) => plugin.kind === 'frontend');
 
-    expect(ideBridge).toMatchObject({
-      id: 'ide-bridge',
-      kind: 'frontend',
-      packageName: 'internal-tauri-ide-bridge',
-      implementationPath: 'app/ui/views/IdeBridgeView.tsx',
-    });
+    expect(frontendPlugins).toEqual([]);
   });
 
 
