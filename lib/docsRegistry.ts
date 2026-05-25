@@ -15,7 +15,7 @@ export const DOCS_BASE_URL: string =
 
 export const VIEW_DOCS_SLUG: Record<ViewId, string | null> = {
   dashboard: 'features/dashboard',
-  features: 'features/',
+  features: 'features/feature-management',
   'integrations-hub': 'features/integrations-hub',
   xmux: 'features/xmux',
   settings: 'features/settings',
@@ -28,7 +28,8 @@ export const VIEW_DOCS_SLUG: Record<ViewId, string | null> = {
   documentation: 'features/documentation',
   'company-standards': 'features/company-standards',
   chat: 'features/chat',
-  'keyboard-shortcuts': 'features/keyboard-shortcuts',
+  // No standalone view / docs page yet; ? button renders disabled.
+  'keyboard-shortcuts': null,
 };
 
 /**

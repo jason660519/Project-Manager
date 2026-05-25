@@ -43,12 +43,44 @@ export default defineConfig({
         items: [{ text: 'Getting Started', link: '/getting-started' }],
       },
       {
-        text: 'Features',
+        text: 'Project view',
+        items: [
+          { text: 'Project Progress Dashboard', link: '/features/dashboard' },
+          { text: 'Features', link: '/features/feature-management' },
+          { text: 'AI Engineers', link: '/features/engineers' },
+        ],
+      },
+      {
+        text: 'Workspaces',
         items: [
           { text: 'xmux Workspace', link: '/features/xmux' },
-          { text: 'Dispatch', link: '/features/dispatch' },
-          { text: 'Documentation Hub', link: '/features/documentation' },
           { text: 'Workstation Layout', link: '/features/workstation' },
+        ],
+      },
+      {
+        text: 'Dispatch & execution',
+        items: [
+          { text: 'Dispatch', link: '/features/dispatch' },
+          { text: 'Sessions', link: '/features/sessions' },
+          { text: 'Channels', link: '/features/channels' },
+          { text: 'Cron Jobs', link: '/features/cron-jobs' },
+          { text: 'Logs', link: '/features/logs' },
+        ],
+      },
+      {
+        text: 'Configuration',
+        items: [
+          { text: 'Settings', link: '/features/settings' },
+          { text: 'Integrations Hub', link: '/features/integrations-hub' },
+          { text: 'Keys', link: '/features/keys' },
+          { text: 'Company Standards', link: '/features/company-standards' },
+        ],
+      },
+      {
+        text: 'Assistance',
+        items: [
+          { text: 'AI Assistant', link: '/features/chat' },
+          { text: 'Documentation Hub', link: '/features/documentation' },
         ],
       },
     ],
