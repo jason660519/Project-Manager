@@ -7,6 +7,7 @@ import {
   PanelBottom,
   PanelRight,
   SquareTerminal,
+  X,
 } from 'lucide-react';
 
 export type PaneTabType = 'terminal' | 'browser' | 'folder';
@@ -24,6 +25,7 @@ export interface PaneActions {
   onAddFolder?: () => void;
   onSplitRight?: () => void;
   onSplitDown?: () => void;
+  onClosePane?: () => void;
 }
 
 export function PaneShell({
@@ -41,7 +43,7 @@ export function PaneShell({
 }) {
   return (
     <div className="flex h-full min-h-0 min-w-0 w-full flex-col overflow-hidden">
-      <div className="flex h-8 min-w-0 items-center overflow-hidden border-b border-stone-800/90 bg-[#202020]">
+      <div className="relative z-20 flex h-8 min-w-0 items-center overflow-hidden border-b border-stone-800/90 bg-[#202020]">
         {tabs.map((tab) => {
           const Icon =
             tab.type === 'browser'
@@ -119,6 +121,12 @@ export function PaneActionToolbar({ actions }: { actions: PaneActions }) {
         title="Show browser side-panel (bottom)"
         ariaLabel="Split pane downward"
         icon={<PanelBottom size={11} />}
+      />
+      <ActionButton
+        onClick={actions.onClosePane}
+        title="Close this pane"
+        ariaLabel="Close pane"
+        icon={<X size={11} />}
       />
     </div>
   );

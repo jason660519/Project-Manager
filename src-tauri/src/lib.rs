@@ -1,4 +1,5 @@
 mod dev_secrets;
+mod xmux_webview;
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -4413,6 +4414,9 @@ pub fn run() {
     tauri::Builder::default()
         .manage(mcp_registry)
         .manage(telegram_registry)
+        .manage(xmux_webview::XmuxWebviewState(std::sync::Mutex::new(
+            std::collections::HashSet::new(),
+        )))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_pty::init())
         .plugin(tauri_plugin_shell::init())
@@ -4495,6 +4499,12 @@ pub fn run() {
             telegram_send_message,
             telegram_get_me,
             check_update,
+            xmux_webview::xmux_webview_create,
+            xmux_webview::xmux_webview_set_bounds,
+            xmux_webview::xmux_webview_set_visible,
+            xmux_webview::xmux_webview_navigate,
+            xmux_webview::xmux_webview_destroy,
+            xmux_webview::xmux_webview_destroy_all,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

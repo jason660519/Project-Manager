@@ -12,6 +12,8 @@
     {
       "identifier": "shell:allow-open",
       "allow": [
+        { "url": "https://**" },
+        { "url": "http://**" },
         { "url": "https://jason660519.github.io/Project-Manager/**" },
         { "url": "https://github.com/jason660519/Project-Manager/**" }
       ]

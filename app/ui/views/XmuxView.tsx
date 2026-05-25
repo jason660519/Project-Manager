@@ -15,6 +15,8 @@ import {
   createInitialLayout,
   countBlocks,
   checkLayoutFits,
+  findBlock,
+  forEachBlock,
   removeBlock,
   splitLeaf,
   updateBlock,
@@ -23,6 +25,8 @@ import {
   type LayoutNode,
   type SplitDirection,
 } from '../../../components/terminal/blockLayout';
+import { destroyBlockItems } from '../../../components/terminal/destroyBlockItems';
+import { purgeOrphanNativeWebviews } from '../../../components/browser/BrowserRegistry';
 import type { ProjectEntry } from '../../../lib/types';
 
 interface WorkspaceRow {
@@ -287,6 +291,10 @@ function InteropConsole({
   const rootRef = useRef<HTMLElement | null>(null);
   const layoutViewportRef = useRef<HTMLDivElement | null>(null);
 
+  useEffect(() => {
+    purgeOrphanNativeWebviews();
+  }, []);
+
   const activeLayout = useMemo(() => {
     if (!activeWorkspace) return undefined;
     const stored = layouts[activeWorkspace.id];
@@ -347,6 +355,7 @@ function InteropConsole({
         const next = updater(layout);
         if (next === layout) return current;
         if (next === null) {
+          forEachBlock(layout, destroyBlockItems);
           const homepage =
             workspacesById.get(workspaceId)?.homepageUrl ?? DEFAULT_HOMEPAGE;
           return { ...current, [workspaceId]: createInitialLayout(homepage) };
@@ -400,9 +409,16 @@ function InteropConsole({
   const handleCloseBlock = useCallback(
     (blockId: string) => {
       if (!activeWorkspace) return;
+      const layout =
+        layouts[activeWorkspace.id] ??
+        pendingLayoutsRef.current[activeWorkspace.id];
+      if (layout) {
+        const block = findBlock(layout, blockId);
+        if (block) destroyBlockItems(block);
+      }
       mutateLayout(activeWorkspace.id, (layout) => removeBlock(layout, blockId));
     },
-    [activeWorkspace, mutateLayout],
+    [activeWorkspace, layouts, mutateLayout],
   );
 
   const handleUpdateBlock = useCallback(
