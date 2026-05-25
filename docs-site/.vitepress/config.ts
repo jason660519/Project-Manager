@@ -87,5 +87,16 @@ export default defineConfig({
     ssr: {
       noExternal: true,
     },
+    // PostCSS walks up from each source file looking for a config. Without
+    // this override it finds the root project's postcss.config.cjs (which
+    // references tailwindcss). That works locally because the root has
+    // tailwindcss installed, but CI only installs docs-site/ deps — making
+    // CI fail with "Cannot find module 'tailwindcss'". Disable postcss here
+    // since the docs site doesn't use Tailwind.
+    css: {
+      postcss: {
+        plugins: [],
+      },
+    },
   },
 });
