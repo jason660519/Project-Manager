@@ -4,15 +4,15 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-05-25T02:46:31.000Z",
+    "generatedAt": "2026-05-25T03:29:15.000Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
     "manifestAudience": "internal",
-    "totalDocuments": 54,
+    "totalDocuments": 55,
     "totalFolders": 12,
     "publicDocuments": 9,
-    "internalDocuments": 44,
+    "internalDocuments": 45,
     "restrictedDocuments": 1,
     "publishableDocuments": 6,
     "reviewRequiredDocuments": 30,
@@ -26,7 +26,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "sourcePath": "docs",
       "label": "All Docs",
       "title": "Documentation",
-      "summary": "54 documentation files indexed from docs.",
+      "summary": "55 documentation files indexed from docs.",
       "parentSlug": null,
       "folderSlugs": [
         "architecture",
@@ -44,14 +44,14 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       ],
       "classificationCounts": {
         "public": 9,
-        "internal": 44,
+        "internal": 45,
         "restricted": 1
       },
       "publishableCount": 6,
       "reviewRequiredCount": 30,
       "visibilityCounts": {
         "public": 9,
-        "internal": 44,
+        "internal": 45,
         "restricted": 1
       },
       "warnings": [
@@ -90,19 +90,20 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "architecture/adr-010-documentation-site-static-sync",
         "architecture/adr-011-schema-v6-located-section",
         "architecture/adr-012-schema-v8-engineer-cron",
+        "architecture/adr-013-xmux-libghostty-terminal",
         "architecture/architecture-overview",
         "architecture/readme"
       ],
       "classificationCounts": {
         "public": 0,
-        "internal": 13,
+        "internal": 14,
         "restricted": 1
       },
       "publishableCount": 0,
       "reviewRequiredCount": 6,
       "visibilityCounts": {
         "public": 0,
-        "internal": 13,
+        "internal": 14,
         "restricted": 1
       },
       "warnings": [
@@ -859,6 +860,39 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "Mentions execution or command policy"
       ],
       "updatedAt": "2026-05-24T03:03:36.000Z"
+    },
+    {
+      "id": "architecture/adr-013-xmux-libghostty-terminal",
+      "slug": "architecture/adr-013-xmux-libghostty-terminal",
+      "route": "/documentation/architecture/adr-013-xmux-libghostty-terminal",
+      "sourcePath": "docs/architecture/ADR-013-xmux-libghostty-terminal.md",
+      "folderSlug": "architecture",
+      "folderPath": "docs/architecture",
+      "title": "ADR-013: xmux Terminal Rendering (libghostty vs WebView)",
+      "summary": "Accepted — Phase 1 implements optimized PTY + WebGL xterm; Phase 2 targets libghostty like cmux. F27 xmux needs embedded terminals inside layout blocks (not separate Terminal.app windows)...",
+      "content": "# ADR-013: xmux Terminal Rendering (libghostty vs WebView)\n\n## Status\n\nAccepted — Phase 1 implements optimized PTY + WebGL xterm; Phase 2 targets libghostty like cmux.\n\n## Context\n\nF27 xmux needs embedded terminals inside layout blocks (not separate Terminal.app windows). Users expect cmux-class responsiveness: GPU-accelerated rendering via **libghostty** (GhosttyKit), not a DOM text grid.\n\nProject Manager ships as **Tauri + Next.js in a WebView**. That stack cannot embed `ghostty_surface_t` / `GhosttyNSView` inside React DOM without a **macOS native view plugin** (separate rendering layer synchronized to pane geometry).\n\ncmux (manaflow-ai/cmux) embeds **GhosttyKit.xcframework** in Swift/AppKit (`GhosttyTerminalView`). That is the reference architecture for “real” terminal blocks.\n\n## Decision\n\n### Phase 1 (current)\n\n- **Shell**: native PTY via `tauri-plugin-pty` (`portable-pty`), `cwd` = selected workspace `project.root`.\n- **Display**: `@xterm/xterm` with **`@xterm/addon-webgl`** (GPU path inside WebView) — interim renderer, not libghostty.\n- **Tabs**: real tab state per pane (each tab = distinct PTY `sessionKey`), not decorative labels.\n\n### Phase 2 (planned)\n\n- **macOS**: Tauri plugin hosting **GhosttyKit** `NSView` aligned to pane rects (cmux model).\n- **Fallback**: keep Phase 1 WebGL xterm when GhosttyKit unavailable or on non-macOS targets.\n\n## Consequences\n\n- Phase 1 improves latency substantially vs canvas xterm but remains **emulator-in-WebView**, not identical to cmux.\n- Phase 2 requires Rust/Swift FFI, xcframework vendoring, code signing, and layout sync — separate feature increment with capability entries.\n- `npm run dev` (browser-only) cannot host PTY or libghostty; `npm run tauri:dev` is required for embedded terminals.\n\n## References\n\n- [cmux GhosttyTerminalView.swift](https://github.com/manaflow-ai/cmux/blob/main/Sources/GhosttyTerminalView.swift)\n- [Ghostty libghostty](https://github.com/ghostty-org/ghostty)\n- [manaflow-ai/ghostty GhosttyKit.xcframework releases](https://github.com/manaflow-ai/ghostty/releases)\n",
+      "contentHash": "868a9aa8277de2b1",
+      "readingMinutes": 2,
+      "classification": "internal",
+      "classificationSource": "policy",
+      "classificationConfidence": 0.92,
+      "classificationReason": "Architecture decisions usually contain internal tradeoffs and implementation constraints.",
+      "matchedPolicyRule": "CLS-INTERNAL-ARCHITECTURE",
+      "publish": false,
+      "reviewStatus": "ai-classified",
+      "needsReview": false,
+      "visibility": "internal",
+      "audience": [
+        "engineers",
+        "technical-reviewers"
+      ],
+      "tags": [
+        "architecture",
+        "adr",
+        "table"
+      ],
+      "warnings": [],
+      "updatedAt": "2026-05-25T03:29:15.000Z"
     },
     {
       "id": "architecture/architecture-overview",
@@ -2289,6 +2323,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
     "architecture/adr-010-documentation-site-static-sync",
     "architecture/adr-011-schema-v6-located-section",
     "architecture/adr-012-schema-v8-engineer-cron",
+    "architecture/adr-013-xmux-libghostty-terminal",
     "architecture/architecture-overview",
     "architecture/readme",
     "archive/archived-20260512-05-adr-tauri",

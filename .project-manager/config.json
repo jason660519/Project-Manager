@@ -900,6 +900,29 @@
       "createdAt": "2026-05-25T02:09:23Z",
       "updatedAt": "2026-05-25T02:46:54Z",
       "updatedBy": "Codex"
+    },
+    {
+      "id": "F28",
+      "name": "xmux Pane Unification, Stable Browser State & Smooth Resize",
+      "category": "Execution",
+      "status": "in_progress",
+      "progress": 95,
+      "phase": "development",
+      "points": 5,
+      "locatedSection": "/xmux",
+      "readmePath": ".project-manager/features/F28/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F28/",
+        "spec": ".project-manager/features/F28/feature-spec.md",
+        "tdd": ".project-manager/features/F28/tdd-spec.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F28/",
+        "implementation": "app/ui/views/XmuxView.tsx",
+        "test": "__tests__/xmux.workspace-tabs.test.tsx"
+      },
+      "notes": "Follow-up to F27. PaneShell primitive extracted; both TerminalPaneGroup and BrowserPane derive from it. BrowserPane is now multi-tab and per-workspace, so 'New Browser' appends instead of overwriting. Resize dividers stay smooth across iframe and xterm via a fixed-position drag overlay + rAF-coalesced state updates. 21 new tests across pane-shell / workspace-tabs / resize files; 570 total passing. Remaining: manual verification on a Tauri desktop build before flipping to done.",
+      "createdAt": "2026-05-25T04:18:56Z",
+      "updatedAt": "2026-05-25T04:43:00Z",
+      "updatedBy": "Claude"
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",
@@ -910,6 +933,6 @@
     "root": "/Volumes/KLEVV-4T-1/Project-Manager"
   },
   "schemaVersion": 8,
-  "updatedAt": "2026-05-25T02:09:23Z",
-  "updatedBy": "Codex"
+  "updatedAt": "2026-05-25T04:43:00Z",
+  "updatedBy": "Claude"
 }

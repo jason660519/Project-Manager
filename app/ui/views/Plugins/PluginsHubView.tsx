@@ -465,7 +465,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalog, apiKeys, systemCommandStatus, mcpStatuses, pluginsFilter, installedIds, manualVersion, resolvedInstallPaths]);
 
-  const pluginRows = useMemo(
+  const pluginSheetRows = useMemo(
     () => allPluginRows.filter((r) => r.sheet === 'plugins'),
     [allPluginRows],
   );
@@ -481,10 +481,14 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     () => new Set(MARKETPLACE.filter((mp) => mp.category === 'dev').map((mp) => mp.id)),
     [],
   );
-  const codingToolRows = useMemo(
-    () => pluginRows.filter((row) => CODING_TOOL_IDS.has(row.sourceId)),
-    [pluginRows, CODING_TOOL_IDS],
-  );
+  const codingToolRows = useMemo(() => pluginSheetRows.filter((row) => CODING_TOOL_IDS.has(row.sourceId)), [
+    pluginSheetRows,
+    CODING_TOOL_IDS,
+  ]);
+  const pluginRows = useMemo(() => pluginSheetRows.filter((row) => !CODING_TOOL_IDS.has(row.sourceId)), [
+    pluginSheetRows,
+    CODING_TOOL_IDS,
+  ]);
 
   const channelRows = useMemo(() => {
     const rows = channelCatalog.channels.map((ch) =>
@@ -587,7 +591,9 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
           setResolvedInstallPaths(ctx.paths);
         }
         const allRows = buildPluginRowsFromCtx(ctx, mcpStatuses);
-        const next = allRows.filter((r) => r.sheet === 'plugins');
+        const next = allRows
+          .filter((r) => r.sheet === 'plugins')
+          .filter((r) => !CODING_TOOL_IDS.has(r.sourceId));
         return {
           sheetId: 'plugins',
           label: 'Plugins',
@@ -608,7 +614,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
         };
       }
     },
-    [pluginRows, runPluginSystemScan, buildPluginRowsFromCtx, mcpStatuses],
+    [pluginRows, runPluginSystemScan, buildPluginRowsFromCtx, mcpStatuses, CODING_TOOL_IDS],
   );
 
   const rescanCodingTools = useCallback(
@@ -1307,11 +1313,6 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     { key: 'memory', label: t.integrations.sheetMemory, badge: memoryRowsMerged.length },
     { key: 'commands', label: t.integrations.sheetCommands, badge: commandRowsMerged.length },
     { key: 'connected-instances', label: 'Connected Instances', badge: connectedInstanceRows.length },
-    { key: 'vla', label: 'VLA (Eyes)' },
-    { key: 'tts', label: 'TTS (Mouth)' },
-    { key: 'stt', label: 'STT (Mouth)' },
-    { key: 'hands', label: 'Hands' },
-    { key: 'tools', label: 'Tools' },
     { key: 'connect', label: 'Connect' },
   ];
 
@@ -1511,7 +1512,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
   return (
     <>
       <WorkstationFrame
-        className="mx-auto w-full max-w-[1400px]"
+        className="w-full"
         header={
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
