@@ -12,6 +12,7 @@ export const zhHant: Translations = {
     dashboard: '專案儀表板',
     engineers: '工程師',
     integrationsHub: '整合中樞',
+    xmux: 'xmux',
     channels: '頻道',
     cronJobs: '排程任務',
     skills: '技能庫',

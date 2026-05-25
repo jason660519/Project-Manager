@@ -49,6 +49,7 @@ export const BUILT_IN_ADAPTER_SUPPORTS: Readonly<Record<string, CapabilityKind[]
   'claude-code': [...FULL_CAPABILITY_SET],
   'codex':       [...FULL_CAPABILITY_SET],
   'openai-cli':  [...FULL_CAPABILITY_SET],
+  'xmux':        [...FULL_CAPABILITY_SET],
   'cmux':        [...FULL_CAPABILITY_SET],
   // Agent apps.
   'codex-app':     [...FULL_CAPABILITY_SET],

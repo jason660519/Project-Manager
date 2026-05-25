@@ -11,6 +11,7 @@ import { ChatPanel } from '../../components/chat/ChatPanel';
 const VIEW_LABELS: Record<ViewId, string> = {
   dashboard:           'Project Progress Dashboard',
   'integrations-hub':  'Integrations Hub',
+  xmux:                'xmux',
   engineers:           'AI Engineers',
   sessions:            'Sessions',
   channels:            'Channels',
@@ -129,12 +130,12 @@ export function TopBar({ currentView, activeRunCount, searchValue = '', onSearch
   const currentLang  = LANGS.find((l) => l.id === lang)   ?? LANGS[0];
 
   return (
-    <div className="flex h-12 items-center justify-between border-b border-stone-200/15 px-5">
-      <h1 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-100">
+    <div className="flex h-12 min-w-0 items-center justify-between gap-2 border-b border-stone-200/15 px-3 sm:px-5">
+      <h1 className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-100">
         {VIEW_LABELS[currentView] ?? currentView}
       </h1>
 
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 shrink-0 items-center gap-2">
         {activeRunCount > 0 && (
           <div className="flex items-center gap-1.5 border border-cyan-400/30 bg-cyan-950/40 px-2.5 py-1">
             <Zap size={10} className="text-cyan-400 animate-pulse" />
@@ -152,7 +153,7 @@ export function TopBar({ currentView, activeRunCount, searchValue = '', onSearch
           title="AI Assistant"
         >
           <Bot size={13} className={chatOpen ? 'text-amber-300' : 'text-stone-400'} />
-          <span className="text-[9px] font-medium uppercase tracking-[0.1em] text-stone-300/70">Assistant</span>
+          <span className="hidden text-[9px] font-medium uppercase tracking-[0.1em] text-stone-300/70 sm:inline">Assistant</span>
           <ChevronDown size={9} className={`shrink-0 text-stone-500 transition-transform ${chatOpen ? 'rotate-180' : ''}`} />
         </button>
 
@@ -181,7 +182,7 @@ export function TopBar({ currentView, activeRunCount, searchValue = '', onSearch
               <span className="h-full w-1/2" style={{ background: currentTheme.swatch[0] }} />
               <span className="h-full w-1/2" style={{ background: currentTheme.swatch[1] }} />
             </span>
-            <span className="text-[9px] font-medium uppercase tracking-[0.1em] text-stone-300/70">
+            <span className="hidden text-[9px] font-medium uppercase tracking-[0.1em] text-stone-300/70 sm:inline">
               {currentTheme.label}
             </span>
             <ChevronDown size={9} className={`shrink-0 text-stone-500 transition-transform ${themeOpen ? 'rotate-180' : ''}`} />
@@ -249,7 +250,7 @@ export function TopBar({ currentView, activeRunCount, searchValue = '', onSearch
         </div>
 
         {/* Search */}
-        <div className="flex items-center gap-2 border border-stone-200/15 bg-stone-900/40 px-2.5 py-1.5">
+        <div className="hidden items-center gap-2 border border-stone-200/15 bg-stone-900/40 px-2.5 py-1.5 md:flex">
           <Search size={11} className="text-stone-500 shrink-0" />
           <input
             type="text"

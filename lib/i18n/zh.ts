@@ -12,6 +12,7 @@ export const zh: Translations = {
     dashboard: '项目仪表盘',
     engineers: '工程师',
     integrationsHub: '集成中枢',
+    xmux: 'xmux',
     channels: '频道',
     cronJobs: '定时任务',
     skills: '技能库',

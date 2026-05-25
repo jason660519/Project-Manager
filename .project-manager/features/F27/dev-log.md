@@ -1,0 +1,69 @@
+# F27 Dev Log: xmux Coding Tool Sidebar Entry
+
+## 2026-05-25
+
+- Created F27 dashboard work item for the xmux sidebar and adapter rename.
+- Read Project Manager implementation rules before coding:
+  - Company AI engineer workflow
+  - Company UI design system
+  - Company table governance
+  - Company file naming standards
+  - Project Manager file naming standards
+  - Project Manager table standards
+  - `DESIGN.md`
+  - `docs/design/shared-ai-desktop-style.md`
+  - `README.md`
+  - `CLAUDE.md`
+  - `docs/architecture/architecture-overview.md`
+  - `docs/architecture/README.md`
+- Checked official cmux documentation via Context7 and the official docs site before writing xmux docs.
+- Captured upstream cmux characteristics relevant to xmux:
+  - native macOS Ghostty-based terminal,
+  - vertical workspaces/tabs,
+  - notification attention model,
+  - Unix socket and CLI API,
+  - browser automation surfaces,
+  - Claude Code Teams mode,
+  - SSH workspaces,
+  - session restore.
+- Added product philosophy: xmux should not dictate how developers use AI; it should expose terminal, browser, notification, workspace, split, tab, and CLI primitives as composable building blocks.
+- Wrote pre-implementation feature spec and TDD spec before touching application code.
+- Added F27 to `.project-manager/config.json` so the Project Manager dashboard can track today's xmux work.
+- Synced documentation manifests after adding the public xmux guide.
+- Implemented `/xmux`, sidebar navigation, `ViewId`, TopBar label, and locale entries.
+- Renamed the built-in adapter surface from `cmux` to `xmux` while preserving the user-installed `cmux` executable command.
+- Added legacy `cmux` adapter id aliasing so old config entries merge into the new `xmux` built-in slot.
+- Added `BUILT_IN_ADAPTER_SUPPORTS.xmux` with the existing full agent capability preset.
+- Reworked the `/xmux` view after product review: replaced the original feature-card view with an interoperability console layout modeled on the real xmux/cmux surface:
+  - workspace/project sidebar,
+  - right-top toolbar icons for built-in browser, notification panel, and split-pane layout,
+  - active workspace header,
+  - terminal tab panes,
+  - browser/terminal split area,
+  - bottom terminal pane.
+- Added toolbar semantics to the UI and docs:
+  - Globe: built-in browser, `Cmd+Shift+L`, DOM snapshots/click/fill/JS automation.
+  - Bell: notification panel, OSC 9/99/777 attention events, `Cmd+I`, latest unread `Cmd+Shift+U`.
+  - Grid: split-pane layout, `Cmd+D`, `Cmd+Shift+D`, `Option+Cmd+Arrow`.
+- Corrected the interop console and docs to place the Globe, Bell, and Grid controls in the right-top toolbar.
+- Reworked the xmux surface after review because the first version still behaved like a static mock:
+  - added `/api/xmux/terminal` with an allowlist for safe inspection commands,
+  - made terminal panes accept and run allowlisted commands,
+  - replaced the browser placeholder with a URL bar and iframe pane,
+  - made the Globe button toggle the browser pane,
+  - made the Bell button open a notification rail,
+  - made the Grid button switch vertical/horizontal split layouts.
+- Clarified the licensing boundary: Project Manager does not bundle, fork, or redistribute cmux; xmux integrates with a user-installed third-party cmux command.
+- Added `__tests__/xmux.registry.test.tsx` covering adapter rename, legacy cmux aliasing, capability preset, and xmux UI content.
+- Marked F27 done in `.project-manager/config.json` after implementation and verification.
+- Verification completed:
+  - `npm test -- --run __tests__/xmux.registry.test.tsx` passed, 4 tests.
+  - `npm run typecheck` passed.
+  - `npm run docs:site:sync` regenerated documentation manifests.
+  - `npm run docs:site:check` passed.
+  - `npm run docs:check` passed.
+  - `npm run standards:check` completed with no P0/P1 findings and the existing P2 hard-coded color review warning.
+  - `npm run build` passed and includes `/xmux` as a static route.
+  - Browser check on `/xmux` passed at desktop width: no horizontal overflow, workspace topology visible.
+  - Browser check on `/xmux` passed at desktop width: right-top toolbar exists with built-in browser, notification panel, and split-pane layout controls.
+  - Browser check on `/xmux` passed at 390px width: no horizontal overflow, workspace topology visible, right-top toolbar visible.

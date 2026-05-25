@@ -14,6 +14,7 @@ export interface Translations {
     dashboard: string;
     engineers: string;
     integrationsHub: string;
+    xmux: string;
     channels: string;
     cronJobs: string;
     skills: string;

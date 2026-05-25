@@ -3,6 +3,11 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      'tauri-pty': new URL('./__tests__/stubs/tauri-pty.ts', import.meta.url).pathname,
+    },
+  },
   test: {
     environment: 'jsdom',
     globals: true,

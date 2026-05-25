@@ -877,6 +877,29 @@
         "developmentLogSummaryFolder": ".project-manager/features/F26/",
         "implementation": "components/table/TaskDispatchModal.tsx"
       }
+    },
+    {
+      "id": "F27",
+      "name": "xmux Coding Tool Sidebar Entry",
+      "category": "Execution",
+      "status": "done",
+      "progress": 100,
+      "phase": "development",
+      "points": 3,
+      "locatedSection": "/xmux",
+      "readmePath": ".project-manager/features/F27/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F27/",
+        "spec": ".project-manager/features/F27/feature-spec.md",
+        "tdd": ".project-manager/features/F27/tdd-spec.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F27/",
+        "implementation": "app/ui/views/XmuxView.tsx",
+        "test": "__tests__/xmux.registry.test.tsx"
+      },
+      "notes": "Add one xmux sidebar item, rename the cmux-backed coding-tool adapter to xmux, and provide an interactive terminal/browser/split workspace while documenting cmux-derived capabilities and future integration boundaries.",
+      "createdAt": "2026-05-25T02:09:23Z",
+      "updatedAt": "2026-05-25T02:46:54Z",
+      "updatedBy": "Codex"
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",
@@ -887,5 +910,6 @@
     "root": "/Volumes/KLEVV-4T-1/Project-Manager"
   },
   "schemaVersion": 8,
-  "updatedAt": "2026-05-25T00:44:49.646Z"
+  "updatedAt": "2026-05-25T02:09:23Z",
+  "updatedBy": "Codex"
 }

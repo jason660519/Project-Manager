@@ -26,6 +26,7 @@ reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-feature
 # real backend is gated behind an explicit feature flag.
 keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native-sync-persistent"] }
 base64 = "0.22"
+tauri-plugin-pty = "0.2.1"
 
 [profile.release]
 panic = "abort"

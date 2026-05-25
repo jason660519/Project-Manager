@@ -242,6 +242,27 @@ export async function spawnTerminal(opts: SpawnTerminalOptions): Promise<void> {
   });
 }
 
+/**
+ * Open the system Terminal app with an interactive shell in `cwd` (no command).
+ * macOS: Terminal.app via AppleScript. Dev browser mode uses `/api/xmux/open-terminal`.
+ */
+export async function openTerminalAtPath(cwd: string): Promise<void> {
+  const trimmed = cwd.trim();
+  if (!trimmed) throw new Error('openTerminalAtPath: cwd must not be empty');
+  if (isTauri()) {
+    return invoke<void>('open_terminal_at_path', { cwd: trimmed });
+  }
+  const res = await fetch('/api/xmux/open-terminal', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cwd: trimmed }),
+  });
+  const body = (await res.json().catch(() => ({}))) as { success?: boolean; output?: string };
+  if (!res.ok || body.success === false) {
+    throw new Error(body.output ?? `open-terminal failed (${res.status})`);
+  }
+}
+
 // ── MCP server lifecycle ──────────────────────────────────────────────────────
 
 export type McpRunStatus =
