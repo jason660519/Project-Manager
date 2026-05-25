@@ -1,0 +1,76 @@
+# Build the VitePress docs site (sourced from docs/guides/) and publish it
+# to GitHub Pages at https://jason660519.github.io/Project-Manager/.
+#
+# Triggers on:
+#   - Push to main that touches docs/guides/** OR docs-site/**
+#   - Manual run via the Actions tab (workflow_dispatch)
+#
+# IMPORTANT: this workflow ONLY publishes docs/guides/ — internal content
+# under docs/architecture/, docs/engineering/, docs/product/ is NEVER copied
+# into the build output because VitePress's `srcDir` in docs-site/.vitepress/
+# config.ts points at docs/guides/ exclusively.
+
+name: Deploy Docs Site to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/guides/**'
+      - 'docs-site/**'
+      - '.github/workflows/deploy-docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one concurrent deploy at a time; queued runs may be skipped but the
+# in-progress run is never cancelled (deploys should always complete).
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # required so VitePress can show last-updated dates
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Install dependencies
+        working-directory: docs-site
+        run: npm ci
+
+      - name: Build with VitePress
+        working-directory: docs-site
+        run: npm run build
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs-site/.vitepress/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

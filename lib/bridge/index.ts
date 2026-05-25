@@ -137,6 +137,19 @@ export async function scanProjects(root: string): Promise<string[]> {
   return invoke<string[]>('scan_projects', { root });
 }
 
+export interface DirEntry {
+  name: string;
+  path: string;
+  isDir: boolean;
+  isSymlink: boolean;
+}
+
+/** Single-level directory listing for the xmux folder-explorer tab. */
+export async function listDirectoryEntries(path: string): Promise<DirEntry[]> {
+  if (!isTauri()) throw new Error('listDirectoryEntries requires Tauri runtime');
+  return invoke<DirEntry[]>('list_directory_entries', { path });
+}
+
 /** Detect a local Git repository's GitHub origin URL. Returns null when no GitHub origin exists. */
 export async function detectGithubRepoUrl(projectRoot: string): Promise<string | null> {
   if (!isTauri()) return null;
@@ -437,6 +450,20 @@ export async function resolveInstallPath(
     commandPath: raw.commandPath ?? null,
     appBundlePath: raw.appBundlePath ?? null,
   };
+}
+
+/**
+ * Run `command --version` (4 s timeout) and return the first line of output.
+ * Resolves with the version string on success, rejects with an error message on failure.
+ * Outside Tauri, always resolves with null.
+ */
+export async function probeCommandVersion(command: string): Promise<string | null> {
+  if (!isTauri()) return null;
+  try {
+    return await invoke<string>('probe_command_version', { command });
+  } catch (err) {
+    throw new Error(err instanceof Error ? err.message : String(err));
+  }
 }
 
 export interface GlobalCliInventoryEntry {
@@ -1615,4 +1642,30 @@ export async function checkUpdate(): Promise<UpdateCheckResult> {
     hasUpdate: raw.has_update,
     latest: raw.latest,
   };
+}
+
+// ── Shell ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Open an external URL in the user's default browser.
+ *
+ * In Tauri release/dev builds: uses tauri-plugin-shell `open`. The capability
+ * scope in `src-tauri/capabilities/default.json` limits which URLs are
+ * permitted — opening an out-of-scope URL surfaces as a rejected promise
+ * rather than a silent no-op.
+ *
+ * In the Next.js web preview (no Tauri runtime): falls back to
+ * `window.open(url, '_blank')` with noopener/noreferrer.
+ */
+export async function openExternalUrl(url: string): Promise<void> {
+  if (isTauri()) {
+    const { open } = await import('@tauri-apps/plugin-shell');
+    await open(url);
+    return;
+  }
+  if (typeof window !== 'undefined') {
+    window.open(url, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  throw new Error('openExternalUrl: no runtime capable of opening a URL');
 }

@@ -2410,6 +2410,61 @@ fn list_dir_recursive(path: &std::path::Path, depth: u32, max_depth: u32) -> Vec
     nodes
 }
 
+/// Single-level directory listing for the xmux folder-explorer tab.
+/// Unlike `list_project_files` this does NOT recurse and DOES include hidden
+/// dotfiles (folder explorers should show them; the caller can filter UI-side).
+/// SKIP_DIRS are still hidden so node_modules etc don't trash the tree.
+#[derive(Serialize, Clone)]
+struct DirEntryNode {
+    name: String,
+    path: String,
+    #[serde(rename = "isDir")]
+    is_dir: bool,
+    #[serde(rename = "isSymlink")]
+    is_symlink: bool,
+}
+
+#[tauri::command]
+async fn list_directory_entries(path: String) -> Result<Vec<DirEntryNode>, String> {
+    let dir = std::path::Path::new(&path);
+    if !dir.exists() {
+        return Err(format!("Path does not exist: {path}"));
+    }
+    if !dir.is_dir() {
+        return Err(format!("Path is not a directory: {path}"));
+    }
+    let read_dir = std::fs::read_dir(dir)
+        .map_err(|e| format!("Cannot read directory {path}: {e}"))?;
+    let mut nodes: Vec<DirEntryNode> = Vec::new();
+    for entry in read_dir.flatten() {
+        let file_name = entry.file_name();
+        let name = file_name.to_string_lossy().to_string();
+        let entry_path = entry.path();
+        let path_str = entry_path.to_string_lossy().to_string();
+        // metadata() follows symlinks; symlink_metadata() does not. We want both
+        // signals: is_dir reflects what it points to; is_symlink flags the entry.
+        let symlink_meta = match entry.metadata() {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        let is_symlink = entry
+            .file_type()
+            .map(|t| t.is_symlink())
+            .unwrap_or(false);
+        let is_dir = symlink_meta.is_dir();
+        if is_dir && SKIP_DIRS.contains(&name.as_str()) {
+            continue;
+        }
+        nodes.push(DirEntryNode { name, path: path_str, is_dir, is_symlink });
+    }
+    nodes.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+    });
+    Ok(nodes)
+}
+
 /// Recursively list files and directories under `root` up to `max_depth`.
 /// Common build/cache folders (.git, node_modules, target, .next, …) are pruned.
 #[tauri::command]
@@ -3033,6 +3088,39 @@ async fn check_command_exists(command: String) -> Result<bool, String> {
     }
 
     Ok(false)
+}
+
+/// Run `command --version` (timeout 4 s) and return the first non-empty line of
+/// combined stdout+stderr.  Returns Err when the process fails to start or exits
+/// with a non-zero code and produced no output.
+#[tauri::command]
+async fn probe_command_version(command: String) -> Result<String, String> {
+    let trimmed = command.trim().to_string();
+    if trimmed.is_empty() {
+        return Err("empty command".to_string());
+    }
+    let output = tokio::time::timeout(
+        std::time::Duration::from_secs(4),
+        tokio::process::Command::new(&trimmed)
+            .arg("--version")
+            .output(),
+    )
+    .await
+    .map_err(|_| format!("`{trimmed} --version` timed out"))?
+    .map_err(|e| format!("failed to run `{trimmed}`: {e}"))?;
+
+    let combined = [output.stdout, output.stderr].concat();
+    let text = String::from_utf8_lossy(&combined);
+    let first = text.lines().find(|l| !l.trim().is_empty()).unwrap_or("").trim().to_string();
+    if first.is_empty() {
+        if output.status.success() {
+            Ok(format!("{trimmed} (no version output)"))
+        } else {
+            Err(format!("exit {}", output.status))
+        }
+    } else {
+        Ok(first)
+    }
 }
 
 #[derive(Serialize, Clone, Default)]
@@ -4327,6 +4415,7 @@ pub fn run() {
         .manage(telegram_registry)
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_pty::init())
+        .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -4372,6 +4461,7 @@ pub fn run() {
             secrets_storage_backend,
             start_github_poll,
             list_project_files,
+            list_directory_entries,
             read_file,
             write_file,
             scan_env_files,
@@ -4390,6 +4480,7 @@ pub fn run() {
             open_in_editor,
             capture_screenshot,
             check_command_exists,
+            probe_command_version,
             resolve_install_path,
             list_global_cli_inventory,
             skill_default_dir,

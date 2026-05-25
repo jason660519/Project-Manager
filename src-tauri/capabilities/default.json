@@ -8,6 +8,13 @@
   "permissions": [
     "core:default",
     "dialog:default",
-    "pty:default"
+    "pty:default",
+    {
+      "identifier": "shell:allow-open",
+      "allow": [
+        { "url": "https://jason660519.github.io/Project-Manager/**" },
+        { "url": "https://github.com/jason660519/Project-Manager/**" }
+      ]
+    }
   ]
 }

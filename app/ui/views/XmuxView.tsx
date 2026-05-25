@@ -8,10 +8,19 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
-import { Bell, Folder, Globe2, PanelsTopLeft } from 'lucide-react';
-import { TerminalPaneGroup } from '../../../components/terminal/TerminalPaneGroup';
-import type { PaneActions } from '../../../components/terminal/PaneShell';
-import { BrowserPane, type BrowserTab } from '../../../components/browser/BrowserPane';
+import { Bell, Folder } from 'lucide-react';
+import { LayoutRenderer } from '../../../components/terminal/LayoutRenderer';
+import {
+  createBlock,
+  createInitialLayout,
+  removeBlock,
+  splitLeaf,
+  updateBlock,
+  updateSplitRatio,
+  type Block,
+  type LayoutNode,
+  type SplitDirection,
+} from '../../../components/terminal/blockLayout';
 import type { ProjectEntry } from '../../../lib/types';
 
 interface WorkspaceRow {
@@ -24,12 +33,25 @@ interface WorkspaceRow {
 }
 
 const DEFAULT_HOMEPAGE = 'http://localhost:43187/project-progress-dashboard';
-const MAX_BROWSER_TABS_PER_WORKSPACE = 8;
 
 function deriveHomepage(project: ProjectEntry): string {
   const github = project.config.project.githubUrl;
   if (github && /^https?:\/\//i.test(github)) return github;
   return DEFAULT_HOMEPAGE;
+}
+
+// Always return a directory path, never the config-file path itself.
+// PTY spawn requires cwd to be a directory; passing a `.json` file path errors.
+function deriveProjectCwd(project: ProjectEntry): string {
+  const root = project.config.project.root;
+  if (root) return root;
+  const configPath = project.configPath;
+  const marker = '/.project-manager/config.json';
+  if (configPath.endsWith(marker)) {
+    return configPath.slice(0, -marker.length);
+  }
+  const lastSlash = configPath.lastIndexOf('/');
+  return lastSlash > 0 ? configPath.slice(0, lastSlash) : '/';
 }
 
 interface XmuxViewProps {
@@ -38,13 +60,7 @@ interface XmuxViewProps {
   selectedProjectId?: string;
 }
 
-type SplitLayout = 'vertical' | 'horizontal';
 type DragCursor = 'col-resize' | 'row-resize' | null;
-
-interface WorkspaceBrowserState {
-  tabs: BrowserTab[];
-  activeTabId: string;
-}
 
 const fallbackWorkspaces: WorkspaceRow[] = [
   {
@@ -113,31 +129,13 @@ function deriveWorkspaceRows(
       id: project.id,
       name: project.config.project.name || project.id,
       branch: project.config.project.githubUrl ? 'github' : 'local*',
-      cwd: project.config.project.root || project.configPath,
+      cwd: deriveProjectCwd(project),
       notification: hasUnread ? 'Feature in progress' : undefined,
       homepageUrl: deriveHomepage(project),
     };
   });
 }
 
-function seedWorkspaceBrowserState(homepageUrl: string): WorkspaceBrowserState {
-  const tab: BrowserTab = {
-    id: `browser-tab-${Date.now()}`,
-    label: deriveTabLabel(homepageUrl),
-    url: homepageUrl,
-  };
-  return { tabs: [tab], activeTabId: tab.id };
-}
-
-function deriveTabLabel(url: string): string {
-  try {
-    const u = new URL(url);
-    if (u.hostname) return u.hostname.replace(/^www\./, '');
-    return url;
-  } catch {
-    return url;
-  }
-}
 
 function WorkspaceSidebar({
   notificationOpen,
@@ -247,48 +245,12 @@ function NotificationPanel({ onClose, workspaceName }: { onClose: () => void; wo
   );
 }
 
-function WorkspaceHeader({
-  workspaceName,
-  browserVisible,
-  splitLayout,
-  onToggleBrowser,
-  onToggleSplit,
-}: {
-  workspaceName: string;
-  browserVisible: boolean;
-  splitLayout: SplitLayout;
-  onToggleBrowser: () => void;
-  onToggleSplit: () => void;
-}) {
+function WorkspaceHeader({ workspaceName }: { workspaceName: string }) {
   return (
-    <header className="flex h-9 min-w-0 items-center justify-between border-b border-stone-800 bg-[#202020] px-3">
+    <header className="flex h-9 min-w-0 items-center border-b border-stone-800 bg-[#202020] px-3">
       <div className="flex min-w-0 items-center gap-2">
         <Folder size={13} className="shrink-0 text-sky-300" />
         <h1 className="truncate text-[13px] font-semibold text-stone-100">{workspaceName} Workspace</h1>
-      </div>
-      <div className="flex shrink-0 items-center gap-2 text-stone-400" aria-label="Right top xmux toolbar">
-        <button
-          type="button"
-          onClick={onToggleBrowser}
-          className={[
-            'flex h-6 w-6 items-center justify-center rounded-sm hover:bg-white/8 hover:text-stone-100',
-            browserVisible ? 'bg-sky-400/15 text-sky-200 ring-1 ring-sky-300/30' : '',
-          ].join(' ')}
-          aria-label="Built-in browser"
-          aria-pressed={browserVisible}
-          title="Built-in browser (Cmd+Shift+L)"
-        >
-          <Globe2 size={13} />
-        </button>
-        <button
-          type="button"
-          onClick={onToggleSplit}
-          className="flex h-6 w-6 items-center justify-center rounded-sm hover:bg-white/8 hover:text-stone-100"
-          aria-label="Split pane layout"
-          title={splitLayout === 'vertical' ? 'Switch to horizontal split' : 'Switch to vertical split'}
-        >
-          <PanelsTopLeft size={14} />
-        </button>
       </div>
     </header>
   );
@@ -303,32 +265,93 @@ function InteropConsole({
   activeWorkspaceId: string;
   onSelectWorkspace: (workspaceId: string) => void;
 }) {
-  const [browserVisible, setBrowserVisible] = useState(true);
   const [notificationOpen, setNotificationOpen] = useState(false);
-  const [splitLayout, setSplitLayout] = useState<SplitLayout>('vertical');
   const [sidebarWidth, setSidebarWidth] = useState(300);
-  const [topAreaPercent, setTopAreaPercent] = useState(72);
-  const [primarySplitPercent, setPrimarySplitPercent] = useState(52);
   const [dragCursor, setDragCursor] = useState<DragCursor>(null);
-  const [browserState, setBrowserState] = useState<Record<string, WorkspaceBrowserState>>({});
+  const [layouts, setLayouts] = useState<Record<string, LayoutNode>>({});
 
-  const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? workspaces[0];
-  const homepageUrl = activeWorkspace?.homepageUrl ?? DEFAULT_HOMEPAGE;
+  const activeWorkspace =
+    workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? workspaces[0];
   const hasPendingAlerts = workspaces.some((workspace) => Boolean(workspace.notification));
+  const workspacesById = useMemo(
+    () => new Map(workspaces.map((workspace) => [workspace.id, workspace])),
+    [workspaces],
+  );
 
   const rootRef = useRef<HTMLElement | null>(null);
-  const stackRef = useRef<HTMLDivElement | null>(null);
-  const primaryRef = useRef<HTMLDivElement | null>(null);
 
+  // Lazily initialise a layout the first time each workspace is shown.
   useEffect(() => {
     if (!activeWorkspace) return;
-    setBrowserState((current) => {
+    setLayouts((current) => {
       if (current[activeWorkspace.id]) return current;
-      return { ...current, [activeWorkspace.id]: seedWorkspaceBrowserState(activeWorkspace.homepageUrl) };
+      return {
+        ...current,
+        [activeWorkspace.id]: createInitialLayout(activeWorkspace.homepageUrl),
+      };
     });
   }, [activeWorkspace]);
 
-  const activeBrowserState = activeWorkspace ? browserState[activeWorkspace.id] : undefined;
+  const activeLayout = activeWorkspace ? layouts[activeWorkspace.id] : undefined;
+
+  const mutateLayout = useCallback(
+    (
+      workspaceId: string,
+      updater: (layout: LayoutNode) => LayoutNode | null,
+    ) => {
+      setLayouts((current) => {
+        const layout = current[workspaceId];
+        if (!layout) return current;
+        const next = updater(layout);
+        if (next === layout) return current;
+        if (next === null) {
+          const homepage =
+            workspacesById.get(workspaceId)?.homepageUrl ?? DEFAULT_HOMEPAGE;
+          return { ...current, [workspaceId]: createInitialLayout(homepage) };
+        }
+        return { ...current, [workspaceId]: next };
+      });
+    },
+    [workspacesById],
+  );
+
+  const handleSplit = useCallback(
+    (blockId: string, direction: SplitDirection) => {
+      if (!activeWorkspace) return;
+      mutateLayout(activeWorkspace.id, (layout) =>
+        splitLeaf(layout, blockId, direction, createBlock()),
+      );
+    },
+    [activeWorkspace, mutateLayout],
+  );
+
+  const handleCloseBlock = useCallback(
+    (blockId: string) => {
+      if (!activeWorkspace) return;
+      mutateLayout(activeWorkspace.id, (layout) => removeBlock(layout, blockId));
+    },
+    [activeWorkspace, mutateLayout],
+  );
+
+  const handleUpdateBlock = useCallback(
+    (blockId: string, updater: (block: Block) => Block) => {
+      if (!activeWorkspace) return;
+      mutateLayout(activeWorkspace.id, (layout) =>
+        updateBlock(layout, blockId, updater),
+      );
+    },
+    [activeWorkspace, mutateLayout],
+  );
+
+  const handleUpdateRatio = useCallback(
+    (splitId: string, ratio: number) => {
+      if (!activeWorkspace) return;
+      mutateLayout(activeWorkspace.id, (layout) =>
+        updateSplitRatio(layout, splitId, ratio),
+      );
+    },
+    [activeWorkspace, mutateLayout],
+  );
 
   const clamp = (value: number, min: number, max: number) =>
     Math.min(Math.max(value, min), max);
@@ -337,17 +360,13 @@ function InteropConsole({
     (onMove: (event: MouseEvent) => void, cursor: 'col-resize' | 'row-resize') => {
       let frameId: number | null = null;
       let latest: MouseEvent | null = null;
-
       const flush = () => {
         frameId = null;
         if (latest) onMove(latest);
       };
-
       const onMouseMove = (event: MouseEvent) => {
         latest = event;
-        if (frameId === null) {
-          frameId = requestAnimationFrame(flush);
-        }
+        if (frameId === null) frameId = requestAnimationFrame(flush);
       };
       const onMouseUp = () => {
         if (frameId !== null) {
@@ -380,143 +399,11 @@ function InteropConsole({
     }, 'col-resize');
   };
 
-  const startTopBottomResize = (event: ReactMouseEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const stack = stackRef.current;
-    if (!stack) return;
-    const rect = stack.getBoundingClientRect();
-    beginDrag((moveEvent) => {
-      const ratio = ((moveEvent.clientY - rect.top) / rect.height) * 100;
-      setTopAreaPercent(clamp(ratio, 35, 85));
-    }, 'row-resize');
-  };
-
-  const startPrimaryResize = (event: ReactMouseEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const primary = primaryRef.current;
-    if (!primary || !browserVisible) return;
-    const rect = primary.getBoundingClientRect();
-    if (splitLayout === 'vertical') {
-      beginDrag((moveEvent) => {
-        const ratio = ((moveEvent.clientX - rect.left) / rect.width) * 100;
-        setPrimarySplitPercent(clamp(ratio, 20, 80));
-      }, 'col-resize');
-      return;
-    }
-    beginDrag((moveEvent) => {
-      const ratio = ((moveEvent.clientY - rect.top) / rect.height) * 100;
-      setPrimarySplitPercent(clamp(ratio, 20, 80));
-    }, 'row-resize');
-  };
-
-  const appendBrowserTab = useCallback(
-    (workspaceId: string, workspaceHomepage: string) => {
-      setBrowserState((current) => {
-        const existing = current[workspaceId] ?? { tabs: [], activeTabId: '' };
-        if (existing.tabs.length >= MAX_BROWSER_TABS_PER_WORKSPACE) return current;
-        const id = `browser-tab-${Date.now()}-${existing.tabs.length + 1}`;
-        const tab: BrowserTab = {
-          id,
-          label: deriveTabLabel(workspaceHomepage),
-          url: workspaceHomepage,
-        };
-        return {
-          ...current,
-          [workspaceId]: {
-            tabs: [...existing.tabs, tab],
-            activeTabId: id,
-          },
-        };
-      });
-    },
-    [],
-  );
-
-  const handleSelectBrowserTab = useCallback(
-    (tabId: string) => {
-      if (!activeWorkspace) return;
-      setBrowserState((current) => {
-        const existing = current[activeWorkspace.id];
-        if (!existing) return current;
-        if (existing.activeTabId === tabId) return current;
-        return {
-          ...current,
-          [activeWorkspace.id]: { ...existing, activeTabId: tabId },
-        };
-      });
-    },
-    [activeWorkspace],
-  );
-
-  const handleCloseBrowserTab = useCallback(
-    (tabId: string) => {
-      if (!activeWorkspace) return;
-      setBrowserState((current) => {
-        const existing = current[activeWorkspace.id];
-        if (!existing || existing.tabs.length <= 1) return current;
-        const next = existing.tabs.filter((tab) => tab.id !== tabId);
-        const nextActive =
-          existing.activeTabId === tabId ? next[0]?.id ?? '' : existing.activeTabId;
-        return {
-          ...current,
-          [activeWorkspace.id]: { tabs: next, activeTabId: nextActive },
-        };
-      });
-    },
-    [activeWorkspace],
-  );
-
-  const handleNavigateBrowserTab = useCallback(
-    (tabId: string, url: string) => {
-      if (!activeWorkspace) return;
-      setBrowserState((current) => {
-        const existing = current[activeWorkspace.id];
-        if (!existing) return current;
-        const tabs = existing.tabs.map((tab) =>
-          tab.id === tabId ? { ...tab, url, label: deriveTabLabel(url) } : tab,
-        );
-        return { ...current, [activeWorkspace.id]: { ...existing, tabs } };
-      });
-    },
-    [activeWorkspace],
-  );
-
-  const openBrowserHomepage = useCallback(() => {
-    if (!activeWorkspace) return;
-    setBrowserVisible(true);
-    appendBrowserTab(activeWorkspace.id, activeWorkspace.homepageUrl);
-  }, [activeWorkspace, appendBrowserTab]);
-
-  const splitRight = useCallback(() => {
-    setBrowserVisible(true);
-    setSplitLayout('vertical');
-  }, []);
-
-  const splitDown = useCallback(() => {
-    setBrowserVisible(true);
-    setSplitLayout('horizontal');
-  }, []);
-
-  const terminalPaneActions: PaneActions = useMemo(
-    () => ({
-      onAddBrowser: openBrowserHomepage,
-      onSplitRight: splitRight,
-      onSplitDown: splitDown,
-    }),
-    [openBrowserHomepage, splitRight, splitDown],
-  );
-
-  const browserPaneActions: PaneActions = useMemo(
-    () => ({
-      onAddBrowser: openBrowserHomepage,
-      onSplitRight: splitRight,
-      onSplitDown: splitDown,
-    }),
-    [openBrowserHomepage, splitRight, splitDown],
-  );
-
   return (
-    <section ref={rootRef} className="flex h-full min-h-0 w-full flex-col overflow-hidden border border-stone-700/80 bg-[#1b1b1b] shadow-2xl lg:flex-row">
+    <section
+      ref={rootRef}
+      className="flex h-full min-h-0 w-full flex-col overflow-hidden border border-stone-700/80 bg-[#1b1b1b] shadow-2xl lg:flex-row"
+    >
       <div className="shrink-0" style={{ width: `min(100%, ${sidebarWidth}px)` }}>
         <WorkspaceSidebar
           notificationOpen={notificationOpen}
@@ -534,73 +421,20 @@ function InteropConsole({
         aria-label="Resize workspace sidebar"
       />
       <div className="flex min-w-0 flex-1 flex-col">
-        <WorkspaceHeader
-          workspaceName={activeWorkspace?.name ?? 'Workspace'}
-          browserVisible={browserVisible}
-          splitLayout={splitLayout}
-          onToggleBrowser={() => setBrowserVisible((value) => !value)}
-          onToggleSplit={() =>
-            setSplitLayout((value) => (value === 'vertical' ? 'horizontal' : 'vertical'))
-          }
-        />
-        <div ref={stackRef} className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-[220px] min-w-0" style={{ height: `${topAreaPercent}%` }}>
-            <div
-              ref={primaryRef}
-              className={splitLayout === 'vertical' ? 'flex h-full min-h-0 min-w-0' : 'flex h-full min-h-0 min-w-0 flex-col'}
-              aria-label={`${splitLayout} split workspace`}
-            >
-              <div
-                className="min-h-0 min-w-[260px]"
-                style={browserVisible ? (splitLayout === 'vertical' ? { width: `${primarySplitPercent}%` } : { height: `${primarySplitPercent}%`, minHeight: 180 }) : undefined}
-              >
-                <TerminalPaneGroup
-                  paneId="terminal-a"
-                  workspaceId={activeWorkspace?.id ?? 'workspace'}
-                  cwd={activeWorkspace?.cwd ?? '/'}
-                  actions={terminalPaneActions}
-                />
-              </div>
-              {browserVisible && activeBrowserState ? (
-                <>
-                  <div
-                    className={[
-                      'shrink-0 bg-stone-900 transition-colors hover:bg-sky-400/60',
-                      splitLayout === 'vertical' ? 'w-1.5 cursor-col-resize' : 'h-1.5 cursor-row-resize',
-                    ].join(' ')}
-                    onMouseDown={startPrimaryResize}
-                    title={splitLayout === 'vertical' ? 'Resize terminal/browser width' : 'Resize terminal/browser height'}
-                    aria-label="Resize terminal browser split"
-                  />
-                  <div className="min-h-0 min-w-0 flex-1">
-                    <BrowserPane
-                      tabs={activeBrowserState.tabs}
-                      activeTabId={activeBrowserState.activeTabId}
-                      homepageUrl={homepageUrl}
-                      onSelectTab={handleSelectBrowserTab}
-                      onCloseTab={handleCloseBrowserTab}
-                      onNavigate={handleNavigateBrowserTab}
-                      actions={browserPaneActions}
-                    />
-                  </div>
-                </>
-              ) : null}
-            </div>
-          </div>
-          <div
-            className="h-1.5 shrink-0 cursor-row-resize bg-stone-900 transition-colors hover:bg-sky-400/60"
-            onMouseDown={startTopBottomResize}
-            title="Resize top and bottom terminals"
-            aria-label="Resize terminal rows"
-          />
-          <div className="min-h-[150px] min-w-0 flex-1">
-            <TerminalPaneGroup
-              paneId="terminal-b"
-              workspaceId={activeWorkspace?.id ?? 'workspace'}
-              cwd={activeWorkspace?.cwd ?? '/'}
-              actions={terminalPaneActions}
+        <WorkspaceHeader workspaceName={activeWorkspace?.name ?? 'Workspace'} />
+        <div className="flex min-h-0 flex-1 flex-col">
+          {activeWorkspace && activeLayout ? (
+            <LayoutRenderer
+              node={activeLayout}
+              workspaceId={activeWorkspace.id}
+              cwd={activeWorkspace.cwd}
+              homepageUrl={activeWorkspace.homepageUrl}
+              onUpdateBlock={handleUpdateBlock}
+              onCloseBlock={handleCloseBlock}
+              onSplit={handleSplit}
+              onUpdateRatio={handleUpdateRatio}
             />
-          </div>
+          ) : null}
         </div>
       </div>
       {notificationOpen ? (

@@ -1,12 +1,14 @@
 'use client';
 
-import { Bot, ChevronDown, Search, Zap } from 'lucide-react';
+import { Bot, ChevronDown, HelpCircle, Search, Zap } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTheme, THEMES } from '../../lib/hooks/useTheme';
 import { useI18n } from '../../lib/i18n';
 import { ViewId } from '../../lib/types';
 import type { ChatContext } from '../../lib/chat/types';
 import { ChatPanel } from '../../components/chat/ChatPanel';
+import { openExternalUrl } from '../../lib/bridge';
+import { docsUrlForView } from '../../lib/docsRegistry';
 
 const VIEW_LABELS: Record<ViewId, string> = {
   dashboard:           'Project Progress Dashboard',
@@ -145,6 +147,9 @@ export function TopBar({ currentView, activeRunCount, searchValue = '', onSearch
           </div>
         )}
 
+        {/* ── Page help (opens docs in external browser) ─────────────────── */}
+        <DocsHelpButton view={currentView} />
+
         {/* ── AI Assistant toggle ────────────────────────────────────────── */}
         <button
           id="chat-toggle-btn"
@@ -262,5 +267,38 @@ export function TopBar({ currentView, activeRunCount, searchValue = '', onSearch
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Docs help button ────────────────────────────────────────────────────────
+//
+// Opens the current view's documentation page in the user's system browser.
+// Tauri: routes through tauri-plugin-shell `open` (scope-gated). Web preview:
+// falls back to window.open. Disabled if no docs URL is mapped for this view.
+
+function DocsHelpButton({ view }: { view: ViewId }) {
+  const url = docsUrlForView(view);
+  const enabled = url !== null;
+  const handleClick = useCallback(() => {
+    if (!url) return;
+    openExternalUrl(url).catch((err) => {
+      // Surface failures (e.g. capability-scope rejection) loudly rather
+      // than silently — debugging a missing scope entry is otherwise opaque.
+      console.error('[TopBar] openExternalUrl failed', err);
+    });
+  }, [url]);
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={!enabled}
+      aria-label={enabled ? 'Open documentation for this page' : 'No documentation available for this page'}
+      title={enabled ? `Open page docs: ${url}` : 'Documentation coming soon'}
+      className="flex items-center gap-1.5 border border-stone-200/15 px-2 py-1.5 hover:bg-white/5 transition-colors disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+    >
+      <HelpCircle size={13} className="text-stone-400" />
+      <span className="hidden text-[9px] font-medium uppercase tracking-[0.1em] text-stone-300/70 sm:inline">Help</span>
+    </button>
   );
 }

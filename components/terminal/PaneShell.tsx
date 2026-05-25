@@ -1,9 +1,15 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Globe2, PanelBottom, PanelRight, SquareTerminal } from 'lucide-react';
+import {
+  FolderTree,
+  Globe2,
+  PanelBottom,
+  PanelRight,
+  SquareTerminal,
+} from 'lucide-react';
 
-export type PaneTabType = 'terminal' | 'browser';
+export type PaneTabType = 'terminal' | 'browser' | 'folder';
 
 export interface PaneShellTab {
   id: string;
@@ -15,6 +21,7 @@ export interface PaneShellTab {
 export interface PaneActions {
   onAddTerminal?: () => void;
   onAddBrowser?: () => void;
+  onAddFolder?: () => void;
   onSplitRight?: () => void;
   onSplitDown?: () => void;
 }
@@ -36,7 +43,12 @@ export function PaneShell({
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex h-8 min-w-0 items-center overflow-hidden border-b border-stone-800/90 bg-[#202020]">
         {tabs.map((tab) => {
-          const Icon = tab.type === 'browser' ? Globe2 : SquareTerminal;
+          const Icon =
+            tab.type === 'browser'
+              ? Globe2
+              : tab.type === 'folder'
+                ? FolderTree
+                : SquareTerminal;
           return (
             <div
               key={tab.id}
@@ -54,12 +66,13 @@ export function PaneShell({
                 <Icon size={11} className="shrink-0" />
                 <span className="truncate">{tab.label}</span>
               </button>
-              {tabs.length > 1 && onCloseTab ? (
+              {onCloseTab ? (
                 <button
                   type="button"
                   onClick={() => onCloseTab(tab.id)}
                   className="shrink-0 px-1.5 text-stone-500 hover:bg-white/10 hover:text-stone-200"
                   aria-label={`Close ${tab.label}`}
+                  title={tabs.length === 1 ? 'Close (also closes this block)' : `Close ${tab.label}`}
                 >
                   ×
                 </button>
@@ -88,6 +101,12 @@ export function PaneActionToolbar({ actions }: { actions: PaneActions }) {
         title="New browser tab (workspace homepage)"
         ariaLabel="New browser tab"
         icon={<Globe2 size={11} />}
+      />
+      <ActionButton
+        onClick={actions.onAddFolder}
+        title="New folder tab (project root)"
+        ariaLabel="New folder tab"
+        icon={<FolderTree size={11} />}
       />
       <ActionButton
         onClick={actions.onSplitRight}
