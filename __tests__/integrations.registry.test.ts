@@ -20,13 +20,13 @@ describe('integration registry runtime metadata', () => {
     );
   });
 
-  it('describes Monaco as a project-scoped frontend editor plugin', () => {
-    const monaco = registryFor('monaco-editor');
+  it('describes IDE Bridge as a project-scoped frontend bridge plugin', () => {
+    const ideBridge = registryFor('ide-bridge');
 
-    expect(monaco.company).toBe('Microsoft');
-    expect(monaco.category1).toBe('Frontend Plugin');
-    expect(monaco.scope).toBe('project');
-    expect(monaco.githubUrl).toBe('https://github.com/microsoft/monaco-editor');
-    expect(monaco.installPathHint).toBe('app/ui/views/MonacoEditorWorkbench.tsx');
+    expect(ideBridge.company).toBe('Project Manager');
+    expect(ideBridge.category1).toBe('Frontend Plugin');
+    expect(ideBridge.category2).toBe('Native IDE Bridge');
+    expect(ideBridge.scope).toBe('project');
+    expect(ideBridge.installPathHint).toBe('app/ui/views/IdeBridgeView.tsx');
   });
 });

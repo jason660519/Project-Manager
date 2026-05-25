@@ -38,16 +38,15 @@ export const INTEGRATION_REGISTRY: Record<string, IntegrationRegistryEntry> = {
 
   'claude-code': { company: 'Anthropic', category1: 'Coding Editor/Orchestrator', category2: 'CLI', scope: 'user' },
   codex: { company: 'OpenAI', category1: 'Coding Editor/Orchestrator', category2: 'CLI', scope: 'user' },
-  'monaco-editor': {
-    company: 'Microsoft',
+  'ide-bridge': {
+    company: 'Project Manager',
     category1: 'Frontend Plugin',
-    category2: 'Code Editor',
-    license: 'MIT',
+    category2: 'Native IDE Bridge',
+    license: 'Internal bridge; third-party IDE licenses remain external',
     scope: 'project',
-    installPathHint: 'app/ui/views/MonacoEditorWorkbench.tsx',
-    githubUrl: 'https://github.com/microsoft/monaco-editor',
+    installPathHint: 'app/ui/views/IdeBridgeView.tsx',
     runtime: {
-      sourcePath: 'node_modules/@monaco-editor/react',
+      sourcePath: 'app/ui/views/IdeBridgeView.tsx',
       docsPath: '.project-manager/features/F25/feature-spec.md',
     },
   },

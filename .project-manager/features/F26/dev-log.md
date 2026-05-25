@@ -92,3 +92,75 @@ npm run build       # passes (no changes yet)
 | `.project-manager/features/F26/feature-spec.md` | Created |
 | `.project-manager/features/F26/tdd-spec.md` | Created |
 | `.project-manager/features/F26/dev-log.md` | Created (this file) |
+
+---
+
+## 2026-05-25 — Session 2: Core Implementation
+
+### What was done
+
+1. **Type extension** (`lib/types/index.ts`):
+   - Added `HarnessRoleStatus = 'idle' | 'running' | 'done' | 'error'` type.
+   - Extended `FeatureHarnessAssignment` with `activePid?: number` and `status?: HarnessRoleStatus`.
+
+2. **Created `RoleConfigPanel`** (`components/table/RoleConfigPanel.tsx`, ~380 lines):
+   - Extracted per-role configuration form from TaskDispatchModal.
+   - Contains: engineer role selector, adapter/target selector (grouped by IDE/CLI/App), model preview, prompt template picker + textarea, workflow selector, advanced auto-loop options, MCP injection preview, scope warning.
+   - Exports `RoleConfigState` interface and `initialRoleConfigState()` helper for state initialization from `feature.harnessAssignments[role]`.
+   - Re-exports shared helpers (`adapterToIDE`, `resolvePath`, `IDE_IDS`) for TaskDispatchModal dispatch logic.
+
+3. **Rewrote `TaskDispatchModal`** (`components/table/TaskDispatchModal.tsx`, ~370 lines — down from ~1550):
+   - **Three-sheet layout**: Uses `BottomSheetTabs` with P/W/E tabs at the bottom of the config area.
+   - **Three independent `RoleConfigState` bundles**: `plannerConfig`, `workerConfig`, `evaluatorConfig` — each with its own engineer, adapter, prompt, workflow, auto-loop settings.
+   - **Batch dispatch**: "Dispatch All" button dispatches all configured roles concurrently via `Promise.allSettled`. Skips roles with no adapter selected, shows skip count.
+   - **Per-role dispatch**: "Dispatch P/W/E" button dispatches only the active tab's role.
+   - **Unified log panel**: Merged `LogEntry[]` with role tags `[P]`, `[W]`, `[E]` in distinct colors (stone/cyan/amber). Process exit events shown as separator lines.
+   - **Per-role run state**: `RoleRunState { phase, activePid }` tracked per role. Tab badges show `●`(pending spin), `●`(running pulse), `✓`(done), `✗`(error).
+   - **Kill support**: Per-role kill from footer with confirmation dialog.
+   - **Open in Terminal**: Available for agent-cli adapters on the active tab.
+   - **Harness assignment persistence**: On dispatch, updates `feature.harnessAssignments[role]` with `activePid` and `status`. On exit, clears `activePid` and sets `status` to `done`/`error`.
+
+4. **Updated P/W/E chips** (`app/project-progress-dashboard/_lib/columns.tsx`):
+   - Created `PWEChip` component with four visual states:
+     - **Idle**: current grey/cyan/amber styling, letter + name.
+     - **Running**: emerald border/bg, pulsing green dot + name.
+     - **Done**: emerald check mark + name.
+     - **Error**: red cross + name.
+   - `resolveRoleStatus()` checks `feature.harnessAssignments[role].activePid` against `activeRuns[]` for real-time running detection.
+   - Added `activeRuns?: ActiveRun[]` to `ColumnHandlers` interface.
+
+5. **Threaded `activeRuns` through the data flow**:
+   - `PhaseTabContent` accepts new `activeRuns` prop.
+   - `ProjectProgressClient` passes `activeRuns` to `PhaseTabContent`.
+   - `PhaseTabContent` forwards to `handlers` object used by column renderers.
+
+### Verification
+
+```bash
+npm run typecheck   # ✅ 0 errors
+npm run build       # ✅ Static export successful
+```
+
+### Architecture notes
+
+- **TaskDispatchModal went from ~1550 → ~370 lines** by extracting RoleConfigPanel. The modal now focuses on orchestration (state management, dispatch logic, log merging, sheet tabs) while the panel handles per-role UI.
+- **Running state lives in two places**: `FeatureHarnessAssignment.activePid/status` (persisted in config, used by chips) and `MainClient.activeRuns[]` (ephemeral, used for ops panel). The chip renderer cross-references both to handle the case where `activePid` is stale (process died without cleanup).
+- **Log entries are typed** as `LogEntry { role, line }` — this makes role-based filtering straightforward if a per-role log view is desired later.
+
+### Files changed
+
+| File | Change |
+|---|---|
+| `lib/types/index.ts` | Added `HarnessRoleStatus`, extended `FeatureHarnessAssignment` |
+| `components/table/RoleConfigPanel.tsx` | **NEW** — extracted per-role config form |
+| `components/table/TaskDispatchModal.tsx` | **REWRITE** — three-sheet layout, batch dispatch, unified log |
+| `app/project-progress-dashboard/_lib/columns.tsx` | PWEChip component, running-state indicators, `activeRuns` in handlers |
+| `app/project-progress-dashboard/_components/PhaseTabContent.tsx` | Accept + forward `activeRuns` prop |
+| `app/project-progress-dashboard/ProjectProgressClient.tsx` | Pass `activeRuns` to PhaseTabContent |
+
+### What remains
+
+- [ ] Write unit/integration tests per TDD spec (T-1 through T-10).
+- [ ] Manual UI verification: open dispatch modal, switch tabs, dispatch individual + batch, verify chip state changes.
+- [ ] Consider log line cap (~500 lines) for long-running concurrent agents.
+- [ ] Consider adding a "Dispatch All" count badge to show how many roles will fire.

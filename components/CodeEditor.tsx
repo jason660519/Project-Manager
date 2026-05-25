@@ -4,15 +4,19 @@ import Editor, { DiffEditor, type OnMount, type DiffOnMount } from '@monaco-edit
 import type { editor } from 'monaco-editor';
 import {
   ArrowDown,
-  ArrowUp,
   Code2,
   ExternalLink,
   FileText,
+  ListTree,
   Loader2,
   Maximize2,
   Minimize2,
+  PanelRight,
   Save,
+  Search,
   SplitSquareVertical,
+  TerminalSquare,
+  WrapText,
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -223,12 +227,18 @@ export function CodeEditor({
 
   const [activeIndex, setActiveIndex] = useState(0);
   const [contents, setContents] = useState<Record<number, string>>({});
+  const [baselineContents, setBaselineContents] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadErrors, setLoadErrors] = useState<Record<number, string>>({});
   const [saveError, setSaveError] = useState('');
+  const [externalError, setExternalError] = useState('');
   const [expanded, setExpanded] = useState(false);
   const [dirty, setDirty] = useState<Record<number, boolean>>({});
+  const [markerCounts, setMarkerCounts] = useState<Record<number, number>>({});
+  const [cursorPosition, setCursorPosition] = useState({ lineNumber: 1, column: 1 });
+  const [minimapEnabled, setMinimapEnabled] = useState(true);
+  const [wordWrapEnabled, setWordWrapEnabled] = useState(true);
   const [showGoToLine, setShowGoToLine] = useState(false);
   const [viewMode, setViewMode] = useState<'edit' | 'diff'>(
     diff ? 'diff' : 'edit',
@@ -239,6 +249,9 @@ export function CodeEditor({
   const activeLang = activeFile ? detectLanguage(activeFile.path, activeFile.language) : 'plaintext';
   const isDirty = activeFile && dirty[activeIndex];
   const activeLoadError = loadErrors[activeIndex];
+  const activeValidationProblems = markerCounts[activeIndex] ?? 0;
+  const activeOperationalProblems = activeLoadError || saveError || externalError ? 1 : 0;
+  const activeProblemCount = activeValidationProblems + activeOperationalProblems;
 
   // ── Load file content ─────────────────────────────────────────────────────
 
@@ -265,8 +278,12 @@ export function CodeEditor({
       }
       if (!cancelled) {
         setContents(loaded);
+        setBaselineContents(loaded);
         setLoadErrors(errors);
         setSaveError('');
+        setExternalError('');
+        setDirty({});
+        setMarkerCounts({});
         setLoading(false);
       }
     }
@@ -285,6 +302,11 @@ export function CodeEditor({
       monaco.editor.defineTheme('pm-dark', PM_DARK_THEME);
       monaco.editor.setTheme('pm-dark');
 
+      setCursorPosition(editor.getPosition() ?? { lineNumber: 1, column: 1 });
+      editor.onDidChangeCursorPosition((event) => {
+        setCursorPosition(event.position);
+      });
+
       // Cmd+S save
       editor.addAction({
         id: 'pm-save',
@@ -299,6 +321,13 @@ export function CodeEditor({
         label: 'Go to Line',
         keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyG],
         run: () => setShowGoToLine((v) => !v),
+      });
+
+      editor.addAction({
+        id: 'pm-diff-saved',
+        label: 'Compare Working File with Saved Version',
+        keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyD],
+        run: () => setViewMode((v) => (v === 'diff' ? 'edit' : 'diff')),
       });
 
       // Jump to initial line if specified
@@ -318,12 +347,37 @@ export function CodeEditor({
     monaco.editor.setTheme('pm-dark');
   }, []);
 
+  const syncOperationalMarkers = useCallback(() => {
+    const monaco = monacoRef.current;
+    const editor = editorRef.current;
+    const model = editor?.getModel();
+    if (!monaco || !model) return;
+    const markers: editor.IMarkerData[] = [];
+    const message = saveError || activeLoadError || externalError;
+    if (message) {
+      markers.push({
+        severity: monaco.MarkerSeverity.Error,
+        message,
+        startLineNumber: 1,
+        startColumn: 1,
+        endLineNumber: 1,
+        endColumn: 1,
+      });
+    }
+    monaco.editor.setModelMarkers(model, 'project-manager', markers);
+  }, [activeLoadError, externalError, saveError]);
+
+  useEffect(() => {
+    syncOperationalMarkers();
+  }, [syncOperationalMarkers]);
+
   // ── Track dirty state ─────────────────────────────────────────────────────
 
   const handleChange = useCallback(
     (value: string | undefined) => {
       if (value === undefined) return;
       setSaveError('');
+      setExternalError('');
       setContents((prev) => ({ ...prev, [activeIndex]: value }));
       setDirty((prev) => ({ ...prev, [activeIndex]: true }));
     },
@@ -339,6 +393,7 @@ export function CodeEditor({
     try {
       await writeFile(activeFile.path, contents[activeIndex]);
       setDirty((prev) => ({ ...prev, [activeIndex]: false }));
+      setBaselineContents((prev) => ({ ...prev, [activeIndex]: contents[activeIndex] }));
       onSave?.(activeFile.path);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -373,10 +428,36 @@ export function CodeEditor({
         }
         return remapped;
       });
+      setBaselineContents((prev) => {
+        const next = { ...prev };
+        delete next[index];
+        const remapped: Record<number, string> = {};
+        let newIdx = 0;
+        for (const [k, v] of Object.entries(next)) {
+          const oldIdx = parseInt(k, 10);
+          if (oldIdx !== index) {
+            remapped[newIdx++] = v;
+          }
+        }
+        return remapped;
+      });
       setDirty((prev) => {
         const next = { ...prev };
         delete next[index];
         const remapped: Record<number, boolean> = {};
+        let newIdx = 0;
+        for (const [k, v] of Object.entries(next)) {
+          const oldIdx = parseInt(k, 10);
+          if (oldIdx !== index) {
+            remapped[newIdx++] = v;
+          }
+        }
+        return remapped;
+      });
+      setMarkerCounts((prev) => {
+        const next = { ...prev };
+        delete next[index];
+        const remapped: Record<number, number> = {};
         let newIdx = 0;
         for (const [k, v] of Object.entries(next)) {
           const oldIdx = parseInt(k, 10);
@@ -397,16 +478,24 @@ export function CodeEditor({
 
   const handleOpenExternal = useCallback(async () => {
     if (!activeFile) return;
+    setExternalError('');
     const editors = [preferredEditor, 'codium', 'code'];
+    const failures: string[] = [];
     for (const editor of editors) {
       try {
         await openInEditor({ editor, path: activeFile.path });
         return;
-      } catch {
+      } catch (err: unknown) {
+        failures.push(err instanceof Error ? err.message : String(err));
         continue;
       }
     }
+    setExternalError(`Unable to open ${activeFile.path} in an external editor: ${failures.join('; ')}`);
   }, [activeFile, preferredEditor]);
+
+  const runEditorAction = useCallback((actionId: string) => {
+    editorRef.current?.getAction(actionId)?.run();
+  }, []);
 
   // ── Global keyboard shortcuts ─────────────────────────────────────────────
 
@@ -440,9 +529,15 @@ export function CodeEditor({
 
   // ── Diff view ─────────────────────────────────────────────────────────────
 
-  if (diff && !showGoToLine) {
-    const originalLang = detectLanguage(diff.original.path, diff.original.language);
-    const modifiedLang = detectLanguage(diff.modified.path, diff.modified.language);
+  if (isDiff && !showGoToLine && (diff || activeFile)) {
+    const diffOriginal = diff?.original ?? activeFile;
+    const diffModified = diff?.modified ?? activeFile;
+    const originalLang = diffOriginal ? detectLanguage(diffOriginal.path, diffOriginal.language) : activeLang;
+    const modifiedLang = diffModified ? detectLanguage(diffModified.path, diffModified.language) : activeLang;
+    const originalValue =
+      diff?.original.content ?? baselineContents[activeIndex] ?? contents[activeIndex] ?? '';
+    const modifiedValue = diff?.modified.content ?? contents[activeIndex] ?? '';
+    const diffLabel = diff?.label ?? (activeFile ? `${displayName(activeFile)}: saved ↔ working` : 'Saved ↔ Working');
 
     return (
       <div className={containerClass}>
@@ -452,7 +547,7 @@ export function CodeEditor({
           <div className="flex items-center gap-2 px-4 py-2 border-b border-[#21262d] shrink-0">
             <SplitSquareVertical className="w-4 h-4 text-[#d29922]" />
             <span className="text-xs font-semibold text-[#8b949e] tracking-wider uppercase">
-              Diff: {diff.label ?? `${displayName(diff.original)} ↔ ${displayName(diff.modified)}`}
+              Diff: {diffLabel}
             </span>
             <div className="flex-1" />
             <button
@@ -479,10 +574,12 @@ export function CodeEditor({
           <div className="flex-1 min-h-0">
             <DiffEditor
               height="100%"
-              original={diff.original.content ?? `// Loading: ${diff.original.path}`}
-              modified={diff.modified.content ?? `// Loading: ${diff.modified.path}`}
+              original={originalValue}
+              modified={modifiedValue}
               language={modifiedLang}
               originalLanguage={originalLang}
+              modifiedLanguage={modifiedLang}
+              theme="pm-dark"
               onMount={handleDiffMount}
               loading={
                 <div className="flex items-center justify-center h-full text-[#8b949e]">
@@ -498,6 +595,8 @@ export function CodeEditor({
                 scrollBeyondLastLine: false,
                 wordWrap: 'on',
                 renderSideBySide: true,
+                originalEditable: false,
+                readOnly: true,
                 smoothScrolling: true,
                 padding: { top: 8 },
                 overviewRulerBorder: false,
@@ -511,8 +610,8 @@ export function CodeEditor({
             <span className="uppercase">{modifiedLang}</span>
             <span className="text-[#d29922]">Diff View</span>
             <div className="flex-1" />
-            <span className="text-[#3fb950]">+ {displayName(diff.modified)}</span>
-            <span className="text-[#f85149]">− {displayName(diff.original)}</span>
+            <span className="text-[#3fb950]">+ {diffModified ? displayName(diffModified) : 'working'}</span>
+            <span className="text-[#f85149]">− {diffOriginal ? displayName(diffOriginal) : 'saved'}</span>
           </div>
         </div>
       </div>
@@ -582,6 +681,43 @@ export function CodeEditor({
             {loading && <Loader2 className="w-4 h-4 text-[#8b949e] animate-spin" />}
 
             <button
+              onClick={() => runEditorAction('editor.action.quickCommand')}
+              title="Command Palette (F1)"
+              className="flex items-center gap-1 px-2 py-1 text-xs rounded hover:bg-[#1f2937] text-[#8b949e] hover:text-[#c9d1d9]"
+            >
+              <TerminalSquare className="w-3.5 h-3.5" />
+              Command
+            </button>
+
+            <button
+              onClick={() => runEditorAction('actions.find')}
+              title="Find in file"
+              className="flex items-center gap-1 px-2 py-1 text-xs rounded hover:bg-[#1f2937] text-[#8b949e] hover:text-[#c9d1d9]"
+            >
+              <Search className="w-3.5 h-3.5" />
+              Find
+            </button>
+
+            <button
+              onClick={() => runEditorAction('editor.action.quickOutline')}
+              title="Open symbol outline"
+              className="flex items-center gap-1 px-2 py-1 text-xs rounded hover:bg-[#1f2937] text-[#8b949e] hover:text-[#c9d1d9]"
+            >
+              <ListTree className="w-3.5 h-3.5" />
+              Outline
+            </button>
+
+            <button
+              onClick={() => setViewMode((v) => (v === 'diff' ? 'edit' : 'diff'))}
+              disabled={!activeFile || loading}
+              title="Compare saved version with current working contents (⇧⌘D)"
+              className="flex items-center gap-1 px-2 py-1 text-xs rounded hover:bg-[#1f2937] text-[#8b949e] hover:text-[#c9d1d9] disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <SplitSquareVertical className="w-3.5 h-3.5" />
+              Diff
+            </button>
+
+            <button
               onClick={handleSave}
               disabled={saving || !isDirty}
               title={`${t.codeEditor.saveShortcut} · Cmd+G go to line · Shift+Cmd+D toggle diff`}
@@ -602,6 +738,24 @@ export function CodeEditor({
             >
               <ArrowDown className="w-3.5 h-3.5" />
               Line
+            </button>
+
+            <button
+              onClick={() => setWordWrapEnabled((value) => !value)}
+              title="Toggle word wrap"
+              className="flex items-center gap-1 px-2 py-1 text-xs rounded hover:bg-[#1f2937] text-[#8b949e] hover:text-[#c9d1d9]"
+            >
+              <WrapText className="w-3.5 h-3.5" />
+              {wordWrapEnabled ? 'Wrap' : 'No wrap'}
+            </button>
+
+            <button
+              onClick={() => setMinimapEnabled((value) => !value)}
+              title="Toggle minimap"
+              className="flex items-center gap-1 px-2 py-1 text-xs rounded hover:bg-[#1f2937] text-[#8b949e] hover:text-[#c9d1d9]"
+            >
+              <PanelRight className="w-3.5 h-3.5" />
+              Minimap
             </button>
 
             <button
@@ -633,9 +787,9 @@ export function CodeEditor({
           </div>
         </div>
 
-        {(activeLoadError || saveError) && (
+        {(activeLoadError || saveError || externalError) && (
           <div className="border-b border-[#3a2a14] bg-[#2b2113] px-4 py-2 text-xs text-[#f0c36a]">
-            {saveError || activeLoadError}
+            {saveError || activeLoadError || externalError}
           </div>
         )}
 
@@ -649,10 +803,17 @@ export function CodeEditor({
           ) : (
             <Editor
               height="100%"
+              path={activeFile?.path}
               language={activeLang}
+              defaultLanguage={activeLang}
               value={contents[activeIndex] ?? ''}
+              saveViewState
+              theme="pm-dark"
               onChange={handleChange}
               onMount={handleMount}
+              onValidate={(markers: editor.IMarker[]) => {
+                setMarkerCounts((prev) => ({ ...prev, [activeIndex]: markers.length }));
+              }}
               loading={
                 <div className="flex items-center justify-center h-full text-[#8b949e]">
                   <Loader2 className="w-5 h-5 animate-spin mr-2" />
@@ -663,11 +824,17 @@ export function CodeEditor({
                 fontSize: 13,
                 fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace",
                 lineNumbers: 'on',
-                minimap: { enabled: false },
+                minimap: { enabled: minimapEnabled },
                 scrollBeyondLastLine: false,
-                wordWrap: 'on',
+                wordWrap: wordWrapEnabled ? 'on' : 'off',
                 tabSize: 2,
                 insertSpaces: true,
+                quickSuggestions: true,
+                suggestOnTriggerCharacters: true,
+                parameterHints: { enabled: true },
+                folding: true,
+                links: true,
+                automaticLayout: true,
                 renderWhitespace: 'selection',
                 bracketPairColorization: { enabled: true },
                 guides: {
@@ -693,6 +860,12 @@ export function CodeEditor({
           <span className="uppercase">{activeLang}</span>
           <span>UTF-8</span>
           <span>LF</span>
+          <span className="tabular-nums">
+            Ln {cursorPosition.lineNumber}, Col {cursorPosition.column}
+          </span>
+          <span className={activeProblemCount > 0 ? 'text-[#f0c36a]' : 'text-[#3fb950]'}>
+            Problems {activeProblemCount}
+          </span>
           <span className="tabular-nums">{activeFile?.path ?? '—'}</span>
           <div className="flex-1" />
           {files.length > 1 && (

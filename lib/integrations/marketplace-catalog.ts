@@ -53,9 +53,9 @@ export const MARKETPLACE: MarketplacePlugin[] = [
     defaultCli: { command: 'codex', argsTemplate: ['exec', '--cwd', '{root}', '{prompt}'], providerId: 'openai' },
   },
   {
-    id: 'monaco-editor', name: 'Monaco Editor Workbench', description: 'Project-scoped frontend editor plugin for editing feature specs, tests, logs, and implementation files inside Project Manager.',
-    category: 'dev', kind: 'frontend', accentColor: 'bg-[rgb(0_122_204)]', initials: 'ME',
-    defaultFrontend: { packageName: '@monaco-editor/react', implementationPath: 'app/ui/views/MonacoEditorWorkbench.tsx' },
+    id: 'ide-bridge', name: 'IDE Bridge', description: 'Project-scoped frontend bridge for launching user-installed desktop IDEs with the selected project or file path.',
+    category: 'dev', kind: 'frontend', accentColor: 'bg-[rgb(0_122_204)]', initials: 'IB',
+    defaultFrontend: { packageName: 'internal-tauri-ide-bridge', implementationPath: 'app/ui/views/IdeBridgeView.tsx' },
   },
   {
     id: 'hermes-agent', name: 'Hermes Agent CLI', description: 'Project-scoped Hermes agent CLI with isolated memory, sessions, skills, and dashboard state.',

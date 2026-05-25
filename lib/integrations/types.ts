@@ -2,6 +2,7 @@
 
 export const INTEGRATION_SHEETS = [
   'plugins',
+  'coding-tools',
   'mcp',
   'skills',
   'channels',

@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Bot, Eye, EyeOff, FileText, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import type {
-  DeployStatus, EngineerRole, Feature, FeaturePhase, FeatureStatus, TestStatus,
+  ActiveRun, DeployStatus, EngineerRole, Feature, FeaturePhase, FeatureStatus,
+  HarnessRoleStatus, HarnessTaskRole, TestStatus,
 } from '../../../lib/types';
 import type { CustomProjectProgressRow } from '../types';
 import type { PhaseRow } from './phaseRows';
@@ -21,6 +22,7 @@ export interface ColumnDef {
 export interface ColumnHandlers {
   projectRoot: string;
   engineerRoles?: EngineerRole[];
+  activeRuns?: ActiveRun[];
   hiddenRowKeysSet: Set<string>;
   onToggleHideRow: (rowKey: string) => void;
   onDeleteCustomRow: (rowId: string) => void;
@@ -340,6 +342,84 @@ function commonIdNameCols(phase: FeaturePhase, projectNameLabel = 'Project Name'
   return cols;
 }
 
+function resolveRoleStatus(
+  role: HarnessTaskRole,
+  feature: Feature | undefined,
+  activeRuns: ActiveRun[] | undefined,
+): HarnessRoleStatus {
+  const assignment = feature?.harnessAssignments?.[role];
+  if (!assignment) return 'idle';
+  if (assignment.activePid != null && activeRuns?.some((r) => r.pid === assignment.activePid)) {
+    return 'running';
+  }
+  return assignment.status ?? 'idle';
+}
+
+const PWE_IDLE_STYLE: Record<HarnessTaskRole, string> = {
+  planner: 'border-stone-200/15 bg-stone-500/10 text-stone-200',
+  worker: 'border-stone-200/15 bg-cyan-500/10 text-cyan-100',
+  evaluator: 'border-stone-200/15 bg-amber-500/10 text-amber-100',
+};
+
+const PWE_LETTER_STYLE: Record<HarnessTaskRole, string> = {
+  planner: 'text-stone-400',
+  worker: 'text-cyan-200/80',
+  evaluator: 'text-amber-200/80',
+};
+
+const PWE_SHORT: Record<HarnessTaskRole, string> = { planner: 'P', worker: 'W', evaluator: 'E' };
+
+function PWEChip({
+  role, name, status,
+}: {
+  role: HarnessTaskRole;
+  name: string;
+  status: HarnessRoleStatus;
+}) {
+  if (status === 'running') {
+    return (
+      <span
+        className="inline-flex h-6 items-center gap-1 rounded border border-emerald-300/30 bg-emerald-500/15 px-1.5 text-[10px] leading-none text-emerald-100"
+        title={`${role}: ${name} (running)`}
+      >
+        <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+        <span className="max-w-[90px] truncate">{name}</span>
+      </span>
+    );
+  }
+  if (status === 'done') {
+    return (
+      <span
+        className="inline-flex h-6 items-center gap-1 rounded border border-emerald-200/20 bg-emerald-500/10 px-1.5 text-[10px] leading-none text-emerald-200"
+        title={`${role}: ${name} (done)`}
+      >
+        <span className="text-[10px] text-emerald-300">✓</span>
+        <span className="max-w-[90px] truncate">{name}</span>
+      </span>
+    );
+  }
+  if (status === 'error') {
+    return (
+      <span
+        className="inline-flex h-6 items-center gap-1 rounded border border-red-400/25 bg-red-500/12 px-1.5 text-[10px] leading-none text-red-200"
+        title={`${role}: ${name} (error)`}
+      >
+        <span className="text-[10px] text-red-300">✗</span>
+        <span className="max-w-[90px] truncate">{name}</span>
+      </span>
+    );
+  }
+  return (
+    <span
+      className={clsx('inline-flex h-6 items-center gap-1 rounded border px-1.5 text-[10px] leading-none', PWE_IDLE_STYLE[role])}
+      title={`${role}: ${name}`}
+    >
+      <span className={clsx('font-mono text-[10px]', PWE_LETTER_STYLE[role])}>{PWE_SHORT[role]}</span>
+      <span className="max-w-[90px] truncate">{name}</span>
+    </span>
+  );
+}
+
 function actionsCol(): ColumnDef {
   return {
     id: 'actions',
@@ -362,27 +442,21 @@ function actionsCol(): ColumnDef {
         <div className="flex items-center gap-1">
           {row.source === 'feature' && (
             <div className="mr-1 flex items-center gap-1">
-              <span
-                className="inline-flex h-6 items-center gap-1 rounded border border-stone-200/15 bg-stone-500/10 px-1.5 text-[10px] leading-none text-stone-200"
-                title={`Planner: ${resolveEngineerName(plannerRoleId)}`}
-              >
-                <span className="font-mono text-[10px] text-stone-400">P</span>
-                <span className="max-w-[90px] truncate">{resolveEngineerName(plannerRoleId)}</span>
-              </span>
-              <span
-                className="inline-flex h-6 items-center gap-1 rounded border border-stone-200/15 bg-cyan-500/10 px-1.5 text-[10px] leading-none text-cyan-100"
-                title={`Worker: ${resolveEngineerName(workerRoleId)}`}
-              >
-                <span className="font-mono text-[10px] text-cyan-200/80">W</span>
-                <span className="max-w-[90px] truncate">{resolveEngineerName(workerRoleId)}</span>
-              </span>
-              <span
-                className="inline-flex h-6 items-center gap-1 rounded border border-stone-200/15 bg-amber-500/10 px-1.5 text-[10px] leading-none text-amber-100"
-                title={`Evaluator: ${resolveEngineerName(evaluatorRoleId)}`}
-              >
-                <span className="font-mono text-[10px] text-amber-200/80">E</span>
-                <span className="max-w-[90px] truncate">{resolveEngineerName(evaluatorRoleId)}</span>
-              </span>
+              <PWEChip
+                role="planner"
+                name={resolveEngineerName(plannerRoleId)}
+                status={resolveRoleStatus('planner', row.feature, h.activeRuns)}
+              />
+              <PWEChip
+                role="worker"
+                name={resolveEngineerName(workerRoleId)}
+                status={resolveRoleStatus('worker', row.feature, h.activeRuns)}
+              />
+              <PWEChip
+                role="evaluator"
+                name={resolveEngineerName(evaluatorRoleId)}
+                status={resolveRoleStatus('evaluator', row.feature, h.activeRuns)}
+              />
             </div>
           )}
           {row.source === 'custom' && (
