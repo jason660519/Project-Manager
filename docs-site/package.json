@@ -1,0 +1,16 @@
+{
+  "name": "@project-manager/docs-site",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "VitePress site for Project Manager public documentation (docs/guides/).",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.4",
+    "vue": "^3.5.34"
+  }
+}

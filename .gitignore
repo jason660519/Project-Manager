@@ -54,3 +54,7 @@ vendor/hermes-agent/
 #   wants to share them, remove the line and commit explicitly.
 .claude/settings.local.json
 .context/sessions/
+
+# VitePress docs site build artifacts (built by GH Actions, not committed)
+docs-site/.vitepress/dist/
+docs-site/.vitepress/cache/
