@@ -1362,18 +1362,17 @@ export async function readFile(path: string): Promise<string> {
   }
   // Browser dev mode: proxy through Next.js API route
   if (typeof window === 'undefined') return '';
-  try {
-    const res = await fetch('/api/editor/read-file', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path }),
-    });
-    if (!res.ok) return '';
-    const data = await res.json();
-    return data.content ?? '';
-  } catch {
-    return '';
+  const res = await fetch('/api/editor/read-file', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `Read failed (${res.status})` }));
+    throw new Error(err.error ?? `Read failed (${res.status})`);
   }
+  const data = await res.json();
+  return data.content ?? '';
 }
 
 // ── .env discovery (Keys view bulk import) ────────────────────────────────────

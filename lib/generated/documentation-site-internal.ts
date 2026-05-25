@@ -4,7 +4,7 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-05-24T21:07:49.000Z",
+    "generatedAt": "2026-05-24T22:44:04.000Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
@@ -2163,7 +2163,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "Mentions secrets, tokens, or credentials",
         "Mentions execution or command policy"
       ],
-      "updatedAt": "2026-05-24T21:07:49.000Z"
+      "updatedAt": "2026-05-24T22:44:04.000Z"
     },
     {
       "id": "project-process/commands/daily-report",

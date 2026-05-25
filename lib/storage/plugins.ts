@@ -101,13 +101,13 @@ const DEFAULT_EDITORS: EditorPlugin[] = [
 
 const DEFAULT_FRONTEND: FrontendPlugin[] = [
   {
-    id: 'monaco-editor',
+    id: 'ide-bridge',
     kind: 'frontend',
-    name: 'Monaco Editor Workbench',
+    name: 'IDE Bridge',
     enabled: true,
     installedAt: BUILT_IN_INSTALL_DATE,
-    packageName: '@monaco-editor/react',
-    implementationPath: 'app/ui/views/MonacoEditorWorkbench.tsx',
+    packageName: 'internal-tauri-ide-bridge',
+    implementationPath: 'app/ui/views/IdeBridgeView.tsx',
   },
 ];
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import type { EngineerRole, Feature, FeaturePhase, FeaturePromptConfig } from '../../../lib/types';
+import type { ActiveRun, EngineerRole, Feature, FeaturePhase, FeaturePromptConfig } from '../../../lib/types';
 import { useI18n } from '../../../lib/i18n';
 import type { CustomProjectProgressRow, PhaseTablePrefs } from '../types';
 import { buildPhaseRows, type PhaseRow } from '../_lib/phaseRows';
@@ -31,13 +31,15 @@ interface PhaseTabContentProps {
   onFeaturePromptSave: (featureId: string, config: FeaturePromptConfig) => void;
   /** Generic feature patcher — receives the namespaced feature id (`<projectId>::<featureId>`). */
   onFeaturePatch: (namespacedFeatureId: string, patch: Partial<Feature>) => void;
+  /** Active agent runs, threaded to column handlers for running-state chips. */
+  activeRuns?: ActiveRun[];
   /** Quick dispatch — opens a modal owned by the parent. Undefined disables the button. */
   onDispatchRow?: (row: PhaseRow) => void;
 }
 
 export function PhaseTabContent({
   phase, projectName, projectNames, projectRoot, features, engineerRoles, prefs, patch, reset,
-  onFeaturePromptSave, onFeaturePatch, onDispatchRow,
+  onFeaturePromptSave, onFeaturePatch, activeRuns, onDispatchRow,
 }: PhaseTabContentProps) {
   const { t } = useI18n();
   const columns = useMemo(() => columnsForPhase(phase, t.dashboard.projectName), [phase, t]);
@@ -162,6 +164,7 @@ export function PhaseTabContent({
   const handlers = useMemo(() => ({
     projectRoot,
     engineerRoles,
+    activeRuns,
     hiddenRowKeysSet: hiddenSet,
     onToggleHideRow,
     onDeleteCustomRow,
@@ -170,7 +173,7 @@ export function PhaseTabContent({
     onChangePhase,
     onDispatch: onDispatchRow,
     onOpenNotePanel: (absPath: string) => setNotesPanelPath(absPath),
-  }), [projectRoot, engineerRoles, hiddenSet, onToggleHideRow, onDeleteCustomRow, onPatchFeature, onPatchCustomRow, onChangePhase, onDispatchRow]);
+  }), [projectRoot, engineerRoles, activeRuns, hiddenSet, onToggleHideRow, onDeleteCustomRow, onPatchFeature, onPatchCustomRow, onChangePhase, onDispatchRow]);
 
   return (
     <div className="flex flex-col gap-2">

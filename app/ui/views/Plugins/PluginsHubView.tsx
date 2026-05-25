@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ExternalLink, FileText, MessageCircle, RotateCw, Snowflake, X } from 'lucide-react';
+import { ExternalLink, FileText, MessageCircle, RefreshCw, RotateCw, Snowflake, X } from 'lucide-react';
 import type { IntegrationRow, IntegrationSheet } from '../../../../lib/integrations/types';
 import { isCapabilitySheet } from '../../../../lib/integrations/types';
+import { diffRows, type ScanOutcome, type ScanReport } from '../../../../lib/integrations/scan-diff';
 import type { IntegrationRuntimeCommand } from '../../../../lib/integrations/registry';
 import { mergeAllManual } from '../../../../lib/integrations/manual-metadata';
 import {
@@ -102,6 +103,7 @@ import { IntegrationsDetailSheet } from './_shared/IntegrationsDetailSheet';
 import { McpLogsViewer } from './_shared/McpLogsViewer';
 import { ConnectSheet } from './ConnectSheet';
 import { CapabilitySheetView } from './CapabilitySheetView';
+import { ScanReportPanel } from './_shared/ScanReportPanel';
 
 const EMPTY_CATALOG: PluginCatalog = { schemaVersion: 2, plugins: [] };
 const PROJECT_MANAGER_ROOT = '/Volumes/KLEVV-4T-1/Project-Manager';
@@ -172,6 +174,8 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [frozenDataColCount, setFrozenDataColCount] = useState(0);
   const [rowDensity, setRowDensity] = useState<PluginsRowDensity>('comfortable');
+  const [scanReport, setScanReport] = useState<ScanReport | null>(null);
+  const [scanRunning, setScanRunning] = useState(false);
 
   const refreshManual = () => setManualVersion((v) => v + 1);
 
@@ -196,60 +200,63 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     setSystemCliExposure(loadSystemCliExposureMap());
   }, []);
 
+  // Pure fetch — reads skill files under `skillsDir` and returns parsed
+  // IntegrationRow[]. No React state writes; callers decide what to do.
+  const fetchSkillRows = useCallback(async (): Promise<IntegrationRow[]> => {
+    if (!skillsDir) return [];
+    const files = await skillList(skillsDir);
+    const parsed: IntegrationRow[] = [];
+    await Promise.all(
+      files.map(async (f) => {
+        try {
+          const raw = await readFile(f.absPath);
+          const { name, description, version, tags } = parseFrontmatter(raw);
+          const { category, slug } = parseCategorySlug(f.relPath);
+          parsed.push(
+            mapSkillRow(
+              {
+                absPath: f.absPath,
+                relPath: f.relPath,
+                name: name || slug,
+                slug,
+                category,
+                description,
+                tags,
+                version,
+                modified: f.modified,
+              },
+              skillsDir,
+            ),
+          );
+        } catch {
+          const { category, slug } = parseCategorySlug(f.relPath);
+          parsed.push(
+            mapSkillRow(
+              {
+                absPath: f.absPath,
+                relPath: f.relPath,
+                name: slug,
+                slug,
+                category,
+                description: '',
+                tags: [],
+                version: '1.0.0',
+                modified: f.modified,
+              },
+              skillsDir,
+            ),
+          );
+        }
+      }),
+    );
+    return parsed;
+  }, [skillsDir]);
+
   const loadSkills = useCallback(async () => {
     setSkillsLoading(true);
     setSkillsError(null);
-    if (!skillsDir) {
-      setSkillRows([]);
-      setSkillsLoading(false);
-      return;
-    }
     try {
-      const files = await skillList(skillsDir);
-      const parsed: IntegrationRow[] = [];
-      await Promise.all(
-        files.map(async (f) => {
-          try {
-            const raw = await readFile(f.absPath);
-            const { name, description, version, tags } = parseFrontmatter(raw);
-            const { category, slug } = parseCategorySlug(f.relPath);
-            parsed.push(
-              mapSkillRow(
-                {
-                  absPath: f.absPath,
-                  relPath: f.relPath,
-                  name: name || slug,
-                  slug,
-                  category,
-                  description,
-                  tags,
-                  version,
-                  modified: f.modified,
-                },
-                skillsDir,
-              ),
-            );
-          } catch {
-            const { category, slug } = parseCategorySlug(f.relPath);
-            parsed.push(
-              mapSkillRow(
-                {
-                  absPath: f.absPath,
-                  relPath: f.relPath,
-                  name: slug,
-                  slug,
-                  category,
-                  description: '',
-                  tags: [],
-                  version: '1.0.0',
-                  modified: f.modified,
-                },
-                skillsDir,
-              ),
-            );
-          }
-        }),
-      );
+      const parsed = await fetchSkillRows();
       setSkillRows(parsed);
     } catch (error) {
       setSkillRows([]);
@@ -257,7 +264,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     } finally {
       setSkillsLoading(false);
     }
-  }, [skillsDir]);
+  }, [fetchSkillRows]);
 
   useEffect(() => {
     void loadSkills();
@@ -309,47 +316,55 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     void loadCommands();
   }, [loadCommands]);
 
+  // Probe each marketplace entry's command on $PATH and resolve install paths.
+  // Returns the raw mapping so callers can both update React state AND build a
+  // fresh row snapshot for diffing without waiting for the next render.
+  const runPluginSystemScan = useCallback(async (): Promise<{
+    status: Record<string, boolean>;
+    paths: Record<string, ResolvedPluginPath>;
+  }> => {
+    const status: Record<string, boolean> = {};
+    const paths: Record<string, ResolvedPluginPath> = {};
+    await Promise.all(
+      MARKETPLACE.map(async (mp) => {
+        let command = '';
+        let appBundleName: string | undefined;
+        if (mp.kind === 'cli' && mp.defaultCli?.command) command = mp.defaultCli.command;
+        else if (mp.kind === 'editor' && mp.defaultEditor?.command) {
+          command = mp.defaultEditor.command;
+          appBundleName = mp.appBundleName;
+        } else if (mp.kind === 'mcp' && mp.defaultMcp?.command) command = mp.defaultMcp.command;
+        if (!command) return;
+        const baseName = command.split('/').pop() || command;
+        try {
+          status[mp.id] = await checkCommandExists(baseName);
+        } catch {
+          status[mp.id] = false;
+        }
+        try {
+          const resolved = await resolveInstallPath(command, appBundleName);
+          if (resolved.commandPath || resolved.appBundlePath) {
+            paths[mp.id] = resolved;
+          }
+        } catch {
+          // Tauri may be unavailable in the web preview; skip silently.
+        }
+      }),
+    );
+    return { status, paths };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
-    const scan = async () => {
-      const status: Record<string, boolean> = {};
-      const paths: Record<string, ResolvedPluginPath> = {};
-      await Promise.all(
-        MARKETPLACE.map(async (mp) => {
-          let command = '';
-          let appBundleName: string | undefined;
-          if (mp.kind === 'cli' && mp.defaultCli?.command) command = mp.defaultCli.command;
-          else if (mp.kind === 'editor' && mp.defaultEditor?.command) {
-            command = mp.defaultEditor.command;
-            appBundleName = mp.appBundleName;
-          } else if (mp.kind === 'mcp' && mp.defaultMcp?.command) command = mp.defaultMcp.command;
-          if (!command) return;
-          const baseName = command.split('/').pop() || command;
-          try {
-            status[mp.id] = await checkCommandExists(baseName);
-          } catch {
-            status[mp.id] = false;
-          }
-          try {
-            const resolved = await resolveInstallPath(command, appBundleName);
-            if (resolved.commandPath || resolved.appBundlePath) {
-              paths[mp.id] = resolved;
-            }
-          } catch {
-            // Tauri may be unavailable in the web preview; skip silently.
-          }
-        }),
-      );
-      if (!cancelled) {
-        setSystemCommandStatus(status);
-        setResolvedInstallPaths(paths);
-      }
-    };
-    void scan();
+    void runPluginSystemScan().then(({ status, paths }) => {
+      if (cancelled) return;
+      setSystemCommandStatus(status);
+      setResolvedInstallPaths(paths);
+    });
     return () => {
       cancelled = true;
     };
-  }, [catalog]);
+  }, [catalog, runPluginSystemScan]);
 
   useEffect(() => {
     let cancelled = false;
@@ -459,6 +474,18 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     [allPluginRows],
   );
 
+  // Coding Tools sheet: subset of Plugins rows whose marketplace classification
+  // is `dev` (IDEs, AI coding CLIs, code-editor surfaces). Excludes vcs/pm/
+  // notify/ci CLIs (GitHub, Linear, Slack, Sentry) and MCP servers.
+  const CODING_TOOL_IDS = useMemo(
+    () => new Set(MARKETPLACE.filter((mp) => mp.category === 'dev').map((mp) => mp.id)),
+    [],
+  );
+  const codingToolRows = useMemo(
+    () => pluginRows.filter((row) => CODING_TOOL_IDS.has(row.sourceId)),
+    [pluginRows, CODING_TOOL_IDS],
+  );
+
   const channelRows = useMemo(() => {
     const rows = channelCatalog.channels.map((ch) =>
       mapChannelRow(ch, pollStatuses, Boolean(getChannelSecret(ch.id, 'botToken'))),
@@ -500,23 +527,474 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     [loadCommands, systemCliRows],
   );
 
+  // ---------------------------------------------------------------------------
+  // Scanner functions — one per sheet. Each rescan function:
+  //   1. Snapshots the current rows for that sheet (closure).
+  //   2. Fetches fresh data from disk / Tauri / catalog.
+  //   3. Updates the relevant React state so the table re-renders.
+  //   4. Builds a new row snapshot from the *fresh* data and diffs against (1).
+  //   5. Returns a ScanOutcome describing added/removed/updated.
+  // Errors are caught and surfaced via outcome.error rather than thrown.
+  // ---------------------------------------------------------------------------
+
+  type SharedPluginCtx = { status: Record<string, boolean>; paths: Record<string, ResolvedPluginPath> };
+
+  /**
+   * Build plugin-system rows from a freshly scanned (status, paths) context.
+   * Mirrors the `allPluginRows` useMemo so we can compute the "after" snapshot
+   * synchronously without waiting for React to re-render.
+   */
+  const buildPluginRowsFromCtx = useCallback(
+    (ctx: SharedPluginCtx, mcpStatusMap: Map<string, McpRunStatus>): IntegrationRow[] => {
+      const mapperCtx = {
+        apiKeys,
+        systemCommandStatus: ctx.status,
+        mcpStatuses: mcpStatusMap,
+        resolvedInstallPaths: ctx.paths,
+      };
+      const installed = mapInstalledPlugins(catalog, mapperCtx);
+      const marketplace = MARKETPLACE.map((mp) =>
+        mapMarketplaceRow(
+          {
+            id: mp.id,
+            name: mp.name,
+            description: mp.description,
+            category: mp.category,
+            kind: mp.kind,
+            installed: installedIds.has(mp.id),
+          },
+          ctx.paths[mp.id],
+        ),
+      );
+      let rows: IntegrationRow[];
+      if (pluginsFilter === 'installed') rows = installed;
+      else if (pluginsFilter === 'marketplace')
+        rows = marketplace.filter((r) => r.status === 'not_installed');
+      else rows = [...installed, ...marketplace.filter((r) => !installedIds.has(r.sourceId))];
+      return mergeAllManual(rows);
+    },
+    [apiKeys, catalog, installedIds, pluginsFilter],
+  );
+
+  const rescanPlugins = useCallback(
+    async (sharedCtx?: SharedPluginCtx): Promise<ScanOutcome> => {
+      const startedAt = Date.now();
+      const prev = pluginRows;
+      try {
+        const ctx = sharedCtx ?? (await runPluginSystemScan());
+        if (!sharedCtx) {
+          setSystemCommandStatus(ctx.status);
+          setResolvedInstallPaths(ctx.paths);
+        }
+        const allRows = buildPluginRowsFromCtx(ctx, mcpStatuses);
+        const next = allRows.filter((r) => r.sheet === 'plugins');
+        return {
+          sheetId: 'plugins',
+          label: 'Plugins',
+          count: next.length,
+          ...diffRows(prev, next),
+          durationMs: Date.now() - startedAt,
+        };
+      } catch (e) {
+        return {
+          sheetId: 'plugins',
+          label: 'Plugins',
+          count: prev.length,
+          added: [],
+          removed: [],
+          updated: [],
+          error: e instanceof Error ? e.message : String(e),
+          durationMs: Date.now() - startedAt,
+        };
+      }
+    },
+    [pluginRows, runPluginSystemScan, buildPluginRowsFromCtx, mcpStatuses],
+  );
+
+  const rescanCodingTools = useCallback(
+    async (sharedCtx?: SharedPluginCtx): Promise<ScanOutcome> => {
+      const startedAt = Date.now();
+      const prev = codingToolRows;
+      try {
+        const ctx = sharedCtx ?? (await runPluginSystemScan());
+        if (!sharedCtx) {
+          setSystemCommandStatus(ctx.status);
+          setResolvedInstallPaths(ctx.paths);
+        }
+        const allRows = buildPluginRowsFromCtx(ctx, mcpStatuses);
+        const next = allRows
+          .filter((r) => r.sheet === 'plugins')
+          .filter((r) => CODING_TOOL_IDS.has(r.sourceId));
+        return {
+          sheetId: 'coding-tools',
+          label: 'Coding Tools',
+          count: next.length,
+          ...diffRows(prev, next),
+          durationMs: Date.now() - startedAt,
+        };
+      } catch (e) {
+        return {
+          sheetId: 'coding-tools',
+          label: 'Coding Tools',
+          count: prev.length,
+          added: [],
+          removed: [],
+          updated: [],
+          error: e instanceof Error ? e.message : String(e),
+          durationMs: Date.now() - startedAt,
+        };
+      }
+    },
+    [codingToolRows, runPluginSystemScan, buildPluginRowsFromCtx, mcpStatuses, CODING_TOOL_IDS],
+  );
+
+  const rescanMcp = useCallback(
+    async (sharedCtx?: SharedPluginCtx): Promise<ScanOutcome> => {
+      const startedAt = Date.now();
+      const prev = mcpRows;
+      try {
+        const ctx = sharedCtx ?? (await runPluginSystemScan());
+        const arr = await mcpStatusAll();
+        const nextStatuses = new Map(arr.map((s) => [s.pluginId, s.status]));
+        if (!sharedCtx) {
+          setSystemCommandStatus(ctx.status);
+          setResolvedInstallPaths(ctx.paths);
+        }
+        setMcpStatuses(nextStatuses);
+        const allRows = buildPluginRowsFromCtx(ctx, nextStatuses);
+        const next = allRows.filter((r) => r.sheet === 'mcp');
+        return {
+          sheetId: 'mcp',
+          label: 'MCP',
+          count: next.length,
+          ...diffRows(prev, next),
+          durationMs: Date.now() - startedAt,
+        };
+      } catch (e) {
+        return {
+          sheetId: 'mcp',
+          label: 'MCP',
+          count: prev.length,
+          added: [],
+          removed: [],
+          updated: [],
+          error: e instanceof Error ? e.message : String(e),
+          durationMs: Date.now() - startedAt,
+        };
+      }
+    },
+    [mcpRows, runPluginSystemScan, buildPluginRowsFromCtx],
+  );
+
+  const rescanSkills = useCallback(async (): Promise<ScanOutcome> => {
+    const startedAt = Date.now();
+    const prev = skillsRowsMerged;
+    if (!skillsDir) {
+      return {
+        sheetId: 'skills',
+        label: 'Skills',
+        count: prev.length,
+        added: [],
+        removed: [],
+        updated: [],
+        skipped: 'Skills directory not configured',
+        durationMs: Date.now() - startedAt,
+      };
+    }
+    try {
+      const rows = await fetchSkillRows();
+      setSkillRows(rows);
+      setSkillsError(null);
+      const next = mergeAllManual(rows);
+      return {
+        sheetId: 'skills',
+        label: 'Skills',
+        count: next.length,
+        ...diffRows(prev, next),
+        durationMs: Date.now() - startedAt,
+      };
+    } catch (e) {
+      return {
+        sheetId: 'skills',
+        label: 'Skills',
+        count: prev.length,
+        added: [],
+        removed: [],
+        updated: [],
+        error: e instanceof Error ? e.message : String(e),
+        durationMs: Date.now() - startedAt,
+      };
+    }
+  }, [skillsRowsMerged, skillsDir, fetchSkillRows]);
+
+  const rescanChannels = useCallback(async (): Promise<ScanOutcome> => {
+    const startedAt = Date.now();
+    const prev = channelRows;
+    try {
+      const arr = await telegramStatusAll();
+      const nextPoll = new Map(arr.map((s) => [s.channelId, s]));
+      setPollStatuses(nextPoll);
+      const next = mergeAllManual(
+        channelCatalog.channels.map((ch) =>
+          mapChannelRow(ch, nextPoll, Boolean(getChannelSecret(ch.id, 'botToken'))),
+        ),
+      );
+      return {
+        sheetId: 'channels',
+        label: 'Channels',
+        count: next.length,
+        ...diffRows(prev, next),
+        durationMs: Date.now() - startedAt,
+      };
+    } catch (e) {
+      return {
+        sheetId: 'channels',
+        label: 'Channels',
+        count: prev.length,
+        added: [],
+        removed: [],
+        updated: [],
+        error: e instanceof Error ? e.message : String(e),
+        durationMs: Date.now() - startedAt,
+      };
+    }
+  }, [channelRows, channelCatalog]);
+
+  const rescanMemory = useCallback(async (): Promise<ScanOutcome> => {
+    const startedAt = Date.now();
+    const prev = memoryRowsMerged;
+    if (!projectRoot) {
+      return {
+        sheetId: 'memory',
+        label: 'Memory',
+        count: prev.length,
+        added: [],
+        removed: [],
+        updated: [],
+        skipped: 'No project selected',
+        durationMs: Date.now() - startedAt,
+      };
+    }
+    try {
+      const rows = await loadMemoryRows(projectRoot);
+      setMemoryRows(rows);
+      setMemoryError(null);
+      const next = mergeAllManual(rows);
+      return {
+        sheetId: 'memory',
+        label: 'Memory',
+        count: next.length,
+        ...diffRows(prev, next),
+        durationMs: Date.now() - startedAt,
+      };
+    } catch (e) {
+      return {
+        sheetId: 'memory',
+        label: 'Memory',
+        count: prev.length,
+        added: [],
+        removed: [],
+        updated: [],
+        error: e instanceof Error ? e.message : String(e),
+        durationMs: Date.now() - startedAt,
+      };
+    }
+  }, [memoryRowsMerged, projectRoot]);
+
+  const rescanCommands = useCallback(async (): Promise<ScanOutcome> => {
+    const startedAt = Date.now();
+    const prev = commandRowsMerged;
+    try {
+      const slash = await loadSlashCommandRows(projectRoot);
+      const mappings = channelCatalog.commandMappings.map(mapCommandMappingRow);
+      const exposure = loadSystemCliExposureMap();
+      setSystemCliExposure(exposure);
+      let systemCli: IntegrationRow[] = [];
+      try {
+        const inventory = await listGlobalCliInventory();
+        systemCli = inventory.map((entry) => mapSystemCliRow(entry, exposure[entry.command] === true));
+      } catch {
+        systemCli = [];
+      }
+      const allRows = [...slash, ...mappings, ...systemCli];
+      setCommandRows(allRows);
+      setCommandsError(null);
+      const next = mergeAllManual(allRows);
+      return {
+        sheetId: 'commands',
+        label: 'Commands',
+        count: next.length,
+        ...diffRows(prev, next),
+        durationMs: Date.now() - startedAt,
+      };
+    } catch (e) {
+      return {
+        sheetId: 'commands',
+        label: 'Commands',
+        count: prev.length,
+        added: [],
+        removed: [],
+        updated: [],
+        error: e instanceof Error ? e.message : String(e),
+        durationMs: Date.now() - startedAt,
+      };
+    }
+  }, [commandRowsMerged, projectRoot, channelCatalog]);
+
+  const rescanConnectedInstances = useCallback(async (): Promise<ScanOutcome> => {
+    const startedAt = Date.now();
+    const prev = connectedInstanceRows;
+    try {
+      // Connected instances are derived from localStorage / catalog state, so
+      // we don't need an async fetch — but we still re-derive and refresh the
+      // manual-merge counter so the table picks up edits made elsewhere.
+      const next = mergeAllManual(buildConnectedInstanceRows());
+      refreshManual();
+      return {
+        sheetId: 'connected-instances',
+        label: 'Connected Instances',
+        count: next.length,
+        ...diffRows(prev, next),
+        durationMs: Date.now() - startedAt,
+      };
+    } catch (e) {
+      return {
+        sheetId: 'connected-instances',
+        label: 'Connected Instances',
+        count: prev.length,
+        added: [],
+        removed: [],
+        updated: [],
+        error: e instanceof Error ? e.message : String(e),
+        durationMs: Date.now() - startedAt,
+      };
+    }
+  }, [connectedInstanceRows]);
+
+  /**
+   * Scan All — runs every sheet's scanner in parallel. The plugin-system probe
+   * (PATH + .app bundle scan) is expensive, so we share its result across the
+   * plugins / coding-tools / mcp scanners.
+   */
+  const runAllScans = useCallback(async () => {
+    setScanRunning(true);
+    setScanReport(null);
+    const startedAt = Date.now();
+    let shared: SharedPluginCtx | undefined;
+    try {
+      shared = await runPluginSystemScan();
+      setSystemCommandStatus(shared.status);
+      setResolvedInstallPaths(shared.paths);
+    } catch {
+      shared = undefined;
+    }
+    const results = await Promise.allSettled([
+      rescanPlugins(shared),
+      rescanCodingTools(shared),
+      rescanMcp(shared),
+      rescanSkills(),
+      rescanChannels(),
+      rescanMemory(),
+      rescanCommands(),
+      rescanConnectedInstances(),
+    ]);
+    const outcomes: ScanOutcome[] = results.map((r) =>
+      r.status === 'fulfilled'
+        ? r.value
+        : {
+            sheetId: 'plugins',
+            label: 'Scanner',
+            count: 0,
+            added: [],
+            removed: [],
+            updated: [],
+            error: r.reason instanceof Error ? r.reason.message : String(r.reason),
+            durationMs: 0,
+          },
+    );
+    setScanReport({ startedAt, durationMs: Date.now() - startedAt, outcomes });
+    setScanRunning(false);
+  }, [
+    runPluginSystemScan,
+    rescanPlugins,
+    rescanCodingTools,
+    rescanMcp,
+    rescanSkills,
+    rescanChannels,
+    rescanMemory,
+    rescanCommands,
+    rescanConnectedInstances,
+  ]);
+
+  /** Per-sheet rescan triggered from the sheet's own toolbar. Wraps the single
+   *  outcome in a one-item ScanReport so the user gets the same diff UI. */
+  const runSheetRescan = useCallback(
+    async (sheet: IntegrationSheet) => {
+      setScanRunning(true);
+      setScanReport(null);
+      const startedAt = Date.now();
+      let outcome: ScanOutcome | undefined;
+      try {
+        if (sheet === 'plugins') outcome = await rescanPlugins();
+        else if (sheet === 'coding-tools') outcome = await rescanCodingTools();
+        else if (sheet === 'mcp') outcome = await rescanMcp();
+        else if (sheet === 'skills') outcome = await rescanSkills();
+        else if (sheet === 'channels') outcome = await rescanChannels();
+        else if (sheet === 'memory') outcome = await rescanMemory();
+        else if (sheet === 'commands') outcome = await rescanCommands();
+        else if (sheet === 'connected-instances') outcome = await rescanConnectedInstances();
+      } catch (e) {
+        outcome = {
+          sheetId: sheet,
+          label: sheet,
+          count: 0,
+          added: [],
+          removed: [],
+          updated: [],
+          error: e instanceof Error ? e.message : String(e),
+          durationMs: Date.now() - startedAt,
+        };
+      }
+      if (outcome) {
+        setScanReport({
+          startedAt,
+          durationMs: Date.now() - startedAt,
+          outcomes: [outcome],
+        });
+      }
+      setScanRunning(false);
+    },
+    [
+      rescanPlugins,
+      rescanCodingTools,
+      rescanMcp,
+      rescanSkills,
+      rescanChannels,
+      rescanMemory,
+      rescanCommands,
+      rescanConnectedInstances,
+    ],
+  );
+
   const activeRows = useMemo(() => {
     let rows =
       activeSheet === 'plugins'
         ? pluginRows
-        : activeSheet === 'mcp'
-          ? mcpRows
-          : activeSheet === 'skills'
-            ? skillsRowsMerged
-            : activeSheet === 'channels'
-              ? channelRows
-              : activeSheet === 'memory'
-                ? memoryRowsMerged
-                : activeSheet === 'commands'
-                  ? commandRowsMerged
-                  : activeSheet === 'connected-instances'
-                    ? connectedInstanceRows
-                    : [];
+        : activeSheet === 'coding-tools'
+          ? codingToolRows
+          : activeSheet === 'mcp'
+            ? mcpRows
+            : activeSheet === 'skills'
+              ? skillsRowsMerged
+              : activeSheet === 'channels'
+                ? channelRows
+                : activeSheet === 'memory'
+                  ? memoryRowsMerged
+                  : activeSheet === 'commands'
+                    ? commandRowsMerged
+                    : activeSheet === 'connected-instances'
+                      ? connectedInstanceRows
+                      : [];
     if (categoryFilter !== 'all') {
       rows = rows.filter((r) => r.category1 === categoryFilter);
     }
@@ -524,6 +1002,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
   }, [
     activeSheet,
     pluginRows,
+    codingToolRows,
     mcpRows,
     skillsRowsMerged,
     channelRows,
@@ -821,6 +1300,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
 
   const sheetTabs: ReadonlyArray<SheetTabItem<IntegrationSheet>> = [
     { key: 'plugins', label: t.integrations.sheetPlugins, badge: pluginRows.length },
+    { key: 'coding-tools', label: 'Coding Tools', badge: codingToolRows.length },
     { key: 'mcp', label: t.integrations.sheetMcp, badge: mcpRows.length },
     { key: 'skills', label: t.integrations.sheetSkills, badge: skillsRowsMerged.length },
     { key: 'channels', label: t.integrations.sheetChannels, badge: channelRows.length },
@@ -859,6 +1339,17 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
           ? commandsError
           : null;
 
+  const RESCANABLE_SHEETS = new Set<IntegrationSheet>([
+    'plugins',
+    'coding-tools',
+    'mcp',
+    'skills',
+    'channels',
+    'memory',
+    'commands',
+    'connected-instances',
+  ]);
+
   const toolbar = activeSheet === 'connect' || isCapabilitySheet(activeSheet) ? null : (
     <div className="flex flex-wrap items-center gap-2 border-b border-stone-200/10 px-4 py-2">
       <input
@@ -867,6 +1358,18 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
         placeholder={t.integrations.searchPlaceholder}
         className="min-w-[200px] flex-1 border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72 px-3 py-2 text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/25"
       />
+      {RESCANABLE_SHEETS.has(activeSheet) && (
+        <button
+          type="button"
+          onClick={() => void runSheetRescan(activeSheet)}
+          disabled={scanRunning}
+          title="Rescan this sheet"
+          className="flex items-center gap-1 border border-stone-200/20 px-2 py-2 text-xs text-stone-300 hover:border-emerald-300/30 disabled:opacity-50"
+        >
+          <RotateCw size={12} className={scanRunning ? 'animate-spin' : ''} />
+          Rescan
+        </button>
+      )}
       <select
         value={categoryFilter}
         onChange={(e) => setCategoryFilter(e.target.value)}
@@ -878,7 +1381,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
           </option>
         ))}
       </select>
-      {(activeSheet === 'plugins' || activeSheet === 'mcp') && (
+      {(activeSheet === 'plugins' || activeSheet === 'coding-tools' || activeSheet === 'mcp') && (
         <select
           value={pluginsFilter}
           onChange={(e) => setPluginsFilter(e.target.value as PluginsFilter)}
@@ -890,30 +1393,9 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
         </select>
       )}
       {activeSheet === 'skills' && (
-        <>
-          <button
-            type="button"
-            onClick={() => void loadSkills()}
-            className="flex items-center gap-1 border border-stone-200/20 px-2 py-2 text-xs text-stone-300"
-          >
-            <RotateCw size={12} /> {t.plugins.rescan}
-          </button>
-          <Link href="/settings" className="text-xs text-emerald-300/80 hover:text-emerald-200">
-            {t.plugins.settings}
-          </Link>
-        </>
-      )}
-      {(activeSheet === 'memory' || activeSheet === 'commands') && (activeSheet !== 'memory' || projectRoot) && (
-        <button
-          type="button"
-          onClick={() => {
-            if (activeSheet === 'memory') void loadMemory();
-            else void loadCommands();
-          }}
-          className="flex items-center gap-1 border border-stone-200/20 px-2 py-2 text-xs text-stone-300"
-        >
-          <RotateCw size={12} /> {t.plugins.rescan}
-        </button>
+        <Link href="/settings" className="text-xs text-emerald-300/80 hover:text-emerald-200">
+          {t.plugins.settings}
+        </Link>
       )}
       {activeSheet === 'commands' && projectRoot && (
         <button
@@ -1038,19 +1520,31 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
               </h1>
               <p className="mt-1 text-xs text-stone-400">{t.integrations.subtitle}</p>
             </div>
-            <button
-              type="button"
-              onClick={() =>
-                void openPath('/Volumes/KLEVV-4T-1/Project-Manager/docs/engineering/plugin-guide.md').catch(
-                  () => {},
-                )
-              }
-              className="flex items-center gap-2 self-start border border-emerald-500/20 bg-emerald-950/25 px-3 py-1.5 text-xs text-emerald-400 sm:self-center"
-            >
-              <FileText size={13} />
-              Plugin Guide
-              <ExternalLink size={11} />
-            </button>
+            <div className="flex items-center gap-2 self-start sm:self-center">
+              <button
+                type="button"
+                onClick={() => void runAllScans()}
+                disabled={scanRunning}
+                title="Re-scan every sheet and report what changed"
+                className="flex items-center gap-2 border border-cyan-400/30 bg-cyan-950/25 px-3 py-1.5 text-xs text-cyan-200 hover:bg-cyan-950/45 disabled:opacity-50"
+              >
+                <RefreshCw size={13} className={scanRunning ? 'animate-spin' : ''} />
+                {scanRunning ? 'Scanning…' : 'Scan All'}
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  void openPath('/Volumes/KLEVV-4T-1/Project-Manager/docs/engineering/plugin-guide.md').catch(
+                    () => {},
+                  )
+                }
+                className="flex items-center gap-2 border border-emerald-500/20 bg-emerald-950/25 px-3 py-1.5 text-xs text-emerald-400"
+              >
+                <FileText size={13} />
+                Plugin Guide
+                <ExternalLink size={11} />
+              </button>
+            </div>
           </div>
         }
         panelClassName="border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72"
@@ -1098,18 +1592,22 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
                 frozenDataColCount={frozenDataColCount}
                 rowDensity={rowDensity}
                 onTestRow={
-                  activeSheet === 'plugins' || activeSheet === 'mcp'
+                  activeSheet === 'plugins' || activeSheet === 'coding-tools' || activeSheet === 'mcp'
                     ? handleTestPluginRow
                     : undefined
                 }
                 testResults={
-                  activeSheet === 'plugins' || activeSheet === 'mcp' ? pluginTestResults : undefined
+                  activeSheet === 'plugins' || activeSheet === 'coding-tools' || activeSheet === 'mcp'
+                    ? pluginTestResults
+                    : undefined
                 }
                 testingKeys={
-                  activeSheet === 'plugins' || activeSheet === 'mcp' ? pluginTestingKeys : undefined
+                  activeSheet === 'plugins' || activeSheet === 'coding-tools' || activeSheet === 'mcp'
+                    ? pluginTestingKeys
+                    : undefined
                 }
                 onToggleEnabled={
-                  activeSheet === 'plugins' || activeSheet === 'mcp'
+                  activeSheet === 'plugins' || activeSheet === 'coding-tools' || activeSheet === 'mcp'
                     ? (row, _enabled) => {
                         if (row.sourceKind === 'plugin-installed') {
                           updateCatalog(togglePluginEnabled(catalog, row.sourceId));
@@ -1222,6 +1720,12 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
           onClose={() => setAddCommandOpen(false)}
         />
       )}
+
+      <ScanReportPanel
+        report={scanReport}
+        running={scanRunning}
+        onClose={() => setScanReport(null)}
+      />
     </>
   );
 }

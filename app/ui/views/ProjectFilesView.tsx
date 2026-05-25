@@ -1,13 +1,13 @@
 'use client';
 
 export {
-  MonacoEditorWorkbench as ProjectFilesView,
-  buildMonacoWorkbenchFiles,
-  detectMonacoWorkbenchLanguage,
-  normalizeWorkbenchPath,
-} from './MonacoEditorWorkbench';
+  IdeBridgeView as ProjectFilesView,
+  buildIdeBridgeArtifacts,
+  buildIdeBridgeTargets,
+} from './IdeBridgeView';
 
 export type {
-  MonacoEditorWorkbenchProps as ProjectFilesViewProps,
-  MonacoWorkbenchFile,
-} from './MonacoEditorWorkbench';
+  IdeBridgeViewProps as ProjectFilesViewProps,
+  IdeBridgeArtifact,
+  IdeBridgeTarget,
+} from './IdeBridgeView';

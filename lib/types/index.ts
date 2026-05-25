@@ -46,6 +46,8 @@ export interface FeaturePaths {
   implementation?: string;            // Implementation code path
 }
 
+export type HarnessRoleStatus = 'idle' | 'running' | 'done' | 'error';
+
 export interface FeatureHarnessAssignment {
   engineerRoleId?: string;
   assignedIDE?: IDEId;
@@ -53,6 +55,8 @@ export interface FeatureHarnessAssignment {
   assignedAt?: string;
   adapterId?: string;
   lastDispatchModel?: string;
+  activePid?: number;
+  status?: HarnessRoleStatus;
 }
 
 export interface FeatureHarnessAssignments {

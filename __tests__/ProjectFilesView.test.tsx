@@ -1,17 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { ProjectFilesView } from '../app/ui/views/ProjectFilesView';
 import type { ProjectEntry, ProjectManagerConfig } from '../lib/types';
-
-vi.mock('../components/CodeEditor', () => ({
-  CodeEditor: ({ files }: { files: Array<{ path: string; label?: string }> }) => (
-    <div data-testid="mock-code-editor">
-      {files.map((file) => (
-        <span key={file.path}>{file.label ?? file.path}</span>
-      ))}
-    </div>
-  ),
-}));
 
 function projectEntry(id: string, name: string, root: string, featureId: string, filePath: string): ProjectEntry {
   const config: ProjectManagerConfig = {
@@ -88,7 +78,7 @@ describe('ProjectFilesView', () => {
     expect(screen.getByText('src/beta.ts')).toBeInTheDocument();
   });
 
-  it('filters the active sheet table by feature', () => {
+  it('renders IDE targets and project open targets for the active sheet', () => {
     render(
       <ProjectFilesView
         projects={[alpha]}
@@ -97,8 +87,9 @@ describe('ProjectFilesView', () => {
       />,
     );
 
-    fireEvent.change(screen.getByRole('combobox', { name: /Feature filter/i }), { target: { value: 'F01' } });
-
+    expect(screen.getByRole('navigation', { name: /IDE targets/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cursor' })).toBeInTheDocument();
+    expect(screen.getByText('Bridge contract')).toBeInTheDocument();
     expect(screen.getByText('src/alpha.ts')).toBeInTheDocument();
     expect(screen.getAllByText('F01').length).toBeGreaterThan(0);
   });

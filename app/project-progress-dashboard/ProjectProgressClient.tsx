@@ -235,6 +235,7 @@ export function ProjectProgressClient({
               reset={activePhasePrefs.reset}
               onFeaturePromptSave={onFeaturePromptSave}
               onFeaturePatch={onFeaturePatch}
+              activeRuns={activeRuns}
               onDispatchRow={(row) => row.source === 'feature' && setDispatchRow(row)}
             />
           ) : (

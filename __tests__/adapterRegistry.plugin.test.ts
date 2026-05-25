@@ -98,7 +98,7 @@ describe('adapter registry plugin agents', () => {
     expect(createRuntimeAdapter(config, 'hermes-agent')).toBeNull();
   });
 
-  it('upgrades existing plugin catalogs with the built-in Monaco frontend plugin', () => {
+  it('upgrades existing plugin catalogs with the built-in IDE Bridge frontend plugin', () => {
     saveCatalog({
       schemaVersion: 2,
       plugins: [
@@ -115,13 +115,13 @@ describe('adapter registry plugin agents', () => {
     });
 
     const catalog = loadPluginCatalog();
-    const monaco = catalog.plugins.find((plugin) => plugin.id === 'monaco-editor');
+    const ideBridge = catalog.plugins.find((plugin) => plugin.id === 'ide-bridge');
 
-    expect(monaco).toMatchObject({
-      id: 'monaco-editor',
+    expect(ideBridge).toMatchObject({
+      id: 'ide-bridge',
       kind: 'frontend',
-      packageName: '@monaco-editor/react',
-      implementationPath: 'app/ui/views/MonacoEditorWorkbench.tsx',
+      packageName: 'internal-tauri-ide-bridge',
+      implementationPath: 'app/ui/views/IdeBridgeView.tsx',
     });
   });
 
