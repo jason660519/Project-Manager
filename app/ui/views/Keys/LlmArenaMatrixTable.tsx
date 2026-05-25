@@ -9,6 +9,7 @@ import {
 } from '@tanstack/react-table';
 import { Eye, Gauge, History, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 import type { LlmProviderId } from '../../../../lib/keys/llmProviders';
+import type { Translations } from '../../../../lib/i18n';
 import type { ArenaModelSpec, ArenaResult } from './useArenaChat';
 import {
   evaluationMeta,
@@ -17,6 +18,7 @@ import {
   invocationPathLabel,
   statusMeta,
   type EvaluationLevel,
+  type LlmArenaCopy,
   type RunHistoryEntry,
 } from './LlmArenaTypes';
 
@@ -35,6 +37,8 @@ interface LlmArenaTableRow {
 }
 
 interface LlmArenaMatrixTableProps {
+  copy: LlmArenaCopy;
+  commonCopy: Translations['keysArena']['common'];
   selectedModels: ArenaModelSpec[];
   providers: readonly ProviderLike[];
   results: Record<string, ArenaResult>;
@@ -59,6 +63,8 @@ interface LlmArenaMatrixTableProps {
 const col = createColumnHelper<LlmArenaTableRow>();
 
 export function LlmArenaMatrixTable({
+  copy,
+  commonCopy,
   selectedModels,
   providers,
   results,
@@ -108,14 +114,14 @@ export function LlmArenaMatrixTable({
         row.spec.model,
         row.result?.content ?? '',
         row.result?.error ?? '',
-        invocationPathLabel('http'),
-        executionPlaneLabel(plane),
+        invocationPathLabel('http', copy),
+        executionPlaneLabel(plane, copy),
       ]
         .join('\n')
         .toLowerCase();
       return searchBlob.includes(keyword);
     });
-  }, [rows, searchText, category]);
+  }, [rows, searchText, category, copy]);
 
   const columns = useMemo(
     () => [
@@ -126,7 +132,7 @@ export function LlmArenaMatrixTable({
       }),
       col.display({
         id: 'col-test',
-        header: '測試',
+        header: copy.columns.test,
         cell: ({ row }) => (
           <input
             type="checkbox"
@@ -137,7 +143,7 @@ export function LlmArenaMatrixTable({
       }),
       col.display({
         id: 'col-provider',
-        header: 'Provider',
+        header: copy.columns.provider,
         cell: ({ row }) => {
           const { spec, index } = row.original;
           return (
@@ -160,7 +166,7 @@ export function LlmArenaMatrixTable({
       }),
       col.display({
         id: 'col-model',
-        header: 'Model',
+        header: copy.columns.model,
         cell: ({ row }) => {
           const { spec, index } = row.original;
           const provider = providers.find((p) => p.id === spec.provider);
@@ -181,48 +187,48 @@ export function LlmArenaMatrixTable({
       }),
       col.display({
         id: 'col-invocation',
-        header: '觸發路徑',
+        header: copy.columns.invocationPath,
         cell: () => (
           <span className="inline-flex rounded-full bg-stone-500/20 px-2 py-0.5 text-[10px] text-stone-300">
-            {invocationPathLabel('http')}
+            {invocationPathLabel('http', copy)}
           </span>
         ),
       }),
       col.display({
         id: 'col-plane',
-        header: '運算面',
+        header: copy.columns.executionPlane,
         cell: ({ row }) => (
           <span className="inline-flex rounded-full bg-stone-500/20 px-2 py-0.5 text-[10px] text-stone-300">
-            {executionPlaneLabel(inferExecutionPlane(row.original.spec.provider))}
+            {executionPlaneLabel(inferExecutionPlane(row.original.spec.provider), copy)}
           </span>
         ),
       }),
       col.display({
         id: 'col-run',
-        header: 'Run',
+        header: copy.columns.run,
         cell: ({ row }) => (
           <button
             onClick={() => onRunSingleRow(row.original.index)}
             disabled={isRunning || !userPrompt.trim()}
             className="inline-flex h-7 items-center gap-1 rounded border border-emerald-200/25 bg-emerald-100/10 px-2 text-[11px] font-medium text-emerald-100 hover:bg-emerald-100/18 disabled:opacity-40"
-            title="執行單列評測"
+            title={copy.runSingleTitle}
           >
             {isRunning ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
-            Run
+            {copy.columns.run}
           </button>
         ),
       }),
       col.display({
         id: 'col-status',
-        header: '狀態',
+        header: copy.columns.status,
         cell: ({ row }) => {
-          const meta = statusMeta(row.original.result);
+          const meta = statusMeta(row.original.result, copy);
           return <span className={`inline-flex rounded-sm px-2 py-0.5 text-[10px] font-semibold ${meta.className}`}>{meta.text}</span>;
         },
       }),
       col.display({
         id: 'col-prompt',
-        header: 'Test Prompt',
+        header: copy.columns.testPrompt,
         cell: () => (
           <p className="max-w-[220px] line-clamp-3 whitespace-pre-wrap break-words text-xs text-stone-300">
             {userPrompt || '—'}
@@ -231,32 +237,32 @@ export function LlmArenaMatrixTable({
       }),
       col.display({
         id: 'col-raw',
-        header: 'Raw Output',
+        header: copy.columns.rawOutput,
         cell: ({ row }) => {
           const rawBody = row.original.result ? row.original.result.error ?? row.original.result.content ?? '' : '';
           return (
             <div className="max-h-24 min-w-[240px] overflow-auto rounded-md border border-stone-200/15 bg-black/25 px-2 py-1 font-mono text-xs text-stone-300 whitespace-pre-wrap break-words">
-              {rawBody || '尚無輸出'}
+              {rawBody || copy.noOutput}
             </div>
           );
         },
       }),
       col.display({
         id: 'col-rendered',
-        header: 'Rendered Output',
+        header: copy.columns.renderedOutput,
         cell: ({ row }) => (
           <div className="max-h-24 min-w-[240px] overflow-auto rounded-md border border-emerald-300/20 bg-emerald-500/10 px-2 py-1 text-xs text-stone-300 whitespace-pre-wrap break-words">
-            {row.original.result?.content?.trim() || (row.original.result?.error ? '（錯誤回覆）' : '尚無輸出')}
+            {row.original.result?.content?.trim() || (row.original.result?.error ? copy.errorReply : copy.noOutput)}
           </div>
         ),
       }),
       col.display({
         id: 'col-eval',
-        header: 'LLM 評價',
+        header: copy.columns.evaluation,
         cell: ({ row }) => {
           const idx = row.original.index;
           const level = evaluationByIndex[idx] ?? 'pending';
-          const badge = evaluationMeta(level);
+          const badge = evaluationMeta(level, copy);
           return (
             <div className="space-y-1.5">
               <span
@@ -269,15 +275,15 @@ export function LlmArenaMatrixTable({
                 onChange={(event) => onEvaluationChange(idx, event.target.value as EvaluationLevel)}
                 className="w-full min-w-[120px] bg-[rgb(var(--pm-input))] border border-stone-200/20 text-stone-200 text-xs py-1 px-2 outline-none"
               >
-                <option value="pending" className="bg-stone-900">待評估</option>
-                <option value="pass" className="bg-stone-900">通過</option>
-                <option value="warning" className="bg-stone-900">需觀察</option>
-                <option value="fail" className="bg-stone-900">不通過</option>
+                <option value="pending" className="bg-stone-900">{copy.evaluationOptions.pending}</option>
+                <option value="pass" className="bg-stone-900">{copy.evaluationOptions.pass}</option>
+                <option value="warning" className="bg-stone-900">{copy.evaluationOptions.warning}</option>
+                <option value="fail" className="bg-stone-900">{copy.evaluationOptions.fail}</option>
               </select>
               <input
                 value={noteByIndex[idx] ?? ''}
                 onChange={(event) => onNoteChange(idx, event.target.value)}
-                placeholder="評語 / 風險"
+                placeholder={copy.evaluationNotePlaceholder}
                 className="w-full min-w-[160px] bg-[rgb(var(--pm-input))] border border-stone-200/20 text-stone-200 text-xs py-1 px-2 outline-none"
               />
             </div>
@@ -286,12 +292,12 @@ export function LlmArenaMatrixTable({
       }),
       col.display({
         id: 'col-ttft',
-        header: 'TTFT(ms)',
+        header: copy.columns.ttft,
         cell: () => <span className="text-xs font-mono text-stone-400">—</span>,
       }),
       col.display({
         id: 'col-e2e',
-        header: 'E2E(ms)',
+        header: copy.columns.e2e,
         cell: ({ row }) =>
           row.original.result ? (
             <span className="inline-flex items-center gap-1 text-xs font-mono text-stone-400">
@@ -304,7 +310,7 @@ export function LlmArenaMatrixTable({
       }),
       col.display({
         id: 'col-tps',
-        header: 'tok/s',
+        header: copy.columns.tokensPerSecond,
         cell: ({ row }) => {
           const result = row.original.result;
           const speed = result && result.latencyMs > 0 ? (((result.outputTokens ?? 0) * 1000) / result.latencyMs).toFixed(2) : '—';
@@ -313,7 +319,7 @@ export function LlmArenaMatrixTable({
       }),
       col.display({
         id: 'col-token',
-        header: 'Token',
+        header: copy.columns.token,
         cell: ({ row }) => (
           <span className="text-xs font-mono text-stone-400">
             {row.original.result ? `${row.original.result.inputTokens ?? 0}↓ ${row.original.result.outputTokens ?? 0}↑` : '—'}
@@ -322,7 +328,7 @@ export function LlmArenaMatrixTable({
       }),
       col.display({
         id: 'col-history',
-        header: 'History',
+        header: copy.columns.history,
         cell: ({ row }) => (
           <button
             onClick={() => onOpenDetail(row.original.index)}
@@ -335,24 +341,24 @@ export function LlmArenaMatrixTable({
       }),
       col.display({
         id: 'col-actions',
-        header: '操作',
+        header: copy.columns.actions,
         cell: ({ row }) => (
           <div className="flex items-center gap-1">
             <button
               onClick={() => onOpenDetail(row.original.index)}
               className="inline-flex items-center gap-1 rounded border border-stone-300/20 bg-stone-200/5 px-2 py-1 text-[11px] text-stone-200 hover:bg-stone-200/10"
-              title="查看詳情"
+              title={copy.viewDetailTitle}
             >
               <Eye size={13} />
-              View
+              {commonCopy.view}
             </button>
             <button
               onClick={() => onRemoveModel(row.original.index)}
               className="inline-flex items-center gap-1 rounded border border-red-400/25 bg-red-500/10 px-2 py-1 text-[11px] text-red-200 hover:bg-red-500/20"
-              title="刪除列"
+              title={copy.deleteRowTitle}
             >
               <Trash2 size={13} />
-              Delete
+              {commonCopy.delete}
             </button>
           </div>
         ),
@@ -360,6 +366,8 @@ export function LlmArenaMatrixTable({
     ],
     [
       enabledByIndex,
+      commonCopy,
+      copy,
       evaluationByIndex,
       isRunning,
       noteByIndex,
@@ -384,12 +392,12 @@ export function LlmArenaMatrixTable({
   return (
     <section className="border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72 shadow-xl backdrop-blur-sm rounded-sm flex min-h-0 flex-1 flex-col">
       <div className="flex items-center justify-between border-b border-stone-200/12 px-4 py-3 bg-white/[0.02]">
-        <h2 className="text-sm font-medium uppercase tracking-[0.16em] text-stone-100">LLM Arena 評測表</h2>
+        <h2 className="text-sm font-medium uppercase tracking-[0.16em] text-stone-100">{copy.tableTitle}</h2>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <input
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            placeholder="搜尋 provider / model / output"
+            placeholder={copy.searchPlaceholder}
             className="h-8 w-60 border border-stone-200/18 bg-[rgb(var(--pm-input))] px-2 text-xs text-stone-200 outline-none"
           />
           <select
@@ -397,20 +405,20 @@ export function LlmArenaMatrixTable({
             onChange={(e) => setCategory(e.target.value as typeof category)}
             className="h-8 border border-stone-200/18 bg-[rgb(var(--pm-input))] px-2 text-xs text-stone-200 outline-none"
           >
-            <option value="all" className="bg-stone-900">全部運算面</option>
-            <option value="vendor_saas" className="bg-stone-900">公有雲 API</option>
-            <option value="on_prem" className="bg-stone-900">地端 / 內網</option>
-            <option value="unknown" className="bg-stone-900">未知</option>
+            <option value="all" className="bg-stone-900">{copy.allPlanes}</option>
+            <option value="vendor_saas" className="bg-stone-900">{copy.executionPlane.vendorSaas}</option>
+            <option value="on_prem" className="bg-stone-900">{copy.executionPlane.onPrem}</option>
+            <option value="unknown" className="bg-stone-900">{copy.executionPlane.unknown}</option>
           </select>
           <button onClick={onClearAll} className="text-[11px] text-stone-400 hover:text-stone-200 uppercase tracking-widest px-2">
-            清除結果
+            {copy.clearResults}
           </button>
           <button
             onClick={onAddModel}
             disabled={selectedModels.length >= 10}
             className="flex items-center gap-1 border border-stone-200/22 px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-stone-200 hover:bg-stone-200/8 transition-colors disabled:opacity-50"
           >
-            <Plus size={12} /> 新增模型
+            <Plus size={12} /> {copy.addModel}
           </button>
           <button
             onClick={onRunSelectedRows}
@@ -418,7 +426,7 @@ export function LlmArenaMatrixTable({
             className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-emerald-50 px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isRunning ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
-            全測
+            {copy.runAll}
           </button>
         </div>
       </div>
@@ -450,8 +458,8 @@ export function LlmArenaMatrixTable({
               <tr>
                 <td colSpan={table.getVisibleLeafColumns().length} className="px-4 py-8 text-center text-xs text-stone-500">
                   {selectedModels.length === 0
-                    ? '目前沒有模型列。先按「新增模型」，再開始 LLM 能力評測。'
-                    : '沒有符合目前篩選條件的列。'}
+                    ? copy.emptyNoModels
+                    : copy.emptyNoFilteredRows}
                 </td>
               </tr>
             )}

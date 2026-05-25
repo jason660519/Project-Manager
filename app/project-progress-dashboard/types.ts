@@ -59,7 +59,7 @@ export interface WidthPreset {
 /** Phase tab ids — match FeaturePhase 1:1. */
 export const PHASE_IDS = ['development', 'e2e_testing', 'deployment', 'operations'] as const;
 
-/** All dashboard sheet ids, in visual order. */
+/** Default dashboard sheet ids, in visual order. User preferences may reorder display only. */
 export const SHEET_IDS = ['projects', 'issues', ...PHASE_IDS] as const;
 
 /** All recognized tab ids: phase tabs + sheet tabs. */

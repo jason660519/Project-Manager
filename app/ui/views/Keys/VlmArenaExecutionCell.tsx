@@ -3,7 +3,7 @@
 import React from 'react';
 import { Gauge, Loader2, Play } from 'lucide-react';
 import type { ArenaResult } from './useArenaChat';
-import { VLM_SCENARIOS, type ScenarioId } from './VlmArenaTypes';
+import { getVlmScenarioItems, vlmStatusMeta, type ScenarioId, type VlmArenaCopy } from './VlmArenaTypes';
 
 interface VlmArenaExecutionCellProps {
   result?: ArenaResult;
@@ -11,6 +11,7 @@ interface VlmArenaExecutionCellProps {
   imageDataUrl: string | null;
   hasUserPrompt: boolean;
   scenario: ScenarioId;
+  copy: VlmArenaCopy;
   onScenarioChange: (scenarioId: ScenarioId) => void;
   onRunSingle: () => void;
 }
@@ -21,15 +22,12 @@ export function VlmArenaExecutionCell({
   imageDataUrl,
   hasUserPrompt,
   scenario,
+  copy,
   onScenarioChange,
   onRunSingle,
 }: VlmArenaExecutionCellProps) {
-  const status = result?.error ? '失敗' : result ? '完成' : '待測';
-  const statusClass = result?.error
-    ? 'bg-red-500/15 text-red-400'
-    : result
-      ? 'bg-emerald-500/15 text-emerald-400'
-      : 'bg-stone-500/15 text-stone-400';
+  const status = vlmStatusMeta(result, copy);
+  const scenarios = getVlmScenarioItems(copy);
 
   return (
     <>
@@ -39,7 +37,7 @@ export function VlmArenaExecutionCell({
           onChange={(event) => onScenarioChange(event.target.value as ScenarioId)}
           className="w-full min-w-[120px] bg-[rgb(var(--pm-input))] border border-stone-200/20 text-stone-200 text-xs py-1 px-2 outline-none"
         >
-          {VLM_SCENARIOS.map((item) => (
+          {scenarios.map((item) => (
             <option key={item.id} value={item.id} className="bg-stone-900">
               {item.label}
             </option>
@@ -51,14 +49,14 @@ export function VlmArenaExecutionCell({
           onClick={onRunSingle}
           disabled={isRunning || !imageDataUrl || !hasUserPrompt}
           className="inline-flex h-7 items-center gap-1 rounded border border-emerald-200/25 bg-emerald-100/10 px-2 text-[11px] font-medium text-emerald-100 hover:bg-emerald-100/18 disabled:opacity-40"
-          title="執行單列評測"
+          title={copy.runSingleTitle}
         >
           {isRunning ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
-          Run
+          {copy.columns.run}
         </button>
       </td>
       <td className="px-3 py-2">
-        <span className={`inline-flex rounded-sm px-2 py-0.5 text-[10px] font-semibold ${statusClass}`}>{status}</span>
+        <span className={`inline-flex rounded-sm px-2 py-0.5 text-[10px] font-semibold ${status.className}`}>{status.text}</span>
       </td>
       <td className="px-3 py-2 text-xs font-mono text-stone-400">
         {result ? (

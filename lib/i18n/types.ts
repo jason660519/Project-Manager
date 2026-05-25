@@ -454,6 +454,185 @@ export interface Translations {
     /** Uses {id} and {fallback} placeholders */
     adapterWarningHint: string;
   };
+  keysArena: {
+    common: {
+      run: string;
+      view: string;
+      delete: string;
+      history: string;
+      noValue: string;
+    };
+    llm: {
+      methodTitle: string;
+      methodDocLink: string;
+      autoAddTopModels: string;
+      autoAddNoModels: string;
+      /** Uses {count} placeholder */
+      autoAddAdded: string;
+      tableTitle: string;
+      searchPlaceholder: string;
+      allPlanes: string;
+      clearResults: string;
+      addModel: string;
+      runAll: string;
+      emptyNoModels: string;
+      emptyNoFilteredRows: string;
+      noOutput: string;
+      errorReply: string;
+      evaluationTitle: string;
+      evaluationNotePlaceholder: string;
+      runSingleTitle: string;
+      viewDetailTitle: string;
+      deleteRowTitle: string;
+      detailTitle: string;
+      exportMarkdown: string;
+      historyEmpty: string;
+      historyExportTitle: string;
+      historyEmptyRow: string;
+      columns: {
+        test: string;
+        provider: string;
+        model: string;
+        invocationPath: string;
+        executionPlane: string;
+        run: string;
+        status: string;
+        testPrompt: string;
+        rawOutput: string;
+        renderedOutput: string;
+        evaluation: string;
+        ttft: string;
+        e2e: string;
+        tokensPerSecond: string;
+        token: string;
+        history: string;
+        actions: string;
+        time: string;
+        summary: string;
+        latency: string;
+      };
+      invocationPath: {
+        cli: string;
+        http: string;
+      };
+      executionPlane: {
+        vendorSaas: string;
+        onPrem: string;
+        unknown: string;
+      };
+      evaluationOptions: {
+        pending: string;
+        pass: string;
+        warning: string;
+        fail: string;
+      };
+      statuses: {
+        queued: string;
+        failed: string;
+        completed: string;
+      };
+      resultSummary: {
+        notRun: string;
+        failedPrefix: string;
+        completedEmpty: string;
+      };
+      methodRows: Array<{
+        dimension: string;
+        observe: string;
+        passRule: string;
+      }>;
+    };
+    vlm: {
+      inputTitle: string;
+      uploadImage: string;
+      removeUploadedImage: string;
+      imageDetail: string;
+      imageDetailLow: string;
+      imageDetailHigh: string;
+      methodTitle: string;
+      tableTitle: string;
+      clearResults: string;
+      addModel: string;
+      importTopModels: string;
+      runAll: string;
+      emptyNoModels: string;
+      runSingleTitle: string;
+      viewDetailTitle: string;
+      deleteRowTitle: string;
+      notePlaceholder: string;
+      noResponseContent: string;
+      noOutput: string;
+      notRun: string;
+      historyEmpty: string;
+      detailTitle: string;
+      currentScenario: string;
+      composedPrompt: string;
+      latestOutput: string;
+      runHistory: string;
+      scenarioLabelPrefix: string;
+      rowSystemPromptPlaceholder: string;
+      rowUserPromptPlaceholder: string;
+      promptTaskPrefix: string;
+      promptTaskFallback: string;
+      promptOutputFormat: string;
+      columns: {
+        test: string;
+        provider: string;
+        model: string;
+        scenario: string;
+        systemPrompt: string;
+        userPromptBase: string;
+        run: string;
+        status: string;
+        latency: string;
+        token: string;
+        modelScore: string;
+        note: string;
+        outputSummary: string;
+        history: string;
+        actions: string;
+      };
+      statuses: {
+        queued: string;
+        failed: string;
+        completed: string;
+      };
+      scores: {
+        unrated: string;
+        pass: string;
+        good: string;
+        great: string;
+        fail: string;
+      };
+      scenarios: {
+        spaceRead: {
+          label: string;
+          instruction: string;
+        };
+        adCopy: {
+          label: string;
+          instruction: string;
+        };
+        designAdvice: {
+          label: string;
+          instruction: string;
+        };
+        errorTolerance: {
+          label: string;
+          instruction: string;
+        };
+        render2d3d: {
+          label: string;
+          instruction: string;
+        };
+      };
+      methodRows: Array<{
+        dimension: string;
+        observe: string;
+        passRule: string;
+      }>;
+    };
+  };
   codeEditor: {
     title: string;
     save: string;

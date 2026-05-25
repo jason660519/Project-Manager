@@ -4,10 +4,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useKeysContext } from './KeysContext';
 import { useArenaChat, type ArenaResult } from './useArenaChat';
 import { listLlmProviders, type LlmProviderId } from '../../../../lib/keys/llmProviders';
+import { useI18n } from '../../../../lib/i18n';
 import { VlmArenaMethodPanel } from './VlmArenaMethodPanel';
 import { VlmArenaMatrixTable } from './VlmArenaMatrixTable';
 import { VlmArenaDetailSheet } from './VlmArenaDetailSheet';
-import { VLM_SCENARIOS, type RowScore, type RunHistoryEntry, type ScenarioId } from './VlmArenaTypes';
+import { getVlmScenarioItems, type RowScore, type RunHistoryEntry, type ScenarioId } from './VlmArenaTypes';
 
 const ENV_TOP_MODEL_PRESETS: Array<{ provider: LlmProviderId; model: string }> = [
   { provider: 'anthropic', model: 'claude-sonnet-4-6' },
@@ -19,6 +20,8 @@ const ENV_TOP_MODEL_PRESETS: Array<{ provider: LlmProviderId; model: string }> =
 ];
 
 export function VlmArenaSheet() {
+  const { t } = useI18n();
+  const copy = t.keysArena.vlm;
   const { vlmState, setVlmState } = useKeysContext();
   const { runComparison, results, clearResults, isRunning } = useArenaChat();
   const allProviders = listLlmProviders();
@@ -103,17 +106,17 @@ export function VlmArenaSheet() {
   }, [vlmState.selectedModels, vlmState.systemPrompt, vlmState.userPrompt]);
 
   const scenarioMap = useMemo(
-    () => Object.fromEntries(VLM_SCENARIOS.map((item) => [item.id, item])),
-    []
+    () => Object.fromEntries(getVlmScenarioItems(copy).map((item) => [item.id, item])),
+    [copy]
   );
 
   const buildRowPrompt = (index: number) => {
     const scenario = scenarioMap[scenarioByIndex[index] ?? 'space_read'];
     return [
       (rowUserPromptByIndex[index] ?? '').trim(),
-      `評測任務：${scenario?.label ?? '空間辨識'}`,
+      `${copy.promptTaskPrefix}${scenario?.label ?? copy.promptTaskFallback}`,
       scenario?.instruction ?? '',
-      '輸出格式：先摘要，再列出重點，最後給風險或不確定項目。',
+      copy.promptOutputFormat,
     ]
       .filter(Boolean)
       .join('\n\n');
@@ -255,6 +258,7 @@ export function VlmArenaSheet() {
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
       <VlmArenaMethodPanel
+        copy={copy}
         imageDataUrl={vlmState.imageDataUrl}
         imageDetail={vlmState.imageDetail}
         fileInputRef={fileInputRef}
@@ -264,6 +268,7 @@ export function VlmArenaSheet() {
       />
 
       <VlmArenaMatrixTable
+        copy={copy}
         selectedModels={vlmState.selectedModels}
         providers={allProviders}
         results={results}
@@ -294,6 +299,7 @@ export function VlmArenaSheet() {
       />
 
       <VlmArenaDetailSheet
+        copy={copy}
         selectedDetailIndex={selectedDetailIndex}
         selectedModel={selectedDetailIndex !== null ? vlmState.selectedModels[selectedDetailIndex] : undefined}
         result={selectedDetailIndex !== null ? results[`${vlmState.selectedModels[selectedDetailIndex]?.provider}-${vlmState.selectedModels[selectedDetailIndex]?.model}`] : undefined}

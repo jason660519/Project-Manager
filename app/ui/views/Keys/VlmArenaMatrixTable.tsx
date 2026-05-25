@@ -3,13 +3,14 @@
 import React from 'react';
 import { Loader2, Play, Plus } from 'lucide-react';
 import type { ArenaModelSpec, ArenaResult } from './useArenaChat';
-import { type ProviderLike, type RowScore, type RunHistoryEntry, type ScenarioId } from './VlmArenaTypes';
+import { type ProviderLike, type RowScore, type RunHistoryEntry, type ScenarioId, type VlmArenaCopy } from './VlmArenaTypes';
 import { VlmArenaModelCell } from './VlmArenaModelCell';
 import { VlmArenaExecutionCell } from './VlmArenaExecutionCell';
 import { VlmArenaReviewCell } from './VlmArenaReviewCell';
 import { VlmArenaPromptCell } from './VlmArenaPromptCell';
 
 interface VlmArenaMatrixTableProps {
+  copy: VlmArenaCopy;
   selectedModels: ArenaModelSpec[];
   providers: readonly ProviderLike[];
   results: Record<string, ArenaResult>;
@@ -40,6 +41,7 @@ interface VlmArenaMatrixTableProps {
 }
 
 export function VlmArenaMatrixTable({
+  copy,
   selectedModels,
   providers,
   results,
@@ -71,26 +73,26 @@ export function VlmArenaMatrixTable({
   return (
     <section className="border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72 shadow-xl backdrop-blur-sm rounded-sm flex min-h-0 flex-1 flex-col">
       <div className="flex items-center justify-between border-b border-stone-200/12 px-4 py-3 bg-white/[0.02]">
-        <h2 className="text-sm font-medium uppercase tracking-[0.16em] text-stone-100">VLM Arena 評測表</h2>
+        <h2 className="text-sm font-medium uppercase tracking-[0.16em] text-stone-100">{copy.tableTitle}</h2>
         <div className="flex items-center gap-2">
           <button
             onClick={onClearAll}
             className="text-[11px] text-stone-400 hover:text-stone-200 uppercase tracking-widest px-2"
           >
-            清除結果
+            {copy.clearResults}
           </button>
           <button
             onClick={onAddModel}
             disabled={selectedModels.length >= 8}
             className="flex items-center gap-1 border border-stone-200/22 px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-stone-200 hover:bg-stone-200/8 transition-colors disabled:opacity-50"
           >
-            <Plus size={12} /> 新增模型
+            <Plus size={12} /> {copy.addModel}
           </button>
           <button
             onClick={onAddTopModels}
             className="flex items-center gap-1 border border-emerald-300/30 px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-emerald-200 hover:bg-emerald-400/10 transition-colors"
           >
-            匯入 .env 頂尖模型
+            {copy.importTopModels}
           </button>
           <button
             onClick={onRunSelectedRows}
@@ -98,7 +100,7 @@ export function VlmArenaMatrixTable({
             className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-emerald-50 px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isRunning ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
-            全測
+            {copy.runAll}
           </button>
         </div>
       </div>
@@ -108,21 +110,21 @@ export function VlmArenaMatrixTable({
           <thead className="sticky top-0 z-10 border-b border-stone-200/12 bg-stone-900">
             <tr>
               <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">#</th>
-              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">測試</th>
-              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">Provider</th>
-              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">Model</th>
-              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">情境</th>
-              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">System Prompt</th>
-              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">User Prompt Base</th>
-              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">Run</th>
-              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">狀態</th>
-              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">Latency</th>
-              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">Token</th>
-              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">模型評分</th>
-              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">評語</th>
-              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">輸出摘要</th>
-              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">History</th>
-              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">操作</th>
+              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">{copy.columns.test}</th>
+              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">{copy.columns.provider}</th>
+              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">{copy.columns.model}</th>
+              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">{copy.columns.scenario}</th>
+              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">{copy.columns.systemPrompt}</th>
+              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">{copy.columns.userPromptBase}</th>
+              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">{copy.columns.run}</th>
+              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">{copy.columns.status}</th>
+              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">{copy.columns.latency}</th>
+              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">{copy.columns.token}</th>
+              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">{copy.columns.modelScore}</th>
+              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">{copy.columns.note}</th>
+              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">{copy.columns.outputSummary}</th>
+              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">{copy.columns.history}</th>
+              <th className="px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400">{copy.columns.actions}</th>
             </tr>
           </thead>
           <tbody>
@@ -152,12 +154,14 @@ export function VlmArenaMatrixTable({
                     imageDataUrl={imageDataUrl}
                     hasUserPrompt={!!rowUserPromptByIndex[index]?.trim()}
                     scenario={scenarioByIndex[index] ?? 'space_read'}
+                    copy={copy}
                     onScenarioChange={(scenarioId) => onScenarioChange(index, scenarioId)}
                     onRunSingle={() => onRunSingleRow(index)}
                   />
                   <VlmArenaPromptCell
                     systemPrompt={rowSystemPromptByIndex[index] ?? ''}
                     userPrompt={rowUserPromptByIndex[index] ?? ''}
+                    copy={copy}
                     onSystemPromptChange={(prompt) => onRowSystemPromptChange(index, prompt)}
                     onUserPromptChange={(prompt) => onRowUserPromptChange(index, prompt)}
                   />
@@ -166,6 +170,7 @@ export function VlmArenaMatrixTable({
                     score={scoreByIndex[index] ?? 'unrated'}
                     note={noteByIndex[index] ?? ''}
                     historyCount={rowHistory.length}
+                    copy={copy}
                     onScoreChange={(score) => onScoreChange(index, score)}
                     onNoteChange={(note) => onNoteChange(index, note)}
                     onOpenDetail={() => onOpenDetail(index)}
@@ -177,7 +182,7 @@ export function VlmArenaMatrixTable({
             {selectedModels.length === 0 && (
               <tr>
                 <td colSpan={16} className="px-4 py-8 text-center text-xs text-stone-500">
-                  目前沒有模型列。先按「新增模型」，再開始文+圖生圖能力評測。
+                  {copy.emptyNoModels}
                 </td>
               </tr>
             )}

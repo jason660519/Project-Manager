@@ -1,7 +1,11 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
-import { SheetTabs } from '../app/project-progress-dashboard/_components/SheetTabs';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  DASHBOARD_SHEET_ORDER_STORAGE_KEY,
+  normalizeSheetOrder,
+  SheetTabs,
+} from '../app/project-progress-dashboard/_components/SheetTabs';
 import { I18nProvider } from '../lib/i18n';
 
 function renderSheetTabs(onTabChange = vi.fn()) {
@@ -24,6 +28,10 @@ function renderSheetTabs(onTabChange = vi.fn()) {
 }
 
 describe('Project progress sheet tabs', () => {
+  afterEach(() => {
+    window.localStorage.clear();
+  });
+
   it('places Issues directly after Projects', () => {
     renderSheetTabs();
 
@@ -40,5 +48,36 @@ describe('Project progress sheet tabs', () => {
     await user.click(screen.getByRole('button', { name: /projects/i }));
 
     expect(onTabChange).toHaveBeenCalledWith('projects');
+  });
+
+  it('persists user-reordered sheets after pointer drag', () => {
+    renderSheetTabs();
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: /issues sheet/i }), { button: 0 });
+    fireEvent.pointerEnter(screen.getByRole('button', { name: /projects sheet/i }));
+    fireEvent.pointerUp(window);
+
+    const buttons = screen.getAllByRole('button');
+    expect(within(buttons[0]).getByText('Issues')).toBeInTheDocument();
+    expect(within(buttons[1]).getByText('Projects')).toBeInTheDocument();
+    expect(JSON.parse(window.localStorage.getItem(DASHBOARD_SHEET_ORDER_STORAGE_KEY) ?? '[]')).toEqual([
+      'issues',
+      'projects',
+      'development',
+      'e2e_testing',
+      'deployment',
+      'operations',
+    ]);
+  });
+
+  it('normalizes invalid stored order by removing unknowns and appending missing sheets', () => {
+    expect(normalizeSheetOrder(['operations', 'unknown', 'operations', 'projects'])).toEqual([
+      'operations',
+      'projects',
+      'issues',
+      'development',
+      'e2e_testing',
+      'deployment',
+    ]);
   });
 });

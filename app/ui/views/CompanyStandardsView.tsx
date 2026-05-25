@@ -4,17 +4,22 @@ import {
   BadgeCheck,
   Boxes,
   CheckCircle2,
+  ClipboardCheck,
   ExternalLink,
+  FileCheck2,
   FileText,
   FolderOpen,
   GitBranch,
   Layers3,
+  Languages,
   Package,
   PanelsTopLeft,
   Route,
   ScanSearch,
   ShieldCheck,
   Sparkles,
+  Terminal,
+  TriangleAlert,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { openPath } from '../../../lib/bridge';
@@ -46,6 +51,17 @@ interface StandardLayer {
   examples: string[];
   icon: LucideIcon;
   tone: Tone;
+}
+
+interface StandardsGate {
+  label: string;
+  status: string;
+  statusTone: Tone;
+  command: string;
+  scope: string;
+  detail: string;
+  tags: string[];
+  icon: LucideIcon;
 }
 
 interface AppProfile {
@@ -168,9 +184,56 @@ const STANDARD_LAYERS: StandardLayer[] = [
     title: 'Governance',
     owner: 'Executable standards',
     purpose: 'Checks, reports, ADRs, templates, and version gates that keep rules from becoming advice-only docs.',
-    examples: ['standards:check', 'docs:check', 'P0/P1/P2', 'ADR deviations'],
+    examples: ['i18n:check', 'standards:check', 'docs:check', 'P0/P1/P2'],
     icon: ShieldCheck,
     tone: 'stone',
+  },
+];
+
+const STANDARDS_GATES: StandardsGate[] = [
+  {
+    label: 'UI i18n hardcoded-copy gate',
+    status: 'Active',
+    statusTone: 'emerald',
+    command: 'npm run i18n:check',
+    scope: 'Project Manager local',
+    detail:
+      'Scans Keys Arena UI files for hardcoded CJK copy so visible strings stay in lib/i18n translations.',
+    tags: ['Arena scope', 'visible copy', 'blocking'],
+    icon: Languages,
+  },
+  {
+    label: 'Composite standards gate',
+    status: 'Active',
+    statusTone: 'emerald',
+    command: 'npm run standards:check',
+    scope: 'PM plus company baseline',
+    detail:
+      'Runs the PM-local i18n gate first, then delegates to the company standards checker for the shared baseline.',
+    tags: ['preflight', 'company script', 'blocking'],
+    icon: ClipboardCheck,
+  },
+  {
+    label: 'Documentation governance',
+    status: 'Active',
+    statusTone: 'cyan',
+    command: 'npm run docs:check',
+    scope: 'Repo documentation',
+    detail:
+      'Keeps public/internal docs, naming, bilingual layout, and source-of-truth placement aligned with PM rules.',
+    tags: ['docs layout', 'naming', 'public guide'],
+    icon: FileCheck2,
+  },
+  {
+    label: 'Color-token drift',
+    status: 'P2 advisory',
+    statusTone: 'amber',
+    command: 'company-standards.sh check .',
+    scope: 'Company baseline advisory',
+    detail:
+      'Flags hardcoded color drift as a follow-up until the shared token package and migration plan are ready.',
+    tags: ['design tokens', 'non-blocking', 'follow-up'],
+    icon: TriangleAlert,
   },
 ];
 
@@ -225,7 +288,8 @@ const PACKAGE_LANES: PackageLane[] = [
   {
     label: '@company-ai/standards-checks',
     stage: 'next',
-    detail: 'Reusable checker package behind standards:check, standards:doctor, and standards:report.',
+    detail:
+      'Reusable checker package behind standards:check, standards:doctor, standards:report, UI i18n, and hardcoded-copy gates.',
     icon: ScanSearch,
   },
   {
@@ -374,6 +438,20 @@ export function CompanyStandardsView() {
 
       <section className="border border-stone-200/12 bg-[rgb(var(--pm-panel))]/62">
         <SectionHeader
+          icon={Terminal}
+          eyebrow="Current project gates"
+          title="Show Executable Checks Without Running Shell Commands Here"
+          detail="The hub exposes the active PM standards gates and the upstream extraction target. Live execution should stay behind the optional standards plugin or a guarded local bridge."
+        />
+        <div className="grid gap-3 p-4 lg:grid-cols-2">
+          {STANDARDS_GATES.map((gate) => (
+            <StandardsGateCard key={gate.command} gate={gate} />
+          ))}
+        </div>
+      </section>
+
+      <section className="border border-stone-200/12 bg-[rgb(var(--pm-panel))]/62">
+        <SectionHeader
           icon={Layers3}
           eyebrow="Recommended information architecture"
           title="Separate Common Standards From App Profiles"
@@ -495,6 +573,46 @@ function MetricCard({ metric }: { metric: Metric }) {
       <p className={`mt-1 text-lg font-semibold ${tone.text}`}>{metric.value}</p>
       <p className="mt-1 text-[11px] leading-4 text-stone-400">{metric.detail}</p>
     </div>
+  );
+}
+
+function StandardsGateCard({ gate }: { gate: StandardsGate }) {
+  const tone = TONE_STYLES[gate.statusTone];
+  return (
+    <article className={`min-w-0 border ${tone.border} ${tone.bg} p-3`}>
+      <div className="flex items-start gap-3">
+        <div className={`flex h-9 w-9 shrink-0 items-center justify-center border ${tone.border} bg-[rgb(var(--pm-input))] ${tone.icon}`}>
+          <gate.icon size={16} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-semibold text-stone-50">{gate.label}</h3>
+            <span
+              className={`border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${tone.border} ${tone.text}`}
+            >
+              {gate.status}
+            </span>
+          </div>
+          <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-500">
+            {gate.scope}
+          </p>
+          <code className="mt-2 block truncate border border-stone-200/12 bg-black/20 px-2 py-1 font-mono text-[11px] text-stone-200">
+            {gate.command}
+          </code>
+          <p className="mt-2 text-xs leading-5 text-stone-400">{gate.detail}</p>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {gate.tags.map((tag) => (
+              <span
+                key={tag}
+                className="border border-stone-200/12 bg-[rgb(var(--pm-input))]/75 px-2 py-0.5 text-[10px] text-stone-300"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </article>
   );
 }
 

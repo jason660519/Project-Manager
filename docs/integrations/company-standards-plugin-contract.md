@@ -30,11 +30,21 @@ Provide an optional integration where Project Manager can query company standard
 - Purpose: Execute standards checks for a target project path.
 - Input:
   - `projectPath`: string
-  - `scope`: string array (example: `["docs", "design", "workflow"]`)
+  - `scope`: string array (example: `["docs", "design", "workflow", "i18n"]`)
 - Output:
   - `status`: `ok` | `warn` | `fail`
   - `summary`: string
   - `findings`: array of `{ severity, code, message, filePath? }`
+
+Known scope ids should remain stable so consumer apps can render consistent filters and summaries:
+
+| Scope | Meaning |
+|---|---|
+| `docs` | Documentation naming, classification, structure, and publishability checks. |
+| `design` | UI design-system conformance, including token drift and hardcoded color advisories. |
+| `workflow` | AI engineer workflow, required files, command availability, and release-gate checks. |
+| `tables` | Table governance profile checks for dense operational views. |
+| `i18n` | Visible UI copy localization checks, including hardcoded-copy and mixed-locale findings. |
 
 ### 3) `standards.template.list`
 
@@ -61,5 +71,5 @@ Provide an optional integration where Project Manager can query company standard
 1. Start Company Standards app/provider.
 2. Start PM and open integrations/standards surface.
 3. Call `standards.profile.get` for table profile.
-4. Call `standards.check.run` on PM root and verify structured findings render.
+4. Call `standards.check.run` on PM root with `["docs", "design", "i18n"]` and verify structured findings render.
 5. Stop provider and confirm PM degrades gracefully without blocking core features.

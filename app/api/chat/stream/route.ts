@@ -25,7 +25,7 @@ const DEFAULT_MODELS: Record<string, string> = {
   anthropic: 'claude-sonnet-4-6',
   openai: 'gpt-4o',
   gemini: 'gemini-1.5-pro-latest',
-  deepseek: 'deepseek-chat',
+  deepseek: 'deepseek-v4-pro',
   grok: 'grok-2-latest',
   kimi: 'kimi-k2.6',
   openrouter: 'anthropic/claude-3.5-sonnet',
@@ -37,6 +37,25 @@ const DEFAULT_MODELS: Record<string, string> = {
 
 /** Fallback chain when no provider is specified by the client. */
 const FALLBACK_PROVIDERS = ['deepseek', 'anthropic', 'openai', 'gemini', 'grok'];
+
+/** Detect provider from model name patterns. */
+function detectProviderFromModel(model: string): string | undefined {
+  const patterns: Array<{ pattern: RegExp; provider: string }> = [
+    { pattern: /^deepseek/i, provider: 'deepseek' },
+    { pattern: /^claude/i, provider: 'anthropic' },
+    { pattern: /^gpt/i, provider: 'openai' },
+    { pattern: /^o1|^o3/i, provider: 'openai' },
+    { pattern: /^gemini/i, provider: 'gemini' },
+    { pattern: /^grok/i, provider: 'grok' },
+    { pattern: /^kimi|^moonshot/i, provider: 'kimi' },
+    { pattern: /^qwen/i, provider: 'qwen' },
+    { pattern: /^glm/i, provider: 'zhipu' },
+  ];
+  for (const { pattern, provider } of patterns) {
+    if (pattern.test(model)) return provider;
+  }
+  return undefined;
+}
 
 function getSystemPrompt(): string {
   return [
@@ -253,12 +272,16 @@ export async function POST(request: NextRequest) {
 
   const systemPrompt = body.systemPrompt;
 
-  // If the client specified a provider, try it first, then fall back to chain on failure
+  // If the client specified a provider, try it first, then fall back to chain on failure.
+  // Smart routing: if model name matches a provider pattern, try that provider first.
   const errors: string[] = [];
   const startProvider = body.provider;
+  const modelProvider = body.model ? detectProviderFromModel(body.model) : undefined;
   const providersToTry = startProvider
     ? [startProvider, ...FALLBACK_PROVIDERS.filter(p => p !== startProvider)]
-    : FALLBACK_PROVIDERS;
+    : modelProvider
+      ? [modelProvider, ...FALLBACK_PROVIDERS.filter(p => p !== modelProvider)]
+      : FALLBACK_PROVIDERS;
 
   for (const provider of providersToTry) {
     const model = body.model || DEFAULT_MODELS[provider] || 'default';

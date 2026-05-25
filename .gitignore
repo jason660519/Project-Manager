@@ -14,6 +14,9 @@ pnpm-debug.log*
 # TypeScript
 *.tsbuildinfo
 
+# Test output
+test-results/
+
 # Env files
 .env
 .env.*

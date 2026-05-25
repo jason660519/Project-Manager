@@ -6,7 +6,7 @@ import type {
   ActiveRun, AnyAdapterConfig, CompletedRun, CronJob, EngineerRole,
   Feature, FeaturePhase, FeaturePromptConfig, ProjectConfig, ProjectEntry,
 } from '../../lib/types';
-import type { TabId } from './types';
+import { PHASE_IDS, SHEET_IDS, type TabId } from './types';
 import type { CustomProjectProgressRow } from './types';
 import { usePhasePreferences } from './_lib/usePhasePreferences';
 import { computePhaseCounts, type PhaseRow } from './_lib/phaseRows';
@@ -62,8 +62,8 @@ interface ProjectProgressClientProps {
   onRunEnd?: (pid: number, exitCode: number) => void;
 }
 
-const PHASE_IDS_ARRAY: FeaturePhase[] = ['development', 'e2e_testing', 'deployment', 'operations'];
-const TAB_IDS_ARRAY: TabId[] = ['projects', 'issues', ...PHASE_IDS_ARRAY];
+const PHASE_IDS_ARRAY: FeaturePhase[] = [...PHASE_IDS];
+const TAB_IDS_ARRAY: TabId[] = [...SHEET_IDS];
 
 /** Legacy URL hash from before the testing tab was renamed to E2E. */
 const LEGACY_PHASE_HASH: Record<string, FeaturePhase> = {

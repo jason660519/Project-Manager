@@ -18,10 +18,11 @@ This view is a **dashboard, not an editor**. It explains:
 
 - The recommended layering for company-wide standards versus per-app profiles.
 - Which apps already consume the baseline and which still need a profile.
+- Which Project Manager standards gates are currently active.
 - Which packages should be extracted from the standards repo, and in what order.
 - Where the canonical source files live so you can open them in one click.
 
-Every "Open" button on the page routes through the Tauri shell's `openPath`, which reveals the file in your OS file manager / editor. Nothing here mutates the standards repo from inside Project Manager.
+Every "Open" button on the page routes through the Tauri shell's `openPath`, which reveals the file in your OS file manager / editor. Nothing here mutates the standards repo from inside Project Manager, and the hub does not execute shell commands directly.
 
 ## Anatomy of the page
 
@@ -32,6 +33,9 @@ Every "Open" button on the page routes through the Tauri shell's `openPath`, whi
 │   1. Company baseline → 2. App profile → 3. Repo override → 4. ADR …     │
 ├──────────────────────────────────────────────────────────────────────────┤
 │ [Baseline v0.2] [Governed Apps 4] [PM Profile Active] [Runtime Optional] │  ← four metric cards
+├──────────────────────────────────────────────────────────────────────────┤
+│ Current Project Gates                                                     │
+│   i18n:check      standards:check      docs:check      color advisory     │  ← executable gate map
 ├──────────────────────────────────────────────────────────────────────────┤
 │ Recommended Information Architecture                                     │
 │   [ Foundations | Components | Patterns | App Profiles | Governance ]    │  ← 5 standard layers
@@ -63,6 +67,19 @@ Four at-a-glance numbers across the top:
 | **PM Profile** | `Active` | Whether Project Manager has a repo-local override layer wired in. |
 | **Runtime** | `Optional` | The Standards app can be consumed at runtime via a plugin or just as static docs — both are supported. |
 
+### Current Project Gates
+
+This section lists the checks Project Manager expects engineers to run before shipping standards-sensitive work. It is intentionally a gate map, not a shell runner.
+
+| Gate | Command | Scope | Status |
+|---|---|---|---|
+| UI i18n hardcoded-copy gate | `npm run i18n:check` | Project Manager local | Active blocker |
+| Composite standards gate | `npm run standards:check` | PM plus company baseline | Active blocker |
+| Documentation governance | `npm run docs:check` | Repo documentation | Active blocker |
+| Color-token drift | `company-standards.sh check .` | Company baseline advisory | P2 advisory |
+
+The current `standards:check` script runs the PM-local `i18n:check` first, then delegates to the company standards checker. The `i18n:check` scope is deliberately narrow today: it scans the Keys Arena UI files for hardcoded CJK copy so strings must move through `lib/i18n`. If this rule proves stable across apps, it should move upstream into `@company-ai/standards-checks` or the company `company-standards.sh` implementation.
+
 ### Recommended Information Architecture (5 layers)
 
 The five layers that the company baseline expects every governed app to acknowledge:
@@ -73,7 +90,7 @@ The five layers that the company baseline expects every governed app to acknowle
 | **Components** | Company baseline first | Reusable UI contracts (table contract, resource links, modal risk copy, empty states) before code extraction. |
 | **Patterns** | Cross-app UX | Repeatable workflows: agent execution, plugin contracts, secrets UX, evidence-first review. |
 | **App Profiles** | Each app repo | Product-specific personality and stricter overrides (e.g. Project Manager's table-first density). |
-| **Governance** | Executable standards | `standards:check`, `docs:check`, P0/P1/P2 levels, ADR deviation flow. |
+| **Governance** | Executable standards | `i18n:check`, `standards:check`, `docs:check`, P0/P1/P2 levels, ADR deviation flow. |
 
 Each layer renders as a card with example tags so you can see, at a glance, what is "shared" versus "owned by the app".
 
@@ -97,7 +114,7 @@ A staged roadmap for what to extract from the standards repo into shared package
 |---|---|---|
 | **Now** | `@company-ai/standards-manifest` | Machine-readable index of foundations, components, patterns, profiles, checks, and resource paths. Cheapest extraction; biggest leverage. |
 | **Next** | `@company-ai/tokens` | Shared CSS variables / Tailwind preset once token names settle across PM and SayDo. |
-| **Next** | `@company-ai/standards-checks` | Reusable checker behind `standards:check`, `standards:doctor`, `standards:report`. |
+| **Next** | `@company-ai/standards-checks` | Reusable checker behind `standards:check`, `standards:doctor`, `standards:report`, UI i18n, and hardcoded-copy gates. |
 | **Later** | `@company-ai/ui-primitives` | Only after two or more apps converge on the same framework-level component contracts (PM is Next + Tailwind + lucide; Standards is Vite + Mantine + Tabler — extraction would be premature today). |
 
 ### Implementation Stance
@@ -127,7 +144,7 @@ Buttons reveal the file (or folder) in your OS file manager. The hub doesn't ren
 |---|---|
 | Editing standards content | Open the file from the resource grid and edit it directly. |
 | Per-project overrides | `.project-manager/config.json` at the project root. |
-| Running `standards:check` | A CLI / package surface is in the `Next` lane of the extraction roadmap. |
+| Running arbitrary shell commands from the hub | Run the listed npm scripts in a terminal until the guarded plugin/bridge contract is implemented. |
 | ADR creation | `docs/architecture/ADR-*.md` in this repo; the hub only links to the decision flow, it doesn't write ADRs. |
 | Live plugin status | [Integrations Hub](./integrations-hub.md) — the standards plugin is optional and surfaces there if wired. |
 
@@ -135,7 +152,7 @@ Buttons reveal the file (or folder) in your OS file manager. The hub doesn't ren
 
 | Follow-up | Why it matters |
 |---|---|
-| Live `standards:check` summary | Replace the static "Baseline v0.2" card with a real check result (pass / warn / fail counts). |
+| Live `standards:check` summary | Replace the static gate map with real pass / warn / fail counts once `standards.check.run` is available through a guarded plugin or bridge. |
 | Per-app profile editor | Inline form to draft / update a profile without leaving the dashboard. |
 | Diff against baseline | Show which baseline rules an app silently overrides — surface ADR-worthy deviations. |
 | Bundled resource viewer | Render the linked docs inside Project Manager (with the Documentation view's classification gate). |

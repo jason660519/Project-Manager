@@ -6,7 +6,7 @@ import { DEFAULT_AGENT_WORKFLOWS } from '../../lib/agent-workflows/definitions';
 import { checkCommandExistsTauri, mcpInjectionFlag, supportsMcpInjection } from '../../lib/bridge';
 import { listLlmProviders } from '../../lib/keys/llmProviders';
 import { collectEnabledMcpServers } from '../../lib/storage/plugins';
-import { useI18n } from '../../lib/i18n';
+import { useI18n, type Translations } from '../../lib/i18n';
 import type {
   AnyAdapterConfig,
   EngineerRole,
@@ -103,13 +103,102 @@ export function initialRoleConfigState(
 
 // ── Prompt template builder ────────────────────────────────────────────────
 
-function buildTemplatePrompt(
-  templateId: string,
+type QuickTemplateId =
+  | 'from-scratch'
+  | 'feature-spec'
+  | 'tdd-spec'
+  | 'unit-test'
+  | 'integration-test'
+  | 'e2e-test'
+  | 'dev-logs'
+  | 'continue-cicd'
+  | 'debug'
+  | 'code-review';
+
+type DispatchCopy = Translations['dispatch'];
+
+const ROLE_PROMPT_PROFILES: Record<HarnessTaskRole, {
+  label: string;
+  mission: string;
+  boundaries: string[];
+  handoff: string[];
+}> = {
+  planner: {
+    label: 'Planner (P)',
+    mission: 'Clarify scope, read the source documents, identify risks, and produce an implementation-ready plan before code changes are made.',
+    boundaries: [
+      'Prefer analysis, task breakdown, file mapping, acceptance criteria, and risk notes.',
+      'Do not make code changes unless the prompt explicitly asks for implementation.',
+      'Call out missing requirements or unsafe assumptions as blockers.',
+    ],
+    handoff: [
+      'A short plan with ordered steps.',
+      'Files likely to change and files that must be read first.',
+      'Acceptance criteria and verification commands for the Worker and Evaluator.',
+    ],
+  },
+  worker: {
+    label: 'Worker (W)',
+    mission: 'Implement the requested change in the smallest coherent scope and keep the repository in a verifiable state.',
+    boundaries: [
+      'Read the referenced docs and existing code before editing.',
+      'Modify only files required for this feature or defect.',
+      'Preserve unrelated user changes and avoid broad refactors.',
+    ],
+    handoff: [
+      'Summary of changed files and user-visible behavior.',
+      'Verification commands run, with pass/fail results.',
+      'Remaining risks, blockers, or follow-up tasks.',
+    ],
+  },
+  evaluator: {
+    label: 'Evaluator (E)',
+    mission: 'Review implementation quality, validate behavior against acceptance criteria, and report defects with concrete evidence.',
+    boundaries: [
+      'Prioritize bugs, regressions, missing tests, unclear requirements, and release risk.',
+      'Run or specify focused verification; do not rely on visual inspection alone.',
+      'Only change code for narrow, clearly necessary fixes.',
+    ],
+    handoff: [
+      'Findings ordered by severity with file and line references where possible.',
+      'Verification evidence and any commands that could not be run.',
+      'Clear pass/block recommendation for the human owner.',
+    ],
+  },
+};
+
+function cleanLabel(label: string): string {
+  return label.replace(/[:：]\s*$/, '');
+}
+
+function bulletList(items: string[]): string {
+  return items.map((item) => `- ${item}`).join('\n');
+}
+
+function numberedList(items: string[]): string {
+  return items.map((item, index) => `${index + 1}. ${item}`).join('\n');
+}
+
+function buildReferences(
+  d: DispatchCopy,
+  refs: Array<{ label: string; value: string }>,
+): string {
+  return refs
+    .map((ref) => `- ${cleanLabel(ref.label)}: ${ref.value}`)
+    .join('\n');
+}
+
+export function buildTemplatePrompt(
+  templateId: QuickTemplateId,
+  role: HarnessTaskRole,
   feature: Feature,
   projectRoot: string,
-  d: ReturnType<typeof useI18n>['t']['dispatch'],
+  selectedPhase: FeaturePhase,
+  d: DispatchCopy,
 ): string {
   const u = d.promptUnspecified;
+  const featureFolder = resolvePath(projectRoot, feature.paths.featureFolder) ?? u;
+  const readme = resolvePath(projectRoot, feature.readmePath) ?? u;
   const spec = resolvePath(projectRoot, feature.paths.spec) ?? u;
   const tdd = resolvePath(projectRoot, feature.paths.tdd) ?? u;
   const unit = resolvePath(projectRoot, feature.paths.unitIntegrationTest) ?? u;
@@ -118,33 +207,186 @@ function buildTemplatePrompt(
   const impl = resolvePath(projectRoot, feature.paths.implementation) ?? u;
   const test = resolvePath(projectRoot, feature.paths.test) ?? u;
   const notes = feature.notes ?? '';
+  const roleProfile = ROLE_PROMPT_PROFILES[role];
 
-  const header = `[${feature.id}] ${feature.name}\n${d.promptStatus} ${feature.status}\n`;
+  const commonReferences = buildReferences(d, [
+    { label: 'Feature Folder', value: featureFolder },
+    { label: 'README', value: readme },
+    { label: d.promptFeatureSpecPath, value: spec },
+    { label: d.promptTddSpecPath, value: tdd },
+    { label: d.promptImplPath, value: impl },
+    { label: d.promptTestPath, value: test },
+    { label: d.promptDevLogsPath, value: devLogs },
+  ]);
 
-  switch (templateId) {
-    case 'from-scratch':
-      return `${header}${notes ? `${d.promptNotes} ${notes}\n` : ''}`;
-    case 'feature-spec':
-      return `${header}${d.promptSpecHeader}\n${d.promptFeatureSpecPath} ${spec}\n\nPlease read the feature spec and implement accordingly.`;
-    case 'tdd-spec':
-      return `${header}${d.promptTddSpecPath} ${tdd}\n\nFollow the TDD spec to implement and verify.`;
-    case 'unit-test':
-      return `${header}${d.promptUnitTestPath} ${unit}\n${d.promptImplPath} ${impl}\n\nWrite or update unit tests.`;
-    case 'integration-test':
-      return `${header}${d.promptIntegrationTestPath} ${unit}\n${d.promptImplPath} ${impl}\n\nWrite or update integration tests.`;
-    case 'e2e-test':
-      return `${header}${d.promptE2eTestPath} ${e2e}\n\nWrite or update E2E acceptance tests.`;
-    case 'dev-logs':
-      return `${header}${d.promptDevLogsPath} ${devLogs}\n\nReview dev logs and continue from last session.`;
-    case 'continue-cicd':
-      return `${header}${d.promptImplPath} ${impl}\n${d.promptTestPath} ${test}\n\nContinue CI/CD pipeline work.`;
-    case 'debug':
-      return `${header}${d.promptImplPath} ${impl}\n${d.promptTestPath} ${test}\n\nDebug failing tests or runtime issues.`;
-    case 'code-review':
-      return `${header}${d.promptImplPath} ${impl}\n\nReview the implementation for correctness, performance, and security.`;
-    default:
-      return '';
-  }
+  const referenceStep = (label: string, value: string, fallback: string): string => {
+    const sentenceLabel = `${label.charAt(0).toUpperCase()}${label.slice(1)}`;
+    if (value === u) {
+      return `${sentenceLabel} is not configured. ${fallback} Mention the missing ${label} in the handoff.`;
+    }
+    return `Read the ${label} first: ${value}`;
+  };
+
+  const templateGuidance: Record<QuickTemplateId, {
+    objective: string;
+    steps: string[];
+    success: string[];
+  }> = {
+    'from-scratch': {
+      objective: 'Start from the available feature context and turn it into a clear, executable path.',
+      steps: [
+        'Read the feature folder, notes, specification, and nearby implementation before deciding scope.',
+        'Identify the smallest useful slice that can be completed and verified now.',
+        'If requirements are missing, state the gap and choose a conservative assumption before proceeding.',
+      ],
+      success: [
+        'The next human or AI Engineer can see the exact scope, decisions, and verification path.',
+        'No unrelated files or project metadata are changed accidentally.',
+      ],
+    },
+    'feature-spec': {
+      objective: 'Use the feature specification as the primary source of truth when it is configured; otherwise make the missing artifact visible and work from the best available context.',
+      steps: [
+        referenceStep('feature spec', spec, 'Use the README, notes, config row, implementation path, and nearby tests as fallback context.'),
+        'Compare the requested behavior against the current implementation and existing tests.',
+        'Implement or plan only the behavior that is supported by the spec; flag contradictions instead of guessing.',
+      ],
+      success: [
+        'Implemented behavior or plan maps directly back to the configured feature spec or documented fallback context.',
+        'Any deviations from the spec are explicitly documented with the reason.',
+      ],
+    },
+    'tdd-spec': {
+      objective: 'Drive the task from the TDD specification and acceptance criteria when they are configured.',
+      steps: [
+        referenceStep('TDD spec', tdd, 'Use existing tests, README, notes, and the feature row to infer the acceptance criteria conservatively.'),
+        'Translate each relevant test case into implementation or verification work.',
+        'Update or add focused tests before calling the task done.',
+      ],
+      success: [
+        'The TDD spec or documented fallback acceptance criteria have matching implementation and test evidence.',
+        'Failures are reported with the failing test name, command, and likely cause.',
+      ],
+    },
+    'unit-test': {
+      objective: 'Create or repair focused unit tests for the implementation area.',
+      steps: [
+        referenceStep('implementation path', impl, 'Find the likely implementation via the feature row, located section, or repository search before editing.'),
+        referenceStep('unit test path', unit, 'Search for nearby unit tests and name the chosen test file before changing it.'),
+        'Cover important branches, edge cases, and regression risks without over-mocking behavior.',
+      ],
+      success: [
+        'Unit tests describe the expected behavior clearly.',
+        'The focused test command and typecheck result are included in the handoff.',
+      ],
+    },
+    'integration-test': {
+      objective: 'Validate how the touched modules work together across their real boundaries.',
+      steps: [
+        referenceStep('implementation path', impl, 'Find the likely implementation via the feature row, located section, or repository search before editing.'),
+        referenceStep('integration test path', unit, 'Search for the closest integration test surface and explain why it is the right boundary.'),
+        'Exercise the real data shape, adapter boundary, or UI workflow involved in this feature.',
+      ],
+      success: [
+        'Integration coverage proves the contract between modules, not only isolated helpers.',
+        'Any mocked boundary is named and justified.',
+      ],
+    },
+    'e2e-test': {
+      objective: 'Validate the user-facing workflow from entry point to expected result.',
+      steps: [
+        referenceStep('E2E test folder or script', e2e, 'Identify the route and user workflow manually from the feature row, README, notes, or implementation path.'),
+        'Identify the route, user actions, expected state changes, and failure visibility.',
+        'Add or update the smallest E2E coverage that proves the workflow still works.',
+      ],
+      success: [
+        'The E2E scenario is clear enough for a human to reproduce.',
+        'The verification result names the browser route and command used.',
+      ],
+    },
+    'dev-logs': {
+      objective: 'Continue from the latest development history without losing prior decisions.',
+      steps: [
+        referenceStep('development log', devLogs, 'Use README, notes, recent git diff, and existing tests to reconstruct current state.'),
+        'Extract the last completed work, known blockers, and intended next step.',
+        'Continue from that state instead of restarting the task from a blank slate.',
+      ],
+      success: [
+        'The handoff explains what was reused from prior work.',
+        'New work appends a concise update to the relevant development log when appropriate.',
+      ],
+    },
+    'continue-cicd': {
+      objective: 'Continue CI/CD, verification, release, or deployment automation work.',
+      steps: [
+        referenceStep('implementation or pipeline-related path', impl, 'Search package scripts, workflow files, docs, and test configuration for the relevant pipeline surface.'),
+        referenceStep('test or verification entry point', test, 'Use package scripts and existing verification docs to find the correct command.'),
+        'Preserve existing gates and make failures visible rather than bypassing checks.',
+        'Document commands, environment assumptions, and any blocked external dependency.',
+      ],
+      success: [
+        'The pipeline or verification path is repeatable by the next engineer.',
+        'Any remaining CI/CD blocker includes exact command output or reproduction steps.',
+      ],
+    },
+    debug: {
+      objective: 'Diagnose and fix a failing test, runtime issue, or unexpected behavior.',
+      steps: [
+        'Reproduce the failure first and capture the exact command, route, or user action.',
+        referenceStep('likely implementation path', impl, 'Locate the relevant code through error output, route names, feature row metadata, or repository search.'),
+        referenceStep('relevant test path', test, 'Search for the closest regression test and state if no focused test exists yet.'),
+        'Make the smallest fix that addresses the root cause, then rerun the focused verification.',
+      ],
+      success: [
+        'The root cause is named in plain language.',
+        'The fix includes regression coverage or a clear reason why coverage was not added.',
+      ],
+    },
+    'code-review': {
+      objective: 'Review the implementation for correctness, maintainability, and release risk.',
+      steps: [
+        referenceStep('implementation path', impl, 'Find the implementation through the feature row, route, category, notes, or repository search before reviewing.'),
+        'Compare the implementation against the feature spec, TDD spec, and current project conventions.',
+        'Prioritize concrete defects over style preferences; include file and line references where possible.',
+      ],
+      success: [
+        'Findings are ordered by severity and are actionable.',
+        'If no issues are found, the handoff still lists test gaps or residual risk.',
+      ],
+    },
+  };
+
+  const guidance = templateGuidance[templateId];
+
+  return [
+    `# Task Dispatch: ${feature.id} - ${feature.name}`,
+    '',
+    '## Assignment',
+    `- Role: ${roleProfile.label}`,
+    `- Mission: ${roleProfile.mission}`,
+    `- Project root: ${projectRoot}`,
+    `- Selected phase: ${selectedPhase}`,
+    `- ${d.promptStatus} ${feature.status}`,
+    notes ? `- ${d.promptNotes} ${notes}` : null,
+    '',
+    '## Source References',
+    commonReferences,
+    '',
+    '## Objective',
+    guidance.objective,
+    '',
+    '## Role Boundaries',
+    bulletList(roleProfile.boundaries),
+    '',
+    '## Required Steps',
+    numberedList(guidance.steps),
+    '',
+    '## Definition of Done',
+    bulletList(guidance.success),
+    '',
+    '## Handoff Requirements',
+    bulletList(roleProfile.handoff),
+  ].filter((part): part is string => part !== null).join('\n');
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -155,7 +397,7 @@ export function RoleConfigPanel({
   adapters,
   engineerRoles,
   projectRoot,
-  selectedPhase: _selectedPhase,
+  selectedPhase,
   state,
   onStateChange,
 }: RoleConfigPanelProps) {
@@ -179,7 +421,7 @@ export function RoleConfigPanel({
   const showMcp = targetKind === 'agent-cli' && mcpCount > 0 && mcpFlag;
 
   // Template buttons.
-  const templates = [
+  const templates: Array<{ id: QuickTemplateId; label: string }> = [
     { id: 'from-scratch', label: d.templateFromScratch },
     { id: 'feature-spec', label: d.templateFeatureSpec },
     { id: 'tdd-spec', label: d.templateTddSpec },
@@ -294,7 +536,7 @@ export function RoleConfigPanel({
             <button
               key={tmpl.id}
               type="button"
-              onClick={() => onStateChange({ prompt: buildTemplatePrompt(tmpl.id, feature, projectRoot, d) })}
+              onClick={() => onStateChange({ prompt: buildTemplatePrompt(tmpl.id, role, feature, projectRoot, selectedPhase, d) })}
               className="rounded border border-stone-200/15 bg-white/[0.03] px-2 py-1 text-[11px] text-stone-300 hover:bg-white/[0.08] hover:text-stone-100"
             >
               {tmpl.label}

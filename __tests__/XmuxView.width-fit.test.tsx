@@ -5,22 +5,23 @@ import { XmuxView } from '../app/ui/views/XmuxView';
 type ResizeObserverEntry = { target: Element };
 
 describe('XmuxView — responsive width fit + split-down gating', () => {
-  let observers: Array<{ callback: (entries: ResizeObserverEntry[]) => void; el: Element | null }> =
-    [];
+  let observers: Array<{
+    callback: (entries: ResizeObserverEntry[]) => void;
+    el: Element | null;
+  }> = [];
 
   beforeEach(() => {
     observers = [];
-    vi.useFakeTimers();
     (window as unknown as { ResizeObserver: unknown }).ResizeObserver = class {
       private readonly cb: (entries: ResizeObserverEntry[]) => void;
-      private element: Element | null = null;
+      private readonly observerIndex: number;
       constructor(cb: (entries: ResizeObserverEntry[]) => void) {
         this.cb = cb;
+        this.observerIndex = observers.length;
         observers.push({ callback: cb, el: null });
       }
       observe(el: Element) {
-        this.element = el;
-        observers[observers.length - 1]!.el = el;
+        observers[this.observerIndex]!.el = el;
       }
       unobserve() {}
       disconnect() {}
@@ -46,9 +47,16 @@ describe('XmuxView — responsive width fit + split-down gating', () => {
     return screen.getAllByLabelText('Split pane downward').length;
   }
 
-  it('blocks split-right immediately on a narrow viewport (min width constraint)', async () => {
+  it('allows one split-right on a narrow viewport, then blocks panes below the min width', async () => {
     render(<XmuxView />);
+    await act(async () => {});
     setViewportSize(800, 500);
+
+    act(() => {
+      fireEvent.click(screen.getAllByLabelText('Split pane to the right')[0]!);
+    });
+
+    expect(blockCount()).toBe(2);
 
     act(() => {
       fireEvent.click(screen.getAllByLabelText('Split pane to the right')[0]!);
@@ -58,9 +66,16 @@ describe('XmuxView — responsive width fit + split-down gating', () => {
     expect(screen.getByText(/此視窗尺寸下無法再分割/)).toBeInTheDocument();
   });
 
-  it('allows one split-right on a wider viewport, then blocks when panes become too narrow', async () => {
+  it('allows more split-right width on a wider viewport, then blocks when panes become too narrow', async () => {
     render(<XmuxView />);
+    await act(async () => {});
     setViewportSize(1400, 900);
+
+    act(() => {
+      fireEvent.click(screen.getAllByLabelText('Split pane to the right')[0]!);
+    });
+
+    expect(blockCount()).toBe(2);
 
     act(() => {
       fireEvent.click(screen.getAllByLabelText('Split pane to the right')[0]!);
@@ -78,6 +93,7 @@ describe('XmuxView — responsive width fit + split-down gating', () => {
 
   it('blocks split-down once panes become too short for the current viewport', async () => {
     render(<XmuxView />);
+    await act(async () => {});
     setViewportSize(800, 500);
 
     for (let i = 0; i < 8; i += 1) {
@@ -87,12 +103,13 @@ describe('XmuxView — responsive width fit + split-down gating', () => {
       });
     }
 
-    expect(blockCount()).toBe(3);
+    expect(blockCount()).toBe(2);
     expect(screen.getByText(/此視窗尺寸下無法再分割/)).toBeInTheDocument();
   });
 
   it('allows more split-down depth on a taller viewport before blocking', async () => {
     render(<XmuxView />);
+    await act(async () => {});
     setViewportSize(1400, 900);
 
     for (let i = 0; i < 10; i += 1) {
@@ -102,7 +119,7 @@ describe('XmuxView — responsive width fit + split-down gating', () => {
       });
     }
 
-    expect(blockCount()).toBe(4);
+    expect(blockCount()).toBe(3);
     expect(screen.getByText(/此視窗尺寸下無法再分割/)).toBeInTheDocument();
   });
 });

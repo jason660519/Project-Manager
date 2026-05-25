@@ -357,7 +357,7 @@ function InteropConsole({
       updater: (layout: LayoutNode) => LayoutNode | null,
     ) => {
       setLayouts((current) => {
-        const layout = current[workspaceId];
+        const layout = current[workspaceId] ?? pendingLayoutsRef.current[workspaceId];
         if (!layout) return current;
         const next = updater(layout);
         if (next === layout) return current;
@@ -365,8 +365,11 @@ function InteropConsole({
           forEachBlock(layout, destroyBlockItems);
           const homepage =
             workspacesById.get(workspaceId)?.homepageUrl ?? DEFAULT_HOMEPAGE;
-          return { ...current, [workspaceId]: createInitialLayout(homepage) };
+          const reset = createInitialLayout(homepage);
+          pendingLayoutsRef.current[workspaceId] = reset;
+          return { ...current, [workspaceId]: reset };
         }
+        pendingLayoutsRef.current[workspaceId] = next;
         return { ...current, [workspaceId]: next };
       });
     },

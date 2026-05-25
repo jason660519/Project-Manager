@@ -40,7 +40,7 @@ const DEFAULT_MODELS: Record<string, string> = {
   anthropic: 'claude-sonnet-4-6',
   openai: 'gpt-4o',
   gemini: 'gemini-1.5-pro-latest',
-  deepseek: 'deepseek-chat',
+  deepseek: 'deepseek-v4-pro',
   grok: 'grok-2-latest',
   kimi: 'kimi-k2.6',
   openrouter: 'anthropic/claude-3.5-sonnet',
@@ -51,6 +51,40 @@ const DEFAULT_MODELS: Record<string, string> = {
 };
 
 const FALLBACK_PROVIDERS = ['deepseek', 'anthropic', 'openai', 'gemini', 'grok'];
+
+/** Detect which provider a model name belongs to, for smarter fallback routing. */
+const MODEL_PATTERNS: Array<{ pattern: RegExp; provider: string }> = [
+  { pattern: /^deepseek/i, provider: 'deepseek' },
+  { pattern: /^claude/i, provider: 'anthropic' },
+  { pattern: /^gpt/i, provider: 'openai' },
+  { pattern: /^o1/i, provider: 'openai' },
+  { pattern: /^o3/i, provider: 'openai' },
+  { pattern: /^gemini/i, provider: 'gemini' },
+  { pattern: /^grok/i, provider: 'grok' },
+  { pattern: /^kimi|^moonshot/i, provider: 'kimi' },
+  { pattern: /^qwen/i, provider: 'qwen' },
+  { pattern: /^glm/i, provider: 'zhipu' },
+];
+
+function detectProviderFromModel(model: string): string | undefined {
+  for (const { pattern, provider } of MODEL_PATTERNS) {
+    if (pattern.test(model)) return provider;
+  }
+  return undefined;
+}
+
+function buildProviderChain(model?: string, userProvider?: string): string[] {
+  const detected = model ? detectProviderFromModel(model) : undefined;
+  if (userProvider && userProvider !== 'auto') {
+    // User specified a provider: try it first, then fallback chain
+    return [userProvider, ...FALLBACK_PROVIDERS.filter(p => p !== userProvider)];
+  }
+  if (detected) {
+    // Model name matches a known provider: try that provider first
+    return [detected, ...FALLBACK_PROVIDERS.filter(p => p !== detected)];
+  }
+  return FALLBACK_PROVIDERS;
+}
 
 // ── SSE Helpers ─────────────────────────────────────────────────────────────
 
@@ -387,23 +421,35 @@ async function streamOpenAI(
 }
 
 /**
- * Stream from OpenAI-compatible providers (DeepSeek, Grok, etc.)
- * These don't have native tool support, so tools are injected into system prompt.
+ * Stream from OpenAI-compatible providers with optional tool support.
+ * DeepSeek V4, Grok, and most modern providers support function calling.
+ * Falls back to text-only streaming if tools param is disabled.
  */
 async function streamOpenAICompat(
   provider: string, apiKey: string, baseUrl: string,
   model: string, sys: string, messages: ChatApiMessage[],
   send: (data: Record<string, unknown>) => void,
+  tools = false, context?: ToolContext,
 ): Promise<void> {
+  const body: Record<string, unknown> = {
+    model,
+    max_tokens: 8192,
+    stream: true,
+    messages: [{ role: 'system', content: sys }, ...messages.filter(m => m.role !== 'system')],
+  };
+
+  if (tools) {
+    body.tools = AVAILABLE_TOOLS.map(t => ({
+      type: 'function',
+      function: { name: t.name, description: t.description, parameters: t.parameters },
+    }));
+    body.tool_choice = 'auto';
+  }
+
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-    body: JSON.stringify({
-      model,
-      max_tokens: 8192,
-      stream: true,
-      messages: [{ role: 'system', content: sys }, ...messages.filter(m => m.role !== 'system')],
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) throw new Error(`${provider} ${res.status}: ${(await res.text()).slice(0, 200)}`);
@@ -413,6 +459,8 @@ async function streamOpenAICompat(
 
   const decoder = new TextDecoder();
   let buffer = '';
+  let toolCalls: Map<number, { id: string; name: string; arguments: string }> = new Map();
+  let hasText = false;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -426,10 +474,102 @@ async function streamOpenAICompat(
       if (!line.trim() || !line.startsWith('data: ') || line.includes('[DONE]')) continue;
       try {
         const data = JSON.parse(line.slice(6));
-        const text = data.choices?.[0]?.delta?.content;
-        if (text) send({ type: 'text', text });
+        const choice = data.choices?.[0];
+        const delta = choice?.delta;
+
+        if (delta?.content) {
+          hasText = true;
+          send({ type: 'text', text: delta.content });
+        }
+
+        if (delta?.tool_calls) {
+          for (const tc of delta.tool_calls) {
+            const idx = tc.index ?? 0;
+            if (!toolCalls.has(idx)) {
+              toolCalls.set(idx, { id: tc.id || `call_${idx}`, name: tc.function?.name || '', arguments: '' });
+            }
+            const existing = toolCalls.get(idx)!;
+            if (tc.id) existing.id = tc.id;
+            if (tc.function?.name) existing.name = tc.function.name;
+            if (tc.function?.arguments) existing.arguments += tc.function.arguments;
+          }
+        }
+
+        if (choice?.finish_reason === 'tool_calls' || choice?.finish_reason === 'function_call') {
+          break;
+        }
       } catch { /* skip */ }
     }
+  }
+
+  // Execute tool calls if any were collected
+  if (toolCalls.size > 0 && context) {
+    const calls: ToolCall[] = [];
+    for (const [, tc] of toolCalls) {
+      let args = {};
+      try { args = JSON.parse(tc.arguments || '{}'); } catch { /* keep empty */ }
+      const call: ToolCall = { id: tc.id, name: tc.name, arguments: args };
+      calls.push(call);
+      send({ type: 'tool_call', id: call.id, name: call.name, arguments: call.arguments });
+    }
+
+    for (const call of calls) {
+      const result = await executeToolCall(call, context);
+      send({ type: 'tool_result', id: call.id, content: result.content, error: result.error });
+    }
+
+    // Follow-up with tool results to get a final text response
+    try {
+      const followMessages = [
+        { role: 'system', content: sys },
+        ...messages.filter(m => m.role !== 'system'),
+        {
+          role: 'assistant' as const,
+          content: null,
+          tool_calls: calls.map(c => ({
+            id: c.id,
+            type: 'function' as const,
+            function: { name: c.name, arguments: JSON.stringify(c.arguments) },
+          })),
+        },
+        ...calls.map(c => ({
+          role: 'tool' as const,
+          tool_call_id: c.id,
+          content: `OK.`,
+        })),
+      ];
+
+      const fr = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ model, max_tokens: 8192, stream: true, messages: followMessages }),
+      });
+
+      if (fr.ok) {
+        const frr = fr.body?.getReader();
+        if (frr) {
+          const d3 = new TextDecoder();
+          let b3 = '';
+          while (true) {
+            const { done: d, value: v } = await frr.read();
+            if (d) break;
+            b3 += d3.decode(v, { stream: true });
+            const ls = b3.split('\n');
+            b3 = ls.pop() ?? '';
+            for (const l of ls) {
+              if (!l.startsWith('data: ') || l.includes('[DONE]')) continue;
+              try {
+                const j = JSON.parse(l.slice(6));
+                const text = j.choices?.[0]?.delta?.content;
+                if (text) send({ type: 'text', text });
+              } catch { /* skip */ }
+            }
+          }
+        }
+      }
+    } catch { /* tool results were already sent, this is best-effort */ }
+  } else if (toolCalls.size > 0 && !context) {
+    send({ type: 'text', text: '\n\n（AI 想要使用工具，但沒有專案 context。請先選擇一個專案。）' });
   }
 }
 
@@ -452,21 +592,21 @@ async function streamWithProvider(
       return streamOpenAI(apiKey, model, sys, messages, send, tools, context);
 
     case 'deepseek':
-      return streamOpenAICompat('deepseek', apiKey, 'https://api.deepseek.com', model, sys, messages, send);
+      return streamOpenAICompat('deepseek', apiKey, 'https://api.deepseek.com', model, sys, messages, send, tools, context);
     case 'grok':
-      return streamOpenAICompat('grok', apiKey, 'https://api.x.ai', model, sys, messages, send);
+      return streamOpenAICompat('grok', apiKey, 'https://api.x.ai', model, sys, messages, send, tools, context);
     case 'kimi':
-      return streamOpenAICompat('kimi', apiKey, 'https://api.moonshot.ai/v1', model, sys, messages, send);
+      return streamOpenAICompat('kimi', apiKey, 'https://api.moonshot.ai/v1', model, sys, messages, send, tools, context);
     case 'openrouter':
-      return streamOpenAICompat('openrouter', apiKey, 'https://openrouter.ai/api', model, sys, messages, send);
+      return streamOpenAICompat('openrouter', apiKey, 'https://openrouter.ai/api', model, sys, messages, send, tools, context);
     case 'perplexity':
-      return streamOpenAICompat('perplexity', apiKey, 'https://api.perplexity.ai', model, sys, messages, send);
+      return streamOpenAICompat('perplexity', apiKey, 'https://api.perplexity.ai', model, sys, messages, send, tools, context);
     case 'together':
-      return streamOpenAICompat('together', apiKey, 'https://api.together.xyz', model, sys, messages, send);
+      return streamOpenAICompat('together', apiKey, 'https://api.together.xyz', model, sys, messages, send, tools, context);
     case 'zhipu':
-      return streamOpenAICompat('zhipu', apiKey, 'https://open.bigmodel.cn/api/paas/v4', model, sys, messages, send);
+      return streamOpenAICompat('zhipu', apiKey, 'https://open.bigmodel.cn/api/paas/v4', model, sys, messages, send, tools, context);
     case 'qwen':
-      return streamOpenAICompat('qwen', apiKey, 'https://dashscope.aliyuncs.com/compatible-mode/v1', model, sys, messages, send);
+      return streamOpenAICompat('qwen', apiKey, 'https://dashscope.aliyuncs.com/compatible-mode/v1', model, sys, messages, send, tools, context);
 
     case 'gemini':
       // Gemini needs special handling but for now use simple text
@@ -503,17 +643,15 @@ export async function POST(request: NextRequest) {
         try {
           send({ type: 'thinking_start' });
 
-          const startProvider = body.provider;
+          const userProvider = body.provider && body.provider !== 'auto' ? body.provider : undefined;
+          const providersToTry = buildProviderChain(body.model, userProvider);
           const errors: string[] = [];
-          const providersToTry = startProvider
-            ? [startProvider, ...FALLBACK_PROVIDERS.filter(p => p !== startProvider)]
-            : FALLBACK_PROVIDERS;
 
           for (const provider of providersToTry) {
             try {
               const model = body.model || DEFAULT_MODELS[provider];
               await streamWithProvider(provider, model, sys, body.messages,
-                useTools && ['anthropic', 'openai'].includes(provider),
+                useTools,  // All providers now support tools via streamOpenAICompat
                 context, send);
               break;
             } catch (e) {

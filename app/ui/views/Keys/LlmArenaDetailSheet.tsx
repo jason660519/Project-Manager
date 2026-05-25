@@ -2,9 +2,10 @@
 
 import React from 'react';
 import type { ArenaModelSpec, ArenaResult } from './useArenaChat';
-import { buildHistoryMarkdown, type RunHistoryEntry } from './LlmArenaTypes';
+import { buildHistoryMarkdown, type LlmArenaCopy, type RunHistoryEntry } from './LlmArenaTypes';
 
 interface LlmArenaDetailSheetProps {
+  copy: LlmArenaCopy;
   selectedIndex: number | null;
   selectedSpec?: ArenaModelSpec;
   selectedResult?: ArenaResult;
@@ -13,6 +14,7 @@ interface LlmArenaDetailSheetProps {
 }
 
 export function LlmArenaDetailSheet({
+  copy,
   selectedIndex,
   selectedSpec,
   selectedResult,
@@ -28,7 +30,7 @@ export function LlmArenaDetailSheet({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-b border-stone-200/12 px-4 py-3">
-          <h3 className="text-sm font-semibold text-stone-100">輸出詳情</h3>
+          <h3 className="text-sm font-semibold text-stone-100">{copy.detailTitle}</h3>
           <p className="mt-1 text-xs text-stone-400">
             {selectedSpec.provider} · <span className="font-mono">{selectedSpec.model}</span>
           </p>
@@ -52,7 +54,7 @@ export function LlmArenaDetailSheet({
               <button
                 type="button"
                 onClick={() => {
-                  const md = buildHistoryMarkdown(selectedSpec.provider, selectedSpec.model, selectedHistory);
+                  const md = buildHistoryMarkdown(selectedSpec.provider, selectedSpec.model, selectedHistory, copy);
                   const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a');
@@ -63,17 +65,17 @@ export function LlmArenaDetailSheet({
                 }}
                 className="rounded border border-stone-200/20 bg-black/20 px-2 py-1 text-[10px] text-stone-200 hover:bg-black/30"
               >
-                匯出 .md
+                {copy.exportMarkdown}
               </button>
             </div>
             <div className="max-h-72 overflow-auto border border-stone-200/12">
               <table className="w-full border-collapse text-left">
                 <thead className="sticky top-0 z-10 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
                   <tr>
-                    <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">時間</th>
-                    <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">摘要</th>
-                    <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">Latency</th>
-                    <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">Token</th>
+                    <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">{copy.columns.time}</th>
+                    <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">{copy.columns.summary}</th>
+                    <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">{copy.columns.latency}</th>
+                    <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">{copy.columns.token}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -93,7 +95,7 @@ export function LlmArenaDetailSheet({
                   ) : (
                     <tr>
                       <td colSpan={4} className="px-4 py-8 text-center text-xs text-stone-500">
-                        尚無歷史紀錄
+                        {copy.historyEmpty}
                       </td>
                     </tr>
                   )}

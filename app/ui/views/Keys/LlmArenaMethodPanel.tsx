@@ -2,8 +2,10 @@
 
 import React from 'react';
 import { openPath } from '../../../../lib/bridge';
+import type { LlmArenaCopy } from './LlmArenaTypes';
 
 interface LlmArenaMethodPanelProps {
+  copy: LlmArenaCopy;
   systemPrompt: string;
   userPrompt: string;
   onSystemPromptChange: (next: string) => void;
@@ -13,6 +15,7 @@ interface LlmArenaMethodPanelProps {
 }
 
 export function LlmArenaMethodPanel({
+  copy,
   systemPrompt,
   userPrompt,
   onSystemPromptChange,
@@ -37,7 +40,7 @@ export function LlmArenaMethodPanel({
     <section className="grid grid-cols-1 gap-4 lg:grid-cols-12">
       <div className="border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72 p-4 shadow-xl backdrop-blur-sm rounded-sm lg:col-span-12">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="text-sm font-medium uppercase tracking-[0.16em] text-stone-100">LLM 能力評測設定</h2>
+          <h2 className="text-sm font-medium uppercase tracking-[0.16em] text-stone-100">{copy.methodTitle}</h2>
           <a
             href={methodDocHref}
             target="_blank"
@@ -45,7 +48,7 @@ export function LlmArenaMethodPanel({
             onClick={handleOpenMethodDoc}
             className="shrink-0 cursor-pointer text-[11px] text-emerald-300 hover:text-emerald-200"
           >
-            查看評測方法文件 ↗
+            {copy.methodDocLink}
           </a>
         </div>
         <div className="space-y-3">
@@ -73,7 +76,7 @@ export function LlmArenaMethodPanel({
               onClick={onAutoAddTopModels}
               className="inline-flex items-center rounded border border-emerald-200/25 bg-emerald-100/10 px-3 py-1.5 text-xs font-medium text-emerald-100 hover:bg-emerald-100/18"
             >
-              一鍵新增頂尖模型（依已存金鑰）
+              {copy.autoAddTopModels}
             </button>
             {autoAddHint ? <span className="text-[11px] text-stone-400">{autoAddHint}</span> : null}
           </div>

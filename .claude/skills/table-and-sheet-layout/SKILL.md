@@ -10,6 +10,7 @@ Build data tables, sheets, and workstation-style views using **raw TanStack Tabl
 
 - `components/layout/WorkstationFrame.tsx` — viewport-fixed page frame with header / toolbar / content / bottom-tabs slots
 - `components/sheets/BottomSheetTabs.tsx` — Excel-style sheet tabs (active indicator at top, icon + badge supported)
+- `app/project-progress-dashboard/_components/SheetTabs.tsx` — Project Progress Dashboard's dedicated bottom sheets, including user-reorder persistence
 - `components/table/TableCore.tsx` — table primitives, column patterns, styling tokens
 
 ## When to Use This Skill
@@ -73,6 +74,31 @@ Tab strip sits at the **bottom** of the panel (Excel-style). Active indicator is
 
 Reference migrations: `app/ui/views/ProjectFilesView.tsx`, `app/ui/views/KeysView.tsx`.
 
+### Reorderable bottom sheets
+
+If users can reorder sheet tabs, keep two concepts separate:
+
+- **Canonical ids** — stable tab keys used by routes, URL hashes, types, tests, and feature logic.
+- **Display order** — a per-user UI preference that may be persisted locally.
+
+Rules:
+
+1. Never encode user display order into domain data or feature schema.
+2. Persist only a list of canonical ids, then normalize it on read: remove unknown ids, remove duplicates, append any newly-added sheets in default order.
+3. Keep URL hash validation and type unions based on canonical ids, not the stored display order.
+4. In Next.js/SSR routes, do not read `localStorage` in the `useState` initializer for the first render. Start with the default order so server and client HTML match, then read persisted order in `useEffect` after mount.
+5. Add focused tests for default order, reorder persistence, and invalid stored-order fallback.
+6. For drag reordering, do not rely on native HTML5 `draggable` on `<button>` tabs; it can look wired but fail in real pointer use. Prefer pointer/mouse handling where pressing a tab and entering another tab immediately reorders the display list. Store the currently dragged id in a ref as well as state, because `pointerenter` can fire before React has committed the `pointerdown` state update.
+7. Drag microinteractions should be restrained: slight lift, scale, tilt, shadow, and target ring are enough. If the user expects the sheet to follow the pointer, render a separate fixed-position drag ghost that tracks pointer coordinates while the original tab stays in the strip as a dimmed placeholder. Use short transform transitions and include `motion-reduce` fallbacks so reduced-motion users do not get animated movement.
+8. Prefer a shared tab component. If a view needs a dedicated tab strip for special styling/i18n, document the exception and keep its contract equivalent to `BottomSheetTabs`.
+
+Project Progress Dashboard lesson: its tab contract has historically touched multiple files. Before changing dashboard sheet behavior, check:
+
+- `app/project-progress-dashboard/types.ts` — canonical `SHEET_IDS` / `TabId`
+- `app/project-progress-dashboard/ProjectProgressClient.tsx` — URL hash validation and active-tab state
+- `app/project-progress-dashboard/_components/SheetTabs.tsx` — visible tab metadata, order, and reorder persistence
+- `__tests__/progressDashboard.SheetTabs.test.tsx` — ordering and selection regression coverage
+
 ---
 
 ## Source Files — Read Before Generating
@@ -81,6 +107,7 @@ Reference migrations: `app/ui/views/ProjectFilesView.tsx`, `app/ui/views/KeysVie
 2. `components/sheets/BottomSheetTabs.tsx` — bottom-tab contract
 3. `components/table/TableCore.tsx` — table component (column patterns, styling tokens)
 4. `lib/types/index.ts` — `Feature`, `FeatureStatus`, `FeaturePaths` type definitions
+5. For Project Progress Dashboard sheets: `app/project-progress-dashboard/types.ts`, `app/project-progress-dashboard/ProjectProgressClient.tsx`, `app/project-progress-dashboard/_components/SheetTabs.tsx`
 
 ---
 
@@ -372,5 +399,6 @@ Always handle zero rows explicitly:
 - [ ] Cells > 30 lines extracted to `*Cell.tsx`
 - [ ] Table scroll container does not mix with `overflow-hidden`
 - [ ] Dashboard-like views use fixed-height workstation contract (`h-[calc(100vh-8rem)]` + `shrink-0` header/toolbar/sheets)
+- [ ] Reorderable sheets persist display order as canonical ids and normalize missing/unknown/duplicate ids on read
 - [ ] Empty state row present
 - [ ] Colours use stone/emerald token palette (no hardcoded `gray-*`)

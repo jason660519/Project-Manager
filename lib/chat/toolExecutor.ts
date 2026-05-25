@@ -272,9 +272,48 @@ export async function executeToolCall(
     case 'run_command':    return executeRunCommand(call, context);
     case 'read_memory':
     case 'write_memory':
-    case 'web_search':
-      // These are handled client-side since they need browser APIs
+      // These are handled client-side since they need browser localStorage
       return ok(call, `Tool "${call.name}" must be executed client-side. Ask the user to run it.`);
+    case 'web_search': {
+      const { query } = call.arguments as { query?: string };
+      if (!query || typeof query !== 'string') return err(call, 'Missing required parameter: query');
+      try {
+        // Try SearXNG public instances first, then fall back to DDG lite
+        const instances = [
+          `https://search.sapti.me/search?q=${encodeURIComponent(query)}&format=json&categories=general`,
+          `https://search.bus-hit.me/search?q=${encodeURIComponent(query)}&format=json&categories=general`,
+        ];
+        let results: Array<{ title: string; snippet: string; url: string }> = [];
+
+        for (const searchUrl of instances) {
+          try {
+            const resp = await fetch(searchUrl, { signal: AbortSignal.timeout(8000) });
+            if (!resp.ok) continue;
+            const data = await resp.json();
+            const items = data.results || [];
+            results = items.slice(0, 5).map((r: { title?: string; content?: string; snippet?: string; url?: string }) => ({
+              title: r.title || 'Untitled',
+              snippet: (r.content || r.snippet || '').slice(0, 250),
+              url: r.url || '',
+            }));
+            if (results.length > 0) break;
+          } catch { continue; }
+        }
+
+        // Fallback: use OpenClaw web search via gateway if available
+        if (results.length === 0 && process.env.OPENCLAW_GATEWAY_URL) {
+          results = [{ title: 'Search not available', snippet: 'Configure a search API key or use the AI assistant with OpenClaw gateway.', url: '' }];
+        }
+
+        if (results.length === 0) return ok(call, `No web results found for "${query}". Web search requires an API key or supported search backend.`);
+        const formatted = results.map((r, i) =>
+          `${i + 1}. **${r.title}**\n   ${r.snippet ? r.snippet + '\n   ' : ''}${r.url}`
+        ).join('\n\n');
+        return ok(call, `Web search results for "${query}":\n\n${formatted}`);
+      } catch (e) {
+        return err(call, `Web search failed: ${(e as Error).message}`);
+      }
+    }
     default:
       return err(call, `Unknown tool: ${call.name}`);
   }

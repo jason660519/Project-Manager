@@ -5,12 +5,15 @@ import { useKeysContext } from './KeysContext';
 import { useArenaChat } from './useArenaChat';
 import { listLlmProviders } from '../../../../lib/keys/llmProviders';
 import { hasProviderKey } from '../../../../lib/keys/loadProviderKey';
+import { useI18n } from '../../../../lib/i18n';
 import { LlmArenaMethodPanel } from './LlmArenaMethodPanel';
 import { LlmArenaMatrixTable } from './LlmArenaMatrixTable';
 import { LlmArenaDetailSheet } from './LlmArenaDetailSheet';
 import { formatResultSummary, type EvaluationLevel, type RunHistoryEntry } from './LlmArenaTypes';
 
 export function LlmArenaSheet() {
+  const { t } = useI18n();
+  const copy = t.keysArena.llm;
   const { llmState, setLlmState } = useKeysContext();
   const { runComparison, results, clearResults, isRunning } = useArenaChat();
   const allProviders = listLlmProviders();
@@ -77,7 +80,7 @@ export function LlmArenaSheet() {
         key: resultKey,
         entry: {
           timestamp: result.timestamp,
-          summary: formatResultSummary(result),
+          summary: formatResultSummary(result, copy),
           latencyMs: result.latencyMs,
           inputTokens: result.inputTokens ?? 0,
           outputTokens: result.outputTokens ?? 0,
@@ -96,7 +99,7 @@ export function LlmArenaSheet() {
       });
       return next;
     });
-  }, [results, llmState.selectedModels]);
+  }, [results, llmState.selectedModels, copy]);
 
   const addModel = () => {
     const defaultProvider = allProviders[0];
@@ -205,7 +208,7 @@ export function LlmArenaSheet() {
     }
 
     if (nextToAdd.length === 0) {
-      setAutoAddHint('找不到可新增模型：請先在 API Key Validation 匯入或儲存 provider key。');
+      setAutoAddHint(copy.autoAddNoModels);
       return;
     }
 
@@ -213,7 +216,7 @@ export function LlmArenaSheet() {
       ...prev,
       selectedModels: [...prev.selectedModels, ...nextToAdd],
     }));
-    setAutoAddHint(`已新增 ${nextToAdd.length} 個頂尖模型。`);
+    setAutoAddHint(copy.autoAddAdded.replace('{count}', String(nextToAdd.length)));
   };
 
   useEffect(() => {
@@ -232,6 +235,7 @@ export function LlmArenaSheet() {
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
       <LlmArenaMethodPanel
+        copy={copy}
         systemPrompt={llmState.systemPrompt}
         userPrompt={llmState.userPrompt}
         onSystemPromptChange={(next) => setLlmState((s) => ({ ...s, systemPrompt: next }))}
@@ -241,6 +245,8 @@ export function LlmArenaSheet() {
       />
 
       <LlmArenaMatrixTable
+        copy={copy}
+        commonCopy={t.keysArena.common}
         selectedModels={llmState.selectedModels}
         providers={allProviders}
         results={results}
@@ -263,6 +269,7 @@ export function LlmArenaSheet() {
       />
 
       <LlmArenaDetailSheet
+        copy={copy}
         selectedIndex={selectedDetailIndex}
         selectedSpec={selectedSpec}
         selectedResult={selectedResult}
