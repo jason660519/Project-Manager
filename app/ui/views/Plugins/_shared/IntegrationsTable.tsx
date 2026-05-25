@@ -58,6 +58,11 @@ interface IntegrationsTableProps {
   selectedRowKey: string | null;
   onRowClick: (row: IntegrationRow) => void;
   onToggleEnabled?: (row: IntegrationRow, enabled: boolean) => void;
+  /** Row selection checkboxes (multi-select for batch operations). */
+  checkedKeys?: ReadonlySet<string>;
+  onToggleCheck?: (rowKey: string, checked: boolean) => void;
+  /** Called when the header checkbox is toggled. Receives all visible row keys. */
+  onToggleCheckAll?: (checked: boolean, visibleRowKeys: string[]) => void;
   /**
    * When provided, renders a Test button on each row that calls back to verify
    * availability/install path. Callers own the actual probe (e.g. checkCommandExists +
@@ -84,6 +89,9 @@ export function IntegrationsTable({
   selectedRowKey,
   onRowClick,
   onToggleEnabled,
+  checkedKeys,
+  onToggleCheck,
+  onToggleCheckAll,
   onTestRow,
   testResults,
   testingKeys,
@@ -97,6 +105,46 @@ export function IntegrationsTable({
   const [columnSizing, setColumnSizing] = useState<Record<string, number>>({});
   const columns = useMemo(
     () => [
+      ...(onToggleCheck
+        ? [
+            columnHelper.display({
+              id: 'col-check',
+              enableSorting: false,
+              size: 36,
+              header: ({ table }) => {
+                const visibleKeys = table.getRowModel().rows.map((r) => r.original.rowKey);
+                const allChecked = visibleKeys.length > 0 && visibleKeys.every((k) => checkedKeys?.has(k));
+                const someChecked = !allChecked && visibleKeys.some((k) => checkedKeys?.has(k));
+                return (
+                  <input
+                    type="checkbox"
+                    checked={allChecked}
+                    ref={(el) => { if (el) el.indeterminate = someChecked; }}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      onToggleCheckAll?.(e.target.checked, visibleKeys);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-3.5 w-3.5 accent-emerald-400"
+                    title={allChecked ? 'Deselect all' : 'Select all'}
+                  />
+                );
+              },
+              cell: ({ row }) => (
+                <input
+                  type="checkbox"
+                  checked={checkedKeys?.has(row.original.rowKey) ?? false}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    onToggleCheck(row.original.rowKey, e.target.checked);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-3.5 w-3.5 accent-emerald-400"
+                />
+              ),
+            }),
+          ]
+        : []),
       ...(onToggleEnabled
         ? [
             columnHelper.display({
@@ -288,10 +336,41 @@ export function IntegrationsTable({
                 );
               },
             }),
+            columnHelper.display({
+              id: 'col-test-result',
+              header: 'Result',
+              enableSorting: false,
+              size: 200,
+              cell: ({ row }) => {
+                const r = row.original;
+                if (!isTestableRow(r)) return emptyCell();
+                const result = testResults?.[r.rowKey];
+                const testing = testingKeys?.has(r.rowKey) ?? false;
+                if (testing) {
+                  return (
+                    <span className="font-mono text-[10px] text-stone-500 italic">testing…</span>
+                  );
+                }
+                if (!result) return emptyCell();
+                const text = result.detail ?? (result.ok ? 'OK' : 'Failed');
+                const MAX = 32;
+                const display = text.length > MAX ? `${text.slice(0, MAX)}…` : text;
+                return (
+                  <span
+                    title={text}
+                    className={`block max-w-[190px] truncate font-mono text-[10px] ${
+                      result.ok ? 'text-emerald-300' : 'text-red-300'
+                    }`}
+                  >
+                    {display}
+                  </span>
+                );
+              },
+            }),
           ]
         : []),
     ],
-    [columnVisibility, onToggleEnabled, onTestRow, testResults, testingKeys],
+    [columnVisibility, onToggleCheck, onToggleCheckAll, checkedKeys, onToggleEnabled, onTestRow, testResults, testingKeys],
   );
 
   const table = useReactTable({
