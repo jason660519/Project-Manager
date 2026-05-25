@@ -6,7 +6,6 @@ import {
   BadgeCheck,
   BookOpen,
   CircleGauge,
-  Files,
   FileText,
   KeyRound,
   MessageSquareText,
@@ -45,7 +44,6 @@ const NAV_GROUPS: NavGroup[] = [
     groupKey: 'workspace',
     items: [
       { id: 'dashboard',     itemKey: 'dashboard', href: '/project-progress-dashboard', icon: CircleGauge },
-      { id: 'coding-editor', itemKey: 'codingEditor', href: '/coding-editor',           icon: Files },
     ],
   },
   {

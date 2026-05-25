@@ -10,7 +10,6 @@ export const ja: Translations = {
   navItems: {
     projects: 'プロジェクト',
     dashboard: 'プロジェクトダッシュボード',
-    codingEditor: 'Coding Editor',
     engineers: 'エンジニア',
     integrationsHub: '統合ハブ',
     channels: 'チャンネル',

@@ -10,7 +10,6 @@ export const zh: Translations = {
   navItems: {
     projects: '项目',
     dashboard: '项目仪表盘',
-    codingEditor: 'Coding Editor',
     engineers: '工程师',
     integrationsHub: '集成中枢',
     channels: '频道',

@@ -20,13 +20,4 @@ describe('integration registry runtime metadata', () => {
     );
   });
 
-  it('describes IDE Bridge as a project-scoped frontend bridge plugin', () => {
-    const ideBridge = registryFor('ide-bridge');
-
-    expect(ideBridge.company).toBe('Project Manager');
-    expect(ideBridge.category1).toBe('Frontend Plugin');
-    expect(ideBridge.category2).toBe('Native IDE Bridge');
-    expect(ideBridge.scope).toBe('project');
-    expect(ideBridge.installPathHint).toBe('app/ui/views/IdeBridgeView.tsx');
-  });
 });

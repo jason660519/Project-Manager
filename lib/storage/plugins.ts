@@ -99,17 +99,7 @@ const DEFAULT_EDITORS: EditorPlugin[] = [
   { id: 'antigravity', kind: 'editor', name: 'Antigravity IDE App', enabled: true, installedAt: BUILT_IN_INSTALL_DATE, command: 'antigravity' },
 ];
 
-const DEFAULT_FRONTEND: FrontendPlugin[] = [
-  {
-    id: 'ide-bridge',
-    kind: 'frontend',
-    name: 'IDE Bridge',
-    enabled: true,
-    installedAt: BUILT_IN_INSTALL_DATE,
-    packageName: 'internal-tauri-ide-bridge',
-    implementationPath: 'app/ui/views/IdeBridgeView.tsx',
-  },
-];
+const DEFAULT_FRONTEND: FrontendPlugin[] = [];
 
 const DEFAULT_CATALOG: PluginCatalog = {
   schemaVersion: 2,

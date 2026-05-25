@@ -615,7 +615,6 @@
       "locatedSection": "app/features",
       "metadata": {
         "evidencePaths": [
-          "__tests__/ProjectFilesView.test.tsx",
           "__tests__/ProjectsView.add-project.test.tsx",
           "__tests__/ProjectsView.reinit.test.tsx"
         ],
@@ -624,7 +623,6 @@
           "confidence": 1,
           "evidencePaths": [
             "app/features",
-            "__tests__/ProjectFilesView.test.tsx",
             "__tests__/ProjectsView.add-project.test.tsx",
             "__tests__/ProjectsView.reinit.test.tsx"
           ],
@@ -634,16 +632,17 @@
         }
       },
       "name": "Project files and workspace views",
-      "notes": "Workspace-centric views for browsing projects, files, and related project state.",
+      "notes": "Workspace-centric views for browsing projects and related project state.",
       "paths": {
         "implementation": "app/features",
-        "test": "__tests__/ProjectFilesView.test.tsx"
+        "test": "__tests__/ProjectsView.add-project.test.tsx"
       },
       "phase": "development",
       "points": 1,
       "progress": 35,
       "status": "todo",
-      "updatedAt": "2026-05-24T05:28:41.878Z"
+      "updatedAt": "2026-05-25T00:46:34.709Z",
+      "updatedBy": "codex"
     },
     {
       "category": "Frontend/Dispatch",
@@ -862,28 +861,6 @@
       "updatedAt": "2026-05-25T00:00:00.000Z"
     },
     {
-      "category": "Frontend/Editor",
-      "createdAt": "2026-05-25T00:00:00.000Z",
-      "id": "F25",
-      "locatedSection": "/coding-editor",
-      "name": "Monaco Editor Workbench",
-      "notes": "Replace the table-first /coding-editor flow with a project-scoped Monaco-first editor workbench.",
-      "paths": {
-        "implementation": "app/ui/views/MonacoEditorWorkbench.tsx",
-        "spec": ".project-manager/features/F25/feature-spec.md",
-        "test": "__tests__/monacoEditorWorkbench.test.tsx",
-        "tdd": ".project-manager/features/F25/tdd-spec.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F25"
-      },
-      "phase": "development",
-      "points": 2,
-      "progress": 100,
-      "readmePath": ".project-manager/features/F25/README.md",
-      "status": "done",
-      "updatedAt": "2026-05-25T08:25:30.000+10:00",
-      "updatedBy": "codex"
-    },
-    {
       "id": "F26",
       "name": "PWE Dispatch Harness (Three-Role Sheet Dispatch)",
       "category": "Dispatch",
@@ -910,5 +887,5 @@
     "root": "/Volumes/KLEVV-4T-1/Project-Manager"
   },
   "schemaVersion": 8,
-  "updatedAt": "2026-05-25T00:00:00.000Z"
+  "updatedAt": "2026-05-25T00:44:49.646Z"
 }

@@ -10,7 +10,6 @@ export const zhHant: Translations = {
   navItems: {
     projects: '專案',
     dashboard: '專案儀表板',
-    codingEditor: 'Coding Editor',
     engineers: '工程師',
     integrationsHub: '整合中樞',
     channels: '頻道',
