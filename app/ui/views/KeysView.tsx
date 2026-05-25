@@ -58,7 +58,7 @@ function KeysViewContent({
 
   return (
     <WorkstationFrame
-      className="mx-auto w-full max-w-7xl"
+      className="w-full"
       header={
         <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">Keys</h1>
       }

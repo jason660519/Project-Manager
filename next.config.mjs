@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Next 16 enforces a single dev server per project via .next/dev/lock. The
+  // Claude preview pass uses NEXT_PREVIEW_DIST_DIR to point at an isolated
+  // dist dir (.next-preview) so it does not collide with the user's primary
+  // dev session on the default .next/. See .claude/launch.json.
+  distDir: process.env.NEXT_PREVIEW_DIST_DIR || '.next',
   // Static export for Tauri WebView — no SSR, no API routes in production
   output: 'export',
   // Disable Next.js image optimization (not compatible with static export)

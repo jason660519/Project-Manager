@@ -4,6 +4,7 @@
 # Node / Next.js
 node_modules/
 .next/
+.next-preview/
 out/
 npm-debug.log*
 yarn-debug.log*

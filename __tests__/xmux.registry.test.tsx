@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { createRuntimeAdapter, listAdapters } from '../lib/adapters/registry';
 import { BUILT_IN_ADAPTER_SUPPORTS } from '../lib/capabilities/registry';
 import { CURRENT_SCHEMA_VERSION } from '../lib/storage/migrate';
-import type { Feature, ProjectManagerConfig } from '../lib/types';
+import type { Feature, ProjectEntry, ProjectManagerConfig } from '../lib/types';
 import { XmuxView } from '../app/ui/views/XmuxView';
 
 const feature: Feature = {
@@ -33,6 +33,23 @@ const baseConfig: ProjectManagerConfig = {
   },
   engineerRoles: [],
 };
+
+function createProjectEntry(id: string, name: string): ProjectEntry {
+  return {
+    id,
+    config: {
+      ...baseConfig,
+      id,
+      project: {
+        ...baseConfig.project,
+        name,
+        root: `/tmp/${id}`,
+      },
+      features: [],
+    },
+    configPath: `/tmp/${id}/.project-manager/config.json`,
+  };
+}
 
 describe('xmux registry integration', () => {
   it('exposes xmux as the built-in cmux-backed agent CLI target', async () => {
@@ -97,25 +114,20 @@ describe('xmux registry integration', () => {
     );
   });
 
-  it('renders the xmux operational view and design philosophy', () => {
+  it('renders the xmux operational view with workspaces and per-pane controls', () => {
     render(<XmuxView />);
 
-    expect(screen.getByRole('heading', { name: 'xmux' })).toBeInTheDocument();
-    expect(screen.getByText(/does not prescribe how developers must use AI/i)).toBeInTheDocument();
-    expect(screen.getByText('xmux -> cmux')).toBeInTheDocument();
     expect(screen.getAllByText('Realestate_Management_Apps').length).toBeGreaterThan(0);
     expect(screen.getByText('Project Management')).toBeInTheDocument();
-    expect(screen.getByText(/native PTY \+ GPU xterm/i)).toBeInTheDocument();
-    expect(screen.getByText(/libghostty rendering like cmux/i)).toBeInTheDocument();
-    expect(screen.getAllByLabelText('New terminal tab').length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Embedded terminal requires/i).length).toBeGreaterThan(0);
-    expect(screen.getByText('Built-In Browser')).toBeInTheDocument();
-    expect(screen.getByText('Notification Panel')).toBeInTheDocument();
-    expect(screen.getByText('Split Pane Layout')).toBeInTheDocument();
     expect(screen.getByLabelText('Right top xmux toolbar')).toBeInTheDocument();
     expect(screen.getByLabelText('Built-in browser')).toBeInTheDocument();
     expect(screen.getByLabelText('Notification panel')).toBeInTheDocument();
     expect(screen.getByLabelText('Split pane layout')).toBeInTheDocument();
+    expect(screen.getAllByLabelText('New terminal in this pane').length).toBeGreaterThanOrEqual(3);
+    expect(screen.getAllByLabelText('New browser tab').length).toBeGreaterThanOrEqual(3);
+    expect(screen.getAllByLabelText('Split pane to the right').length).toBeGreaterThanOrEqual(3);
+    expect(screen.getAllByLabelText('Split pane downward').length).toBeGreaterThanOrEqual(3);
   });
 
   it('makes the xmux toolbar controls interactive', async () => {
@@ -137,5 +149,20 @@ describe('xmux registry integration', () => {
 
     await user.click(screen.getByLabelText('Split pane layout'));
     expect(screen.getByLabelText('horizontal split workspace')).toBeInTheDocument();
+  });
+
+  it('only shows dashboard-selected projects when project data is provided', () => {
+    const projects = [
+      createProjectEntry('project-a', 'Project A'),
+      createProjectEntry('project-b', 'Project B'),
+      createProjectEntry('project-c', 'Project C'),
+    ];
+
+    render(<XmuxView projects={projects} selectedDashboardProjectIds={['project-b']} />);
+
+    expect(screen.getByText('Project B')).toBeInTheDocument();
+    expect(screen.queryByText('Project A')).not.toBeInTheDocument();
+    expect(screen.queryByText('Project C')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /顯示全部專案/i })).not.toBeInTheDocument();
   });
 });
