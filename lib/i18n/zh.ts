@@ -341,6 +341,11 @@ export const zh: Translations = {
     enterToSend: 'Enter 发送 · Shift+Enter 换行',
     deleteSession: '删除对话',
     openFullChat: '打开全页聊天',
+    startTalk: '开始对话',
+    chatSettings: '设置',
+    newSession: '新会话',
+    exportChat: '导出',
+    sendMessage: '发送',
   },
   dispatch: {
     title: '任务派遣',

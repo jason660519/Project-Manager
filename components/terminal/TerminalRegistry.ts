@@ -15,12 +15,13 @@
 //   destroy(itemId)            → kill PTY, dispose xterm, drop session
 
 import { FitAddon } from '@xterm/addon-fit';
-import { WebglAddon } from '@xterm/addon-webgl';
 import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
+import { isTauriRuntime } from '../../lib/runtime/tauri-ready';
 
 const SHELL = '/bin/zsh';
 const MIN_DIM = 20; // hostDiv must be at least this large in both axes before we trust fit()
+const MAX_OPEN_ATTEMPTS = 180; // ~3s at 60fps
 
 type PtyHandle = {
   write: (data: string) => void;
@@ -33,23 +34,29 @@ interface Session {
   hostDiv: HTMLDivElement;
   term: Terminal;
   fitAddon: FitAddon;
-  webglAddon: WebglAddon | null;
   pty: PtyHandle | null;
   inputDisposable: { dispose: () => void };
   dataDisposable: { dispose: () => void } | null;
   resizeObserver: ResizeObserver | null;
   resizeTimer: ReturnType<typeof setTimeout> | null;
+  openRafId: number | null;
+  openAttempts: number;
   cwd: string;
   pendingSpawn: Promise<void> | null;
   destroyed: boolean;
-  // term.open() and WebglAddon init must happen on an attached div; otherwise
-  // xterm caches a 0x0 canvas and the renderer never recovers. We defer the
-  // expensive bits until the first attach() call.
   initialized: boolean;
 }
 
 const sessions = new Map<string, Session>();
 let limboDiv: HTMLDivElement | null = null;
+
+function hostHasUsableSize(hostDiv: HTMLDivElement): boolean {
+  return (
+    hostDiv.isConnected &&
+    hostDiv.clientWidth >= MIN_DIM &&
+    hostDiv.clientHeight >= MIN_DIM
+  );
+}
 
 function ensureLimbo(): HTMLDivElement {
   if (typeof document === 'undefined') {
@@ -58,16 +65,11 @@ function ensureLimbo(): HTMLDivElement {
   if (!limboDiv) {
     limboDiv = document.createElement('div');
     limboDiv.setAttribute('data-terminal-limbo', '');
-    // Off-screen but still part of the layout tree so xterm DOM stays valid.
     limboDiv.style.cssText =
       'position:fixed;left:-99999px;top:-99999px;width:1px;height:1px;overflow:hidden;visibility:hidden;pointer-events:none;';
     document.body.appendChild(limboDiv);
   }
   return limboDiv;
-}
-
-function isTauri(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
 
 async function spawnPty(cwd: string, cols: number, rows: number): Promise<PtyHandle> {
@@ -103,19 +105,17 @@ function createSession(itemId: string, cwd: string): Session {
   const fitAddon = new FitAddon();
   term.loadAddon(fitAddon);
 
-  // NOTE: WebglAddon and term.open() are deferred to initializeIfNeeded() —
-  // they need the host DIV to be DOM-attached with non-zero size.
-
   const session: Session = {
     hostDiv,
     term,
     fitAddon,
-    webglAddon: null,
     pty: null,
     inputDisposable: { dispose: () => {} },
     dataDisposable: null,
     resizeObserver: null,
     resizeTimer: null,
+    openRafId: null,
+    openAttempts: 0,
     cwd,
     pendingSpawn: null,
     destroyed: false,
@@ -129,58 +129,86 @@ function createSession(itemId: string, cwd: string): Session {
   return session;
 }
 
-// First-attach init: must happen with hostDiv in the DOM (so xterm's renderer
-// reads real dimensions and WebGL gets a valid canvas to draw on).
-function initializeIfNeeded(session: Session): void {
-  if (session.initialized || session.destroyed) return;
-  if (!session.hostDiv.isConnected) return;
-
-  try {
-    const webgl = new WebglAddon();
-    session.term.loadAddon(webgl);
-    session.webglAddon = webgl;
-  } catch {
-    session.webglAddon = null;
-  }
+function tryOpenTerminal(session: Session): boolean {
+  if (session.initialized || session.destroyed) return false;
+  if (!hostHasUsableSize(session.hostDiv)) return false;
 
   session.term.open(session.hostDiv);
 
-  if (!isTauri()) {
+  if (!isTauriRuntime()) {
     session.term.writeln(
-      '\x1b[33mEmbedded terminal requires `npm run tauri:dev` (PTY + GPU xterm).\x1b[0m',
+      '\x1b[33mEmbedded terminal requires `npm run tauri:dev` (PTY + xterm).\x1b[0m',
     );
     session.term.writeln(
       '\x1b[33mBrowser preview cannot host a shell inside the pane.\x1b[0m',
     );
   }
 
-  // ResizeObserver fires whenever host dimensions change, including when the
-  // host moves from a 0-sized limbo into a real slot. Used to fit xterm and to
-  // trigger the deferred PTY spawn (we wait for real dims before spawning).
+  session.initialized = true;
+  return true;
+}
+
+function scheduleOpenAttempts(session: Session): void {
+  if (session.initialized || session.destroyed) return;
+  if (session.openRafId !== null) return;
+
+  const tick = () => {
+    session.openRafId = null;
+    if (session.destroyed || session.initialized) return;
+    if (tryOpenTerminal(session)) {
+      scheduleFitAndSpawn(session);
+      return;
+    }
+    session.openAttempts += 1;
+    if (session.openAttempts >= MAX_OPEN_ATTEMPTS) {
+      if (session.hostDiv.isConnected) {
+        session.term.writeln(
+          '\r\n\x1b[31mTerminal pane has no usable size — try resizing the split.\x1b[0m',
+        );
+        session.initialized = true;
+      }
+      return;
+    }
+    if (session.hostDiv.isConnected) {
+      session.openRafId = requestAnimationFrame(tick);
+    }
+  };
+  session.openRafId = requestAnimationFrame(tick);
+}
+
+function scheduleFitAndSpawn(session: Session): void {
+  if (session.destroyed || !session.initialized) return;
+  if (!hostHasUsableSize(session.hostDiv)) return;
+  if (session.resizeTimer) clearTimeout(session.resizeTimer);
+  session.resizeTimer = setTimeout(() => {
+    if (session.destroyed || !session.initialized) return;
+    if (!hostHasUsableSize(session.hostDiv)) return;
+    try {
+      session.fitAddon.fit();
+    } catch {
+      return;
+    }
+    session.pty?.resize(session.term.cols, session.term.rows);
+    if (!session.pty && !session.pendingSpawn && isTauriRuntime()) {
+      session.pendingSpawn = startPty(session).finally(() => {
+        session.pendingSpawn = null;
+      });
+    }
+  }, 32);
+}
+
+function ensureResizeObserver(session: Session): void {
+  if (session.resizeObserver) return;
   const ro = new ResizeObserver(() => {
     if (session.destroyed) return;
-    if (session.resizeTimer) clearTimeout(session.resizeTimer);
-    session.resizeTimer = setTimeout(() => {
-      if (session.destroyed) return;
-      if (!session.hostDiv.isConnected) return;
-      if (session.hostDiv.clientWidth < MIN_DIM || session.hostDiv.clientHeight < MIN_DIM) return;
-      try {
-        session.fitAddon.fit();
-      } catch {
-        return;
-      }
-      session.pty?.resize(session.term.cols, session.term.rows);
-      if (!session.pty && !session.pendingSpawn && isTauri()) {
-        session.pendingSpawn = startPty(session).finally(() => {
-          session.pendingSpawn = null;
-        });
-      }
-    }, 32);
+    if (!session.initialized) {
+      scheduleOpenAttempts(session);
+      return;
+    }
+    scheduleFitAndSpawn(session);
   });
   ro.observe(session.hostDiv);
   session.resizeObserver = ro;
-
-  session.initialized = true;
 }
 
 async function startPty(session: Session): Promise<void> {
@@ -212,13 +240,33 @@ export function attach(itemId: string, slot: HTMLElement, cwd: string): void {
   if (session.hostDiv.parentElement !== slot) {
     slot.appendChild(session.hostDiv);
   }
-  // Now that hostDiv is attached, run the lazy init (xterm.open + addon load).
-  initializeIfNeeded(session);
+  session.openAttempts = 0;
+  ensureResizeObserver(session);
+  scheduleOpenAttempts(session);
+  if (session.initialized) {
+    scheduleFitAndSpawn(session);
+  }
+}
+
+/** Called when a terminal tab becomes visible — opens/fits if still deferred. */
+export function notifySlotVisible(itemId: string): void {
+  const session = sessions.get(itemId);
+  if (!session || session.destroyed) return;
+  ensureResizeObserver(session);
+  session.openAttempts = 0;
+  scheduleOpenAttempts(session);
+  if (session.initialized) {
+    scheduleFitAndSpawn(session);
+  }
 }
 
 export function detach(itemId: string): void {
   const session = sessions.get(itemId);
   if (!session) return;
+  if (session.openRafId !== null) {
+    cancelAnimationFrame(session.openRafId);
+    session.openRafId = null;
+  }
   const limbo = ensureLimbo();
   if (session.hostDiv.parentElement !== limbo) {
     limbo.appendChild(session.hostDiv);
@@ -229,12 +277,15 @@ export function destroy(itemId: string): void {
   const session = sessions.get(itemId);
   if (!session) return;
   session.destroyed = true;
+  if (session.openRafId !== null) {
+    cancelAnimationFrame(session.openRafId);
+    session.openRafId = null;
+  }
   if (session.resizeTimer) clearTimeout(session.resizeTimer);
   session.resizeObserver?.disconnect();
   session.inputDisposable.dispose();
   session.dataDisposable?.dispose();
   session.pty?.kill();
-  session.webglAddon?.dispose();
   session.term.dispose();
   session.hostDiv.remove();
   sessions.delete(itemId);

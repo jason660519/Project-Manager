@@ -342,6 +342,11 @@ export const ja: Translations = {
     enterToSend: 'Enterで送信 · Shift+Enterで改行',
     deleteSession: '会話を削除',
     openFullChat: '全画面チャットを開く',
+    startTalk: '会話開始',
+    chatSettings: '設定',
+    newSession: '新規セッション',
+    exportChat: 'エクスポート',
+    sendMessage: '送信',
   },
   dispatch: {
     title: 'タスクディスパッチ',

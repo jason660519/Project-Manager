@@ -25,7 +25,7 @@ vi.mock('../lib/adapters/registry', () => ({
       args: ['exec', '--cwd', '/tmp/project-manager', 'prompt'],
     }),
   }),
-  getAdapterExecutionKind: vi.fn((adapter) => adapter?.type === 'agent' ? 'agent-cli' : adapter?.type),
+  getAdapterExecutionKind: vi.fn((adapter) => (adapter?.type === 'agent' ? 'agent-cli' : adapter?.type)),
 }));
 
 const context: ChatContext = {
@@ -38,16 +38,42 @@ const context: ChatContext = {
       id: 'pm',
       project: { name: 'Project Manager', root: '/tmp/project-manager', defaultIDE: 'Cursor' },
       features: [
-        { id: 'F14', name: 'Sidebar Chatbot', category: 'Frontend', status: 'in_progress', progress: 20, paths: { implementation: 'components/chat' } },
+        {
+          id: 'F14',
+          name: 'Sidebar Chatbot',
+          category: 'Frontend',
+          status: 'in_progress',
+          progress: 20,
+          phase: 'development',
+          paths: { implementation: 'components/chat' },
+        },
       ],
       adapters: { ides: [], agents: [] },
     },
   },
   adapters: [
-    { id: 'codex', name: 'Codex', type: 'agent', command: 'codex', argsTemplate: ['exec', '--cwd', '{root}', '{prompt}'] },
+    {
+      id: 'codex',
+      name: 'Codex',
+      type: 'agent',
+      command: 'codex',
+      argsTemplate: ['exec', '--cwd', '{root}', '{prompt}'],
+    },
   ],
   activeRunCount: 1,
   recentRuns: [],
+  features: [
+    {
+      id: 'F14',
+      name: 'Sidebar Chatbot',
+      category: 'Frontend',
+      status: 'in_progress',
+      progress: 20,
+      phase: 'development',
+      paths: { implementation: 'components/chat' },
+    },
+  ],
+  dashboardProjects: ['Project Manager'],
 };
 
 describe('sendChatMessage', () => {
@@ -63,16 +89,70 @@ describe('sendChatMessage', () => {
     expect(result.content).toMatch(/logs/i);
   });
 
-  it('summarizes project status locally', async () => {
+  it('returns enhanced Chinese-format /status without spanning an agent', async () => {
     const result = await sendChatMessage({ content: '/status', history: [], context });
-    expect(result.content).toContain('Project: Project Manager');
-    expect(result.content).toContain('Active runs: 1');
+    expect(result.content).toContain('Project Manager');
+    expect(result.content).toContain('功能狀態分佈');
+    expect(result.content).toContain('可用 Adapters');
     expect(spawnAgent).not.toHaveBeenCalled();
   });
 
   it('returns help locally', async () => {
     const result = await sendChatMessage({ content: '/help', history: [], context });
+    expect(result.content).toContain('/help');
     expect(result.content).toContain('/status');
+    expect(spawnAgent).not.toHaveBeenCalled();
+  });
+
+  it('returns feature details for /feature <id>', async () => {
+    const result = await sendChatMessage({ content: '/feature F14', history: [], context });
+    expect(result.content).toContain('F14');
+    expect(result.content).toContain('Sidebar Chatbot');
+    expect(result.content).toContain('in_progress');
+    expect(spawnAgent).not.toHaveBeenCalled();
+  });
+
+  it('returns error for non-existent feature', async () => {
+    const result = await sendChatMessage({ content: '/feature F99', history: [], context });
+    expect(result.content).toContain('找不到功能');
+    expect(spawnAgent).not.toHaveBeenCalled();
+  });
+
+  it('returns /runs summary', async () => {
+    const ctxWithRuns: ChatContext = {
+      ...context,
+      activeRuns: [{ featureId: 'F01', featureName: 'Test Run', phase: 'development', startedAt: Date.now() }],
+      recentRuns: [
+        {
+          pid: 1,
+          featureId: 'F01',
+          featureName: 'Test',
+          command: 'test',
+          args: [],
+          startedAt: Date.now() - 60000,
+          completedAt: Date.now(),
+          exitCode: 0,
+          success: true,
+          logs: [],
+        },
+      ],
+    };
+    const result = await sendChatMessage({ content: '/runs', history: [], context: ctxWithRuns });
+    expect(result.content).toContain('執行記錄');
+    expect(result.content).toContain('Test');
+    expect(spawnAgent).not.toHaveBeenCalled();
+  });
+
+  it('returns /config summary', async () => {
+    const result = await sendChatMessage({ content: '/config', history: [], context });
+    expect(result.content).toContain('專案配置');
+    expect(result.content).toContain('Codex');
+    expect(spawnAgent).not.toHaveBeenCalled();
+  });
+
+  it('returns /memory when no memory stored', async () => {
+    const result = await sendChatMessage({ content: '/memory', history: [], context });
+    expect(result.content).toContain('沒有任何');
     expect(spawnAgent).not.toHaveBeenCalled();
   });
 
@@ -84,7 +164,7 @@ describe('sendChatMessage', () => {
       args: ['exec', '--cwd', '/tmp/project-manager', 'prompt'],
       workingDir: '/tmp/project-manager',
     });
-    expect(result.content).toMatch(/configured project agent/i);
+    expect(result.content).toMatch(/Agent|發送/);
   });
 
   it('falls back to AI chat API when no agent adapter is configured', async () => {
@@ -94,14 +174,19 @@ describe('sendChatMessage', () => {
       context: { ...context, adapters: [] },
     });
     expect(result.error).toBeFalsy();
-    expect(mockFetch).toHaveBeenCalledWith('/api/chat', expect.objectContaining({
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-    }));
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/chat',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
     expect(result.content).toContain('Hello from the AI assistant');
   });
 
-  it('returns error when AI chat API call fails', async () => {
+  it('returns Chinese error when AI chat API call fails', async () => {
+    // Need two rejections: one for agent API, one for chat API
+    mockFetch.mockRejectedValueOnce(new Error('Agent API error'));
     mockFetch.mockRejectedValueOnce(new Error('Network error'));
     const result = await sendChatMessage({
       content: 'question',
@@ -109,17 +194,47 @@ describe('sendChatMessage', () => {
       context: { ...context, adapters: [] },
     });
     expect(result.error).toBe(true);
-    expect(result.content).toMatch(/could not reach/i);
+    expect(result.content).toMatch(/抱歉|無法/i);
   });
 
   it('falls back to AI chat API when no project is selected', async () => {
     const result = await sendChatMessage({
       content: 'what is agile?',
       history: [],
-      context: { currentView: 'chat', adapters: [], activeRunCount: 0, recentRuns: [] },
+      context: {
+        currentView: 'chat',
+        adapters: [],
+        activeRunCount: 0,
+        recentRuns: [],
+        features: [],
+        dashboardProjects: [],
+      },
     });
     expect(result.error).toBeFalsy();
     expect(mockFetch).toHaveBeenCalled();
     expect(result.content).toContain('Hello from the AI assistant');
+  });
+
+  it('routes Chinese "打開 dashboard"', async () => {
+    const navigate = vi.fn();
+    const result = await sendChatMessage({
+      content: '打開 dashboard',
+      history: [],
+      context,
+      navigate,
+    });
+    expect(navigate).toHaveBeenCalledWith('/project-progress-dashboard');
+    expect(result.content).toContain('已打開');
+  });
+
+  it('routes Chinese "帶我去 logs"', async () => {
+    const navigate = vi.fn();
+    const result = await sendChatMessage({
+      content: '帶我去 logs',
+      history: [],
+      context,
+      navigate,
+    });
+    expect(navigate).toHaveBeenCalledWith('/logs');
   });
 });

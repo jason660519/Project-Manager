@@ -3,7 +3,6 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -17,6 +16,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { listDirectoryEntries, type DirEntry } from '../../lib/bridge';
+import { isTauriRuntime, waitForTauriRuntime } from '../../lib/runtime/tauri-ready';
 
 type NodeState =
   | { status: 'idle' }
@@ -27,34 +27,42 @@ type NodeState =
 interface FolderContentProps {
   itemId: string;
   rootPath: string;
+  /** When false, skip IPC loads (tab is mounted but hidden). */
+  isActive?: boolean;
   onOpenFile?: (filePath: string) => void;
 }
 
-function isTauriRuntime(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-}
-
-export function FolderContent({ itemId, rootPath, onOpenFile }: FolderContentProps) {
+export function FolderContent({
+  itemId,
+  rootPath,
+  isActive = true,
+  onOpenFile,
+}: FolderContentProps) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([rootPath]));
   const [nodeStates, setNodeStates] = useState<Map<string, NodeState>>(new Map());
-  const tauri = useMemo(() => isTauriRuntime(), []);
+  const loadGenerationRef = useRef(0);
   // Latest props in refs so the imperative loader doesn't capture stale values.
   const rootPathRef = useRef(rootPath);
   rootPathRef.current = rootPath;
 
   const loadDir = useCallback(
     async (path: string) => {
-      if (!tauri) {
-        setNodeStates((prev) => {
-          const next = new Map(prev);
-          next.set(path, {
-            status: 'error',
-            message: 'Folder tree requires Tauri runtime (npm run tauri:dev).',
+      if (!isTauriRuntime()) {
+        const ready = await waitForTauriRuntime();
+        if (!ready) {
+          setNodeStates((prev) => {
+            const next = new Map(prev);
+            next.set(path, {
+              status: 'error',
+              message:
+                'Folder tree requires the desktop app (./start_project_manager.sh or npm run tauri:dev).',
+            });
+            return next;
           });
-          return next;
-        });
-        return;
+          return;
+        }
       }
+      const generation = ++loadGenerationRef.current;
       setNodeStates((prev) => {
         const next = new Map(prev);
         next.set(path, { status: 'loading' });
@@ -62,12 +70,14 @@ export function FolderContent({ itemId, rootPath, onOpenFile }: FolderContentPro
       });
       try {
         const entries = await listDirectoryEntries(path);
+        if (generation !== loadGenerationRef.current) return;
         setNodeStates((prev) => {
           const next = new Map(prev);
           next.set(path, { status: 'loaded', entries });
           return next;
         });
       } catch (err) {
+        if (generation !== loadGenerationRef.current) return;
         const message = err instanceof Error ? err.message : String(err);
         setNodeStates((prev) => {
           const next = new Map(prev);
@@ -76,14 +86,35 @@ export function FolderContent({ itemId, rootPath, onOpenFile }: FolderContentPro
         });
       }
     },
-    [tauri],
+    [],
   );
 
-  // Load the root on mount and whenever the root path changes.
+  // Load root when this tab is visible and path changes.
   useEffect(() => {
-    void loadDir(rootPath);
+    if (!isActive) return;
+    let cancelled = false;
     setExpanded(new Set([rootPath]));
-  }, [rootPath, loadDir]);
+    void (async () => {
+      const ready = await waitForTauriRuntime();
+      if (cancelled) return;
+      if (!ready) {
+        setNodeStates((prev) => {
+          const next = new Map(prev);
+          next.set(rootPath, {
+            status: 'error',
+            message:
+              'Folder tree requires the desktop app (./start_project_manager.sh or npm run tauri:dev).',
+          });
+          return next;
+        });
+        return;
+      }
+      await loadDir(rootPath);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [rootPath, loadDir, isActive]);
 
   const toggleExpand = useCallback(
     (path: string, isDir: boolean) => {
@@ -108,6 +139,7 @@ export function FolderContent({ itemId, rootPath, onOpenFile }: FolderContentPro
   );
 
   const refresh = useCallback(() => {
+    loadGenerationRef.current += 1;
     setNodeStates(new Map());
     void loadDir(rootPathRef.current);
     setExpanded(new Set([rootPathRef.current]));

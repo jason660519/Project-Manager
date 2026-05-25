@@ -4,7 +4,31 @@ import { Check, Copy } from 'lucide-react';
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import tsx from 'react-syntax-highlighter/dist/esm/languages/prism/tsx';
+import typescript from 'react-syntax-highlighter/dist/esm/languages/prism/typescript';
+import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript';
+import json from 'react-syntax-highlighter/dist/esm/languages/prism/json';
+import bash from 'react-syntax-highlighter/dist/esm/languages/prism/bash';
+import python from 'react-syntax-highlighter/dist/esm/languages/prism/python';
+import css from 'react-syntax-highlighter/dist/esm/languages/prism/css';
+import html from 'react-syntax-highlighter/dist/esm/languages/prism/markup';
+import yaml from 'react-syntax-highlighter/dist/esm/languages/prism/yaml';
+import markdown from 'react-syntax-highlighter/dist/esm/languages/prism/markdown';
 import type { ChatMessage as ChatMessageType } from '../../lib/chat/types';
+
+// Register common languages
+SyntaxHighlighter.registerLanguage('tsx', tsx);
+SyntaxHighlighter.registerLanguage('typescript', typescript);
+SyntaxHighlighter.registerLanguage('javascript', javascript);
+SyntaxHighlighter.registerLanguage('json', json);
+SyntaxHighlighter.registerLanguage('bash', bash);
+SyntaxHighlighter.registerLanguage('python', python);
+SyntaxHighlighter.registerLanguage('css', css);
+SyntaxHighlighter.registerLanguage('html', html);
+SyntaxHighlighter.registerLanguage('yaml', yaml);
+SyntaxHighlighter.registerLanguage('markdown', markdown);
 
 function formatTime(ts: number): string {
   const d = new Date(ts);
@@ -44,10 +68,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
     >
       {/* Meta row: role label + timestamp + actions */}
       <div className="mb-1 flex items-center gap-2">
-        <span className={[
-          'text-[9px] font-semibold uppercase tracking-wider',
-          isUser ? 'text-amber-200/50' : 'text-stone-300/50',
-        ].join(' ')}>
+        <span
+          className={[
+            'text-[9px] font-semibold uppercase tracking-wider',
+            isUser ? 'text-amber-200/50' : 'text-stone-300/50',
+          ].join(' ')}
+        >
           {isUser ? 'You' : 'AI'}
         </span>
         {message.createdAt && (
@@ -79,14 +105,42 @@ export function ChatMessage({ message }: ChatMessageProps) {
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
-            p: ({ children }) => <p className="mb-1.5 last:mb-0 whitespace-pre-wrap break-words">{children}</p>,
+            p: ({ children }) => (
+              <p className="mb-1.5 last:mb-0 whitespace-pre-wrap break-words">{children}</p>
+            ),
             ul: ({ children }) => <ul className="mb-1.5 list-disc pl-4">{children}</ul>,
             ol: ({ children }) => <ol className="mb-1.5 list-decimal pl-4">{children}</ol>,
-            code: ({ children, className }) => (
-              <code className={className ? 'rounded bg-black/40 px-1 py-0.5 font-mono text-[10px] text-cyan-100' : 'rounded bg-black/35 px-1 font-mono text-[10px] text-cyan-100'}>
-                {children}
-              </code>
-            ),
+            code: ({ className, children, ...props }) => {
+              const match = /language-(\w+)/.exec(className || '');
+              const isInline = !match;
+              if (isInline) {
+                return (
+                  <code
+                    className="rounded bg-black/35 px-1 font-mono text-[10px] text-cyan-100"
+                    {...props}
+                  >
+                    {children}
+                  </code>
+                );
+              }
+              const language = match[1];
+              return (
+                <SyntaxHighlighter
+                  style={oneDark}
+                  language={language}
+                  PreTag="div"
+                  customStyle={{
+                    margin: 0,
+                    borderRadius: '0.25rem',
+                    fontSize: '10px',
+                    background: 'rgba(0,0,0,0.45)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                  }}
+                >
+                  {String(children).replace(/\n$/, '')}
+                </SyntaxHighlighter>
+              );
+            },
             pre: ({ children }) => (
               <pre className="my-2 overflow-x-auto rounded border border-stone-200/10 bg-black/45 p-2 font-mono text-[10px] text-cyan-100">
                 {children}

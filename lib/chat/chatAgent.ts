@@ -32,15 +32,202 @@ const ROUTES: Record<string, string> = {
   chat: '/ai_assistants',
 };
 
-const HELP_TEXT = [
-  'I can help with Project Manager from the sidebar.',
-  '',
-  'Commands:',
-  '- `/help` - show commands',
-  '- `/status` - summarize the selected project',
-  '- `/go <view>` - open a view, like `/go logs`',
-  '- `/dispatch <feature-id>` - prepare a dispatch prompt for a feature',
-].join('\n');
+// ---------------------------------------------------------------------------
+// System Prompt v2
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a rich Chinese-language system prompt with full project context.
+ * Truncates at ~6000 chars to stay within reasonable token budgets.
+ */
+export function buildSystemPrompt(context: ChatContext): string {
+  const project = context.selectedProject;
+  const features = context.features ?? project?.config.features ?? [];
+  const selectedFeature = context.selectedFeature;
+
+  // Feature summary by status
+  const statusCounts: Record<string, number> = {};
+  const phaseCounts: Record<string, number> = {};
+  for (const f of features) {
+    statusCounts[f.status] = (statusCounts[f.status] ?? 0) + 1;
+    phaseCounts[f.phase ?? 'unknown'] = (phaseCounts[f.phase ?? 'unknown'] ?? 0) + 1;
+  }
+
+  // Feature summary by status
+  const statusSummary = Object.entries(statusCounts)
+    .map(([s, c]) => `${s}: ${c}`)
+    .join(', ');
+
+  // Adapter list
+  const agentNames = context.adapters
+    .filter((a) => a.type === 'agent')
+    .map((a) => a.name)
+    .join(', ');
+
+  // Recent runs summary (top 5)
+  const recentRunsLines = (context.recentRuns ?? []).slice(0, 5).map((r) =>
+    `- ${r.featureId} ${r.featureName}: ${r.success ? '✅' : '❌'} (exit ${r.exitCode})`
+  );
+
+  // Dashboard projects
+  const dashboardNames = context.dashboardProjects ?? [];
+
+  const parts: string[] = [
+    `你係 Project Manager 嘅 AI 助手，我叫小龍蝦 🦞`,
+    '講嘢風格輕鬆自然，但講到 code 就會戴返工程師眼鏡認真對待。用繁體中文同用戶溝通。',
+    '',
+    '**專案資訊：**',
+    `- 專案名稱：${project?.config.project.name ?? '未選擇'}`,
+    `- 專案路徑：${project?.config.project.root ?? '無'}`,
+    `- 預設 IDE：${project?.config.project.defaultIDE ?? '無'}`,
+    `- 當前頁面：${context.currentView}`,
+    '',
+    `**功能列表：**${features.length} 個功能`,
+    `狀態分佈：${statusSummary || '無'}`,
+  ];
+
+  if (Object.keys(phaseCounts).length > 0) {
+    const phaseSummary = Object.entries(phaseCounts)
+      .map(([p, c]) => `${p}: ${c}`)
+      .join(', ');
+    parts.push(`階段分佈：${phaseSummary}`);
+  }
+
+  if (agentNames) {
+    parts.push(`可用 Agent：${agentNames}`);
+  }
+
+  if (selectedFeature) {
+    parts.push(
+      '',
+      `**已選功能：**`,
+      `- ${selectedFeature.id}: ${selectedFeature.name}`,
+      `  狀態：${selectedFeature.status}（${selectedFeature.progress}%）`,
+      `  分類：${selectedFeature.category}`,
+      `  實作：${selectedFeature.paths?.implementation ?? '未指定'}`,
+    );
+  }
+
+  if (dashboardNames.length > 0) {
+    parts.push('', `**Dashboard 專案：**${dashboardNames.join(', ')}`);
+  }
+
+  if (recentRunsLines.length > 0) {
+    parts.push('', '**最近執行記錄：**', ...recentRunsLines);
+  }
+
+  parts.push(
+    '',
+    `**執行中任務：**${context.activeRunCount} 個`,
+    '',
+    '**能力說明：**',
+    '- 搜尋檔案內容：問我「搜尋 X」或「search for X」',
+    '- 讀取檔案：問我「打開檔案 Y」',
+    '- 查看功能詳情：`/feature <id>`',
+    '- 查看執行記錄：`/runs`',
+    '- 查看記憶：`/memory`',
+    '- 導航頁面：`/go <view>` 或「打開 dashboard」',
+    '',
+    '請簡潔回答，用繁體中文。如果要做 code review 或技術分析，切換到工程師模式認真處理。',
+  );
+
+  const full = parts.join('\n');
+  // Truncate to ~6000 chars if needed
+  if (full.length > 6000) {
+    return full.slice(0, 5997) + '...';
+  }
+  return full;
+}
+
+// ---------------------------------------------------------------------------
+// Memory System
+// ---------------------------------------------------------------------------
+
+const MEMORY_KEY = 'pm-assistant-memory';
+
+interface AssistantMemory {
+  lastSearch?: string;
+  lastInteractionAt?: number;
+  [key: string]: unknown;
+}
+
+function loadMemory(): AssistantMemory {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(MEMORY_KEY);
+    return raw ? (JSON.parse(raw) as AssistantMemory) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveMemory(key: string, value: unknown): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const mem = loadMemory();
+    mem[key] = value;
+    mem.lastInteractionAt = Date.now();
+    window.localStorage.setItem(MEMORY_KEY, JSON.stringify(mem));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function getMemoryDump(): string {
+  const mem = loadMemory();
+  const entries = Object.entries(mem).filter(
+    ([k]) => k !== 'lastInteraction' && k !== 'lastInteractionAt',
+  );
+  if (entries.length === 0) return '目前沒有任何已儲存的記憶。';
+  return entries
+    .map(([k, v]) => `- ${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`)
+    .join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Tool Execution
+// ---------------------------------------------------------------------------
+
+export async function executeSearch(query: string, projectRoot: string): Promise<string> {
+  try {
+    const res = await fetch('/api/chat/tools/search', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ query, root: projectRoot }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Search failed' }));
+      return `搜尋失敗：${err.error ?? res.statusText}`;
+    }
+    const data = await res.json();
+    return data.results ?? data.content ?? JSON.stringify(data);
+  } catch (e) {
+    return `搜尋出錯：${(e as Error).message}`;
+  }
+}
+
+export async function executeReadFile(path: string, projectRoot: string): Promise<string> {
+  try {
+    const res = await fetch('/api/chat/tools/file', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path, root: projectRoot }),
+    });
+    if (!res.ok) {
+      if (res.status === 404) return `找不到檔案：${path}`;
+      const err = await res.json().catch(() => ({ error: 'File read failed' }));
+      return `讀取失敗：${err.error ?? res.statusText}`;
+    }
+    const data = await res.json();
+    return data.content ?? data.result ?? JSON.stringify(data);
+  } catch (e) {
+    return `讀取出錯：${(e as Error).message}`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function normalize(value: string): string {
   return value.trim().toLowerCase();
@@ -51,45 +238,183 @@ function routeForView(view: string): string | undefined {
 }
 
 function findFeature(context: ChatContext, featureId: string): Feature | undefined {
+  const features = context.features ?? context.selectedProject?.config.features ?? [];
   const normalizedId = normalize(featureId);
-  return context.selectedProject?.config.features.find((feature) =>
-    normalize(feature.id) === normalizedId || normalize(feature.name) === normalizedId
+  return features.find(
+    (f) => normalize(f.id) === normalizedId || normalize(f.name) === normalizedId,
   );
 }
 
+// ---------------------------------------------------------------------------
+// Slash Commands v2
+// ---------------------------------------------------------------------------
+
+const HELP_TEXT = `**🦞 Project Manager 小龍蝦助手**
+
+| 指令 | 說明 |
+|------|------|
+| \`/help\` | 顯示此幫助訊息 |
+| \`/status\` | 顯示專案摘要 |
+| \`/feature <id>\` | 查看功能詳情 |
+| \`/runs\` | 查看執行記錄 |
+| \`/config\` | 顯示專案配置 |
+| \`/memory\` | 查看已儲存記憶 |
+| \`/go <view>\` | 導航至頁面 |
+| \`/dispatch <id>\` | 準備 Dispatch 提示 |
+
+**自然語言：**
+- 「搜尋 &lt;關鍵字&gt;」— 搜尋專案檔案
+- 「search for &lt;keyword&gt;」— 同上（英文）
+- 「打開 dashboard」— 導航到 Dashboard
+- 「帶我去 logs」— 導航到 Logs`;
+
 function summarizeStatus(context: ChatContext): string {
   const project = context.selectedProject;
-  if (!project) return 'No project is selected. Add or select a project from the Dashboard Projects sheet first.';
+  if (!project) return '目前未選擇任何專案。請先在 Dashboard Projects 分頁中加入或選擇一個專案。';
 
-  const features = project.config.features;
-  const counts = features.reduce<Record<string, number>>((acc, feature) => {
-    acc[feature.status] = (acc[feature.status] ?? 0) + 1;
-    return acc;
-  }, {});
-  const recent = context.recentRuns?.slice(0, 3).map((run) =>
-    `- ${run.featureName}: ${run.success ? 'success' : 'failed'} (exit ${run.exitCode})`
+  const features = context.features ?? project.config.features ?? [];
+  const statusCounts: Record<string, number> = {};
+  const phaseCounts: Record<string, number> = {};
+  for (const f of features) {
+    statusCounts[f.status] = (statusCounts[f.status] ?? 0) + 1;
+    phaseCounts[f.phase ?? 'unknown'] = (phaseCounts[f.phase ?? 'unknown'] ?? 0) + 1;
+  }
+
+  const statusRows = Object.entries(statusCounts)
+    .map(([s, c]) => `| ${s} | ${c} |`)
+    .join('\n');
+
+  const phaseRows = Object.entries(phaseCounts)
+    .map(([p, c]) => `| ${p} | ${c} |`)
+    .join('\n');
+
+  const adapterList = context.adapters.map((a) => `- ${a.type}: ${a.name}`).join('\n') || '無';
+  const dashboardNames = context.dashboardProjects ?? [];
+
+  const recent = context.recentRuns?.slice(0, 3).map((r) =>
+    `- ${r.featureId} ${r.featureName}: ${r.success ? '✅' : '❌'} (exit ${r.exitCode})`
   );
 
   return [
-    `Project: ${project.config.project.name}`,
-    `Root: ${project.config.project.root}`,
-    `Current view: ${context.currentView}`,
-    `Features: ${features.length} total, ${counts.done ?? 0} done, ${counts.in_progress ?? 0} in progress, ${counts.todo ?? 0} todo, ${counts.on_hold ?? 0} on hold`,
-    `Active runs: ${context.activeRunCount}`,
-    recent && recent.length > 0 ? ['Recent runs:', ...recent].join('\n') : null,
-  ].filter(Boolean).join('\n');
+    `## 📊 專案狀態`,
+    '',
+    `**專案名稱：** ${project.config.project.name}`,
+    `**專案路徑：** ${project.config.project.root}`,
+    `**預設 IDE：** ${project.config.project.defaultIDE ?? '無'}`,
+    `**當前頁面：** ${context.currentView}`,
+    '',
+    `### 功能狀態分佈`,
+    `| 狀態 | 數量 |`,
+    `|------|------|`,
+    statusRows,
+    '',
+    `### 階段分佈`,
+    `| 階段 | 數量 |`,
+    `|------|------|`,
+    phaseRows,
+    '',
+    `**總功能數：** ${features.length}　**執行中任務：** ${context.activeRunCount}`,
+    '',
+    `### 可用 Adapters`,
+    adapterList,
+    '',
+    dashboardNames.length > 0 ? `### Dashboard 專案\n${dashboardNames.join(', ')}` : null,
+    recent && recent.length > 0
+      ? `\n### 最近執行\n${recent.join('\n')}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function summarizeFeature(context: ChatContext, featureId: string): string {
+  const feature = findFeature(context, featureId);
+  if (!feature) {
+    return `找不到功能 **${featureId}**。請用 \`/status\` 查看所有功能。`;
+  }
+
+  const notes = feature.notes ? `\n**備註：** ${feature.notes}` : '';
+
+  return [
+    `## 📋 ${feature.id}: ${feature.name}`,
+    '',
+    `| 屬性 | 值 |`,
+    `|------|-----|`,
+    `| 狀態 | ${feature.status} |`,
+    `| 進度 | ${feature.progress}% |`,
+    `| 分類 | ${feature.category} |`,
+    `| 階段 | ${feature.phase ?? '未指定'} |`,
+    `| 實作路徑 | ${feature.paths?.implementation ?? '未指定'} |`,
+    `| 測試路徑 | ${feature.paths?.test ?? '未指定'} |`,
+    notes,
+  ].join('\n');
+}
+
+function summarizeRuns(context: ChatContext): string {
+  const activeRuns = context.activeRuns ?? [];
+  const recentRuns = context.recentRuns ?? [];
+
+  const parts: string[] = ['## 🏃 執行記錄'];
+
+  if (activeRuns.length > 0) {
+    parts.push('', '### 執行中', ...activeRuns.map((r) =>
+      `- **${r.featureId}** ${r.featureName} (phase: ${r.phase}, started: ${new Date(r.startedAt).toLocaleString()})`
+    ));
+  } else {
+    parts.push('', '目前沒有執行中的任務。');
+  }
+
+  if (recentRuns.length > 0) {
+    parts.push('', '### 最近執行', ...recentRuns.map((r) =>
+      `- ${r.featureId} ${r.featureName}: ${r.success ? '✅' : '❌'} exit=${r.exitCode} (${new Date(r.completedAt).toLocaleString()})`
+    ));
+  }
+
+  return parts.join('\n');
+}
+
+function summarizeConfig(context: ChatContext): string {
+  const project = context.selectedProject;
+  if (!project) return '目前未選擇任何專案。';
+
+  const adapterList = context.adapters
+    .map((a) => `| ${a.id} | ${a.name} | ${a.type} |`)
+    .join('\n');
+
+  return [
+    `## ⚙️ 專案配置`,
+    '',
+    `| 屬性 | 值 |`,
+    `|------|-----|`,
+    `| 專案 ID | ${project.id} |`,
+    `| 專案名稱 | ${project.config.project.name} |`,
+    `| 專案路徑 | ${project.config.project.root} |`,
+    `| 預設 IDE | ${project.config.project.defaultIDE ?? '無'} |`,
+    `| 功能數量 | ${project.config.features.length} |`,
+    `| Adapters | ${context.adapters.length} 個 |`,
+    '',
+    `### Adapters`,
+    `| ID | 名稱 | 類型 |`,
+    `|----|------|------|`,
+    adapterList,
+  ].join('\n');
 }
 
 function buildDispatchResponse(context: ChatContext, featureId: string): string {
   const feature = findFeature(context, featureId);
-  if (!feature) return `I could not find feature ${featureId}. Try /status to inspect the selected project.`;
+  if (!feature) {
+    return `找不到功能 **${featureId}**。請用 \`/status\` 查看所有功能。`;
+  }
   return [
-    `Ready to dispatch ${feature.id}: ${feature.name}.`,
+    `## 🚀 Dispatch: ${feature.id} ${feature.name}`,
     '',
-    `Status: ${feature.status} (${feature.progress}%)`,
-    `Implementation: ${feature.paths.implementation ?? 'unspecified'}`,
+    `**狀態：** ${feature.status}（${feature.progress}%）`,
+    `**分類：** ${feature.category}`,
+    `**實作路徑：** ${feature.paths?.implementation ?? '未指定'}`,
+    `**測試路徑：** ${feature.paths?.test ?? '未指定'}`,
     '',
-    'For v1, open the feature from Dashboard or Features and use the existing Dispatch control. A later chat action can open that modal directly.',
+    '請從 Dashboard 或 Features 頁面使用 Dispatch 功能來分派此任務。',
+    `或直接輸入 \`/go features\` 前往功能頁面。`,
   ].join('\n');
 }
 
@@ -99,59 +424,170 @@ function naturalLanguageRoute(content: string): string | undefined {
   return match ? routeForView(match[1]) : undefined;
 }
 
+function naturalLanguageSearch(content: string): string | undefined {
+  const text = normalize(content);
+  // Chinese: 搜尋 X
+  const chineseMatch = text.match(/搜尋\s+(.+)/);
+  if (chineseMatch) return chineseMatch[1].trim();
+
+  // English: search for X
+  const englishMatch = text.match(/search\s+(?:for\s+)?(.+)/i);
+  if (englishMatch) return englishMatch[1].trim();
+
+  return undefined;
+}
+
+function naturalLanguageChineseRoute(content: string): string | undefined {
+  const text = content.trim();
+  const mappings: Record<string, string> = {
+    打開dashboard: 'dashboard',
+    帶我去logs: 'logs',
+    帶我去log: 'logs',
+    打開logs: 'logs',
+    打開log: 'logs',
+    打開features: 'features',
+    打開功能: 'features',
+    打開settings: 'settings',
+    打開設定: 'settings',
+    打開keys: 'keys',
+    打開plugins: 'plugins',
+    打開channels: 'channels',
+    打開sessions: 'sessions',
+    打開文檔: 'documentation',
+    打開文件: 'documentation',
+    打開docs: 'documentation',
+  };
+  const normalized = text.replace(/\s+/g, '');
+  const target = mappings[normalized];
+  if (target) return routeForView(target);
+  return undefined;
+}
+
 function localCommand(request: SendChatMessageRequest): SendChatMessageResult | null {
   const content = request.content.trim();
   const lowered = normalize(content);
 
+  // /help
   if (lowered === '/help' || lowered === 'help') {
     return { content: HELP_TEXT, handledLocally: true };
   }
 
+  // /status
   if (lowered === '/status' || lowered.includes('project status') || lowered.includes('feature status')) {
+    saveMemory('lastInteraction', '/status');
     return { content: summarizeStatus(request.context), handledLocally: true };
   }
 
+  // /feature <id>
+  if (lowered.startsWith('/feature ')) {
+    saveMemory('lastInteraction', content);
+    return { content: summarizeFeature(request.context, content.slice('/feature '.length)), handledLocally: true };
+  }
+
+  // /runs
+  if (lowered === '/runs') {
+    saveMemory('lastInteraction', '/runs');
+    return { content: summarizeRuns(request.context), handledLocally: true };
+  }
+
+  // /config
+  if (lowered === '/config') {
+    saveMemory('lastInteraction', '/config');
+    return { content: summarizeConfig(request.context), handledLocally: true };
+  }
+
+  // /memory
+  if (lowered === '/memory' || lowered === 'memory') {
+    saveMemory('lastInteraction', '/memory');
+    return { content: getMemoryDump(), handledLocally: true };
+  }
+
+  // /go <view>
   if (lowered.startsWith('/go ')) {
     const route = routeForView(content.slice(4));
-    if (!route) return { content: 'I do not recognize that view. Try `/help` for supported commands.', handledLocally: true, error: true };
+    if (!route) {
+      return {
+        content: '唔好意思，我唔識呢個頁面。試下 `/help` 睇下有咩指令可以用。',
+        handledLocally: true,
+        error: true,
+      };
+    }
     request.navigate?.(route);
-    return { content: `Opened ${route}.`, handledLocally: true, route };
+    return { content: `已打開 ${route}。`, handledLocally: true, route };
   }
 
+  // /dispatch <id>
   if (lowered.startsWith('/dispatch ')) {
-    return { content: buildDispatchResponse(request.context, content.slice('/dispatch '.length)), handledLocally: true };
+    saveMemory('lastInteraction', content);
+    return {
+      content: buildDispatchResponse(request.context, content.slice('/dispatch '.length)),
+      handledLocally: true,
+    };
   }
 
+  // Natural language: Chinese navigation
+  const chineseRoute = naturalLanguageChineseRoute(content);
+  if (chineseRoute) {
+    request.navigate?.(chineseRoute);
+    return { content: `已打開 ${chineseRoute}。`, handledLocally: true, route: chineseRoute };
+  }
+
+  // Natural language: English navigation
   const route = naturalLanguageRoute(content);
   if (route) {
     request.navigate?.(route);
     return { content: `Opened ${route}.`, handledLocally: true, route };
   }
 
+  // Natural language: Search
+  const searchQuery = naturalLanguageSearch(content);
+  if (searchQuery && request.context.selectedProject) {
+    saveMemory('lastSearch', searchQuery);
+    saveMemory('lastInteraction', `search: ${searchQuery}`);
+    // Defer to tool execution — handled below after localCommand check
+    // We return a placeholder so the caller can do the async search
+    return {
+      content: `正在搜尋「${searchQuery}」...`,
+      handledLocally: true,
+    };
+  }
+
+  // Unknown slash command
   if (lowered.startsWith('/')) {
-    return { content: 'Unknown command. Try `/help` for supported commands.', handledLocally: true, error: true };
+    return { content: '未知指令。輸入 `/help` 查看可用指令。', handledLocally: true, error: true };
   }
 
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// AI Chat API
+// ---------------------------------------------------------------------------
+
 function fallbackFeature(context: ChatContext): Feature {
-  return context.selectedFeature ?? context.selectedProject?.config.features[0] ?? {
-    id: 'chat',
-    name: 'Sidebar Chatbot',
-    category: 'Assistant',
-    status: 'in_progress',
-    progress: 0,
-    paths: {},
-  };
+  return (
+    context.selectedFeature ??
+    context.selectedProject?.config.features[0] ?? {
+      id: 'chat',
+      name: 'Sidebar Chatbot',
+      category: 'Assistant',
+      status: 'in_progress',
+      progress: 0,
+      paths: {},
+    }
+  );
 }
 
 function buildAgentPrompt(content: string, context: ChatContext): string {
   const project = context.selectedProject;
   const selectedFeature = context.selectedFeature;
-  const recentRuns = context.recentRuns?.slice(0, 5).map((run) =>
-    `- ${run.featureId} ${run.featureName}: ${run.success ? 'success' : 'failed'} exit=${run.exitCode}`
-  ).join('\n') || 'None';
+  const recentRuns = (context.recentRuns ?? [])
+    .slice(0, 5)
+    .map(
+      (run) =>
+        `- ${run.featureId} ${run.featureName}: ${run.success ? 'success' : 'failed'} exit=${run.exitCode}`,
+    )
+    .join('\n') || 'None';
 
   return [
     'You are the Project Manager sidebar assistant. Answer concisely and use app context.',
@@ -172,12 +608,10 @@ function buildAgentPrompt(content: string, context: ChatContext): string {
 
 /**
  * Load the user's preferred chat provider + model from their Key settings.
- * Returns undefined if not configured (server will use default fallback chain).
  */
 async function loadChatProvider(): Promise<{ provider: string; model?: string; systemPrompt?: string } | undefined> {
   if (typeof window === 'undefined') return undefined;
   try {
-    // First try the inline chat settings (from ChatSettings component)
     const settingsRaw = window.localStorage.getItem('pm-chat-settings');
     if (settingsRaw) {
       const settings = JSON.parse(settingsRaw);
@@ -189,7 +623,6 @@ async function loadChatProvider(): Promise<{ provider: string; model?: string; s
         };
       }
     }
-    // Fall back to the Keys view provider order
     const raw = window.localStorage.getItem('projectManager-llm-provider-order');
     if (!raw) return undefined;
     const order: { provider: string; model?: string; enabled: boolean }[] = JSON.parse(raw);
@@ -203,30 +636,35 @@ async function loadChatProvider(): Promise<{ provider: string; model?: string; s
 
 /**
  * Call the server-side AI proxy with conversation history.
- * Never exposes API keys to the browser.
- * If onStream is provided, uses SSE streaming for typewriter effect.
+ * Injects the system prompt as the first message.
  */
 async function callChatApi(
   content: string,
   history: ChatMessage[],
+  context: ChatContext,
   onStream?: (chunk: string) => void,
-  /** Explicit provider/model override from chat settings (takes priority over localStorage). */
   chatSettingsOverride?: { provider: string; model: string; systemPrompt: string },
 ): Promise<string> {
-  const messages = history.map((m) => ({
-    role: m.role === 'user' ? 'user' as const : 'assistant' as const,
-    content: m.content,
-  }));
+  // Build messages array WITHOUT system prompt (passed separately via systemPrompt field)
+  const systemPrompt = chatSettingsOverride?.systemPrompt || buildSystemPrompt(context);
+  const messages: { role: 'user' | 'assistant'; content: string }[] = [];
+
+  for (const m of history) {
+    if (m.role === 'user') {
+      messages.push({ role: 'user', content: m.content });
+    } else if (m.role === 'assistant') {
+      messages.push({ role: 'assistant', content: m.content });
+    }
+  }
   messages.push({ role: 'user', content });
 
-  // Determine provider config: explicit override > localStorage > none (server fallback chain)
+  // Determine provider config
   let providerConfig: { provider?: string; model?: string; systemPrompt?: string } = {};
-
   if (chatSettingsOverride?.provider && chatSettingsOverride.provider !== 'auto') {
     providerConfig = {
       provider: chatSettingsOverride.provider,
       model: chatSettingsOverride.model || undefined,
-      systemPrompt: chatSettingsOverride.systemPrompt || undefined,
+      systemPrompt,
     };
   } else {
     const userProvider = await loadChatProvider();
@@ -235,19 +673,13 @@ async function callChatApi(
     }
   }
 
-  // Build the payload — include provider/model/systemPrompt when the user has a preference
   const chatPayload: Record<string, unknown> = { messages };
-  if (providerConfig.provider) {
-    chatPayload.provider = providerConfig.provider;
-  }
-  if (providerConfig.model) {
-    chatPayload.model = providerConfig.model;
-  }
-  if (providerConfig.systemPrompt) {
-    chatPayload.systemPrompt = providerConfig.systemPrompt;
-  }
+  if (providerConfig.provider) chatPayload.provider = providerConfig.provider;
+  if (providerConfig.model) chatPayload.model = providerConfig.model;
+  // Always pass system prompt via the dedicated field
+  chatPayload.systemPrompt = systemPrompt;
 
-  // If streaming callback is provided, use the streaming endpoint
+  // Streaming
   if (onStream) {
     const res = await fetch('/api/chat/stream', {
       method: 'POST',
@@ -303,7 +735,7 @@ async function callChatApi(
     return result;
   }
 
-  // Non-streaming fallback
+  // Non-streaming
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -319,9 +751,15 @@ async function callChatApi(
   return data.content ?? '';
 }
 
+// ---------------------------------------------------------------------------
+// Agent dispatch fallback
+// ---------------------------------------------------------------------------
+
 function waitForAgentOutput(pid: number): Promise<string> {
   if (pid === 0 || typeof window === 'undefined') {
-    return Promise.resolve('I sent this to the configured project agent. No live output is available in browser dry-run mode.');
+    return Promise.resolve(
+      '已將任務發送到已配置的專案 Agent。瀏覽器 dry-run 模式下沒有即時輸出。',
+    );
   }
 
   return new Promise((resolve) => {
@@ -340,33 +778,242 @@ function waitForAgentOutput(pid: number): Promise<string> {
 
     void onAgentStdout((payload: AgentStdioPayload) => {
       if (payload.pid === pid) lines.push(payload.line);
-    }).then((unlisten) => { unStdout = unlisten; });
+    }).then((unlisten) => {
+      unStdout = unlisten;
+    });
 
     void onAgentExit((payload: AgentExitPayload) => {
       if (payload.pid !== pid) return;
       const output = lines.join('\n').trim();
-      if (payload.code === 0) finish(output || 'Done.');
-      else finish(output || `Agent exited with code ${payload.code}.`);
-    }).then((unlisten) => { unExit = unlisten; });
+      if (payload.code === 0) finish(output || '完成。');
+      else finish(output || `Agent 退出，exit code: ${payload.code}。`);
+    }).then((unlisten) => {
+      unExit = unlisten;
+    });
 
     window.setTimeout(() => {
-      finish(lines.join('\n').trim() || 'The agent is still running. Check Logs for live output.');
+      finish(lines.join('\n').trim() || 'Agent 仍在執行中。請到 Logs 頁面查看即時輸出。');
     }, 15000);
   });
 }
 
-export async function sendChatMessage(request: SendChatMessageRequest): Promise<SendChatMessageResult> {
+// ---------------------------------------------------------------------------
+// Agent API with Tool Calling
+// ---------------------------------------------------------------------------
+
+interface AgentStreamCallbacks {
+  onThinkingStart?: () => void;
+  onThinking?: (text: string) => void;
+  onToolCall?: (id: string, name: string, args: Record<string, unknown>) => void;
+  onToolResult?: (id: string, content: string, error?: boolean) => void;
+  onText?: (chunk: string) => void;
+}
+
+interface AgentStreamResult {
+  content: string;
+  toolCalls: Array<{ id: string; name: string; arguments: Record<string, unknown>; result?: string; error?: boolean }>;
+}
+
+/**
+ * Call the AI Agent API with tool support.
+ * Streams thinking, tool calls, and text responses.
+ */
+async function callAgentApi(
+  content: string,
+  history: ChatMessage[],
+  context: ChatContext,
+  callbacks: AgentStreamCallbacks,
+  chatSettingsOverride?: { provider: string; model: string; systemPrompt: string },
+): Promise<AgentStreamResult> {
+  const systemPrompt = chatSettingsOverride?.systemPrompt || buildSystemPrompt(context);
+  
+  const messages: { role: 'user' | 'assistant'; content: string }[] = [];
+  for (const m of history) {
+    if (m.role === 'user') messages.push({ role: 'user', content: m.content });
+    else if (m.role === 'assistant') messages.push({ role: 'assistant', content: m.content });
+  }
+  messages.push({ role: 'user', content });
+
+  // Build tool context
+  const project = context.selectedProject;
+  const toolContext = {
+    projectRoot: project?.config.project.root ?? '',
+    features: (context.features ?? project?.config.features ?? []).map(f => ({
+      id: f.id, name: f.name, status: f.status, progress: f.progress,
+      category: f.category, phase: f.phase, points: f.points,
+      notes: f.notes, paths: f.paths,
+    })),
+    config: {
+      projectName: project?.config.project.name,
+      defaultIDE: project?.config.project.defaultIDE,
+      agentCount: context.adapters?.length ?? 0,
+      featureCount: (context.features ?? project?.config.features ?? []).length,
+      adapterNames: context.adapters?.map(a => a.name),
+    },
+    activeRuns: context.activeRuns?.map(r => ({
+      pid: 0, featureId: r.featureId, featureName: r.featureName,
+      phase: r.phase, command: '', startedAt: r.startedAt,
+    })),
+    recentRuns: context.recentRuns?.slice(0, 10).map(r => ({
+      featureName: r.featureName, exitCode: r.exitCode, success: r.success,
+    })),
+  };
+
+  // Determine provider
+  let providerConfig: { provider?: string; model?: string; systemPrompt?: string } = {};
+  if (chatSettingsOverride?.provider && chatSettingsOverride.provider !== 'auto') {
+    providerConfig = chatSettingsOverride;
+  } else {
+    const userProvider = await loadChatProvider();
+    if (userProvider) providerConfig = userProvider;
+  }
+
+  const payload: Record<string, unknown> = {
+    messages,
+    tools: true,
+    context: toolContext,
+    systemPrompt, // Always pass the rich system prompt
+  };
+  if (providerConfig.provider) payload.provider = providerConfig.provider;
+  if (providerConfig.model) payload.model = providerConfig.model;
+
+  const res = await fetch('/api/chat/agent', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || 'Agent API failed');
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error('No response body');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let contentAccum = '';
+  const toolCalls: AgentStreamResult['toolCalls'] = [];
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith('data: ')) continue;
+      
+      try {
+        const json = JSON.parse(trimmed.slice(6));
+        
+        switch (json.type) {
+          case 'thinking_start':
+            callbacks.onThinkingStart?.();
+            break;
+          case 'thinking':
+            callbacks.onThinking?.(json.text);
+            break;
+          case 'tool_call': {
+            const tc = { id: json.id, name: json.name, arguments: json.arguments || {} };
+            toolCalls.push(tc);
+            callbacks.onToolCall?.(json.id, json.name, json.arguments || {});
+            break;
+          }
+          case 'tool_result': {
+            const existing = toolCalls.find(t => t.id === json.id);
+            if (existing) {
+              existing.result = json.content;
+              existing.error = json.error;
+            }
+            callbacks.onToolResult?.(json.id, json.content, json.error);
+            break;
+          }
+          case 'text':
+            contentAccum += json.text;
+            callbacks.onText?.(json.text);
+            break;
+          case 'error':
+            contentAccum = `❌ ${json.error}`;
+            break;
+          case 'done':
+            break;
+        }
+      } catch { /* skip malformed */ }
+    }
+  }
+
+  return { content: contentAccum, toolCalls };
+}
+
+// ---------------------------------------------------------------------------
+// Main entry point
+// ---------------------------------------------------------------------------
+
+export async function sendChatMessage(
+  request: SendChatMessageRequest,
+): Promise<SendChatMessageResult> {
+  // 1. Check for local commands
   const local = localCommand(request);
-  if (local) return local;
+  if (local) {
+    // If it was a search query that needs async execution
+    if (local.handledLocally && local.content.startsWith('正在搜尋')) {
+      const query = request.content.replace(/^搜尋\s+/i, '').replace(/^search\s+(?:for\s+)?/i, '');
+      const root = request.context.selectedProject?.config.project.root ?? '';
+      if (root) {
+        try {
+          const results = await executeSearch(query.trim(), root);
+          return { content: results, handledLocally: true };
+        } catch {
+          return { content: `搜尋「${query}」失敗。`, handledLocally: true, error: true };
+        }
+      }
+    }
+    return local;
+  }
+
+  saveMemory('lastInteraction', request.content);
 
   const project = request.context.selectedProject;
-  const adapter = request.context.adapters.find((candidate) =>
-    getAdapterExecutionKind(candidate) === 'agent-cli'
+
+  // 2. Agent API with tool calling (takes priority when project context available)
+  if (project && request.context.features && request.context.features.length > 0) {
+    try {
+      const result = await callAgentApi(
+        request.content,
+        request.history,
+        request.context,
+        {
+          onThinking: request.onThinking,
+          onToolCall: request.onToolCall,
+          onToolResult: request.onToolResult,
+          onThinkingStart: request.onThinkingStart,
+          onText: request.onStream,
+        },
+        request.chatSettings,
+      );
+      
+      // If we got a meaningful response, return it
+      if (result.content || result.toolCalls.length > 0) {
+        return {
+          content: result.content || '已執行工具呼叫，詳見上方結果。',
+          toolCalls: result.toolCalls.length > 0 ? result.toolCalls : undefined,
+        };
+      }
+    } catch {
+      // Fall through to agent dispatch or simple chat
+    }
+  }
+
+  const adapter = request.context.adapters.find(
+    (candidate) => getAdapterExecutionKind(candidate) === 'agent-cli',
   );
 
-  // If we have both a project and an agent adapter, dispatch through the agent bridge.
-  // This gives the agent access to file context, project files, etc.
-  // If the agent fails to prepare or exits with non-zero, fall back to AI API.
+  // 3. Agent dispatch path (project + agent adapter available)
   if (project && adapter) {
     const runtime = createRuntimeAdapterFromConfig(adapter);
     const prompt = buildAgentPrompt(request.content, request.context);
@@ -377,12 +1024,17 @@ export async function sendChatMessage(request: SendChatMessageRequest): Promise<
     });
 
     if (!result.success || !result.command || !result.args) {
-      // Fallback to API chat if agent command preparation fails
       try {
-        const apiContent = await callChatApi(request.content, request.history, request.onStream, request.chatSettings);
+        const apiContent = await callChatApi(
+          request.content,
+          request.history,
+          request.context,
+          request.onStream,
+          request.chatSettings,
+        );
         return { content: apiContent };
       } catch {
-        return { content: result.message || 'The agent command could not be prepared.', error: true };
+        return { content: result.message || 'Agent 指令準備失敗。', error: true };
       }
     }
 
@@ -392,10 +1044,15 @@ export async function sendChatMessage(request: SendChatMessageRequest): Promise<
       workingDir: project.config.project.root,
     });
     const agentOutput = await waitForAgentOutput(pid);
-    // If agent exited with a non-zero exit code, fall back to AI API
     if (agentOutput.includes('Agent exited with code') && !agentOutput.includes('code 0')) {
       try {
-        const apiContent = await callChatApi(request.content, request.history, request.onStream, request.chatSettings);
+        const apiContent = await callChatApi(
+          request.content,
+          request.history,
+          request.context,
+          request.onStream,
+          request.chatSettings,
+        );
         return { content: apiContent };
       } catch {
         return { content: agentOutput, error: true };
@@ -404,21 +1061,49 @@ export async function sendChatMessage(request: SendChatMessageRequest): Promise<
     return { content: agentOutput };
   }
 
-  // No project or no adapter configured — use the AI chat API directly
+  // 3. AI API fallback
   try {
-    const content = await callChatApi(request.content, request.history, request.onStream, request.chatSettings);
+    const content = await callChatApi(
+      request.content,
+      request.history,
+      request.context,
+      request.onStream,
+      request.chatSettings,
+    );
     return { content };
   } catch (e) {
     const err = e as Error;
-    if (err.message.includes('ANTHROPIC_API_KEY') || err.message.includes('OPENAI_API_KEY') || err.message.includes('GEMINI_API_KEY') || err.message.includes('DEEPSEEK_API_KEY')) {
-      return { content: 'The AI assistant cannot respond because no API keys are configured. Please add an API key in Settings or Keys.', error: true };
+    if (
+      err.message.includes('ANTHROPIC_API_KEY') ||
+      err.message.includes('OPENAI_API_KEY') ||
+      err.message.includes('GEMINI_API_KEY') ||
+      err.message.includes('DEEPSEEK_API_KEY')
+    ) {
+      return {
+        content: 'AI 助手目前無法回應，因為尚未配置 API 金鑰。請到 Settings 或 Keys 頁面新增。',
+        error: true,
+      };
     }
     if (err.message.includes('429') || err.message.includes('rate limit')) {
-      return { content: 'The AI service is currently rate-limited. Please wait a moment and try again.', error: true };
+      return {
+        content: 'AI 服務目前被速率限制了，請稍等片刻再試。',
+        error: true,
+      };
     }
-    if (err.message.includes('401') || err.message.includes('unauthorized') || err.message.includes('403') || err.message.includes('forbidden')) {
-      return { content: 'The AI service authentication failed. Please check your API keys in Settings.', error: true };
+    if (
+      err.message.includes('401') ||
+      err.message.includes('unauthorized') ||
+      err.message.includes('403') ||
+      err.message.includes('forbidden')
+    ) {
+      return {
+        content: 'AI 服務認證失敗，請檢查 Settings 中的 API 金鑰。',
+        error: true,
+      };
     }
-    return { content: `Sorry, I could not reach the AI service right now. (${err.message})`, error: true };
+    return {
+      content: `抱歉，我暫時無法連到 AI 服務。（${err.message}）`,
+      error: true,
+    };
   }
 }

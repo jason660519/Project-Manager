@@ -57,23 +57,27 @@ export function Block({
   const activeItem =
     block.items.find((item) => item.id === block.activeItemId) ?? block.items[0];
 
-  // Lazy-mount: only mount an item the first time it becomes active. Once
-  // mounted, the item stays mounted (hidden via display:none when inactive)
-  // so terminal PTY sessions and browser iframe state survive tab switches.
-  const [seenItemIds, setSeenItemIds] = useState<Set<string>>(
-    () => new Set(block.items.map((item) => item.id)),
-  );
-  // Keep seenItemIds in sync with block.items so new tabs mount immediately.
+  // Lazy-mount: mount a tab the first time it becomes active (or when newly
+  // added as the active tab). Once mounted it stays mounted (hidden when
+  // inactive) so PTY / native browser state survive tab switches — without
+  // eagerly mounting every tab at block creation (which broke 0×0 xterm init,
+  // concurrent webview creates, and folder IPC races on smaller machines).
+  const [seenItemIds, setSeenItemIds] = useState<Set<string>>(() => {
+    const initial =
+      block.items.find((item) => item.id === block.activeItemId) ??
+      block.items[0];
+    return new Set(initial ? [initial.id] : []);
+  });
   useEffect(() => {
     setSeenItemIds((prev) => {
       const aliveIds = new Set(block.items.map((item) => item.id));
+      const activeId =
+        block.activeItemId || block.items[0]?.id || '';
       let changed = false;
       const next = new Set(prev);
-      for (const id of aliveIds) {
-        if (!next.has(id)) {
-          next.add(id);
-          changed = true;
-        }
+      if (activeId && !next.has(activeId)) {
+        next.add(activeId);
+        changed = true;
       }
       for (const id of prev) {
         if (!aliveIds.has(id)) {
@@ -83,7 +87,7 @@ export function Block({
       }
       return changed ? next : prev;
     });
-  }, [block.items]);
+  }, [block.items, block.activeItemId]);
 
   const addTerminal = useCallback(() => {
     const nextLabel = `zsh ${block.items.filter(isTerminal).length + 1}`;
@@ -210,29 +214,41 @@ export function Block({
       onCloseTab={closeTab}
       actions={actions}
     >
+      <div className="relative h-full min-h-0 w-full">
       {block.items.map((item) => {
         if (!seenItemIds.has(item.id)) return null;
         const visible = item.id === activeItem?.id;
         return (
           <div
             key={item.id}
-            className={visible ? 'flex h-full min-h-0 flex-col' : 'hidden'}
+            className={
+              visible
+                ? 'relative z-10 flex h-full min-h-0 flex-col'
+                : 'pointer-events-none absolute inset-0 z-0 flex h-full min-h-0 flex-col opacity-0'
+            }
+            aria-hidden={!visible}
           >
             {isTerminal(item) ? (
-              <TerminalSlot itemId={item.id} cwd={cwd} />
+              <TerminalSlot itemId={item.id} cwd={cwd} isActive={visible} />
             ) : isBrowser(item) ? (
               <BrowserContent
                 itemId={item.id}
                 url={item.url}
                 homepageUrl={homepageUrl}
+                isActive={visible}
                 onNavigate={(url) => navigateBrowser(item.id, url)}
               />
             ) : isFolder(item) ? (
-              <FolderContent itemId={item.id} rootPath={item.path} />
+              <FolderContent
+                itemId={item.id}
+                rootPath={item.path}
+                isActive={visible}
+              />
             ) : null}
           </div>
         );
       })}
+      </div>
     </PaneShell>
   );
 }

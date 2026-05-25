@@ -1,6 +1,6 @@
 'use client';
 
-import { Bot, ChevronDown, MessageSquareText, Trash2 } from 'lucide-react';
+import { Bot, ChevronDown, Download, MessageSquareText, Mic, Send, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '../../lib/i18n';
@@ -8,6 +8,9 @@ import { ChatInput } from '../../components/chat/ChatInput';
 import { ChatMessage as ChatMessageView } from '../../components/chat/ChatMessage';
 import { ChatSettings } from '../../components/chat/ChatSettings';
 import { QuickActions } from '../../components/chat/QuickActions';
+import { ThinkingIndicator } from '../../components/chat/ThinkingIndicator';
+import { ToolCallGroup } from '../../components/chat/ToolCallCard';
+import type { ToolCallDisplay } from '../../components/chat/ToolCallCard';
 import type { ChatMessage } from '../../lib/chat/types';
 
 interface StoredSession {
@@ -53,7 +56,13 @@ function saveSessions(sessions: StoredSession[]) {
   }
 }
 
-function CurrentSessionMessages({ messages, loading }: { messages: ChatMessage[]; loading: boolean }) {
+function CurrentSessionMessages({
+  messages, loading, thinkingActive, thinkingText, toolCalls,
+}: {
+  messages: ChatMessage[]; loading: boolean;
+  thinkingActive: boolean; thinkingText: string;
+  toolCalls: ToolCallDisplay[];
+}) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showLoading, setShowLoading] = useState(false);
 
@@ -80,6 +89,13 @@ function CurrentSessionMessages({ messages, loading }: { messages: ChatMessage[]
       {messages.map((message) => (
         <ChatMessageView key={message.id} message={message} />
       ))}
+      
+      {/* Thinking indicator */}
+      <ThinkingIndicator active={thinkingActive} text={thinkingText} />
+      
+      {/* Tool calls */}
+      <ToolCallGroup calls={toolCalls} />
+      
       {showLoading && (
         <div className="mr-4 flex animate-pulse items-center gap-2 rounded border border-stone-200/15 bg-stone-950/60 px-2.5 py-2 text-[11px] text-stone-400">
           <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-amber-400/80" />
@@ -112,6 +128,11 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Agent/tool state
+  const [thinkingActive, setThinkingActive] = useState(false);
+  const [thinkingText, setThinkingText] = useState('');
+  const [toolCalls, setToolCalls] = useState<ToolCallDisplay[]>([]);
 
   // Chat settings (provider, model, system prompt)
   const [chatSettings, setChatSettings] = useState<{ provider: string; model: string; systemPrompt: string }>({
@@ -228,6 +249,11 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
         recentRuns: [],
       };
 
+      // Reset tool/thinking state for new message
+      setThinkingActive(false);
+      setThinkingText('');
+      setToolCalls([]);
+
       // Add placeholder, then start streaming updates into it
       setMessages([...nextMessages, placeholder]);
 
@@ -240,12 +266,29 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
         chatSettings: chatSettings.provider !== 'auto' ? chatSettings : undefined,
         onStream: (chunk: string) => {
           accumulated += chunk;
-          // Update the assistant message in-place
           setMessages((prev) =>
             prev.map((m) => (m.id === assistantId ? { ...m, content: accumulated } : m)),
           );
         },
+        onThinkingStart: () => {
+          setThinkingActive(true);
+          setThinkingText('');
+        },
+        onThinking: (text: string) => {
+          setThinkingText(prev => prev + text);
+        },
+        onToolCall: (id: string, name: string, args: Record<string, unknown>) => {
+          setToolCalls(prev => [...prev, { id, name, arguments: args, status: 'running' as ToolCallDisplay['status'] }]);
+        },
+        onToolResult: (id: string, content: string, error?: boolean) => {
+          setThinkingActive(false);
+          setToolCalls(prev => prev.map(tc =>
+            tc.id === id ? { ...tc, result: content, error, status: (error ? 'error' : 'done') as ToolCallDisplay['status'] } : tc
+          ));
+        },
       });
+
+      setThinkingActive(false);
 
       const finalContent = result.content || accumulated;
       const assistantMessage = makeMessage(
@@ -254,6 +297,8 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
         result.error ? 'error' : 'sent',
       );
       assistantMessage.id = assistantId;
+      // Attach tool calls to the assistant message for display
+      (assistantMessage as any).toolCalls = result.toolCalls || toolCalls;
 
       const finalMessages = [...nextMessages, assistantMessage];
       setMessages(finalMessages);
@@ -305,6 +350,48 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
     }
   };
 
+  // Export current conversation as Markdown
+  const handleExport = useCallback(() => {
+    if (messages.length === 0) return;
+    const title = generateTitle(messages);
+    const markdown = [
+      `# ${title}`,
+      '',
+      `Exported: ${new Date().toISOString()}`,
+      '',
+      ...messages.map((m) => {
+        const role = m.role === 'user' ? '**You**' : '**AI**';
+        const time = new Date(m.createdAt).toLocaleString();
+        return `### ${role} — ${time}\n\n${m.content}\n`;
+      }),
+    ].join('\n');
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, '_').slice(0, 40)}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [messages]);
+
+  // Start Talk: create a new session and focus input
+  const handleStartTalk = useCallback(() => {
+    if (activeSessionId && messages.length > 0) {
+      persistCurrentSession(messages, activeSessionId);
+    }
+    setActiveSessionId(null);
+    setMessages([]);
+    setTimeout(() => inputRef.current?.focus(), 100);
+  }, [activeSessionId, messages, persistCurrentSession]);
+
+  // Send from top bar: trigger the same as pressing send in ChatInput
+  const handleTopSend = useCallback(() => {
+    const textarea = inputRef.current;
+    if (!textarea || !textarea.value.trim()) return;
+    // Simulate Enter key press to trigger the existing send logic
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  }, []);
+
   return (
     <div className="flex h-[calc(100vh-var(--pm-topbar-h,48px)-40px)] gap-0 lg:gap-4">
       {/* ── History sidebar ──────────────────────────────────────────────── */}
@@ -326,16 +413,24 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
         {/* Header row */}
         <div className="flex h-10 items-center justify-between border-b border-stone-200/15 px-3">
           <h2 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400">
-            History
+            {t.chat.history}
           </h2>
-          <button
-            type="button"
-            onClick={handleNewChat}
-            className="flex items-center gap-1 rounded border border-amber-200/20 bg-amber-500/8 px-2 py-1 text-[10px] font-semibold text-amber-100 transition-colors hover:bg-amber-500/15"
-          >
-            <MessageSquareText size={11} />
-            <span>{t.chat.new}</span>
-          </button>
+          <div className="flex items-center gap-1">
+            {/* Start Talk */}
+            <button
+              type="button"
+              onClick={handleStartTalk}
+              className="flex items-center gap-1 rounded border border-emerald-200/20 bg-emerald-500/10 px-1.5 py-1 text-[10px] font-semibold text-emerald-100 transition-colors hover:bg-emerald-500/20"
+              title={t.chat.startTalk}
+            >
+              <Mic size={11} />
+            </button>
+            {/* Settings (inline ChatSettings popover) */}
+            <ChatSettings
+              current={chatSettings}
+              onChange={(s) => setChatSettings(s)}
+            />
+          </div>
         </div>
 
         {/* Session list */}
@@ -380,6 +475,18 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
             </div>
           )}
         </div>
+
+        {/* Footer: New Chat button */}
+        <div className="border-t border-stone-200/15 px-2 py-2">
+          <button
+            type="button"
+            onClick={handleNewChat}
+            className="flex h-8 w-full items-center justify-center gap-1.5 rounded border border-amber-200/20 bg-amber-500/8 text-[10px] font-semibold text-amber-100 transition-colors hover:bg-amber-500/15"
+          >
+            <MessageSquareText size={11} />
+            <span>{t.chat.new}</span>
+          </button>
+        </div>
       </div>
 
       {/* ── Main chat area ────────────────────────────────────────────────── */}
@@ -401,16 +508,42 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
             AI Assistant
           </h1>
 
-          {activeSessionId && messages.length > 0 && (
+          {/* Action buttons */}
+          <div className="flex items-center gap-1">
+            {/* New Session */}
             <button
               type="button"
               onClick={handleNewChat}
               className="flex items-center gap-1 rounded border border-stone-200/15 px-2 py-1 text-[10px] text-stone-400 transition-colors hover:border-amber-200/25 hover:text-amber-100"
+              title={t.chat.newSession}
             >
               <MessageSquareText size={11} />
-              <span>{t.chat.newChat}</span>
+              <span className="hidden sm:inline">{t.chat.newSession}</span>
             </button>
-          )}
+
+            {/* Export */}
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={messages.length === 0}
+              className="flex items-center gap-1 rounded border border-stone-200/15 px-2 py-1 text-[10px] text-stone-400 transition-colors hover:border-stone-200/25 hover:text-stone-200 disabled:cursor-not-allowed disabled:opacity-30"
+              title={t.chat.exportChat}
+            >
+              <Download size={11} />
+              <span className="hidden sm:inline">{t.chat.exportChat}</span>
+            </button>
+
+            {/* Send */}
+            <button
+              type="button"
+              onClick={handleTopSend}
+              className="flex items-center gap-1 rounded border border-amber-200/25 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-100 transition-colors hover:bg-amber-500/20"
+              title={t.chat.sendMessage}
+            >
+              <Send size={11} />
+              <span className="hidden sm:inline">{t.chat.sendMessage}</span>
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
@@ -437,7 +570,13 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
             </div>
           </div>
         ) : (
-          <CurrentSessionMessages messages={messages} loading={loading} />
+          <CurrentSessionMessages
+            messages={messages}
+            loading={loading}
+            thinkingActive={thinkingActive}
+            thinkingText={thinkingText}
+            toolCalls={toolCalls}
+          />
         )}
 
         {/* Input */}

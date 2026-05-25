@@ -26,7 +26,11 @@ import {
   type SplitDirection,
 } from '../../../components/terminal/blockLayout';
 import { destroyBlockItems } from '../../../components/terminal/destroyBlockItems';
-import { purgeOrphanNativeWebviews } from '../../../components/browser/BrowserRegistry';
+import {
+  migrateStaleIframeSessions,
+  purgeOrphanNativeWebviews,
+} from '../../../components/browser/BrowserRegistry';
+import { waitForTauriRuntime } from '../../../lib/runtime/tauri-ready';
 import type { ProjectEntry } from '../../../lib/types';
 
 interface WorkspaceRow {
@@ -293,6 +297,9 @@ function InteropConsole({
 
   useEffect(() => {
     purgeOrphanNativeWebviews();
+    void waitForTauriRuntime().then((ready) => {
+      if (ready) migrateStaleIframeSessions();
+    });
   }, []);
 
   const activeLayout = useMemo(() => {

@@ -340,6 +340,11 @@ export const en: Translations = {
     enterToSend: 'Enter to send · Shift+Enter for new line',
     deleteSession: 'Delete session',
     openFullChat: 'Open full chat page',
+    startTalk: 'Start Talk',
+    chatSettings: 'Settings',
+    newSession: 'New Session',
+    exportChat: 'Export',
+    sendMessage: 'Send',
   },
   dispatch: {
     title: 'Task Dispatch',

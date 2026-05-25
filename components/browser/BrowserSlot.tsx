@@ -1,17 +1,44 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import { measureBrowserSlotBounds } from './browser-bounds';
 import {
   attach,
   backendKind,
   detach,
+  forceNativeBoundsSync,
   navigate,
+  notifySlotVisible,
   setBounds,
   setSlotHidden,
 } from './BrowserRegistry';
 
-export function BrowserSlot({ itemId, url }: { itemId: string; url: string }) {
+export function BrowserSlot({
+  itemId,
+  url,
+  isActive = true,
+}: {
+  itemId: string;
+  url: string;
+  isActive?: boolean;
+}) {
   const slotRef = useRef<HTMLDivElement>(null);
+
+  const applyBounds = useCallback(() => {
+    const slot = slotRef.current;
+    if (!slot || backendKind() !== 'tauri') return;
+    const bounds = measureBrowserSlotBounds(slot);
+    if (!bounds) return;
+    setBounds(itemId, bounds.x, bounds.y, bounds.width, bounds.height);
+  }, [itemId]);
+
+  const applyBoundsForced = useCallback(() => {
+    const slot = slotRef.current;
+    if (!slot || backendKind() !== 'tauri') return;
+    const bounds = measureBrowserSlotBounds(slot);
+    if (!bounds) return;
+    forceNativeBoundsSync(itemId, bounds);
+  }, [itemId]);
 
   useEffect(() => {
     const slot = slotRef.current;
@@ -23,47 +50,68 @@ export function BrowserSlot({ itemId, url }: { itemId: string; url: string }) {
 
   useEffect(() => {
     navigate(itemId, url);
-  }, [itemId, url]);
+    // After Enter / Go the native webview is often created on the first valid
+    // bounds tick — force a remeasure so it does not cover the URL chrome.
+    if (backendKind() !== 'tauri' || !isActive) return;
+    let innerRaf = 0;
+    const outerRaf = requestAnimationFrame(() => {
+      innerRaf = requestAnimationFrame(() => {
+        applyBoundsForced();
+      });
+    });
+    return () => {
+      cancelAnimationFrame(outerRaf);
+      if (innerRaf) cancelAnimationFrame(innerRaf);
+    };
+  }, [itemId, url, isActive, applyBoundsForced]);
 
   useEffect(() => {
     if (backendKind() !== 'tauri') return;
+    if (!isActive) {
+      setSlotHidden(itemId);
+      return;
+    }
+    notifySlotVisible(itemId);
+    applyBoundsForced();
+  }, [isActive, itemId, applyBoundsForced]);
+
+  useEffect(() => {
+    if (backendKind() !== 'tauri' || !isActive) return;
     const slot = slotRef.current;
     if (!slot) return;
 
+    const pane = slot.closest('[data-browser-pane]');
     let rafId: number | null = null;
-    let last: { x: number; y: number; width: number; height: number } | null = null;
     let stopped = false;
     let hiddenAcknowledged = false;
 
     const tick = () => {
       if (stopped) return;
-      const r = slot.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) {
-        if (
-          !last ||
-          last.x !== r.x ||
-          last.y !== r.y ||
-          last.width !== r.width ||
-          last.height !== r.height
-        ) {
-          last = { x: r.x, y: r.y, width: r.width, height: r.height };
-          setBounds(itemId, r.x, r.y, r.width, r.height);
-        }
+      const bounds = measureBrowserSlotBounds(slot);
+      if (bounds) {
+        setBounds(itemId, bounds.x, bounds.y, bounds.width, bounds.height);
         hiddenAcknowledged = false;
       } else if (!hiddenAcknowledged) {
         setSlotHidden(itemId);
         hiddenAcknowledged = true;
-        last = null;
       }
       rafId = requestAnimationFrame(tick);
     };
     rafId = requestAnimationFrame(tick);
 
+    const ro = new ResizeObserver(() => {
+      applyBoundsForced();
+    });
+    ro.observe(slot);
+    if (pane) ro.observe(pane);
+
     return () => {
       stopped = true;
       if (rafId !== null) cancelAnimationFrame(rafId);
+      ro.disconnect();
+      setSlotHidden(itemId);
     };
-  }, [itemId]);
+  }, [itemId, isActive, applyBoundsForced]);
 
   return <div ref={slotRef} className="relative z-0 min-h-0 min-w-0 flex-1" />;
 }

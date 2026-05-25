@@ -223,8 +223,8 @@
       },
       "phase": "development",
       "points": 1,
-      "progress": 40,
-      "status": "todo",
+      "progress": 60,
+      "status": "in_progress",
       "updatedAt": "2026-05-24T05:28:41.878Z"
     },
     {
@@ -263,8 +263,8 @@
       },
       "phase": "development",
       "points": 1,
-      "progress": 35,
-      "status": "todo",
+      "progress": 55,
+      "status": "in_progress",
       "updatedAt": "2026-05-24T05:28:41.878Z"
     },
     {
@@ -923,6 +923,29 @@
       "createdAt": "2026-05-25T04:18:56Z",
       "updatedAt": "2026-05-25T04:43:00Z",
       "updatedBy": "Claude"
+    },
+    {
+      "id": "F30",
+      "name": "AI Assistant Capability Upgrade",
+      "category": "Core/AI",
+      "status": "done",
+      "progress": 98,
+      "phase": "development",
+      "points": 13,
+      "locatedSection": "/ai_assistants",
+      "readmePath": ".project-manager/features/F30/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F30/",
+        "spec": ".project-manager/features/F30/feature-spec.md",
+        "tdd": ".project-manager/features/F30/tdd-spec.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F30/",
+        "implementation": "app/api/chat",
+        "test": "__tests__/chat.agent.test.ts"
+      },
+      "notes": "Upgrade AI Assistant to match/exceed OpenClaw capabilities. Enhanced system prompt, tool execution, slash commands v2, cross-session memory, streaming UX polish.",
+      "createdAt": "2026-05-25T12:30:00Z",
+      "updatedAt": "2026-05-25T13:15:00Z",
+      "updatedBy": "小龍蝦"
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",

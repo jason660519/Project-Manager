@@ -1151,6 +1151,8 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
           startedAt: run.startedAt,
         })),
         recentRuns: runHistory.slice(0, 5),
+        features: dashboardFeatures,
+        dashboardProjects: effectiveDashboardProjects.map((p) => p.config.project.name),
       }}
     >
       {currentView === 'dashboard' && selectedProject && (
@@ -1270,6 +1272,8 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
               startedAt: run.startedAt,
             })),
             recentRuns: runHistory.slice(0, 5),
+            features: dashboardFeatures,
+            dashboardProjects: effectiveDashboardProjects.map((p) => p.config.project.name),
           }}
         />
       )}

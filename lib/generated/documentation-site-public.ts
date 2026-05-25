@@ -4,19 +4,19 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-05-25T03:29:15.000Z",
+    "generatedAt": "2026-05-25T12:07:27.000Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
     "manifestAudience": "public",
-    "totalDocuments": 6,
+    "totalDocuments": 7,
     "totalFolders": 4,
-    "publicDocuments": 9,
+    "publicDocuments": 22,
     "internalDocuments": 45,
     "restrictedDocuments": 1,
-    "publishableDocuments": 6,
-    "reviewRequiredDocuments": 30,
-    "warningCount": 61
+    "publishableDocuments": 7,
+    "reviewRequiredDocuments": 42,
+    "warningCount": 96
   },
   "folders": [
     {
@@ -26,7 +26,7 @@ export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
       "sourcePath": "docs",
       "label": "All Docs",
       "title": "Documentation",
-      "summary": "6 documentation files indexed from docs.",
+      "summary": "7 documentation files indexed from docs.",
       "parentSlug": null,
       "folderSlugs": [
         "deployment",
@@ -34,14 +34,14 @@ export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
       ],
       "docIds": [],
       "classificationCounts": {
-        "public": 6,
+        "public": 7,
         "internal": 0,
         "restricted": 0
       },
-      "publishableCount": 6,
+      "publishableCount": 7,
       "reviewRequiredCount": 0,
       "visibilityCounts": {
-        "public": 6,
+        "public": 7,
         "internal": 0,
         "restricted": 0
       },
@@ -81,23 +81,24 @@ export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
       "sourcePath": "docs/guides",
       "label": "Guides",
       "title": "Guides",
-      "summary": "5 documentation files indexed from docs/guides.",
+      "summary": "6 documentation files indexed from docs/guides.",
       "parentSlug": "",
       "folderSlugs": [
         "guides/features"
       ],
       "docIds": [
-        "guides/getting-started"
+        "guides/getting-started",
+        "guides/index"
       ],
       "classificationCounts": {
-        "public": 5,
+        "public": 6,
         "internal": 0,
         "restricted": 0
       },
-      "publishableCount": 5,
+      "publishableCount": 6,
       "reviewRequiredCount": 0,
       "visibilityCounts": {
-        "public": 5,
+        "public": 6,
         "internal": 0,
         "restricted": 0
       },
@@ -267,15 +268,15 @@ export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
       "sourcePath": "docs/guides/features/xmux.md",
       "folderSlug": "guides/features",
       "folderPath": "docs/guides/features",
-      "title": "xmux",
-      "summary": "xmux is the Project Manager-facing coding-tool entry for a user-installed cmux command. cmux is a third-party project by Manaflow. In the first Project Manager integration, xmux is a side...",
-      "content": "\n# xmux\n\nxmux is the Project Manager-facing coding-tool entry for a user-installed cmux command. cmux is a third-party project by Manaflow. In the first Project Manager integration, xmux is a sidebar item and agent target that delegates to the installed `cmux` command. The goal is to make multi-agent coding work visible from Project Manager without bundling, forking, or redistributing cmux.\n\n## Design Philosophy\n\nxmux does not prescribe how developers must use AI. It is not a closed workflow product. Instead, it treats terminals, browser panes, notifications, workspaces, splits, tabs, and CLI commands as composable building blocks. Developers can combine those parts into the AI collaboration workflow that fits their codebase.\n\n## Current Project Manager Behavior\n\n| Area | Current behavior |\n|---|---|\n| Sidebar | `xmux` appears under Execution. |\n| Adapter | Dispatch target is named `xmux`. |\n| Command | Project Manager invokes the installed `cmux` executable. |\n| Interface | Interactive workspace sidebar plus terminal/browser split-pane topology. |\n| Terminal | Page-local terminal panes can run allowlisted inspection commands through `/api/xmux/terminal`. |\n| Browser | Browser pane has a URL bar and iframe surface for local Project Manager pages. |\n| Toolbar | Globe toggles browser, Bell opens notifications, Grid switches vertical/horizontal split. |\n| Deep control | Full PTY, cmux socket inventory, cmux browser automation, and notification feed wiring are future work. |\n\n## Install And Verify cmux\n\ncmux is distributed as a macOS app. The official getting-started guide documents two install paths:\n\n```bash\nbrew tap manaflow-ai/cmux\nbrew install --cask cmux\n```\n\nFor CLI access outside cmux terminals, create the standard symlink:\n\n```bash\nsudo ln -sf \"/Applications/cmux.app/Contents/Resources/bin/cmux\" /usr/local/bin/cmux\ncmux list-workspaces\ncmux notify --title \"Build Complete\" --body \"Your build finished\"\n```\n\nProject Manager expects the executable to be available as `cmux`. It does not ship cmux inside Project Manager.\n\n## Page-Local Terminal\n\nThe terminal pane is interactive, but intentionally allowlisted. It is meant for safe local inspection, not arbitrary shell execution. Supported commands:\n\n| Command | Purpose |\n|---|---|\n| `pwd` | Show the Project Manager server working directory. |\n| `git branch --show-current` | Show the current git branch. |\n| `git status --short` | Show dirty worktree entries. |\n| `cmux --version` | Verify the installed cmux CLI. |\n| `cmux list-workspaces` | Ask cmux for current workspaces. |\n\n## Core Capabilities\n\n### Right-Top Toolbar\n\nThe xmux interop surface mirrors the native cmux right-top controls for browser, notification, and split-pane actions. These controls are live in Project Manager: they change visible pane state rather than only documenting the upstream cmux behavior.\n\n### AI Notification Attention\n\ncmux supports desktop and in-app notifications so coding agents and scripts can alert you when they need attention. Unread workspaces can be surfaced in the sidebar, and the notification panel provides a central place to review pending work.\n\n### Notification Panel\n\nUse the cmux notification panel for pending agent alerts. The upstream shortcut `Cmd+Shift+U` jumps to the workspace with the latest unread notification.\n\n### Vertical Workspace Sidebar\n\ncmux organizes work into windows, workspaces, panes, surfaces, and panels. Workspaces appear in the sidebar and can carry operational metadata such as current working directory, notifications, and coding context.\n\n### Embedded Browser Panes\n\ncmux browser surfaces can sit beside terminal panes. The browser command group can navigate pages, inspect DOM state, take screenshots, click elements, fill forms, evaluate JavaScript, and save or restore browser session state.\n\nThe Globe toolbar icon opens or hides the built-in browser split. Shortcut target: `Cmd+Shift+L`.\n\n### Notification Toolbar\n\nThe Bell toolbar icon opens the centralized notification panel. cmux listens for OSC 9/99/777 terminal sequences, so coding agents can mark panes as waiting for input. Waiting panes get attention rings, and the related workspace tab lights up in the sidebar.\n\nShortcuts:\n\n| Action | Shortcut |\n|---|---|\n| Open notification panel | `Cmd+I` |\n| Jump to latest unread | `Cmd+Shift+U` |\n\n### Split Pane Toolbar\n\nThe Grid toolbar icon controls split-pane layout for parallel agent work. In Project Manager today it switches the visible terminal/browser split between vertical and horizontal layouts.\n\n| Action | Shortcut |\n|---|---|\n| Split right | `Cmd+D` |\n| Split down | `Cmd+Shift+D` |\n| Move pane focus | `Option+Cmd+Arrow` |\n\n### Claude Code Teams\n\n`cmux claude-teams` launches Claude Code with teammate agents mapped into native cmux splits. cmux provides a tmux compatibility shim so Claude's teammate-pane behavior can run without requiring users to manage tmux directly.\n\n### SSH Workspaces\n\n`cmux ssh user@remote` creates a remote workspace. Browser panes in that workspace route HTTP and WebSocket traffic through the remote machine, so remote `localhost` services are accessible without manual port forwarding. Remote coding-agent notifications can still appear locally.\n\n### Session Restore\n\ncmux can restore app-owned layout and metadata after relaunch, including windows, workspaces, panes, working directories, terminal scrollback on a best-effort basis, and browser URL/history. Supported coding agents can resume when cmux captures their native session identifiers through hooks.\n\n## Project Manager Boundary\n\nxmux currently does not provide a full PTY, read the cmux socket, control cmux browser panes, or ingest cmux notifications into Project Manager logs. Those are separate follow-up integrations because they require command boundaries, socket access policy, and UI state design.\n\n## Follow-Up Integration Ideas\n\n| Follow-up | Purpose |\n|---|---|\n| Socket status check | Show whether `/tmp/cmux.sock` is reachable and which access mode is active. |\n| Workspace inventory | List cmux workspaces inside the xmux view. |\n| Notification mirror | Surface cmux unread notifications inside Project Manager. |\n| Browser automation bridge | Dispatch browser verification steps to a cmux browser pane. |\n| SSH workspace shortcuts | Open known remote development hosts from Project Manager. |\n\n## Official References\n\n- [cmux Getting Started](https://cmux.com/docs/getting-started)\n- [cmux Concepts](https://cmux.com/docs/concepts)\n- [cmux API Reference](https://cmux.com/docs/api)\n- [cmux Browser Automation](https://cmux.com/docs/browser-automation)\n- [cmux Notifications](https://cmux.com/docs/notifications)\n- [cmux SSH](https://cmux.com/docs/ssh)\n- [cmux Claude Code Teams](https://cmux.com/docs/agent-integrations/claude-code-teams)\n- [cmux Session Restore](https://cmux.com/docs/session-restore)\n",
-      "contentHash": "e6be432993a9eb62",
-      "readingMinutes": 5,
+      "title": "xmux Workspace",
+      "summary": "xmux is Project Manager's in-app **tiling workspace**: terminals, browsers, and folder views arranged like tmux panes — split, resize, and tabbed — all without leaving the desktop shell....",
+      "content": "\n# xmux Workspace\n\nxmux is Project Manager's in-app **tiling workspace**: terminals, browsers, and folder views arranged like tmux panes — split, resize, and tabbed — all without leaving the desktop shell. It is inspired by [cmux](https://cmux.com/) (Manaflow), and is intended to grow into the same level of multi-agent coding ergonomics over time.\n\nThis page documents the workspace exactly as it ships today. For the background inspiration and the upstream cmux feature surface, see [Background: inspired by cmux](#background-inspired-by-cmux) at the end.\n\n## At a glance\n\nWhen you open **xmux** from the sidebar, you land on a single workspace with two tabs visible:\n\n- A `zsh` terminal tab\n- A `localhost` browser tab opened to the selected project's homepage\n\nThe browser is active by default so you immediately see your project context. Click the `zsh` tab to switch to the terminal. From there you can split the screen, add more tabs, or open new workspaces.\n\n## Anatomy of the page\n\n```\n┌──────────────────────────────────────────────────────────────────────────┐\n│ XMUX                                          [?] [Bot] [Theme] [Lang]   │  ← global TopBar (Help button opens this doc)\n├──────────────────────────────────────────────────────────────────────────┤\n│ WORKSPACES         🔔│ Owner-Property-Management-AI-SPA Workspace        │  ← header (active workspace name)\n│                      ├────────────────────────────────────────────────── │\n│ ┌─────────────────┐  │ ┌──Block────────────┐ │ ┌──Block────────────────┐ │\n│ │ Project A   *   │  │ │ zsh × │ localhost │ │ │ zsh ×                 │ │\n│ │ local /…        │  │ │       [⊞ ⊕ ⊟ ⇆ ⇣]│ │ │      [⊞ ⊕ ⊟ ⇆ ⇣]      │ │\n│ │ feature in …    │  │ ├───────────────────┤ │ ├───────────────────────┤ │\n│ ├─────────────────┤  │ │  iframe / xterm   │ │ │   xterm content       │ │\n│ │ Project B       │  │ │                   │ │ │                       │ │\n│ └─────────────────┘  │ └───────────────────┘ │ └───────────────────────┘ │\n│  (sidebar)           │  (resizable column)                               │\n└──────────────────────────────────────────────────────────────────────────┘\n```\n\n| Region | What it does |\n|---|---|\n| Workspaces sidebar | One row per project selected on the Project Progress Dashboard. Click a row to switch workspace. The little blue dot marks unread agent notifications. |\n| Bell (🔔) | Opens the right-side notification panel. |\n| Workspace header | Shows the active workspace name. The page-level **Help (?)** button in the global TopBar opens this very documentation page in your system browser. |\n| Block | A single tabbed pane. Holds any mix of terminal / browser / folder tabs. The 5-button toolbar lives in the tab strip. |\n| Divider | Drag the slim grey gutter between two blocks to resize them. Vertical dividers resize left/right; horizontal dividers resize top/bottom. |\n| Notification panel | Optional column on the right; toggle with the bell. |\n\n## Blocks and tabs\n\nA **block** is the basic unit. Every block has a tab strip on top and one large content area below. The tab strip holds tabs and a 5-button action toolbar on the right.\n\n### Tab types\n\n| Icon | Type | What it shows |\n|---|---|---|\n| ▣ | Terminal | An embedded xterm (real PTY in `tauri:dev` / built app; placeholder in `npm run dev` browser preview). |\n| 🌐 | Browser | URL bar + iframe. Defaults to the active workspace's homepage (the project's GitHub URL if set, otherwise the in-app Project Progress Dashboard). |\n| 🗂 | Folder | A simple folder explorer rooted at the workspace's project root. |\n\nTabs can be mixed freely within one block — for example a block can hold two terminals + one browser + one folder. The active tab determines which content area is visible.\n\n### The 5-button toolbar\n\nEvery block carries the same five buttons in its tab strip, on the right:\n\n| Icon | Action | Behaviour |\n|---|---|---|\n| **▣** | New terminal | Adds a `zsh N` tab to **this block**. |\n| **🌐** | New browser tab | Adds a browser tab in **this block**, pre-loaded with the workspace homepage. |\n| **🗂** | New folder tab | Adds a folder explorer tab in **this block**, rooted at the project root. |\n| **⇉** | Split right | Creates a brand-new **sibling block** to the right of this one. If a sibling already exists to the right, adds a tab instead so the click is never a no-op. |\n| **⇣** | Split down | Same as Split right but below. |\n\nThe split buttons operate on the **layout tree**, not on tabs — that is what makes xmux feel like tmux. Clicking \"Split right\" never changes the current block's contents; it places a new empty block alongside it.\n\n### Closing tabs and blocks\n\nClick the **×** next to a tab label to close it. When you close the **last** tab in a block, the block itself is removed from the layout tree, and its sibling block automatically expands to fill the space (left-right sibling stretches horizontally, top-bottom sibling stretches vertically).\n\nThis means there is no separate \"close block\" button — emptying the block IS closing it.\n\nIf you close every block in a workspace, xmux re-seeds the workspace with a fresh initial block (one terminal + one browser pre-loaded with the homepage), so you can never end up with a blank workspace by accident.\n\n## Splits and the tiling layout\n\nThe workspace content area is a binary tree:\n\n- **Leaf node** → one Block\n- **Split node** → two children (first / second) plus a direction (vertical = side-by-side, horizontal = stacked) and a ratio\n\nSplits can nest to any depth. For example, after **Split down** then **Split right** on the top block, the tree looks like:\n\n```\nsplit(horizontal)\n├─ split(vertical)\n│  ├─ Block A (top-left)\n│  └─ Block B (top-right)\n└─ Block C (bottom)\n```\n\nEach split node remembers its own size ratio, and every divider you see on screen corresponds to exactly one split node. Dragging a divider only resizes the immediate two children of that split — siblings further up the tree stay put.\n\n### Closing a block in a nested tree\n\nWhen a block is removed, the empty side of the parent split disappears and the surviving side **takes over the parent's full space**. Example: closing `Block A` above collapses `split(vertical)` to just `Block B`, and `Block B` now fills the entire top half of the workspace.\n\nIf every block under a split is closed, the split itself disappears and the layout tree shrinks one level.\n\n## Workspaces\n\nThe left sidebar lists every project currently selected on the **Project Progress Dashboard**. Each row shows:\n\n- Project name (bold)\n- Branch label and working directory (mono small text)\n- Status note when applicable (e.g. \"Feature in progress\")\n- A small blue dot if there are unread notifications for that workspace\n\nSwitch workspace by clicking a row. The active row is highlighted blue.\n\n### Per-workspace layout state\n\nEach workspace keeps its **own** layout tree in memory. Switching back and forth between workspaces preserves your splits, tabs, and browser URLs for each one. The first time you visit a workspace it seeds the default `terminal + browser` block described above.\n\n> Note: layout state lives in memory only for now. Closing the app or switching tabs in the dashboard does not currently persist your workspace layout across launches — that is on the [follow-ups list](#follow-up-integration-ideas).\n\n## Resizing\n\nThree kinds of drag handles exist in xmux:\n\n| Handle | Where | What it resizes |\n|---|---|---|\n| Sidebar resize | Between the workspaces sidebar and the main content (visible on ≥ `lg` screens) | Workspaces sidebar width |\n| Split divider | Between two children of a split node | The split's ratio (clamped 10% – 90%) |\n| Notification panel | Fixed 320px column on `lg` screens | Not user-resizable |\n\nDrags are RAF-throttled so layout stays smooth.\n\n## Notifications\n\nClick the 🔔 in the sidebar header to open the notification panel on the right. Today the panel shows a placeholder card for the active workspace; the long-term plan is to surface real agent notifications (OSC 9 / 99 / 777 sequences from running PTY sessions, GitHub events, dispatch results, etc.).\n\nThe bell pulses when any workspace in the sidebar has an unread alert.\n\n## Keyboard shortcuts\n\n| Action | Shortcut |\n|---|---|\n| Toggle notification panel | `Cmd+I` (visual title only — wiring TBD) |\n| Jump to latest unread workspace | `Cmd+Shift+U` (planned) |\n\n> The keyboard layer is intentionally minimal in the first iteration. Splits, tab navigation, and pane focus are all currently mouse / click driven; first-class keyboard navigation is a follow-up.\n\n## Page-level Help button\n\nThe `?` button in the global TopBar opens this page in your **system browser** (via the Tauri shell plugin in the desktop app, or a new tab in web preview). The destination URL is per-view — each tool page in Project Manager has its own slug in `lib/docsRegistry.ts`. If a view does not have a documentation page yet, the `?` button renders disabled.\n\n## Background: inspired by cmux\n\nThe xmux design is a deliberate echo of [cmux by Manaflow](https://cmux.com/) — a multi-agent terminal application with native browser panes, notifications, and Claude Code teammate splits. Project Manager's xmux is **not** a port or wrapper of cmux; it is an in-app reimplementation of the same core idea (tiling terminal + browser workspace) so the dashboard stays self-contained.\n\nThe same vocabulary applies in spirit:\n\n| cmux concept | xmux equivalent |\n|---|---|\n| Workspace | Workspace (sidebar row) |\n| Pane | Block leaf in the layout tree |\n| Split | Split node in the layout tree |\n| Browser surface | Browser tab inside a block |\n| Notification | Bell + notification panel |\n| Session restore | (Planned) persistent layout state per workspace |\n\nIf you already use the standalone cmux app, the in-app xmux workspace should feel familiar.\n\n## Follow-up integration ideas\n\n| Follow-up | Why it matters |\n|---|---|\n| Persistent layout per workspace | So your splits survive app restarts. |\n| Real PTY notifications | Surface OSC 9 / 99 / 777 sequences from running shells. |\n| Keyboard-first navigation | Pane focus, split, close, tab cycle without the mouse. |\n| Folder tab → file preview | Click a file in the folder tab to open it in a side preview. |\n| Browser pane bookmarks | Per-workspace pinned URLs (CI dashboard, staging site, GitHub Issues, …). |\n| Optional bridge to standalone cmux | For users who already have cmux installed, mirror its workspace inventory and notifications. |\n\n## References\n\n- [cmux Getting Started](https://cmux.com/docs/getting-started)\n- [cmux Concepts](https://cmux.com/docs/concepts)\n- [cmux Notifications](https://cmux.com/docs/notifications)\n- [cmux Session Restore](https://cmux.com/docs/session-restore)\n- Source: [`app/ui/views/XmuxView.tsx`](https://github.com/jason660519/Project-Manager/tree/main/app/ui/views/XmuxView.tsx), [`components/terminal/blockLayout.ts`](https://github.com/jason660519/Project-Manager/tree/main/components/terminal/blockLayout.ts), [`components/terminal/Block.tsx`](https://github.com/jason660519/Project-Manager/tree/main/components/terminal/Block.tsx), [`components/terminal/LayoutRenderer.tsx`](https://github.com/jason660519/Project-Manager/tree/main/components/terminal/LayoutRenderer.tsx)\n",
+      "contentHash": "98d17df76e86e22f",
+      "readingMinutes": 8,
       "classification": "public",
       "classificationSource": "frontmatter",
       "classificationConfidence": 0.95,
-      "classificationReason": "User-facing coding-tool guide with no secrets, credentials, or private infrastructure details.",
+      "classificationReason": "User-facing workspace guide with no secrets, credentials, or private infrastructure details.",
       "matchedPolicyRule": "CLS-FRONTMATTER-OVERRIDE",
       "publish": true,
       "reviewStatus": "approved",
@@ -286,11 +287,10 @@ export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
         "customers"
       ],
       "tags": [
-        "guides",
-        "table"
+        "guides"
       ],
       "warnings": [],
-      "updatedAt": "2026-05-25T02:46:31.000Z"
+      "updatedAt": "2026-05-25T06:39:55.000Z"
     },
     {
       "id": "guides/getting-started",
@@ -322,6 +322,37 @@ export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
       ],
       "warnings": [],
       "updatedAt": "2026-05-23T16:57:11.000Z"
+    },
+    {
+      "id": "guides/index",
+      "slug": "guides/index",
+      "route": "/documentation/guides/index",
+      "sourcePath": "docs/guides/index.md",
+      "folderSlug": "guides",
+      "folderPath": "docs/guides",
+      "title": "Index",
+      "summary": "Documentation page generated from the repo docs folder.",
+      "content": "",
+      "contentHash": "d316d8ba3553a56c",
+      "readingMinutes": 1,
+      "classification": "public",
+      "classificationSource": "frontmatter",
+      "classificationConfidence": 0.95,
+      "classificationReason": "Public landing page for the Project Manager docs site.",
+      "matchedPolicyRule": "CLS-FRONTMATTER-OVERRIDE",
+      "publish": true,
+      "reviewStatus": "approved",
+      "needsReview": false,
+      "visibility": "public",
+      "audience": [
+        "users",
+        "customers"
+      ],
+      "tags": [
+        "guides"
+      ],
+      "warnings": [],
+      "updatedAt": "2026-05-25T06:39:55.000Z"
     }
   ],
   "routes": [
@@ -334,6 +365,7 @@ export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
     "guides/features/documentation",
     "guides/features/workstation",
     "guides/features/xmux",
-    "guides/getting-started"
+    "guides/getting-started",
+    "guides/index"
   ]
 } satisfies DocumentationSiteManifest;

@@ -19,7 +19,9 @@ describe('ChatMessage', () => {
         }}
       />,
     );
-    expect(screen.getByText('npm test').closest('code')).toBeInTheDocument();
-    expect(screen.getByText('npm test').closest('pre')).toBeInTheDocument();
+    // With syntax highlighting, text is split into token spans. Use closest approach.
+    const pre = document.querySelector('pre');
+    expect(pre).toBeInTheDocument();
+    expect(pre!.textContent).toContain('npm test');
   });
 });

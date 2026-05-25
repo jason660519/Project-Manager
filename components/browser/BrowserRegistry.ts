@@ -13,9 +13,11 @@ import {
   xmuxWebviewSetVisible,
   xmuxWebviewDestroyAll,
 } from '../../lib/bridge';
+import { isTauriRuntime, waitForTauriRuntime } from '../../lib/runtime/tauri-ready';
+import type { ViewBounds } from './browser-bounds';
 
 function isTauri(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+  return isTauriRuntime();
 }
 
 function webviewLabel(itemId: string): string {
@@ -43,7 +45,16 @@ interface TauriSession {
 type Session = IframeSession | TauriSession;
 
 const sessions = new Map<string, Session>();
+const embedFailures = new Map<string, string>();
 let limboDiv: HTMLDivElement | null = null;
+// Serialize native webview creates — concurrent add_child calls often fail on macOS.
+let createChain: Promise<void> = Promise.resolve();
+
+function enqueueCreate(task: () => Promise<void>): Promise<void> {
+  const run = createChain.then(task, task);
+  createChain = run.catch(() => {});
+  return run;
+}
 
 function ensureLimbo(): HTMLDivElement {
   if (typeof document === 'undefined') {
@@ -89,7 +100,34 @@ function createTauriSession(itemId: string, url: string): TauriSession {
   };
 }
 
-function promoteTauriToIframe(itemId: string, session: TauriSession, url: string): IframeSession {
+function upgradeIframeToTauri(
+  itemId: string,
+  iframeSession: IframeSession,
+  url: string,
+): TauriSession {
+  const parent = iframeSession.hostDiv.parentElement;
+  iframeSession.iframe.src = 'about:blank';
+  iframeSession.hostDiv.remove();
+  const fresh = createTauriSession(itemId, url);
+  sessions.set(itemId, fresh);
+  embedFailures.delete(itemId);
+  if (parent) {
+    parent.appendChild(fresh.hostDiv);
+  }
+  const bounds = fresh.lastBounds;
+  if (bounds && bounds.width >= 1 && bounds.height >= 1) {
+    void ensureCreated(itemId, fresh, bounds);
+  }
+  return fresh;
+}
+
+function promoteTauriToIframe(
+  itemId: string,
+  session: TauriSession,
+  url: string,
+  reason: string,
+): IframeSession {
+  embedFailures.set(itemId, reason);
   if (session.created) {
     void xmuxWebviewDestroy(session.label).catch((err) => {
       console.error('[BrowserRegistry] destroy failed during iframe fallback', err);
@@ -122,41 +160,54 @@ function ensureCreated(
     });
   }
   if (session.pendingCreate) return session.pendingCreate;
-  session.pendingCreate = xmuxWebviewCreate(
-    session.label,
-    session.url,
-    bounds.x,
-    bounds.y,
-    bounds.width,
-    bounds.height,
-  )
-    .then(() => {
-      session.created = true;
-      const latest = session.lastBounds;
-      if (
-        latest &&
-        (latest.x !== bounds.x ||
-          latest.y !== bounds.y ||
-          latest.width !== bounds.width ||
-          latest.height !== bounds.height)
-      ) {
-        return xmuxWebviewSetBounds(
-          session.label,
-          latest.x,
-          latest.y,
-          latest.width,
-          latest.height,
-        );
-      }
-    })
-    .catch((err) => {
-      console.error('[BrowserRegistry] embed create failed; iframe fallback', err);
-      promoteTauriToIframe(itemId, session, session.url);
-    })
-    .finally(() => {
-      session.pendingCreate = null;
-    });
+  session.pendingCreate = enqueueCreate(() =>
+    xmuxWebviewCreate(
+      session.label,
+      session.url,
+      bounds.x,
+      bounds.y,
+      bounds.width,
+      bounds.height,
+    )
+      .then(() => {
+        embedFailures.delete(itemId);
+        session.created = true;
+        const latest = session.lastBounds;
+        if (
+          latest &&
+          (latest.x !== bounds.x ||
+            latest.y !== bounds.y ||
+            latest.width !== bounds.width ||
+            latest.height !== bounds.height)
+        ) {
+          return xmuxWebviewSetBounds(
+            session.label,
+            latest.x,
+            latest.y,
+            latest.width,
+            latest.height,
+          );
+        }
+      })
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error('[BrowserRegistry] embed create failed; iframe fallback', err);
+        promoteTauriToIframe(itemId, session, session.url, message);
+      })
+      .finally(() => {
+        session.pendingCreate = null;
+      }),
+  );
   return session.pendingCreate;
+}
+
+function ensureNativeSession(itemId: string, url: string): Session | undefined {
+  const session = sessions.get(itemId);
+  if (!session) return undefined;
+  if (isTauri() && session.kind === 'iframe') {
+    return upgradeIframeToTauri(itemId, session, url);
+  }
+  return session;
 }
 
 export function attach(itemId: string, slot: HTMLElement, initialUrl: string): void {
@@ -166,6 +217,8 @@ export function attach(itemId: string, slot: HTMLElement, initialUrl: string): v
       ? createTauriSession(itemId, initialUrl)
       : createIframeSession(initialUrl);
     sessions.set(itemId, session);
+  } else {
+    session = ensureNativeSession(itemId, initialUrl) ?? session;
   }
   session.url = initialUrl;
   if (session.kind === 'iframe' && session.iframe.src !== initialUrl) {
@@ -179,6 +232,28 @@ export function attach(itemId: string, slot: HTMLElement, initialUrl: string): v
     void xmuxWebviewSetVisible(session.label, true).catch((err) => {
       console.error('[BrowserRegistry] show failed', err);
     });
+  }
+
+  void waitForTauriRuntime().then((ready) => {
+    if (!ready) return;
+    const current = sessions.get(itemId);
+    if (!current) return;
+    if (current.kind === 'iframe') {
+      const upgraded = upgradeIframeToTauri(itemId, current, initialUrl);
+      if (upgraded.hostDiv.parentElement !== slot) {
+        slot.appendChild(upgraded.hostDiv);
+      }
+    }
+  });
+}
+
+/** Upgrade sessions created before `__TAURI_INTERNALS__` was injected. */
+export function migrateStaleIframeSessions(): void {
+  if (!isTauri()) return;
+  for (const [itemId, session] of Array.from(sessions.entries())) {
+    if (session.kind === 'iframe') {
+      upgradeIframeToTauri(itemId, session, session.url);
+    }
   }
 }
 
@@ -197,9 +272,50 @@ export function detach(itemId: string): void {
   }
 }
 
+export function getEmbedFailure(itemId: string): string | null {
+  return embedFailures.get(itemId) ?? null;
+}
+
+/** Drop iframe fallback and recreate native embed on next attach/bounds tick. */
+export function retryNativeEmbed(itemId: string, url: string): void {
+  if (!isTauri()) return;
+  embedFailures.delete(itemId);
+  const session = sessions.get(itemId);
+  if (session?.kind === 'iframe') {
+    upgradeIframeToTauri(itemId, session, url);
+    return;
+  }
+  if (session?.kind === 'tauri') {
+    const tauriSession = session;
+    if (tauriSession.created) {
+      void xmuxWebviewDestroy(tauriSession.label).catch((err) => {
+        console.error('[BrowserRegistry] destroy before retry failed', err);
+      });
+    }
+    tauriSession.created = false;
+    tauriSession.pendingCreate = null;
+    tauriSession.visible = false;
+    const bounds = tauriSession.lastBounds;
+    if (bounds && bounds.width >= 1 && bounds.height >= 1) {
+      void ensureCreated(itemId, tauriSession, bounds);
+    }
+  }
+}
+
+export function notifySlotVisible(itemId: string): void {
+  const session = sessions.get(itemId);
+  if (!session || session.kind !== 'tauri') return;
+  const bounds = session.lastBounds;
+  if (!bounds || bounds.width < 1 || bounds.height < 1) return;
+  if (!session.created && !session.pendingCreate) {
+    void ensureCreated(itemId, session, bounds);
+  }
+}
+
 export function destroy(itemId: string): void {
   const session = sessions.get(itemId);
   if (!session) return;
+  embedFailures.delete(itemId);
   session.hostDiv.remove();
   if (session.kind === 'tauri') {
     void xmuxWebviewSetVisible(session.label, false).catch(() => {});
@@ -225,6 +341,40 @@ export function navigate(itemId: string, url: string): void {
   if (!session.created) return;
   void xmuxWebviewNavigate(session.label, url).catch((err) => {
     console.error('[BrowserRegistry] navigate failed', err);
+  });
+}
+
+/** Always push bounds to the native webview (e.g. after URL change / layout settle). */
+export function forceNativeBoundsSync(itemId: string, bounds: ViewBounds): void {
+  const session = sessions.get(itemId);
+  if (!session || session.kind !== 'tauri') return;
+  session.lastBounds = bounds;
+  if (!session.created && !session.pendingCreate) {
+    void ensureCreated(itemId, session, bounds).then(() => {
+      const current = sessions.get(itemId);
+      if (!current || current.kind !== 'tauri' || current.visible) return;
+      current.visible = true;
+      void xmuxWebviewSetVisible(current.label, true).catch((err) => {
+        console.error('[BrowserRegistry] show (post-create) failed', err);
+      });
+    });
+    return;
+  }
+  if (!session.created) return;
+  if (!session.visible) {
+    session.visible = true;
+    void xmuxWebviewSetVisible(session.label, true).catch((err) => {
+      console.error('[BrowserRegistry] show failed', err);
+    });
+  }
+  void xmuxWebviewSetBounds(
+    session.label,
+    bounds.x,
+    bounds.y,
+    bounds.width,
+    bounds.height,
+  ).catch((err) => {
+    console.error('[BrowserRegistry] force set_bounds failed', err);
   });
 }
 
@@ -303,6 +453,8 @@ export function destroyAllBrowserSessions(): void {
 
 export function __resetForTests(): void {
   destroyAllBrowserSessions();
+  embedFailures.clear();
+  createChain = Promise.resolve();
   if (limboDiv?.parentElement) {
     limboDiv.remove();
   }

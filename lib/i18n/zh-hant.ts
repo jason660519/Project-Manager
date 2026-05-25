@@ -341,6 +341,11 @@ export const zhHant: Translations = {
     enterToSend: 'Enter 傳送 · Shift+Enter 換行',
     deleteSession: '刪除對話',
     openFullChat: '開啟全頁聊天',
+    startTalk: '開始對話',
+    chatSettings: '設定',
+    newSession: '新工作階段',
+    exportChat: '匯出',
+    sendMessage: '傳送',
   },
   dispatch: {
     title: '任務派遣',

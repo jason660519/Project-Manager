@@ -170,23 +170,14 @@ export async function POST(request: NextRequest) {
 
   const systemPrompt = body.systemPrompt;
 
-  // If the client specified a provider, try only that one
-  if (body.provider) {
-    const model = body.model || DEFAULT_MODELS[body.provider] || 'default';
-    try {
-      const content = await callProvider(body.provider, model, body.messages, systemPrompt);
-      return NextResponse.json({ content, provider: body.provider, model });
-    } catch (e) {
-      return NextResponse.json(
-        { error: `${body.provider} failed`, details: (e as Error).message },
-        { status: 502 },
-      );
-    }
-  }
-
-  // No provider specified — try fallback chain
+  // Try user-specified provider first, then fall back to chain on failure
   const errors: string[] = [];
-  for (const provider of FALLBACK_CHAIN) {
+  const startProvider = body.provider;
+  const providersToTry = startProvider
+    ? [startProvider, ...FALLBACK_CHAIN.filter(p => p !== startProvider)]
+    : [...FALLBACK_CHAIN];
+
+  for (const provider of providersToTry) {
     try {
       const model = body.model || DEFAULT_MODELS[provider];
       const content = await callProvider(provider, model, body.messages, systemPrompt);

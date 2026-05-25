@@ -84,7 +84,7 @@ export function PaneShell({
         })}
         {actions ? <PaneActionToolbar actions={actions} /> : null}
       </div>
-      <div className="min-h-0 flex-1">{children}</div>
+      <div className="relative min-h-0 flex-1">{children}</div>
     </div>
   );
 }

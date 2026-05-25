@@ -253,32 +253,15 @@ export async function POST(request: NextRequest) {
 
   const systemPrompt = body.systemPrompt;
 
-  // If the client specified a provider, try only that one
-  if (body.provider) {
-    const model = body.model || DEFAULT_MODELS[body.provider] || 'default';
-    const gen = streamProvider(body.provider, model, body.messages, systemPrompt);
-    // Pre-authorization check
-    try {
-      const iterator = gen[Symbol.asyncIterator]();
-      const first = await iterator.next();
-      async function* withFirst(): AsyncGenerator<string> {
-        if (first.done) return;
-        yield first.value;
-        yield* gen;
-      }
-      return makeStreamResponse(body.provider, model, withFirst());
-    } catch (e) {
-      return new Response(JSON.stringify({ error: `${body.provider} failed`, details: (e as Error).message }), {
-        status: 502,
-        headers: { 'content-type': 'application/json' },
-      });
-    }
-  }
-
-  // No provider specified — try fallback chain
+  // If the client specified a provider, try it first, then fall back to chain on failure
   const errors: string[] = [];
-  for (const provider of FALLBACK_PROVIDERS) {
-    const model = body.model || DEFAULT_MODELS[provider];
+  const startProvider = body.provider;
+  const providersToTry = startProvider
+    ? [startProvider, ...FALLBACK_PROVIDERS.filter(p => p !== startProvider)]
+    : FALLBACK_PROVIDERS;
+
+  for (const provider of providersToTry) {
+    const model = body.model || DEFAULT_MODELS[provider] || 'default';
     try {
       const gen = streamProvider(provider, model, body.messages, systemPrompt);
       const iterator = gen[Symbol.asyncIterator]();

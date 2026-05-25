@@ -25,6 +25,8 @@ export interface ChatContext {
   activeRunCount: number;
   activeRuns?: ChatRunSummary[];
   recentRuns?: CompletedRun[];
+  features?: Feature[];
+  dashboardProjects?: string[];
 }
 
 export interface SendChatMessageRequest {
@@ -36,6 +38,11 @@ export interface SendChatMessageRequest {
   onStream?: (chunk: string) => void;
   /** Optional provider/model/systemPrompt override from chat settings. */
   chatSettings?: { provider: string; model: string; systemPrompt: string };
+  /** Agent API callbacks for tool calling support */
+  onThinkingStart?: () => void;
+  onThinking?: (text: string) => void;
+  onToolCall?: (id: string, name: string, args: Record<string, unknown>) => void;
+  onToolResult?: (id: string, content: string, error?: boolean) => void;
 }
 
 export interface SendChatMessageResult {
@@ -43,4 +50,12 @@ export interface SendChatMessageResult {
   handledLocally?: boolean;
   route?: string;
   error?: boolean;
+  /** Tool calls that the AI made during this response */
+  toolCalls?: Array<{
+    id: string;
+    name: string;
+    arguments: Record<string, unknown>;
+    result?: string;
+    error?: boolean;
+  }>;
 }

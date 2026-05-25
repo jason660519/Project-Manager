@@ -10,6 +10,9 @@ import { ChatInput, type AttachedFile } from './ChatInput';
 import { ChatMessage as ChatMessageView } from './ChatMessage';
 import { ChatSettings } from './ChatSettings';
 import { QuickActions } from './QuickActions';
+import { ThinkingIndicator } from './ThinkingIndicator';
+import { ToolCallGroup } from './ToolCallCard';
+import type { ToolCallDisplay } from './ToolCallCard';
 
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -44,6 +47,9 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen }: Chat
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [thinkingActive, setThinkingActive] = useState(false);
+  const [thinkingText, setThinkingText] = useState('');
+  const [toolCalls, setToolCalls] = useState<ToolCallDisplay[]>([]);
   const [chatSettings, setChatSettings] = useState<{ provider: string; model: string; systemPrompt: string }>({
     provider: 'auto',
     model: '',
@@ -105,6 +111,11 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen }: Chat
     setMessages((prev) => [...prev, placeholder]);
 
     try {
+      // Reset tool/thinking state
+      setThinkingActive(false);
+      setThinkingText('');
+      setToolCalls([]);
+
       let accumulated = '';
       const result = await sendChatMessage({
         content: augmentedContent,
@@ -118,11 +129,25 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen }: Chat
           );
         },
         chatSettings: chatSettings.provider !== 'auto' ? chatSettings : undefined,
+        onThinkingStart: () => { setThinkingActive(true); setThinkingText(''); },
+        onThinking: (text: string) => { setThinkingText(prev => prev + text); },
+        onToolCall: (id: string, name: string, args: Record<string, unknown>) => {
+          setToolCalls(prev => [...prev, { id, name, arguments: args, status: 'running' as const }]);
+        },
+        onToolResult: (id: string, content: string, error?: boolean) => {
+          setThinkingActive(false);
+          setToolCalls(prev => prev.map(tc =>
+            tc.id === id ? { ...tc, result: content, error, status: (error ? 'error' : 'done') as ToolCallDisplay['status'] } : tc
+          ));
+        },
       });
+
+      setThinkingActive(false);
 
       const finalContent = result.content || accumulated;
       const assistantMessage = makeMessage('assistant', finalContent, result.error ? 'error' : 'sent');
       assistantMessage.id = assistantId;
+      (assistantMessage as any).toolCalls = result.toolCalls || toolCalls;
       setMessages((prev) => {
         const withoutPlaceholder = prev.filter((m) => m.id !== assistantId);
         return [...withoutPlaceholder, assistantMessage];
@@ -205,6 +230,10 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen }: Chat
             {messages.map((message) => (
               <ChatMessageView key={message.id} message={message} />
             ))}
+            
+            {/* Thinking & Tools */}
+            <ThinkingIndicator active={thinkingActive} text={thinkingText} />
+            <ToolCallGroup calls={toolCalls} />
           </div>
         )}
 

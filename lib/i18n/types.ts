@@ -344,6 +344,11 @@ export interface Translations {
     enterToSend: string;
     deleteSession: string;
     openFullChat: string;
+    startTalk: string;
+    chatSettings: string;
+    newSession: string;
+    exportChat: string;
+    sendMessage: string;
   };
   dispatch: {
     title: string;

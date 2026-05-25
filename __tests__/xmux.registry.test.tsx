@@ -126,7 +126,8 @@ describe('xmux registry integration', () => {
     expect(screen.getByText('Project Management')).toBeInTheDocument();
     // F29: TerminalSlot is stubbed in setup.ts; assert the mock placeholder.
     expect(screen.getAllByTestId('terminal-slot-mock').length).toBeGreaterThan(0);
-    expect(screen.getByTitle('xmux browser pane')).toBeInTheDocument();
+    // Browser tab exists but is lazy-mounted only when selected (terminal is default).
+    expect(screen.queryByTitle('xmux browser pane')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Notification panel')).toBeInTheDocument();
     expect(screen.getByLabelText('Close pane')).toBeInTheDocument();
     expect(screen.getAllByLabelText('New terminal in this pane').length).toBeGreaterThanOrEqual(1);
@@ -137,7 +138,8 @@ describe('xmux registry integration', () => {
     const user = userEvent.setup();
     render(<XmuxView />);
 
-    expect(screen.getAllByTitle('xmux browser pane').length).toBeGreaterThanOrEqual(1);
+    await user.click(screen.getByRole('button', { name: 'localhost' }));
+    expect(screen.getByTitle('xmux browser pane')).toBeInTheDocument();
     expect(screen.getAllByLabelText('Browser URL').length).toBeGreaterThanOrEqual(1);
 
     await user.click(screen.getByLabelText('Notification panel'));
