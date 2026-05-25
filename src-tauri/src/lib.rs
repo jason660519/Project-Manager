@@ -2427,15 +2427,21 @@ struct DirEntryNode {
 
 #[tauri::command]
 async fn list_directory_entries(path: String) -> Result<Vec<DirEntryNode>, String> {
-    let dir = std::path::Path::new(&path);
-    if !dir.exists() {
-        return Err(format!("Path does not exist: {path}"));
+    let requested = path.trim();
+    if requested.is_empty() {
+        return Err("Project root path is empty.".into());
     }
+    let requested_path = std::path::Path::new(requested);
+    if !requested_path.is_absolute() {
+        return Err(format!("Project root must be an absolute local path: {requested}"));
+    }
+    let dir = std::fs::canonicalize(requested_path)
+        .map_err(|e| format!("Cannot resolve directory {requested}: {e}"))?;
     if !dir.is_dir() {
-        return Err(format!("Path is not a directory: {path}"));
+        return Err(format!("Path is not a directory: {requested}"));
     }
-    let read_dir = std::fs::read_dir(dir)
-        .map_err(|e| format!("Cannot read directory {path}: {e}"))?;
+    let read_dir = std::fs::read_dir(&dir)
+        .map_err(|e| format!("Cannot read directory {requested}: {e}"))?;
     let mut nodes: Vec<DirEntryNode> = Vec::new();
     for entry in read_dir.flatten() {
         let file_name = entry.file_name();

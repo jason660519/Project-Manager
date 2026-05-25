@@ -18,6 +18,7 @@ interface RendererProps {
   node: LayoutNode;
   workspaceId: string;
   cwd: string;
+  cwdIssue?: string;
   homepageUrl: string;
   onUpdateBlock: (
     blockId: string,
@@ -69,18 +70,17 @@ export function LayoutRenderer(props: RendererProps) {
   const { node } = props;
   if (node.type === 'leaf') {
     return (
-      <div className="h-full min-h-0 min-w-0 overflow-hidden">
-        <Block
-          block={node.block}
-          workspaceId={props.workspaceId}
-          cwd={props.cwd}
-          homepageUrl={props.homepageUrl}
-          onUpdate={(updater) => props.onUpdateBlock(node.block.id, updater)}
-          onClose={() => props.onCloseBlock(node.block.id)}
-          onSplitRight={() => props.onSplit(node.block.id, 'vertical')}
-          onSplitDown={() => props.onSplit(node.block.id, 'horizontal')}
-        />
-      </div>
+      <Block
+        block={node.block}
+        workspaceId={props.workspaceId}
+        cwd={props.cwd}
+        cwdIssue={props.cwdIssue}
+        homepageUrl={props.homepageUrl}
+        onUpdate={(updater) => props.onUpdateBlock(node.block.id, updater)}
+        onClose={() => props.onCloseBlock(node.block.id)}
+        onSplitRight={() => props.onSplit(node.block.id, 'vertical')}
+        onSplitDown={() => props.onSplit(node.block.id, 'horizontal')}
+      />
     );
   }
   return <SplitView split={node} {...props} />;
@@ -125,11 +125,11 @@ function SplitView({
       ref={containerRef}
       className={
         isVertical
-          ? 'flex h-full min-h-0 w-full min-w-0 overflow-hidden'
-          : 'flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden'
+          ? 'flex h-full min-h-0 w-full min-w-0'
+          : 'flex h-full min-h-0 w-full min-w-0 flex-col'
       }
     >
-      <div className="min-h-0 min-w-0 overflow-hidden" style={firstStyle}>
+      <div className="min-h-0 min-w-0" style={firstStyle}>
         <LayoutRenderer {...rest} node={split.first} />
       </div>
       <div
@@ -143,7 +143,7 @@ function SplitView({
           dragging ? 'bg-sky-400/80' : '',
         ].join(' ')}
       />
-      <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
+      <div className="min-h-0 min-w-0 flex-1">
         <LayoutRenderer {...rest} node={split.second} />
       </div>
     </div>

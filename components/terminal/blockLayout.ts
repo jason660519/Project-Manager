@@ -26,6 +26,7 @@ export type FolderItem = {
   id: string;
   label: string;
   path: string;
+  pathError?: string;
 };
 
 export type BlockItem = TerminalItem | BrowserItem | FolderItem;
@@ -89,12 +90,13 @@ export function deriveFolderLabel(path: string): string {
   return last || '/';
 }
 
-export function createFolderItem(path: string, label?: string): FolderItem {
+export function createFolderItem(path: string, label?: string, pathError?: string): FolderItem {
   return {
     kind: 'folder',
     id: uniqueId('folder'),
     label: label ?? deriveFolderLabel(path),
     path,
+    pathError,
   };
 }
 
@@ -103,18 +105,16 @@ export function createBlock(seed?: BlockItem): Block {
   return { id: uniqueId('block'), items: [item], activeItemId: item.id };
 }
 
-// One tabbed block: terminal + browser tabs (cmux-style). Terminal is active first;
-// browser is one click away and can be closed with the tab × without a orphan overlay.
+// First-time layout for a workspace: terminal (left) + browser (right) so both
+// surfaces are visible without hunting through tabs.
 export function createInitialLayout(homepageUrl: string): LayoutNode {
-  const terminal = createTerminalItem();
-  const browser = createBrowserItem(homepageUrl);
   return {
-    type: 'leaf',
-    block: {
-      id: uniqueId('block'),
-      items: [terminal, browser],
-      activeItemId: terminal.id,
-    },
+    type: 'split',
+    id: uniqueId('split'),
+    direction: 'vertical',
+    ratio: 0.5,
+    first: { type: 'leaf', block: createBlock(createTerminalItem()) },
+    second: { type: 'leaf', block: createBlock(createBrowserItem(homepageUrl)) },
   };
 }
 
@@ -202,73 +202,4 @@ export function forEachBlock(tree: LayoutNode, visit: (block: Block) => void): v
   }
   forEachBlock(tree.first, visit);
   forEachBlock(tree.second, visit);
-}
-
-export function countBlocks(tree: LayoutNode): number {
-  if (tree.type === 'leaf') return 1;
-  return countBlocks(tree.first) + countBlocks(tree.second);
-}
-
-export type LeafSizeFraction = {
-  blockId: string;
-  widthFraction: number;
-  heightFraction: number;
-};
-
-export function collectLeafSizeFractions(
-  tree: LayoutNode,
-  widthFraction: number = 1,
-  heightFraction: number = 1,
-): LeafSizeFraction[] {
-  if (tree.type === 'leaf') {
-    return [{ blockId: tree.block.id, widthFraction, heightFraction }];
-  }
-  if (tree.direction === 'vertical') {
-    return [
-      ...collectLeafSizeFractions(tree.first, widthFraction * tree.ratio, heightFraction),
-      ...collectLeafSizeFractions(tree.second, widthFraction * (1 - tree.ratio), heightFraction),
-    ];
-  }
-  return [
-    ...collectLeafSizeFractions(tree.first, widthFraction, heightFraction * tree.ratio),
-    ...collectLeafSizeFractions(tree.second, widthFraction, heightFraction * (1 - tree.ratio)),
-  ];
-}
-
-export type LayoutFitCheck = {
-  ok: boolean;
-  failingBlockId?: string;
-  minBlockWidthPx: number;
-  minBlockHeightPx: number;
-};
-
-export function checkLayoutFits(
-  tree: LayoutNode,
-  containerWidth: number,
-  containerHeight: number,
-  minBlockWidthPx: number,
-  minBlockHeightPx: number,
-): LayoutFitCheck {
-  const leaves = collectLeafSizeFractions(tree);
-  let minWidth = Number.POSITIVE_INFINITY;
-  let minHeight = Number.POSITIVE_INFINITY;
-  for (const leaf of leaves) {
-    const w = containerWidth * leaf.widthFraction;
-    const h = containerHeight * leaf.heightFraction;
-    if (w < minWidth) minWidth = w;
-    if (h < minHeight) minHeight = h;
-    if (w < minBlockWidthPx || h < minBlockHeightPx) {
-      return {
-        ok: false,
-        failingBlockId: leaf.blockId,
-        minBlockWidthPx: minWidth === Number.POSITIVE_INFINITY ? 0 : minWidth,
-        minBlockHeightPx: minHeight === Number.POSITIVE_INFINITY ? 0 : minHeight,
-      };
-    }
-  }
-  return {
-    ok: true,
-    minBlockWidthPx: minWidth === Number.POSITIVE_INFINITY ? 0 : minWidth,
-    minBlockHeightPx: minHeight === Number.POSITIVE_INFINITY ? 0 : minHeight,
-  };
 }

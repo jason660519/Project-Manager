@@ -26,7 +26,7 @@ describe('block layout helpers', () => {
     const layout = createInitialLayout('http://localhost:43187/');
     const blockIds: string[] = [];
     forEachBlock(layout, (block) => blockIds.push(block.id));
-    expect(blockIds).toHaveLength(1);
+    expect(blockIds).toHaveLength(2);
     for (const id of blockIds) {
       expect(findBlock(layout, id)?.id).toBe(id);
     }
@@ -39,10 +39,13 @@ describe('block layout helpers', () => {
     const blocks: ReturnType<typeof findBlock>[] = [];
     forEachBlock(layout, (block) => blocks.push(block));
 
-    const block = blocks[0];
-    expect(block?.items).toHaveLength(2);
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]?.items).toHaveLength(1);
+    expect(blocks[1]?.items).toHaveLength(1);
 
-    destroyBlockItems(block!);
+    for (const block of blocks) {
+      destroyBlockItems(block!);
+    }
     expect(destroyTerminal).toHaveBeenCalledTimes(1);
     expect(destroyBrowser).toHaveBeenCalledTimes(1);
   });

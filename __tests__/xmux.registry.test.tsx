@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../components/terminal/TerminalSlot', () => ({
   TerminalSlot: () => <div data-testid="terminal-slot-mock" className="h-full min-h-0" />,
@@ -11,6 +11,7 @@ import { BUILT_IN_ADAPTER_SUPPORTS } from '../lib/capabilities/registry';
 import { CURRENT_SCHEMA_VERSION } from '../lib/storage/migrate';
 import type { Feature, ProjectEntry, ProjectManagerConfig } from '../lib/types';
 import { XmuxView } from '../app/ui/views/XmuxView';
+import { __resetForTests as resetBrowserRegistry } from '../components/browser/BrowserRegistry';
 
 const feature: Feature = {
   id: 'F27',
@@ -57,6 +58,10 @@ function createProjectEntry(id: string, name: string): ProjectEntry {
 }
 
 describe('xmux registry integration', () => {
+  afterEach(() => {
+    resetBrowserRegistry();
+  });
+
   it('exposes xmux as the built-in cmux-backed agent CLI target', async () => {
     const adapters = listAdapters(baseConfig);
     const xmux = adapters.find((adapter) => adapter.id === 'xmux');
@@ -126,10 +131,10 @@ describe('xmux registry integration', () => {
     expect(screen.getByText('Project Management')).toBeInTheDocument();
     // F29: TerminalSlot is stubbed in setup.ts; assert the mock placeholder.
     expect(screen.getAllByTestId('terminal-slot-mock').length).toBeGreaterThan(0);
-    // Browser tab exists but is lazy-mounted only when selected (terminal is default).
-    expect(screen.queryByTitle('xmux browser pane')).not.toBeInTheDocument();
+    // Initial split layout shows terminal and browser surfaces side-by-side.
+    expect(screen.getByTitle('xmux browser pane')).toBeInTheDocument();
     expect(screen.getByLabelText('Notification panel')).toBeInTheDocument();
-    expect(screen.getByLabelText('Close pane')).toBeInTheDocument();
+    expect(screen.getAllByLabelText('Close pane').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByLabelText('New terminal in this pane').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByLabelText('New browser tab').length).toBeGreaterThanOrEqual(1);
   });
@@ -148,6 +153,34 @@ describe('xmux registry integration', () => {
 
     await user.click(screen.getAllByLabelText('New browser tab')[0]);
     expect(screen.getAllByLabelText('Browser URL').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('keeps the browser URL input visible and saves edited URLs', async () => {
+    const user = userEvent.setup();
+    const project = createProjectEntry('project-github', 'Project GitHub');
+    project.config.project.githubUrl = 'https://github.com/example/project-github';
+
+    render(
+      <XmuxView
+        projects={[project]}
+        selectedDashboardProjectIds={['project-github']}
+        selectedProjectId="project-github"
+      />,
+    );
+
+    const input = screen.getByLabelText('Browser URL') as HTMLInputElement;
+    expect(input).toHaveValue('https://github.com/example/project-github');
+
+    await user.clear(input);
+    await user.type(input, 'example.com/docs');
+
+    expect(screen.getByLabelText('Browser URL')).toBeInTheDocument();
+    expect(input).toHaveValue('example.com/docs');
+
+    await user.click(screen.getByRole('button', { name: 'Go' }));
+
+    expect(screen.getByLabelText('Browser URL')).toHaveValue('http://example.com/docs');
+    expect(screen.getByRole('button', { name: 'example.com' })).toBeInTheDocument();
   });
 
   it('only shows dashboard-selected projects when project data is provided', () => {

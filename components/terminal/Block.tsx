@@ -21,6 +21,7 @@ interface BlockProps {
   block: BlockModel;
   workspaceId: string;
   cwd: string;
+  cwdIssue?: string;
   homepageUrl: string;
   onUpdate: (updater: (block: BlockModel) => BlockModel) => void;
   onClose: () => void;
@@ -48,6 +49,7 @@ export function Block({
   block,
   workspaceId,
   cwd,
+  cwdIssue,
   homepageUrl,
   onUpdate,
   onClose,
@@ -118,6 +120,7 @@ export function Block({
 
   const addFolder = useCallback(() => {
     const id = nextItemId('folder');
+    const rootPath = cwd.trim();
     onUpdate((b) => ({
       ...b,
       items: [
@@ -125,13 +128,14 @@ export function Block({
         {
           kind: 'folder',
           id,
-          label: deriveFolderLabel(cwd),
-          path: cwd,
+          label: deriveFolderLabel(rootPath || 'Invalid root'),
+          path: rootPath,
+          pathError: cwdIssue,
         },
       ],
       activeItemId: id,
     }));
-  }, [cwd, onUpdate]);
+  }, [cwd, cwdIssue, onUpdate]);
 
   const selectTab = useCallback(
     (tabId: string) => {
@@ -242,6 +246,7 @@ export function Block({
               <FolderContent
                 itemId={item.id}
                 rootPath={item.path}
+                rootPathError={item.pathError}
                 isActive={visible}
               />
             ) : null}

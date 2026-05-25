@@ -13,10 +13,6 @@ import { LayoutRenderer } from '../../../components/terminal/LayoutRenderer';
 import {
   createBlock,
   createInitialLayout,
-  countBlocks,
-  checkLayoutFits,
-  findBlock,
-  forEachBlock,
   removeBlock,
   splitLeaf,
   updateBlock,
@@ -25,12 +21,7 @@ import {
   type LayoutNode,
   type SplitDirection,
 } from '../../../components/terminal/blockLayout';
-import { destroyBlockItems } from '../../../components/terminal/destroyBlockItems';
-import {
-  migrateStaleIframeSessions,
-  purgeOrphanNativeWebviews,
-} from '../../../components/browser/BrowserRegistry';
-import { waitForTauriRuntime } from '../../../lib/runtime/tauri-ready';
+import { deriveProjectWorkspacePath } from '../../../lib/xmux/workspacePaths';
 import type { ProjectEntry } from '../../../lib/types';
 
 interface WorkspaceRow {
@@ -38,6 +29,7 @@ interface WorkspaceRow {
   name: string;
   branch: string;
   cwd: string;
+  cwdIssue?: string;
   notification?: string;
   homepageUrl: string;
 }
@@ -48,20 +40,6 @@ function deriveHomepage(project: ProjectEntry): string {
   const github = project.config.project.githubUrl;
   if (github && /^https?:\/\//i.test(github)) return github;
   return DEFAULT_HOMEPAGE;
-}
-
-// Always return a directory path, never the config-file path itself.
-// PTY spawn requires cwd to be a directory; passing a `.json` file path errors.
-function deriveProjectCwd(project: ProjectEntry): string {
-  const root = project.config.project.root;
-  if (root) return root;
-  const configPath = project.configPath;
-  const marker = '/.project-manager/config.json';
-  if (configPath.endsWith(marker)) {
-    return configPath.slice(0, -marker.length);
-  }
-  const lastSlash = configPath.lastIndexOf('/');
-  return lastSlash > 0 ? configPath.slice(0, lastSlash) : '/';
 }
 
 interface XmuxViewProps {
@@ -135,12 +113,17 @@ function deriveWorkspaceRows(
     const hasUnread =
       project.id !== selectedProjectId &&
       project.config.features.some((feature) => feature.status === 'in_progress');
+    const workspacePath = deriveProjectWorkspacePath(project);
+    const cwd = workspacePath.ok ? workspacePath.cwd : '';
+    const pathIssue =
+      workspacePath.ok ? workspacePath.warning : workspacePath.error;
     return {
       id: project.id,
       name: project.config.project.name || project.id,
       branch: project.config.project.githubUrl ? 'github' : 'local*',
-      cwd: deriveProjectCwd(project),
-      notification: hasUnread ? 'Feature in progress' : undefined,
+      cwd,
+      cwdIssue: pathIssue,
+      notification: pathIssue ?? (hasUnread ? 'Feature in progress' : undefined),
       homepageUrl: deriveHomepage(project),
     };
   });
@@ -280,9 +263,6 @@ function InteropConsole({
   const [dragCursor, setDragCursor] = useState<DragCursor>(null);
   const [layouts, setLayouts] = useState<Record<string, LayoutNode>>({});
   const pendingLayoutsRef = useRef<Record<string, LayoutNode>>({});
-  const [splitNotice, setSplitNotice] = useState<string | null>(null);
-  const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [layoutViewport, setLayoutViewport] = useState({ width: 0, height: 0 });
 
   const activeWorkspace =
     workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? workspaces[0];
@@ -293,14 +273,6 @@ function InteropConsole({
   );
 
   const rootRef = useRef<HTMLElement | null>(null);
-  const layoutViewportRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    purgeOrphanNativeWebviews();
-    void waitForTauriRuntime().then((ready) => {
-      if (ready) migrateStaleIframeSessions();
-    });
-  }, []);
 
   const activeLayout = useMemo(() => {
     if (!activeWorkspace) return undefined;
@@ -328,48 +300,21 @@ function InteropConsole({
     });
   }, [activeWorkspace]);
 
-  useEffect(() => {
-    const el = layoutViewportRef.current;
-    if (!el) return;
-    const update = () =>
-      setLayoutViewport({ width: el.clientWidth, height: el.clientHeight });
-    update();
-    const observer = new ResizeObserver(() => update());
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  const showSplitBlocked = useCallback((message: string) => {
-    setSplitNotice(message);
-    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
-    noticeTimerRef.current = setTimeout(() => setSplitNotice(null), 2600);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
-    };
-  }, []);
-
   const mutateLayout = useCallback(
     (
       workspaceId: string,
       updater: (layout: LayoutNode) => LayoutNode | null,
     ) => {
       setLayouts((current) => {
-        const layout = current[workspaceId] ?? pendingLayoutsRef.current[workspaceId];
+        const layout = current[workspaceId];
         if (!layout) return current;
         const next = updater(layout);
         if (next === layout) return current;
         if (next === null) {
-          forEachBlock(layout, destroyBlockItems);
           const homepage =
             workspacesById.get(workspaceId)?.homepageUrl ?? DEFAULT_HOMEPAGE;
-          const reset = createInitialLayout(homepage);
-          pendingLayoutsRef.current[workspaceId] = reset;
-          return { ...current, [workspaceId]: reset };
+          return { ...current, [workspaceId]: createInitialLayout(homepage) };
         }
-        pendingLayoutsRef.current[workspaceId] = next;
         return { ...current, [workspaceId]: next };
       });
     },
@@ -380,55 +325,18 @@ function InteropConsole({
     (blockId: string, direction: SplitDirection) => {
       if (!activeWorkspace) return;
       mutateLayout(activeWorkspace.id, (layout) =>
-        {
-          const { width, height } = layoutViewport;
-          const hasViewport = width > 0 && height > 0;
-          const minBlockWidth = width < 900 ? 240 : 300;
-          const minBlockHeight = height < 600 ? 160 : 200;
-          const maxBlocks = hasViewport
-            ? Math.max(
-                1,
-                Math.floor(width / minBlockWidth) * Math.floor(height / minBlockHeight),
-              )
-            : Number.POSITIVE_INFINITY;
-          const currentBlocks = countBlocks(layout);
-          if (hasViewport && currentBlocks >= maxBlocks) {
-            showSplitBlocked(
-              `已達到此視窗可合理顯示的最大區塊數（${maxBlocks}）。請先關閉部分區塊或放大視窗後再分割。`,
-            );
-            return layout;
-          }
-
-          const next = splitLeaf(layout, blockId, direction, createBlock());
-          if (next === layout) return layout;
-
-          if (hasViewport) {
-            const fit = checkLayoutFits(next, width, height, minBlockWidth, minBlockHeight);
-            if (!fit.ok) {
-              showSplitBlocked('此視窗尺寸下無法再分割，避免區塊過小或導致版面超出可視範圍。');
-              return layout;
-            }
-          }
-          return next;
-        },
+        splitLeaf(layout, blockId, direction, createBlock()),
       );
     },
-    [activeWorkspace, layoutViewport, mutateLayout, showSplitBlocked],
+    [activeWorkspace, mutateLayout],
   );
 
   const handleCloseBlock = useCallback(
     (blockId: string) => {
       if (!activeWorkspace) return;
-      const layout =
-        layouts[activeWorkspace.id] ??
-        pendingLayoutsRef.current[activeWorkspace.id];
-      if (layout) {
-        const block = findBlock(layout, blockId);
-        if (block) destroyBlockItems(block);
-      }
       mutateLayout(activeWorkspace.id, (layout) => removeBlock(layout, blockId));
     },
-    [activeWorkspace, layouts, mutateLayout],
+    [activeWorkspace, mutateLayout],
   );
 
   const handleUpdateBlock = useCallback(
@@ -500,7 +408,7 @@ function InteropConsole({
   return (
     <section
       ref={rootRef}
-      className="relative flex h-full min-h-0 w-full flex-col overflow-hidden border border-stone-700/80 bg-[#1b1b1b] shadow-2xl lg:flex-row"
+      className="flex h-full min-h-0 w-full flex-col overflow-hidden border border-stone-700/80 bg-[#1b1b1b] shadow-2xl lg:flex-row"
     >
       <div className="shrink-0" style={{ width: `min(100%, ${sidebarWidth}px)` }}>
         <WorkspaceSidebar
@@ -520,16 +428,13 @@ function InteropConsole({
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <WorkspaceHeader workspaceName={activeWorkspace?.name ?? 'Workspace'} />
-        <div
-          ref={layoutViewportRef}
-          data-xmux-viewport
-          className="flex min-h-0 flex-1 flex-col overflow-hidden"
-        >
+        <div className="flex min-h-0 flex-1 flex-col">
           {activeWorkspace && activeLayout ? (
             <LayoutRenderer
               node={activeLayout}
               workspaceId={activeWorkspace.id}
               cwd={activeWorkspace.cwd}
+              cwdIssue={activeWorkspace.cwdIssue}
               homepageUrl={activeWorkspace.homepageUrl}
               onUpdateBlock={handleUpdateBlock}
               onCloseBlock={handleCloseBlock}
@@ -544,15 +449,6 @@ function InteropConsole({
           onClose={() => setNotificationOpen(false)}
           workspaceName={activeWorkspace?.name ?? 'Workspace'}
         />
-      ) : null}
-      {splitNotice ? (
-        <div
-          role="status"
-          aria-live="polite"
-          className="pointer-events-none absolute bottom-3 right-3 z-40 max-w-[420px] border border-amber-300/40 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-100 shadow-[0_10px_30px_rgba(0,0,0,0.35)]"
-        >
-          {splitNotice}
-        </div>
       ) : null}
       {dragCursor ? (
         <div
@@ -605,7 +501,7 @@ export function XmuxView({
   }, [activeWorkspaceId, workspaces]);
 
   return (
-    <section className="flex h-full min-h-0 w-full flex-col overflow-hidden">
+    <section className="flex h-full w-full flex-col gap-3">
       {workspaces.length === 0 ? (
         <div className="flex h-full min-h-[280px] items-center justify-center rounded border border-stone-700/80 bg-[#1b1b1b] text-stone-400">
           目前沒有可顯示的 workspace，請先在 Project Dashboard 勾選專案。

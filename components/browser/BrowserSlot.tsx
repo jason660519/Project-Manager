@@ -13,6 +13,15 @@ import {
   setSlotHidden,
 } from './BrowserRegistry';
 
+// Position sync strategy:
+//   - For iframe backend: no-op, CSS lays out the iframe inside the slot.
+//   - For Tauri native webview: poll slot rect every frame, fire setBounds
+//     only when the safe slot bounds actually changed. This catches resize,
+//     scroll, parent layout changes, and position-only shifts.
+//
+// Native webviews draw above React DOM. Bounds must be measured from the settled
+// content slot below the URL chrome; otherwise the native view can cover the URL
+// input and make it look like the field disappeared while the user edits it.
 export function BrowserSlot({
   itemId,
   url,
@@ -23,14 +32,6 @@ export function BrowserSlot({
   isActive?: boolean;
 }) {
   const slotRef = useRef<HTMLDivElement>(null);
-
-  const applyBounds = useCallback(() => {
-    const slot = slotRef.current;
-    if (!slot || backendKind() !== 'tauri') return;
-    const bounds = measureBrowserSlotBounds(slot);
-    if (!bounds) return;
-    setBounds(itemId, bounds.x, bounds.y, bounds.width, bounds.height);
-  }, [itemId]);
 
   const applyBoundsForced = useCallback(() => {
     const slot = slotRef.current;
@@ -50,8 +51,6 @@ export function BrowserSlot({
 
   useEffect(() => {
     navigate(itemId, url);
-    // After Enter / Go the native webview is often created on the first valid
-    // bounds tick — force a remeasure so it does not cover the URL chrome.
     if (backendKind() !== 'tauri' || !isActive) return;
     let innerRaf = 0;
     const outerRaf = requestAnimationFrame(() => {
@@ -82,6 +81,7 @@ export function BrowserSlot({
 
     const pane = slot.closest('[data-browser-pane]');
     let rafId: number | null = null;
+    let last: { x: number; y: number; width: number; height: number } | null = null;
     let stopped = false;
     let hiddenAcknowledged = false;
 
@@ -89,11 +89,23 @@ export function BrowserSlot({
       if (stopped) return;
       const bounds = measureBrowserSlotBounds(slot);
       if (bounds) {
-        setBounds(itemId, bounds.x, bounds.y, bounds.width, bounds.height);
+        if (
+          !last ||
+          last.x !== bounds.x ||
+          last.y !== bounds.y ||
+          last.width !== bounds.width ||
+          last.height !== bounds.height
+        ) {
+          last = bounds;
+          setBounds(itemId, bounds.x, bounds.y, bounds.width, bounds.height);
+        }
         hiddenAcknowledged = false;
-      } else if (!hiddenAcknowledged) {
-        setSlotHidden(itemId);
-        hiddenAcknowledged = true;
+      } else {
+        if (!hiddenAcknowledged) {
+          setSlotHidden(itemId);
+          hiddenAcknowledged = true;
+        }
+        last = null;
       }
       rafId = requestAnimationFrame(tick);
     };
@@ -113,5 +125,5 @@ export function BrowserSlot({
     };
   }, [itemId, isActive, applyBoundsForced]);
 
-  return <div ref={slotRef} className="relative z-0 min-h-0 min-w-0 flex-1" />;
+  return <div ref={slotRef} data-browser-slot className="relative z-0 min-h-0 min-w-0 flex-1" />;
 }

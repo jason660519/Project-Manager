@@ -9,6 +9,7 @@
 import { migrateConfig } from '../storage';
 import type { ProjectManagerConfig } from '../types';
 import { KEY_PERSONAL_SYSTEM_CLI_EXPOSURE } from '../storage/keys';
+import { validateWorkspaceFolderPath } from '../xmux/workspacePaths';
 
 // ── Tauri detection ───────────────────────────────────────────────────────────
 
@@ -147,7 +148,9 @@ export interface DirEntry {
 /** Single-level directory listing for the xmux folder-explorer tab. */
 export async function listDirectoryEntries(path: string): Promise<DirEntry[]> {
   if (!isTauri()) throw new Error('listDirectoryEntries requires Tauri runtime');
-  return invoke<DirEntry[]>('list_directory_entries', { path });
+  const validation = validateWorkspaceFolderPath(path);
+  if (!validation.ok) throw new Error(validation.error);
+  return invoke<DirEntry[]>('list_directory_entries', { path: validation.path });
 }
 
 // ── xmux native webview overlay (B1) ────────────────────────────────────────

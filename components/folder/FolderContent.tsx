@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { listDirectoryEntries, type DirEntry } from '../../lib/bridge';
 import { isTauriRuntime, waitForTauriRuntime } from '../../lib/runtime/tauri-ready';
+import { validateWorkspaceFolderPath } from '../../lib/xmux/workspacePaths';
 
 type NodeState =
   | { status: 'idle' }
@@ -27,7 +28,7 @@ type NodeState =
 interface FolderContentProps {
   itemId: string;
   rootPath: string;
-  /** When false, skip IPC loads (tab is mounted but hidden). */
+  rootPathError?: string;
   isActive?: boolean;
   onOpenFile?: (filePath: string) => void;
 }
@@ -35,6 +36,7 @@ interface FolderContentProps {
 export function FolderContent({
   itemId,
   rootPath,
+  rootPathError,
   isActive = true,
   onOpenFile,
 }: FolderContentProps) {
@@ -44,9 +46,20 @@ export function FolderContent({
   // Latest props in refs so the imperative loader doesn't capture stale values.
   const rootPathRef = useRef(rootPath);
   rootPathRef.current = rootPath;
+  const rootPathErrorRef = useRef(rootPathError);
+  rootPathErrorRef.current = rootPathError;
 
   const loadDir = useCallback(
     async (path: string) => {
+      const validation = validateWorkspaceFolderPath(path);
+      if (!validation.ok) {
+        setNodeStates((prev) => {
+          const next = new Map(prev);
+          next.set(path, { status: 'error', message: validation.error });
+          return next;
+        });
+        return;
+      }
       if (!isTauriRuntime()) {
         const ready = await waitForTauriRuntime();
         if (!ready) {
@@ -94,6 +107,18 @@ export function FolderContent({
     if (!isActive) return;
     let cancelled = false;
     setExpanded(new Set([rootPath]));
+    const validationError = rootPathError ?? (() => {
+      const validation = validateWorkspaceFolderPath(rootPath);
+      return validation.ok ? undefined : validation.error;
+    })();
+    if (validationError) {
+      setNodeStates((prev) => {
+        const next = new Map(prev);
+        next.set(rootPath, { status: 'error', message: validationError });
+        return next;
+      });
+      return;
+    }
     void (async () => {
       const ready = await waitForTauriRuntime();
       if (cancelled) return;
@@ -114,7 +139,7 @@ export function FolderContent({
     return () => {
       cancelled = true;
     };
-  }, [rootPath, loadDir, isActive]);
+  }, [rootPath, rootPathError, loadDir, isActive]);
 
   const toggleExpand = useCallback(
     (path: string, isDir: boolean) => {
@@ -141,6 +166,12 @@ export function FolderContent({
   const refresh = useCallback(() => {
     loadGenerationRef.current += 1;
     setNodeStates(new Map());
+    const error = rootPathErrorRef.current;
+    if (error) {
+      setNodeStates(new Map([[rootPathRef.current, { status: 'error', message: error }]]));
+      setExpanded(new Set([rootPathRef.current]));
+      return;
+    }
     void loadDir(rootPathRef.current);
     setExpanded(new Set([rootPathRef.current]));
   }, [loadDir]);
