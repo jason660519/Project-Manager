@@ -12,6 +12,7 @@ export const en: Translations = {
     dashboard: 'Project Dashboard',
     engineers: 'Engineers',
     integrationsHub: 'Integrations Hub',
+    xmux: 'xmux',
     channels: 'Channels',
     cronJobs: 'Cron Jobs',
     skills: 'Skills',

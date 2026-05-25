@@ -4,17 +4,17 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-05-25T00:46:02.000Z",
+    "generatedAt": "2026-05-25T02:46:31.000Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
     "manifestAudience": "internal",
-    "totalDocuments": 53,
+    "totalDocuments": 54,
     "totalFolders": 12,
-    "publicDocuments": 8,
+    "publicDocuments": 9,
     "internalDocuments": 44,
     "restrictedDocuments": 1,
-    "publishableDocuments": 5,
+    "publishableDocuments": 6,
     "reviewRequiredDocuments": 30,
     "warningCount": 61
   },
@@ -26,7 +26,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "sourcePath": "docs",
       "label": "All Docs",
       "title": "Documentation",
-      "summary": "53 documentation files indexed from docs.",
+      "summary": "54 documentation files indexed from docs.",
       "parentSlug": null,
       "folderSlugs": [
         "architecture",
@@ -43,14 +43,14 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "file-naming-standards"
       ],
       "classificationCounts": {
-        "public": 8,
+        "public": 9,
         "internal": 44,
         "restricted": 1
       },
-      "publishableCount": 5,
+      "publishableCount": 6,
       "reviewRequiredCount": 30,
       "visibilityCounts": {
-        "public": 8,
+        "public": 9,
         "internal": 44,
         "restricted": 1
       },
@@ -260,7 +260,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "sourcePath": "docs/guides",
       "label": "Guides",
       "title": "Guides",
-      "summary": "4 documentation files indexed from docs/guides.",
+      "summary": "5 documentation files indexed from docs/guides.",
       "parentSlug": "",
       "folderSlugs": [
         "guides/features"
@@ -269,14 +269,14 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "guides/getting-started"
       ],
       "classificationCounts": {
-        "public": 4,
+        "public": 5,
         "internal": 0,
         "restricted": 0
       },
-      "publishableCount": 4,
+      "publishableCount": 5,
       "reviewRequiredCount": 0,
       "visibilityCounts": {
-        "public": 4,
+        "public": 5,
         "internal": 0,
         "restricted": 0
       },
@@ -289,23 +289,24 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "sourcePath": "docs/guides/features",
       "label": "Features",
       "title": "Features",
-      "summary": "3 documentation files indexed from docs/guides/features.",
+      "summary": "4 documentation files indexed from docs/guides/features.",
       "parentSlug": "guides",
       "folderSlugs": [],
       "docIds": [
         "guides/features/dispatch",
         "guides/features/documentation",
-        "guides/features/workstation"
+        "guides/features/workstation",
+        "guides/features/xmux"
       ],
       "classificationCounts": {
-        "public": 3,
+        "public": 4,
         "internal": 0,
         "restricted": 0
       },
-      "publishableCount": 3,
+      "publishableCount": 4,
       "reviewRequiredCount": 0,
       "visibilityCounts": {
-        "public": 3,
+        "public": 4,
         "internal": 0,
         "restricted": 0
       },
@@ -1729,6 +1730,38 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "updatedAt": "2026-05-23T16:57:17.000Z"
     },
     {
+      "id": "guides/features/xmux",
+      "slug": "guides/features/xmux",
+      "route": "/documentation/guides/features/xmux",
+      "sourcePath": "docs/guides/features/xmux.md",
+      "folderSlug": "guides/features",
+      "folderPath": "docs/guides/features",
+      "title": "xmux",
+      "summary": "xmux is the Project Manager-facing coding-tool entry for a user-installed cmux command. cmux is a third-party project by Manaflow. In the first Project Manager integration, xmux is a side...",
+      "content": "\n# xmux\n\nxmux is the Project Manager-facing coding-tool entry for a user-installed cmux command. cmux is a third-party project by Manaflow. In the first Project Manager integration, xmux is a sidebar item and agent target that delegates to the installed `cmux` command. The goal is to make multi-agent coding work visible from Project Manager without bundling, forking, or redistributing cmux.\n\n## Design Philosophy\n\nxmux does not prescribe how developers must use AI. It is not a closed workflow product. Instead, it treats terminals, browser panes, notifications, workspaces, splits, tabs, and CLI commands as composable building blocks. Developers can combine those parts into the AI collaboration workflow that fits their codebase.\n\n## Current Project Manager Behavior\n\n| Area | Current behavior |\n|---|---|\n| Sidebar | `xmux` appears under Execution. |\n| Adapter | Dispatch target is named `xmux`. |\n| Command | Project Manager invokes the installed `cmux` executable. |\n| Interface | Interactive workspace sidebar plus terminal/browser split-pane topology. |\n| Terminal | Page-local terminal panes can run allowlisted inspection commands through `/api/xmux/terminal`. |\n| Browser | Browser pane has a URL bar and iframe surface for local Project Manager pages. |\n| Toolbar | Globe toggles browser, Bell opens notifications, Grid switches vertical/horizontal split. |\n| Deep control | Full PTY, cmux socket inventory, cmux browser automation, and notification feed wiring are future work. |\n\n## Install And Verify cmux\n\ncmux is distributed as a macOS app. The official getting-started guide documents two install paths:\n\n```bash\nbrew tap manaflow-ai/cmux\nbrew install --cask cmux\n```\n\nFor CLI access outside cmux terminals, create the standard symlink:\n\n```bash\nsudo ln -sf \"/Applications/cmux.app/Contents/Resources/bin/cmux\" /usr/local/bin/cmux\ncmux list-workspaces\ncmux notify --title \"Build Complete\" --body \"Your build finished\"\n```\n\nProject Manager expects the executable to be available as `cmux`. It does not ship cmux inside Project Manager.\n\n## Page-Local Terminal\n\nThe terminal pane is interactive, but intentionally allowlisted. It is meant for safe local inspection, not arbitrary shell execution. Supported commands:\n\n| Command | Purpose |\n|---|---|\n| `pwd` | Show the Project Manager server working directory. |\n| `git branch --show-current` | Show the current git branch. |\n| `git status --short` | Show dirty worktree entries. |\n| `cmux --version` | Verify the installed cmux CLI. |\n| `cmux list-workspaces` | Ask cmux for current workspaces. |\n\n## Core Capabilities\n\n### Right-Top Toolbar\n\nThe xmux interop surface mirrors the native cmux right-top controls for browser, notification, and split-pane actions. These controls are live in Project Manager: they change visible pane state rather than only documenting the upstream cmux behavior.\n\n### AI Notification Attention\n\ncmux supports desktop and in-app notifications so coding agents and scripts can alert you when they need attention. Unread workspaces can be surfaced in the sidebar, and the notification panel provides a central place to review pending work.\n\n### Notification Panel\n\nUse the cmux notification panel for pending agent alerts. The upstream shortcut `Cmd+Shift+U` jumps to the workspace with the latest unread notification.\n\n### Vertical Workspace Sidebar\n\ncmux organizes work into windows, workspaces, panes, surfaces, and panels. Workspaces appear in the sidebar and can carry operational metadata such as current working directory, notifications, and coding context.\n\n### Embedded Browser Panes\n\ncmux browser surfaces can sit beside terminal panes. The browser command group can navigate pages, inspect DOM state, take screenshots, click elements, fill forms, evaluate JavaScript, and save or restore browser session state.\n\nThe Globe toolbar icon opens or hides the built-in browser split. Shortcut target: `Cmd+Shift+L`.\n\n### Notification Toolbar\n\nThe Bell toolbar icon opens the centralized notification panel. cmux listens for OSC 9/99/777 terminal sequences, so coding agents can mark panes as waiting for input. Waiting panes get attention rings, and the related workspace tab lights up in the sidebar.\n\nShortcuts:\n\n| Action | Shortcut |\n|---|---|\n| Open notification panel | `Cmd+I` |\n| Jump to latest unread | `Cmd+Shift+U` |\n\n### Split Pane Toolbar\n\nThe Grid toolbar icon controls split-pane layout for parallel agent work. In Project Manager today it switches the visible terminal/browser split between vertical and horizontal layouts.\n\n| Action | Shortcut |\n|---|---|\n| Split right | `Cmd+D` |\n| Split down | `Cmd+Shift+D` |\n| Move pane focus | `Option+Cmd+Arrow` |\n\n### Claude Code Teams\n\n`cmux claude-teams` launches Claude Code with teammate agents mapped into native cmux splits. cmux provides a tmux compatibility shim so Claude's teammate-pane behavior can run without requiring users to manage tmux directly.\n\n### SSH Workspaces\n\n`cmux ssh user@remote` creates a remote workspace. Browser panes in that workspace route HTTP and WebSocket traffic through the remote machine, so remote `localhost` services are accessible without manual port forwarding. Remote coding-agent notifications can still appear locally.\n\n### Session Restore\n\ncmux can restore app-owned layout and metadata after relaunch, including windows, workspaces, panes, working directories, terminal scrollback on a best-effort basis, and browser URL/history. Supported coding agents can resume when cmux captures their native session identifiers through hooks.\n\n## Project Manager Boundary\n\nxmux currently does not provide a full PTY, read the cmux socket, control cmux browser panes, or ingest cmux notifications into Project Manager logs. Those are separate follow-up integrations because they require command boundaries, socket access policy, and UI state design.\n\n## Follow-Up Integration Ideas\n\n| Follow-up | Purpose |\n|---|---|\n| Socket status check | Show whether `/tmp/cmux.sock` is reachable and which access mode is active. |\n| Workspace inventory | List cmux workspaces inside the xmux view. |\n| Notification mirror | Surface cmux unread notifications inside Project Manager. |\n| Browser automation bridge | Dispatch browser verification steps to a cmux browser pane. |\n| SSH workspace shortcuts | Open known remote development hosts from Project Manager. |\n\n## Official References\n\n- [cmux Getting Started](https://cmux.com/docs/getting-started)\n- [cmux Concepts](https://cmux.com/docs/concepts)\n- [cmux API Reference](https://cmux.com/docs/api)\n- [cmux Browser Automation](https://cmux.com/docs/browser-automation)\n- [cmux Notifications](https://cmux.com/docs/notifications)\n- [cmux SSH](https://cmux.com/docs/ssh)\n- [cmux Claude Code Teams](https://cmux.com/docs/agent-integrations/claude-code-teams)\n- [cmux Session Restore](https://cmux.com/docs/session-restore)\n",
+      "contentHash": "e6be432993a9eb62",
+      "readingMinutes": 5,
+      "classification": "public",
+      "classificationSource": "frontmatter",
+      "classificationConfidence": 0.95,
+      "classificationReason": "User-facing coding-tool guide with no secrets, credentials, or private infrastructure details.",
+      "matchedPolicyRule": "CLS-FRONTMATTER-OVERRIDE",
+      "publish": true,
+      "reviewStatus": "approved",
+      "needsReview": false,
+      "visibility": "public",
+      "audience": [
+        "users",
+        "customers"
+      ],
+      "tags": [
+        "guides",
+        "table"
+      ],
+      "warnings": [],
+      "updatedAt": "2026-05-25T02:46:31.000Z"
+    },
+    {
       "id": "guides/getting-started",
       "slug": "guides/getting-started",
       "route": "/documentation/guides/getting-started",
@@ -2282,6 +2315,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
     "guides/features/dispatch",
     "guides/features/documentation",
     "guides/features/workstation",
+    "guides/features/xmux",
     "guides/getting-started",
     "integrations/company-standards-plugin-contract",
     "integrations/readme",

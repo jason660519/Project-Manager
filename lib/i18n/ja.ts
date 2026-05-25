@@ -12,6 +12,7 @@ export const ja: Translations = {
     dashboard: 'プロジェクトダッシュボード',
     engineers: 'エンジニア',
     integrationsHub: '統合ハブ',
+    xmux: 'xmux',
     channels: 'チャンネル',
     cronJobs: 'Cronジョブ',
     skills: 'スキル',

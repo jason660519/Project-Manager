@@ -1489,6 +1489,98 @@ async fn spawn_terminal(
     }
 }
 
+/// Open a new system Terminal window with an interactive login shell in `cwd`.
+///
+/// Unlike `spawn_terminal`, no CLI command is executed — the user gets a normal
+/// shell already `cd`'d into the project folder.
+#[tauri::command]
+async fn open_terminal_at_path(cwd: String) -> Result<(), String> {
+    if cwd.trim().is_empty() {
+        return Err("cwd must not be empty".to_string());
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let shell_line = format!("cd {} && exec $SHELL", shell_quote(&cwd));
+        let escaped = shell_line
+            .replace('\\', "\\\\")
+            .replace('"', "\\\"")
+            .replace('\r', "\\r")
+            .replace('\n', "\\n");
+        let script = format!(
+            "tell application \"Terminal\"\nactivate\ndo script \"{escaped}\"\nend tell"
+        );
+        let output = tokio::process::Command::new("osascript")
+            .args(["-e", &script])
+            .output()
+            .await
+            .map_err(|e| format!("osascript spawn failed: {e}"))?;
+        if !output.status.success() {
+            return Err(format!(
+                "osascript failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+        Ok(())
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let shell_line = format!("cd {} && exec $SHELL", shell_quote(&cwd));
+        let candidates: &[(&str, &[&str])] = &[
+            ("x-terminal-emulator", &["-e", "bash", "-c"]),
+            ("gnome-terminal", &["--", "bash", "-c"]),
+            ("konsole", &["-e", "bash", "-c"]),
+            ("xterm", &["-e", "bash", "-c"]),
+        ];
+        for (term, prefix) in candidates {
+            let found = tokio::process::Command::new("which")
+                .arg(term)
+                .output()
+                .await
+                .map(|o| o.status.success())
+                .unwrap_or(false);
+            if !found {
+                continue;
+            }
+            let mut all_args: Vec<String> = prefix.iter().map(|s| s.to_string()).collect();
+            all_args.push(format!("{shell_line}; exec bash"));
+            tokio::process::Command::new(term)
+                .args(&all_args)
+                .spawn()
+                .map_err(|e| format!("{term} spawn failed: {e}"))?;
+            return Ok(());
+        }
+        Err("No supported terminal emulator found (tried x-terminal-emulator, gnome-terminal, konsole, xterm)".to_string())
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let wt_found = tokio::process::Command::new("where")
+            .arg("wt.exe")
+            .output()
+            .await
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+        if wt_found {
+            tokio::process::Command::new("wt.exe")
+                .args(["-d", cwd.as_str()])
+                .spawn()
+                .map_err(|e| format!("wt.exe spawn failed: {e}"))?;
+        } else {
+            tokio::process::Command::new("cmd")
+                .args(["/c", "start", "cmd"])
+                .current_dir(&cwd)
+                .spawn()
+                .map_err(|e| format!("cmd start failed: {e}"))?;
+        }
+        Ok(())
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    {
+        let _ = cwd;
+        Err("open_terminal_at_path is not supported on this platform".to_string())
+    }
+}
+
 /// Kill a running process by PID (SIGTERM on Unix).
 #[tauri::command]
 async fn kill_process(pid: u32) -> Result<(), String> {
@@ -4234,6 +4326,7 @@ pub fn run() {
         .manage(mcp_registry)
         .manage(telegram_registry)
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_pty::init())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -4257,6 +4350,7 @@ pub fn run() {
             scan_projects,
             spawn_agent,
             spawn_terminal,
+            open_terminal_at_path,
             kill_process,
             call_anthropic,
             call_openai,

@@ -14,6 +14,11 @@ import { LocalIDEAdapter } from './local-ide-adapter';
 import { loadPluginCatalog, selectCli } from '../storage/plugins';
 
 const PLUGIN_AGENT_IDS = new Set(['hermes-agent', 'openclaw']);
+const ADAPTER_ID_ALIASES = new Map<string, string>([['cmux', 'xmux']]);
+
+function canonicalAdapterId(id: string): string {
+  return ADAPTER_ID_ALIASES.get(id) ?? id;
+}
 
 const BUILT_IN_IDES: IDEAdapterConfig[] = [
   { id: 'Trae', name: 'TRAE IDE', type: 'ide', targetKind: 'ide', command: 'trae' },
@@ -49,8 +54,8 @@ const BUILT_IN_AGENT_CLIS: AgentAdapterConfig[] = [
     argsTemplate: ['api', 'responses.create', '-m', '{prompt}'],
   },
   {
-    id: 'cmux',
-    name: 'Cmux CLI',
+    id: 'xmux',
+    name: 'xmux',
     type: 'agent',
     targetKind: 'agent-cli',
     command: 'cmux',
@@ -78,9 +83,9 @@ const BUILT_IN_AGENT_APPS: AgentAppAdapterConfig[] = [
 ];
 
 function mergeBuiltIns<T extends AnyAdapterConfig>(builtIns: T[], configured: T[] = []): T[] {
-  const byId = new Map(configured.map((adapter) => [adapter.id, adapter]));
+  const byId = new Map(configured.map((adapter) => [canonicalAdapterId(adapter.id), adapter]));
   const merged = builtIns.map((builtIn) => {
-    const configuredAdapter = byId.get(builtIn.id);
+    const configuredAdapter = byId.get(canonicalAdapterId(builtIn.id));
     if (!configuredAdapter) return builtIn;
     return {
       ...builtIn,
@@ -90,10 +95,10 @@ function mergeBuiltIns<T extends AnyAdapterConfig>(builtIns: T[], configured: T[
         : {}),
     } as T;
   });
-  const builtInIds = new Set(builtIns.map((adapter) => adapter.id));
+  const builtInIds = new Set(builtIns.map((adapter) => canonicalAdapterId(adapter.id)));
   return [
     ...merged,
-    ...configured.filter((adapter) => !builtInIds.has(adapter.id)),
+    ...configured.filter((adapter) => !builtInIds.has(canonicalAdapterId(adapter.id))),
   ];
 }
 
