@@ -43,6 +43,11 @@ function writeJSON(key: string, value: unknown): void {
   }
 }
 
+// Plugin IDs that were once shipped as built-ins but have since been removed.
+// Listed here so loadPluginCatalog can purge them from persisted catalogs on
+// next load without requiring a manual user action.
+const DEPRECATED_PLUGIN_IDS = new Set(['monaco-editor', 'ide-bridge']);
+
 // Sentinel install date for built-in defaults that ship with the app.
 const BUILT_IN_INSTALL_DATE = '1970-01-01T00:00:00.000Z';
 const nowIso = () => new Date().toISOString();
@@ -191,20 +196,28 @@ function ensureRequiredBuiltins(catalog: PluginCatalog): {
   };
 }
 
+function pruneDeprecated(catalog: PluginCatalog): { catalog: PluginCatalog; changed: boolean } {
+  const next = catalog.plugins.filter((p) => !DEPRECATED_PLUGIN_IDS.has(p.id));
+  if (next.length === catalog.plugins.length) return { catalog, changed: false };
+  return { catalog: { ...catalog, plugins: next }, changed: true };
+}
+
 export function loadPluginCatalog(): PluginCatalog {
   const raw = readJSON<unknown>(KEY_SHARED_PLUGINS);
   if (!raw) return DEFAULT_CATALOG;
 
   if (isV2(raw)) {
-    const upgrade = upgradeBuiltinNames({ schemaVersion: 2, plugins: raw.plugins });
+    const pruned = pruneDeprecated({ schemaVersion: 2, plugins: raw.plugins });
+    const upgrade = upgradeBuiltinNames(pruned.catalog);
     const required = ensureRequiredBuiltins(upgrade.catalog);
-    if (upgrade.changed || required.changed) writeJSON(KEY_SHARED_PLUGINS, required.catalog);
+    if (pruned.changed || upgrade.changed || required.changed) writeJSON(KEY_SHARED_PLUGINS, required.catalog);
     return required.catalog;
   }
 
   if (isV1(raw)) {
     const migrated = migrateV1toV2(raw);
-    const upgrade = upgradeBuiltinNames(migrated);
+    const pruned = pruneDeprecated(migrated);
+    const upgrade = upgradeBuiltinNames(pruned.catalog);
     const required = ensureRequiredBuiltins(upgrade.catalog);
     writeJSON(KEY_SHARED_PLUGINS, required.catalog);
     return required.catalog;

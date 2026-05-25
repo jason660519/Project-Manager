@@ -18,6 +18,7 @@ import { ExportProgressDialog } from './_components/ExportProgressDialog';
 import { PhaseTabContent } from './_components/PhaseTabContent';
 import { IssuesTab } from './_components/IssuesTab';
 import { TaskDispatchModal } from '../../components/table/TaskDispatchModal';
+import { WorkstationFrame } from '../../components/layout/WorkstationFrame';
 import { ProjectsView } from '../ui/views/ProjectsView';
 
 interface ProjectProgressClientProps {
@@ -159,107 +160,111 @@ export function ProjectProgressClient({
   }, []);
 
   return (
-    <div className="flex flex-col gap-4 min-h-[calc(100vh-8rem)]">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="flex items-center gap-2 text-xl font-semibold text-stone-50">
-            <Activity className="h-5 w-5 text-emerald-300" />
-            Project Progress Dashboard
-          </h1>
-          {selectedDashboardProjectIds.length > 0 && dashboardProjectNames.length > 0 && (
-            <p className="mt-1 text-xs text-cyan-200/85">
-              Showing {dashboardProjectNames.length} selected project{dashboardProjectNames.length > 1 ? 's' : ''}:{' '}
-              {dashboardProjectNames.join(', ')}
-            </p>
-          )}
-          {selectedDashboardProjectIds.length === 0 && dashboardProjectNames.length > 0 && (
-            <p className="mt-1 text-xs text-amber-100/85">
-              No dashboard projects selected; showing current project: {dashboardProjectNames.join(', ')}
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <button
-            type="button"
-            onClick={() => setExportOpen(true)}
-            className="flex h-8 items-center gap-1.5 rounded bg-emerald-500/30 px-3 text-xs font-medium text-emerald-100 hover:bg-emerald-500/40"
-            title="Export progress JSON"
-          >
-            <Upload size={14} /> Export
-          </button>
-          {isPhaseTab && (
-            <SharedStatsCards phase={activePhase} features={headerFeatures} compact />
-          )}
-        </div>
-      </div>
-
-      {/* Paperclip-style ops panels on development phase (only when not in Issues tab) */}
-      {isPhaseTab && activePhase === 'development' && (
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <AgentOpsPanel adapters={adapters} activeRuns={activeRuns} />
-          <CronControlPanel
-            cronJobs={cronJobs}
-            onCronJobsChange={onCronJobsChange}
-            onRunJob={onRunCronJob}
+    <>
+      <WorkstationFrame
+        className="w-full"
+        header={
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <h1 className="flex items-center gap-2 text-xl font-semibold text-stone-50">
+                <Activity className="h-5 w-5 text-emerald-300" />
+                Project Progress Dashboard
+              </h1>
+              {selectedDashboardProjectIds.length > 0 && dashboardProjectNames.length > 0 && (
+                <p className="mt-1 text-xs text-cyan-200/85">
+                  Showing {dashboardProjectNames.length} selected project{dashboardProjectNames.length > 1 ? 's' : ''}:{' '}
+                  {dashboardProjectNames.join(', ')}
+                </p>
+              )}
+              {selectedDashboardProjectIds.length === 0 && dashboardProjectNames.length > 0 && (
+                <p className="mt-1 text-xs text-amber-100/85">
+                  No dashboard projects selected; showing current project: {dashboardProjectNames.join(', ')}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setExportOpen(true)}
+                className="flex h-8 items-center gap-1.5 rounded bg-emerald-500/30 px-3 text-xs font-medium text-emerald-100 hover:bg-emerald-500/40"
+                title="Export progress JSON"
+              >
+                <Upload size={14} /> Export
+              </button>
+              {isPhaseTab && <SharedStatsCards phase={activePhase} features={headerFeatures} compact />}
+            </div>
+          </div>
+        }
+        panelClassName="border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72"
+        scrollChildren={false}
+        bottomTabs={
+          <SheetTabs
+            activeTab={activeTab}
+            onTabChange={onChangeTab}
+            phaseCounts={phaseCounts}
+            projectCount={projects.length}
           />
-        </div>
-      )}
-
-      {/* Active tab content area */}
-      <div className="flex-1 min-h-0 flex flex-col">
-        <div className="flex-1 min-h-0">
-          {activeTab === 'projects' ? (
-            <ProjectsView
-              projects={projects}
-              selectedProjectId={selectedProjectId}
-              selectedDashboardProjectIds={selectedDashboardProjectIds}
-              onSelectProject={onSelectProject}
-              onToggleDashboardProject={onToggleDashboardProject}
-              onAddProject={onAddProject}
-              onUpdateProject={onUpdateProject}
-              onRemoveProject={onRemoveProject}
-              onSyncFromDesktop={onSyncFromDesktop}
-              runHistory={runHistory}
-            />
-          ) : isPhaseTab ? (
-            <PhaseTabContent
-              phase={activePhase}
-              projectName={project.name}
-              projectNames={dashboardProjectNames}
-              projectRoot={projectRoot}
-              features={phaseFeatures}
-              engineerRoles={engineerRoles}
-              prefs={activePhasePrefs.prefs}
-              patch={activePhasePrefs.patch}
-              reset={activePhasePrefs.reset}
-              onFeaturePromptSave={onFeaturePromptSave}
-              onFeaturePatch={onFeaturePatch}
-              activeRuns={activeRuns}
-              onDispatchRow={(row) => row.source === 'feature' && setDispatchRow(row)}
-            />
-          ) : (
-            <IssuesTab
-              projectName={project.name}
-              selectedProjectNames={dashboardProjectNames}
-              selectedProjects={dashboardProjects}
-              repoUrl={project.githubUrl}
-              projectRoot={projectRoot}
-              storyPoints={features.reduce((s, f) => s + (f.points ?? 1), 0)}
-              adapters={adapters}
-              engineerRoles={engineerRoles}
-              defaultIDE={project.defaultIDE}
-              onDispatchIssue={(issue) => setDispatchIssue(issue)}
-            />
+        }
+      >
+        <div className="flex h-full min-h-0 flex-col gap-4 overflow-auto p-4">
+          {isPhaseTab && activePhase === 'development' && (
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              <AgentOpsPanel adapters={adapters} activeRuns={activeRuns} />
+              <CronControlPanel
+                cronJobs={cronJobs}
+                onCronJobsChange={onCronJobsChange}
+                onRunJob={onRunCronJob}
+              />
+            </div>
           )}
+
+          <div className="min-h-0 flex-1">
+            {activeTab === 'projects' ? (
+              <ProjectsView
+                projects={projects}
+                selectedProjectId={selectedProjectId}
+                selectedDashboardProjectIds={selectedDashboardProjectIds}
+                onSelectProject={onSelectProject}
+                onToggleDashboardProject={onToggleDashboardProject}
+                onAddProject={onAddProject}
+                onUpdateProject={onUpdateProject}
+                onRemoveProject={onRemoveProject}
+                onSyncFromDesktop={onSyncFromDesktop}
+                runHistory={runHistory}
+              />
+            ) : isPhaseTab ? (
+              <PhaseTabContent
+                phase={activePhase}
+                projectName={project.name}
+                projectNames={dashboardProjectNames}
+                projectRoot={projectRoot}
+                features={phaseFeatures}
+                engineerRoles={engineerRoles}
+                prefs={activePhasePrefs.prefs}
+                patch={activePhasePrefs.patch}
+                reset={activePhasePrefs.reset}
+                onFeaturePromptSave={onFeaturePromptSave}
+                onFeaturePatch={onFeaturePatch}
+                activeRuns={activeRuns}
+                onDispatchRow={(row) => row.source === 'feature' && setDispatchRow(row)}
+              />
+            ) : (
+              <IssuesTab
+                projectName={project.name}
+                selectedProjectNames={dashboardProjectNames}
+                selectedProjects={dashboardProjects}
+                repoUrl={project.githubUrl}
+                projectRoot={projectRoot}
+                storyPoints={features.reduce((s, f) => s + (f.points ?? 1), 0)}
+                adapters={adapters}
+                engineerRoles={engineerRoles}
+                defaultIDE={project.defaultIDE}
+                onDispatchIssue={(issue) => setDispatchIssue(issue)}
+              />
+            )}
+          </div>
         </div>
-        <SheetTabs
-          activeTab={activeTab}
-          onTabChange={onChangeTab}
-          phaseCounts={phaseCounts}
-          projectCount={projects.length}
-        />
-      </div>
+      </WorkstationFrame>
 
       <ExportProgressDialog
         open={exportOpen}
@@ -307,6 +312,6 @@ export function ProjectProgressClient({
           onRunEnd={onRunEnd}
         />
       )}
-    </div>
+    </>
   );
 }

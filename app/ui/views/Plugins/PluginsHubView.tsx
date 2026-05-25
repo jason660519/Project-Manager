@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ExternalLink, FileText, MessageCircle, RefreshCw, RotateCw, Snowflake, X } from 'lucide-react';
+import { CheckCircle2, ExternalLink, FileText, MessageCircle, RefreshCw, RotateCw, Snowflake, X } from 'lucide-react';
 import type { IntegrationRow, IntegrationSheet } from '../../../../lib/integrations/types';
 import { isCapabilitySheet } from '../../../../lib/integrations/types';
 import { diffRows, type ScanOutcome, type ScanReport } from '../../../../lib/integrations/scan-diff';
@@ -73,6 +73,7 @@ import {
   readFile,
   listGlobalCliInventory,
   resolveInstallPath,
+  probeCommandVersion,
   skillInstallFromUrl,
   skillList,
   skillUninstall,
@@ -169,6 +170,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
   const [resolvedInstallPaths, setResolvedInstallPaths] = useState<Record<string, ResolvedPluginPath>>({});
   const [pluginTestResults, setPluginTestResults] = useState<Record<string, IntegrationRowTestResult>>({});
   const [pluginTestingKeys, setPluginTestingKeys] = useState<ReadonlySet<string>>(new Set());
+  const [checkedRowKeys, setCheckedRowKeys] = useState<ReadonlySet<string>>(new Set());
   const [logsForId, setLogsForId] = useState<string | null>(null);
   const [skillsInstallUrl, setSkillsInstallUrl] = useState('');
   const [isGuideOpen, setIsGuideOpen] = useState(false);
@@ -1074,9 +1076,21 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
       }
 
       const ok = exists || Boolean(resolved.appBundlePath || resolved.commandPath);
-      const summary = ok
-        ? resolved.appBundlePath ?? resolved.commandPath ?? `${baseName} on PATH`
-        : detail ?? 'Command not found on PATH; no .app bundle detected';
+      let summary: string;
+      if (ok) {
+        // Probe the CLI binary for a version string; fall back to the resolved path.
+        let versionStr: string | null = null;
+        if (exists) {
+          try {
+            versionStr = await probeCommandVersion(baseName);
+          } catch {
+            // version probe is best-effort; silence the error
+          }
+        }
+        summary = versionStr ?? resolved.appBundlePath ?? resolved.commandPath ?? `${baseName} on PATH`;
+      } else {
+        summary = detail ?? 'Command not found on PATH; no .app bundle detected';
+      }
 
       setSystemCommandStatus((prev) => ({ ...prev, [row.sourceId]: exists }));
       setResolvedInstallPaths((prev) => {
@@ -1319,8 +1333,41 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
   const handleSheetSelect = (key: IntegrationSheet) => {
     setSelectedRow(null);
     setCategoryFilter('all');
+    setCheckedRowKeys(new Set());
     router.push(`/integrations-hub/${key}`);
   };
+
+  const handleToggleCheck = useCallback((rowKey: string, checked: boolean) => {
+    setCheckedRowKeys((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(rowKey); else next.delete(rowKey);
+      return next;
+    });
+  }, []);
+
+  const handleToggleCheckAll = useCallback((checked: boolean, visibleRowKeys: string[]) => {
+    setCheckedRowKeys((prev) => {
+      const next = new Set(prev);
+      if (checked) visibleRowKeys.forEach((k) => next.add(k));
+      else visibleRowKeys.forEach((k) => next.delete(k));
+      return next;
+    });
+  }, []);
+
+  const isTestableSheet =
+    activeSheet === 'plugins' || activeSheet === 'coding-tools' || activeSheet === 'mcp';
+
+  const handleTestAll = useCallback(async () => {
+    if (!isTestableSheet) return;
+    const rowsToTest = activeRows.filter(
+      (r) =>
+        checkedRowKeys.has(r.rowKey) &&
+        (r.sourceKind === 'plugin-installed' || r.sourceKind === 'plugin-marketplace'),
+    );
+    for (const row of rowsToTest) {
+      await handleTestPluginRow(row);
+    }
+  }, [isTestableSheet, activeRows, checkedRowKeys, handleTestPluginRow]);
 
   const activeSheetLoading =
     activeSheet === 'skills'
@@ -1522,6 +1569,22 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
               <p className="mt-1 text-xs text-stone-400">{t.integrations.subtitle}</p>
             </div>
             <div className="flex items-center gap-2 self-start sm:self-center">
+              {isTestableSheet && (
+                <button
+                  type="button"
+                  onClick={() => void handleTestAll()}
+                  disabled={checkedRowKeys.size === 0 || pluginTestingKeys.size > 0}
+                  title={
+                    checkedRowKeys.size === 0
+                      ? 'Select rows to test'
+                      : `Test ${checkedRowKeys.size} selected item${checkedRowKeys.size > 1 ? 's' : ''}`
+                  }
+                  className="flex items-center gap-2 border border-emerald-400/30 bg-emerald-950/25 px-3 py-1.5 text-xs text-emerald-200 hover:bg-emerald-950/45 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <CheckCircle2 size={13} />
+                  {pluginTestingKeys.size > 0 ? 'Testing…' : `Test All${checkedRowKeys.size > 0 ? ` (${checkedRowKeys.size})` : ''}`}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => void runAllScans()}
@@ -1586,6 +1649,9 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
                 rows={activeRows}
                 selectedRowKey={selectedRow?.rowKey ?? null}
                 onRowClick={setSelectedRow}
+                checkedKeys={checkedRowKeys}
+                onToggleCheck={handleToggleCheck}
+                onToggleCheckAll={handleToggleCheckAll}
                 globalFilter={search}
                 columnVisibility={columnVisibility}
                 isLoading={activeSheetLoading}
