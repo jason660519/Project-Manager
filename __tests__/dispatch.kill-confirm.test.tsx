@@ -116,19 +116,19 @@ describe('TaskDispatchModal [kill confirmation]', () => {
       </I18nProvider>,
     );
 
-    await user.click(screen.getByText('Run in Project Manager'));
+    await user.selectOptions(screen.getAllByRole('combobox')[2], 'claude-code');
+    await user.click(screen.getByRole('button', { name: 'Dispatch W' }));
 
-    expect(await screen.findAllByText('Preparing dispatch command…')).toHaveLength(2);
-    expect(screen.queryByText('Live Output')).not.toBeInTheDocument();
-    expect(screen.queryByText('PID 12345')).not.toBeInTheDocument();
+    expect(await screen.findByText('Live Output')).toBeInTheDocument();
+    expect(screen.getByText(/Waiting for output/)).toBeInTheDocument();
+    expect(screen.queryByText(/PID 12345/)).not.toBeInTheDocument();
 
     await act(async () => {
       resolveSpawn?.(12345);
     });
 
-    expect(await screen.findByText('Live Output')).toBeInTheDocument();
-    expect(screen.getByText('PID 12345')).toBeInTheDocument();
-    expect(screen.getByText('Kill')).toBeInTheDocument();
+    expect(screen.getByText('W: PID 12345')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Kill W' })).toBeInTheDocument();
   });
 
   it('transitions running to done when the agent exits cleanly', async () => {
@@ -140,7 +140,8 @@ describe('TaskDispatchModal [kill confirmation]', () => {
       </I18nProvider>,
     );
 
-    await user.click(screen.getByText('Run in Project Manager'));
+    await user.selectOptions(screen.getAllByRole('combobox')[2], 'claude-code');
+    await user.click(screen.getByRole('button', { name: 'Dispatch W' }));
     expect(await screen.findByText('Live Output')).toBeInTheDocument();
 
     act(() => {
@@ -148,8 +149,8 @@ describe('TaskDispatchModal [kill confirmation]', () => {
     });
 
     expect(screen.getByText('Execution Log')).toBeInTheDocument();
-    expect(screen.getByText(/process exited \(PID 12345, code 0\)/)).toBeInTheDocument();
-    expect(screen.queryByText('Kill')).not.toBeInTheDocument();
+    expect(screen.getByText(/W exited \(PID 12345, code 0\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/Kill/)).not.toBeInTheDocument();
   });
 
   it('transitions running to error when the agent exits non-zero', async () => {
@@ -161,7 +162,8 @@ describe('TaskDispatchModal [kill confirmation]', () => {
       </I18nProvider>,
     );
 
-    await user.click(screen.getByText('Run in Project Manager'));
+    await user.selectOptions(screen.getAllByRole('combobox')[2], 'claude-code');
+    await user.click(screen.getByRole('button', { name: 'Dispatch W' }));
     expect(await screen.findByText('Live Output')).toBeInTheDocument();
 
     act(() => {
@@ -169,8 +171,8 @@ describe('TaskDispatchModal [kill confirmation]', () => {
     });
 
     expect(screen.getByText('Execution Log')).toBeInTheDocument();
-    expect(screen.getByText(/process exited \(PID 12345, code 1\)/)).toBeInTheDocument();
-    expect(screen.queryByText('Kill')).not.toBeInTheDocument();
+    expect(screen.getByText(/W exited \(PID 12345, code 1\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/Kill/)).not.toBeInTheDocument();
   });
 
   it('shows kill confirmation dialog with PID and feature name', async () => {
@@ -183,11 +185,11 @@ describe('TaskDispatchModal [kill confirmation]', () => {
     );
 
     // Start dispatch to enter running phase
-    const dispatchBtn = screen.getByText('Run in Project Manager');
-    await user.click(dispatchBtn);
+    await user.selectOptions(screen.getAllByRole('combobox')[2], 'claude-code');
+    await user.click(screen.getByRole('button', { name: 'Dispatch W' }));
 
     // Kill button should now be visible
-    const killBtn = await screen.findByText('Kill');
+    const killBtn = await screen.findByRole('button', { name: 'Kill W' });
     await user.click(killBtn);
 
     // Kill confirmation dialog visible — use the dialog title text
@@ -206,11 +208,11 @@ describe('TaskDispatchModal [kill confirmation]', () => {
     );
 
     // Start dispatch
-    const dispatchBtn = screen.getByText('Run in Project Manager');
-    await user.click(dispatchBtn);
+    await user.selectOptions(screen.getAllByRole('combobox')[2], 'claude-code');
+    await user.click(screen.getByRole('button', { name: 'Dispatch W' }));
 
     // Open kill confirmation
-    const killBtn = await screen.findByText('Kill');
+    const killBtn = await screen.findByRole('button', { name: 'Kill W' });
     await user.click(killBtn);
 
     // Confirm dialog is shown
@@ -223,7 +225,7 @@ describe('TaskDispatchModal [kill confirmation]', () => {
     expect(screen.queryByText('Kill this process?')).not.toBeInTheDocument();
     expect(screen.getByText('Live Output')).toBeInTheDocument();
     // Kill button should still be present (modal is still running)
-    expect(screen.getByText('Kill')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Kill W' })).toBeInTheDocument();
   });
 
   it('Confirm kill calls killProcess bridge', async () => {
@@ -236,11 +238,11 @@ describe('TaskDispatchModal [kill confirmation]', () => {
     );
 
     // Start dispatch
-    const dispatchBtn = screen.getByText('Run in Project Manager');
-    await user.click(dispatchBtn);
+    await user.selectOptions(screen.getAllByRole('combobox')[2], 'claude-code');
+    await user.click(screen.getByRole('button', { name: 'Dispatch W' }));
 
     // Open kill confirmation
-    const killBtn = await screen.findByText('Kill');
+    const killBtn = await screen.findByRole('button', { name: 'Kill W' });
     await user.click(killBtn);
 
     // Confirm kill
@@ -264,12 +266,12 @@ describe('TaskDispatchModal [kill confirmation]', () => {
     );
 
     // Start dispatch — this will fail
-    const dispatchBtn = screen.getByText('Run in Project Manager');
-    await user.click(dispatchBtn);
+    await user.selectOptions(screen.getAllByRole('combobox')[2], 'claude-code');
+    await user.click(screen.getByRole('button', { name: 'Dispatch W' }));
 
     // Error should be shown in the post-run error banner
     await waitFor(() => {
-      expect(screen.getByText('Process crashed with signal 9')).toBeInTheDocument();
+      expect(screen.getByText(/Process crashed with signal 9/)).toBeInTheDocument();
     });
   });
 
@@ -281,6 +283,6 @@ describe('TaskDispatchModal [kill confirmation]', () => {
     );
 
     // In idle phase (before clicking dispatch), Kill button should not exist
-    expect(screen.queryByText('Kill')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Kill/)).not.toBeInTheDocument();
   });
 });

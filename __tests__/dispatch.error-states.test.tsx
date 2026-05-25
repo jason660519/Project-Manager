@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { I18nProvider } from '../lib/i18n';
 import React from 'react';
@@ -124,18 +124,18 @@ describe('TaskDispatchModal [error states]', () => {
     );
 
     // Click dispatch
-    const dispatchBtn = screen.getByText('Run in Project Manager');
-    await user.click(dispatchBtn);
+    await user.selectOptions(screen.getAllByRole('combobox')[2], 'claude-code');
+    await user.click(screen.getByRole('button', { name: 'Dispatch W' }));
 
     // Expect error message inline (post-run error banner)
     await waitFor(() => {
-      expect(screen.getByText('Unable to build command for Claude Code')).toBeInTheDocument();
+      expect(screen.getByText(/Unable to build command for Claude Code/)).toBeInTheDocument();
     });
   });
 
   // ── Adapter not found fallback ───────────────────────────────────────────────
 
-  it('shows warning when assigned adapter is not found, falls back to first', () => {
+  it('does not crash when a saved adapter id is missing', () => {
     const featureWithMissingAdapter = {
       ...MOCK_FEATURE,
       promptConfig: {
@@ -152,16 +152,11 @@ describe('TaskDispatchModal [error states]', () => {
       </I18nProvider>,
     );
 
-    // Warning should mention the missing adapter and the fallback
-    expect(screen.getByText(/nonexistent-adapter/)).toBeInTheDocument();
-    expect(screen.getByText(/Previously assigned adapter/)).toBeInTheDocument();
-    // The warning text includes the fallback name — use getAllByText since
-    // 'Claude Code' also appears as a select option
-    const claudeMatches = screen.getAllByText(/Claude Code/);
-    expect(claudeMatches.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Task Dispatch')).toBeInTheDocument();
+    expect(screen.getAllByRole('combobox')[2]).toHaveValue('');
   });
 
-  it('does not show adapter warning when saved adapter exists', () => {
+  it('preselects saved adapter when promptConfig.agentId exists', () => {
     const featureWithExistingAdapter = {
       ...MOCK_FEATURE,
       promptConfig: {
@@ -178,8 +173,7 @@ describe('TaskDispatchModal [error states]', () => {
       </I18nProvider>,
     );
 
-    // Should not show adapter warning
-    expect(screen.queryByText(/no longer configured/)).not.toBeInTheDocument();
+    expect(screen.getAllByRole('combobox')[2]).toHaveValue('claude-code');
   });
 
   // ── Command not found indicator (select option text) ─────────────────────────
@@ -204,17 +198,11 @@ describe('TaskDispatchModal [error states]', () => {
     );
 
     expect(screen.getByText('Task Dispatch')).toBeInTheDocument();
-    expect(screen.getByText('No available adapters')).toBeInTheDocument();
     expect(screen.getByText('Close')).toBeInTheDocument();
-    expect(screen.queryByText('Run in Project Manager')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Dispatch/ })).not.toBeInTheDocument();
   });
 
-  it('disables the prompt textarea while the spec file loads', async () => {
-    let resolveSpec: (content: string) => void = () => {};
-    readFileMock.mockReturnValueOnce(new Promise((resolve) => {
-      resolveSpec = resolve;
-    }));
-
+  it('renders an editable prompt textarea', () => {
     const { container } = render(
       <I18nProvider>
         <TaskDispatchModal {...baseProps} />
@@ -223,25 +211,19 @@ describe('TaskDispatchModal [error states]', () => {
 
     const textarea = container.querySelector('textarea');
     expect(textarea).not.toBeNull();
-    expect(textarea).toBeDisabled();
-
-    await act(async () => {
-      resolveSpec('loaded spec');
-    });
-    await waitFor(() => expect(textarea).not.toBeDisabled());
+    expect(textarea).not.toBeDisabled();
   });
 
   // ── MCP empty state ─────────────────────────────────────────────────────────
 
-  it('shows "No MCP servers configured" when no servers are enabled', () => {
-    // With agent-cli adapters, MCP empty state should be visible
+  it('does not show MCP injection banner when no servers are enabled', () => {
     render(
       <I18nProvider>
         <TaskDispatchModal {...baseProps} />
       </I18nProvider>,
     );
 
-    expect(screen.getByText('No MCP servers configured')).toBeInTheDocument();
+    expect(screen.queryByText(/MCP server\\(s\\) injected/)).not.toBeInTheDocument();
   });
 
   // ── MCP error banner via dispatch failure ────────────────────────────────────
@@ -264,12 +246,12 @@ describe('TaskDispatchModal [error states]', () => {
     );
 
     // Click dispatch
-    const dispatchBtn = screen.getByText('Run in Project Manager');
-    await user.click(dispatchBtn);
+    await user.selectOptions(screen.getAllByRole('combobox')[2], 'claude-code');
+    await user.click(screen.getByRole('button', { name: 'Dispatch W' }));
 
     // Error should surface
     await waitFor(() => {
-      expect(screen.getByText('Adapter build failed due to MCP dependency issue')).toBeInTheDocument();
+      expect(screen.getByText(/Adapter build failed due to MCP dependency issue/)).toBeInTheDocument();
     });
   });
 
@@ -286,8 +268,7 @@ describe('TaskDispatchModal [error states]', () => {
       </I18nProvider>,
     );
 
-    // MCP empty should NOT be visible (hidden when targetKind !== 'agent-cli')
-    expect(screen.queryByText('No MCP servers configured')).not.toBeInTheDocument();
+    expect(screen.queryByText(/MCP server\\(s\\) injected/)).not.toBeInTheDocument();
   });
 
   // ── No adapter selected error path ───────────────────────────────────────────

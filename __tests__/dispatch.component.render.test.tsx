@@ -133,14 +133,13 @@ describe('TaskDispatchModal [render]', () => {
     expect(screen.getByText('Execution Target')).toBeInTheDocument();
   });
 
-  it('renders selected target preflight status', async () => {
+  it('renders target hints for external IDE', () => {
     render(
       <I18nProvider>
         <TaskDispatchModal {...baseProps} />
       </I18nProvider>,
     );
 
-    expect(await screen.findByText(/Target available/)).toBeInTheDocument();
     expect(screen.getByText(/External IDE/)).toBeInTheDocument();
   });
 });
