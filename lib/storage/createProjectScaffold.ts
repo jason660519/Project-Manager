@@ -140,6 +140,12 @@ export function buildRecoveredProjectConfig(
         ...(hasRelPath(snapshot, `${featureFolder}tdd-spec.md`)
           ? { tdd: `${featureFolder}tdd-spec.md` }
           : {}),
+        ...(hasRelPath(snapshot, `${featureFolder}debug-retro.md`)
+          ? { debugRetro: `${featureFolder}debug-retro.md` }
+          : {}),
+        ...(hasRelPath(snapshot, `${featureFolder}test-scenarios.md`)
+          ? { testScenarios: `${featureFolder}test-scenarios.md` }
+          : {}),
         ...(hasRelPath(snapshot, `${featureFolder}dev-log.md`)
           ? { developmentLogSummaryFolder: featureFolder }
           : extractBacktickValue(doc.content, 'Dev Logs')

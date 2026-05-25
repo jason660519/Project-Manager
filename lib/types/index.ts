@@ -38,6 +38,8 @@ export interface FeaturePaths {
   tdd?: string;                       // TDD spec (.md — source, editable)
   tddProgressReport?: string;         // TDD progress data (.md — raw data source)
   tddProgressReportHtml?: string;     // TDD progress report (.html — generated artifact, rich display)
+  debugRetro?: string;                // Debug retrospective (.md — reusable root-cause and verification record)
+  testScenarios?: string;             // Test scenario map (.md — user paths translated to unit/E2E coverage)
   unitIntegrationTest?: string;       // Unit & integration test path
   e2eAcceptanceTestScriptFolder?: string; // E2E acceptance test script folder
   developmentLogSummaryFolder?: string;   // Dev log folder (raw logs)

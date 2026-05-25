@@ -1,5 +1,10 @@
 /** URL toolbar row height in BrowserContent (`h-8`). */
 export const BROWSER_CHROME_HEIGHT_PX = 32;
+// Native child webviews are not DOM layers. On macOS/WKWebView they can render
+// one toolbar row higher than the DOM slot during child-view reparenting or
+// stale-session recovery, so keep an extra toolbar-height guard in the native
+// rectangle. Browser-mode iframes still use the real DOM slot without this gap.
+export const NATIVE_WEBVIEW_TOP_GUARD_PX = BROWSER_CHROME_HEIGHT_PX;
 
 export type ViewBounds = {
   x: number;
@@ -34,4 +39,15 @@ export function measureBrowserSlotBounds(slot: HTMLElement): ViewBounds | null {
   if (rect.height > paneRect.height - BROWSER_CHROME_HEIGHT_PX + 8) return null;
 
   return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+}
+
+export function toNativeWebviewBounds(bounds: ViewBounds): ViewBounds | null {
+  const height = bounds.height - NATIVE_WEBVIEW_TOP_GUARD_PX;
+  if (bounds.width < 20 || height < 20) return null;
+  return {
+    x: bounds.x,
+    y: bounds.y + NATIVE_WEBVIEW_TOP_GUARD_PX,
+    width: bounds.width,
+    height,
+  };
 }

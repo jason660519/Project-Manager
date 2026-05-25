@@ -9,6 +9,11 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from 'react';
 import { Bell, Folder } from 'lucide-react';
+import {
+  destroyAllBrowserSessions,
+  migrateStaleIframeSessions,
+  purgeOrphanNativeWebviews,
+} from '../../../components/browser/BrowserRegistry';
 import { LayoutRenderer } from '../../../components/terminal/LayoutRenderer';
 import {
   createBlock,
@@ -23,6 +28,7 @@ import {
 } from '../../../components/terminal/blockLayout';
 import { deriveProjectWorkspacePath } from '../../../lib/xmux/workspacePaths';
 import type { ProjectEntry } from '../../../lib/types';
+import { waitForTauriRuntime } from '../../../lib/runtime/tauri-ready';
 
 interface WorkspaceRow {
   id: string;
@@ -273,6 +279,16 @@ function InteropConsole({
   );
 
   const rootRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    purgeOrphanNativeWebviews();
+    void waitForTauriRuntime().then((ready) => {
+      if (ready) migrateStaleIframeSessions();
+    });
+    return () => {
+      destroyAllBrowserSessions();
+    };
+  }, []);
 
   const activeLayout = useMemo(() => {
     if (!activeWorkspace) return undefined;

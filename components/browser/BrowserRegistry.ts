@@ -38,6 +38,7 @@ interface TauriSession {
   url: string;
   visible: boolean;
   created: boolean;
+  disposed: boolean;
   pendingCreate: Promise<void> | null;
   lastBounds: { x: number; y: number; width: number; height: number } | null;
 }
@@ -49,6 +50,7 @@ const embedFailures = new Map<string, string>();
 let limboDiv: HTMLDivElement | null = null;
 // Serialize native webview creates — concurrent add_child calls often fail on macOS.
 let createChain: Promise<void> = Promise.resolve();
+const OFFSCREEN_BOUNDS = { x: -100_000, y: -100_000, width: 1, height: 1 };
 
 function enqueueCreate(task: () => Promise<void>): Promise<void> {
   const run = createChain.then(task, task);
@@ -95,9 +97,43 @@ function createTauriSession(itemId: string, url: string): TauriSession {
     url,
     visible: false,
     created: false,
+    disposed: false,
     pendingCreate: null,
     lastBounds: null,
   };
+}
+
+function parkNativeWebview(session: TauriSession, context: string): void {
+  session.visible = false;
+  void xmuxWebviewSetBounds(
+    session.label,
+    OFFSCREEN_BOUNDS.x,
+    OFFSCREEN_BOUNDS.y,
+    OFFSCREEN_BOUNDS.width,
+    OFFSCREEN_BOUNDS.height,
+  ).catch((err) => {
+    console.error(`[BrowserRegistry] park failed (${context})`, err);
+  });
+  void xmuxWebviewSetVisible(session.label, false).catch((err) => {
+    console.error(`[BrowserRegistry] hide failed (${context})`, err);
+  });
+}
+
+function destroyNativeWebview(session: TauriSession, context: string): void {
+  session.disposed = true;
+  session.visible = false;
+  session.created = false;
+  void xmuxWebviewSetBounds(
+    session.label,
+    OFFSCREEN_BOUNDS.x,
+    OFFSCREEN_BOUNDS.y,
+    OFFSCREEN_BOUNDS.width,
+    OFFSCREEN_BOUNDS.height,
+  ).catch(() => {});
+  void xmuxWebviewSetVisible(session.label, false).catch(() => {});
+  void xmuxWebviewDestroy(session.label).catch((err) => {
+    console.error(`[BrowserRegistry] destroy failed (${context})`, err);
+  });
 }
 
 function upgradeIframeToTauri(
@@ -148,6 +184,10 @@ function ensureCreated(
   session: TauriSession,
   bounds: { x: number; y: number; width: number; height: number },
 ): Promise<void> {
+  if (session.disposed || sessions.get(itemId) !== session) {
+    void xmuxWebviewDestroy(session.label).catch(() => {});
+    return Promise.resolve();
+  }
   if (session.created) {
     return xmuxWebviewSetBounds(
       session.label,
@@ -161,17 +201,26 @@ function ensureCreated(
   }
   if (session.pendingCreate) return session.pendingCreate;
   session.pendingCreate = enqueueCreate(() =>
-    xmuxWebviewCreate(
-      session.label,
-      session.url,
-      bounds.x,
-      bounds.y,
-      bounds.width,
-      bounds.height,
-    )
+    (session.disposed || sessions.get(itemId) !== session
+      ? Promise.resolve()
+      : xmuxWebviewCreate(
+          session.label,
+          session.url,
+          bounds.x,
+          bounds.y,
+          bounds.width,
+          bounds.height,
+        ))
       .then(() => {
+        if (session.disposed || sessions.get(itemId) !== session) {
+          return xmuxWebviewDestroy(session.label).catch(() => {});
+        }
         embedFailures.delete(itemId);
         session.created = true;
+        if (!session.visible) {
+          parkNativeWebview(session, 'post-create hidden session');
+          return;
+        }
         const latest = session.lastBounds;
         if (
           latest &&
@@ -264,11 +313,8 @@ export function detach(itemId: string): void {
   if (session.hostDiv.parentElement !== limbo) {
     limbo.appendChild(session.hostDiv);
   }
-  if (session.kind === 'tauri' && session.visible) {
-    session.visible = false;
-    void xmuxWebviewSetVisible(session.label, false).catch((err) => {
-      console.error('[BrowserRegistry] hide failed', err);
-    });
+  if (session.kind === 'tauri') {
+    parkNativeWebview(session, 'detach');
   }
 }
 
@@ -288,10 +334,9 @@ export function retryNativeEmbed(itemId: string, url: string): void {
   if (session?.kind === 'tauri') {
     const tauriSession = session;
     if (tauriSession.created) {
-      void xmuxWebviewDestroy(tauriSession.label).catch((err) => {
-        console.error('[BrowserRegistry] destroy before retry failed', err);
-      });
+      destroyNativeWebview(tauriSession, 'retry before recreate');
     }
+    tauriSession.disposed = false;
     tauriSession.created = false;
     tauriSession.pendingCreate = null;
     tauriSession.visible = false;
@@ -318,10 +363,7 @@ export function destroy(itemId: string): void {
   embedFailures.delete(itemId);
   session.hostDiv.remove();
   if (session.kind === 'tauri') {
-    void xmuxWebviewSetVisible(session.label, false).catch(() => {});
-    void xmuxWebviewDestroy(session.label).catch((err) => {
-      console.error('[BrowserRegistry] destroy failed', err);
-    });
+    destroyNativeWebview(session, 'destroy');
   } else {
     session.iframe.src = 'about:blank';
   }
@@ -349,11 +391,11 @@ export function forceNativeBoundsSync(itemId: string, bounds: ViewBounds): void 
   const session = sessions.get(itemId);
   if (!session || session.kind !== 'tauri') return;
   session.lastBounds = bounds;
+  session.visible = true;
   if (!session.created && !session.pendingCreate) {
     void ensureCreated(itemId, session, bounds).then(() => {
       const current = sessions.get(itemId);
-      if (!current || current.kind !== 'tauri' || current.visible) return;
-      current.visible = true;
+      if (!current || current.kind !== 'tauri' || current.disposed || !current.visible) return;
       void xmuxWebviewSetVisible(current.label, true).catch((err) => {
         console.error('[BrowserRegistry] show (post-create) failed', err);
       });
@@ -395,16 +437,15 @@ export function setBounds(
   if (!session || session.kind !== 'tauri') return;
   const bounds = { x, y, width, height };
   session.lastBounds = bounds;
+  session.visible = true;
   if (!session.created && !session.pendingCreate) {
     void ensureCreated(itemId, session, bounds).then(() => {
       const current = sessions.get(itemId);
       if (!current || current.kind !== 'tauri') return;
-      if (!current.visible) {
-        current.visible = true;
-        return xmuxWebviewSetVisible(current.label, true).catch((err) => {
-          console.error('[BrowserRegistry] show (post-create) failed', err);
-        });
-      }
+      if (current.disposed || !current.visible) return;
+      return xmuxWebviewSetVisible(current.label, true).catch((err) => {
+        console.error('[BrowserRegistry] show (post-create) failed', err);
+      });
     });
     return;
   }
@@ -423,11 +464,7 @@ export function setBounds(
 export function setSlotHidden(itemId: string): void {
   const session = sessions.get(itemId);
   if (!session || session.kind !== 'tauri') return;
-  if (!session.visible) return;
-  session.visible = false;
-  void xmuxWebviewSetVisible(session.label, false).catch((err) => {
-    console.error('[BrowserRegistry] hide (slot hidden) failed', err);
-  });
+  parkNativeWebview(session, 'slot hidden');
 }
 
 export function getCurrentUrl(itemId: string): string | null {
@@ -440,6 +477,15 @@ export function backendKind(): 'tauri' | 'iframe' {
 
 export function purgeOrphanNativeWebviews(): void {
   if (!isTauri()) return;
+  for (const [itemId, session] of Array.from(sessions.entries())) {
+    if (session.kind === 'tauri') {
+      destroyNativeWebview(session, 'purge');
+    } else {
+      session.iframe.src = 'about:blank';
+      session.hostDiv.remove();
+    }
+    sessions.delete(itemId);
+  }
   void xmuxWebviewDestroyAll().catch((err) => {
     console.error('[BrowserRegistry] purgeOrphanNativeWebviews failed', err);
   });

@@ -130,6 +130,8 @@ export function FeatureDetailPanel({
             <div className="divide-y divide-stone-200/8">
               <PathRow label="Spec" path={feature.paths.spec} icon={FileText} />
               <PathRow label="TDD" path={feature.paths.tdd} icon={FlaskConical} />
+              <PathRow label="Debug Retro" path={feature.paths.debugRetro} icon={FileText} />
+              <PathRow label="Test Scenarios" path={feature.paths.testScenarios} icon={FlaskConical} />
               <PathRow label="Implementation" path={feature.paths.implementation} icon={FileCode} />
             </div>
           </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef } from 'react';
-import { measureBrowserSlotBounds } from './browser-bounds';
+import { measureBrowserSlotBounds, toNativeWebviewBounds } from './browser-bounds';
 import {
   attach,
   backendKind,
@@ -36,7 +36,8 @@ export function BrowserSlot({
   const applyBoundsForced = useCallback(() => {
     const slot = slotRef.current;
     if (!slot || backendKind() !== 'tauri') return;
-    const bounds = measureBrowserSlotBounds(slot);
+    const slotBounds = measureBrowserSlotBounds(slot);
+    const bounds = slotBounds ? toNativeWebviewBounds(slotBounds) : null;
     if (!bounds) return;
     forceNativeBoundsSync(itemId, bounds);
   }, [itemId]);
@@ -87,7 +88,8 @@ export function BrowserSlot({
 
     const tick = () => {
       if (stopped) return;
-      const bounds = measureBrowserSlotBounds(slot);
+      const slotBounds = measureBrowserSlotBounds(slot);
+      const bounds = slotBounds ? toNativeWebviewBounds(slotBounds) : null;
       if (bounds) {
         if (
           !last ||

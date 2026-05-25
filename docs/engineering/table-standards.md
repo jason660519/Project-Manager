@@ -1,7 +1,7 @@
 # Project Manager Table Standards
 
 > Status: Active  
-> Last updated: 2026-05-23  
+> Last updated: 2026-05-26  
 > Audience: AI engineers and frontend maintainers
 
 ## Purpose
@@ -47,6 +47,8 @@ Canonical labels for dashboard document columns:
 - `feature-spec.md`
 - `tdd-spec.md`
 - `tdd-report.md`
+- `debug-retro.md`
+- `test-scenarios.md`
 - `dev-log.md`
 
 ### 4) Visual and Layout

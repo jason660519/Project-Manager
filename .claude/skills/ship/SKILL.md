@@ -95,6 +95,7 @@ For each true item, surface to the user **before** committing. Use a single batc
 | **DESIGN.md sync** | Diff touches `app/ui/**` substantially | Confirm DESIGN.md / `docs/design/shared-ai-desktop-style.md` still describes reality |
 | **Unreviewed non-trivial diff** | >3 files AND no `plan-review` / `pre-landing-review` in conversation context | Recommend running `pre-landing-review` first |
 | **Feature folder missing** | Diff adds a new feature entry to `config.json` | Verify `.project-manager/features/<ID>/` exists with at minimum a `README.md`, and that `readmePath` points there instead of storing a path in `notes` |
+| **Debug-retro missing** | Diff fixes a bug/regression or adds a feature artifact row with expensive debugging value | Verify `.project-manager/features/<ID>/debug-retro.md` and `test-scenarios.md` exist and `paths.debugRetro` / `paths.testScenarios` point to them, or record why this was not applicable |
 
 If the user overrides any check, **record the override** in the commit message footer (`Override: capabilities-not-updated — reason: ...`).
 

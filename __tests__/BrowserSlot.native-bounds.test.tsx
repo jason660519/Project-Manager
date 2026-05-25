@@ -1,6 +1,9 @@
 import { act, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BROWSER_CHROME_HEIGHT_PX } from '../components/browser/browser-bounds';
+import {
+  BROWSER_CHROME_HEIGHT_PX,
+  NATIVE_WEBVIEW_TOP_GUARD_PX,
+} from '../components/browser/browser-bounds';
 import { BrowserSlot } from '../components/browser/BrowserSlot';
 import {
   forceNativeBoundsSync,
@@ -120,15 +123,33 @@ describe('BrowserSlot native bounds', () => {
     expect(setBounds).toHaveBeenCalledWith(
       'browser-test',
       0,
-      BROWSER_CHROME_HEIGHT_PX,
+      BROWSER_CHROME_HEIGHT_PX + NATIVE_WEBVIEW_TOP_GUARD_PX,
       500,
-      288,
+      288 - NATIVE_WEBVIEW_TOP_GUARD_PX,
     );
     expect(forceNativeBoundsSync).toHaveBeenCalledWith('browser-test', {
       x: 0,
-      y: BROWSER_CHROME_HEIGHT_PX,
+      y: BROWSER_CHROME_HEIGHT_PX + NATIVE_WEBVIEW_TOP_GUARD_PX,
       width: 500,
-      height: 288,
+      height: 288 - NATIVE_WEBVIEW_TOP_GUARD_PX,
     });
+  });
+
+  it('hides the native webview when the slot is inactive', () => {
+    render(
+      <div data-browser-pane>
+        <div data-browser-chrome />
+        <BrowserSlot
+          itemId="browser-test"
+          url="https://github.com/example/repo"
+          isActive={false}
+        />
+      </div>,
+    );
+
+    flushRafPasses();
+
+    expect(setSlotHidden).toHaveBeenCalledWith('browser-test');
+    expect(setBounds).not.toHaveBeenCalled();
   });
 });

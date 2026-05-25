@@ -26,6 +26,8 @@ export interface CustomProjectProgressRow {
   specPath?: string;
   tddPath?: string;
   tddReportPath?: string;
+  debugRetroPath?: string;
+  testScenariosPath?: string;
   unitIntegrationTestPath?: string;
   e2eAcceptanceTestScriptFolder?: string;
   developmentLogSummaryFolder?: string;

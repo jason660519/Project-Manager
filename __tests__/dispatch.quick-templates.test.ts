@@ -15,6 +15,8 @@ const feature: Feature = {
     featureFolder: '.project-manager/features/F13',
     spec: '.project-manager/features/F13/feature-spec.md',
     tdd: '.project-manager/features/F13/tdd-spec.md',
+    debugRetro: '.project-manager/features/F13/debug-retro.md',
+    testScenarios: '.project-manager/features/F13/test-scenarios.md',
     implementation: 'components/table/TaskDispatchModal.tsx',
     test: '__tests__/dispatch.component.render.test.tsx',
     unitIntegrationTest: '__tests__/dispatch.component.render.test.tsx',
@@ -38,6 +40,8 @@ describe('dispatch quick template prompts', () => {
     expect(prompt).toContain('- Role: Worker (W)');
     expect(prompt).toContain('- Project root: /repo');
     expect(prompt).toContain('Feature Spec: /repo/.project-manager/features/F13/feature-spec.md');
+    expect(prompt).toContain('Debug Retro: /repo/.project-manager/features/F13/debug-retro.md');
+    expect(prompt).toContain('Test Scenarios: /repo/.project-manager/features/F13/test-scenarios.md');
     expect(prompt).toContain('## Required Steps');
     expect(prompt).toContain('Read the feature spec first: /repo/.project-manager/features/F13/feature-spec.md');
     expect(prompt).toContain('Verification commands run, with pass/fail results.');

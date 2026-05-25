@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   BROWSER_CHROME_HEIGHT_PX,
+  NATIVE_WEBVIEW_TOP_GUARD_PX,
   measureBrowserSlotBounds,
+  toNativeWebviewBounds,
 } from '../components/browser/browser-bounds';
 
 describe('measureBrowserSlotBounds', () => {
@@ -73,5 +75,21 @@ describe('measureBrowserSlotBounds', () => {
     });
 
     pane.remove();
+  });
+
+  it('adds an extra top guard to native webview bounds', () => {
+    expect(
+      toNativeWebviewBounds({
+        x: 10,
+        y: BROWSER_CHROME_HEIGHT_PX,
+        width: 400,
+        height: 260,
+      }),
+    ).toEqual({
+      x: 10,
+      y: BROWSER_CHROME_HEIGHT_PX + NATIVE_WEBVIEW_TOP_GUARD_PX,
+      width: 400,
+      height: 260 - NATIVE_WEBVIEW_TOP_GUARD_PX,
+    });
   });
 });

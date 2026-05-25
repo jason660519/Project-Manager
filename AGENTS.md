@@ -46,6 +46,8 @@ Claude `.claude/commands/*.md` files are not automatically exposed as Codex slas
 
 When the user asks for `/daily-report`, `daily-report`, `每日工作日誌`, or a similar daily progress report request, follow `docs/project-process/commands/daily-report.md` and write the report under `docs/project-process/` using the repo-local date-prefixed filename convention.
 
+When the user asks for `/debug-retro`, `debug-retro`, `沉澱本次debug經驗`, or asks to convert a debugging session into reusable TDD/E2E scenarios, follow `docs/project-process/commands/debug-retro.md` and update the affected feature's `debug-retro.md`, `test-scenarios.md`, and dashboard metadata.
+
 ## Context7
 
 Use Context7 MCP to fetch current documentation whenever the task asks about a library, framework, SDK, API, CLI tool, or cloud service. Start with `resolve-library-id` unless the user provides an exact `/org/project` library ID, then use `query-docs` with the selected library ID and the full question.

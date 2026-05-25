@@ -27,6 +27,8 @@ const row: PhaseRow = {
   points: 1,
   specPath: '.project-manager/features/F01/feature-spec.md',
   tddPath: '.project-manager/features/F01/tdd-spec.md',
+  debugRetroPath: '.project-manager/features/F01/debug-retro.md',
+  testScenariosPath: '.project-manager/features/F01/test-scenarios.md',
   devLogFolder: '.project-manager/features/F01/',
   notes: 'Short note that should not become the link label',
   readmePath: '.project-manager/features/F01/README.md',
@@ -71,6 +73,24 @@ describe('project progress path labels', () => {
     expect(screen.getByRole('button')).toHaveAttribute(
       'title',
       '/source-project/.project-manager/features/F01/dev-log.md',
+    );
+  });
+
+  it('shows Debug Retro and Test Scenarios as canonical artifact labels', () => {
+    renderCell('debugRetro');
+    expect(screen.getByText('debug-retro.md')).toBeInTheDocument();
+    expect(screen.queryByText('.project-manager/features/F01/debug-retro.md')).toBeNull();
+    expect(screen.getByRole('button')).toHaveAttribute(
+      'title',
+      '/source-project/.project-manager/features/F01/debug-retro.md',
+    );
+
+    renderCell('testScenarios');
+    expect(screen.getByText('test-scenarios.md')).toBeInTheDocument();
+    expect(screen.queryByText('.project-manager/features/F01/test-scenarios.md')).toBeNull();
+    expect(screen.getAllByRole('button')[1]).toHaveAttribute(
+      'title',
+      '/source-project/.project-manager/features/F01/test-scenarios.md',
     );
   });
 

@@ -1,7 +1,7 @@
 # Daily Report Command
 
 > Status: Active  
-> Last updated: 2026-05-18  
+> Last updated: 2026-05-26  
 > Audience: OpenAI/Codex agents working in Project Manager
 
 This command is the Project Manager equivalent of the legacy Claude `/daily-report` workflow. It is not an app runtime feature. It is an AI workflow contract for OpenAI/Codex agents to generate a durable daily work log from the current conversation and repository state.
@@ -71,9 +71,13 @@ Project Manager feature-local artifacts use the schema v6 document contract:
 | `.project-manager/features/<ID>/README.md` | `feature.readmePath` |
 | `.project-manager/features/<ID>/feature-spec.md` | `feature.paths.spec` |
 | `.project-manager/features/<ID>/tdd-spec.md` | `feature.paths.tdd` |
+| `.project-manager/features/<ID>/debug-retro.md` | `feature.paths.debugRetro` |
+| `.project-manager/features/<ID>/test-scenarios.md` | `feature.paths.testScenarios` |
 | `.project-manager/features/<ID>/dev-log.md` | `feature.paths.developmentLogSummaryFolder` points to the feature folder |
 
 `feature.notes` is short summary text only. Do not put README or artifact paths in `notes`.
+
+For expensive debugging or regression work, update `debug-retro.md` and `test-scenarios.md` in the same feature folder. `debug-retro.md` preserves the reproduction, root cause, fix, verification, and lessons. `test-scenarios.md` translates real user paths into unit, integration, and E2E coverage candidates.
 
 Only update `.project-manager.json` or feature progress fields when:
 

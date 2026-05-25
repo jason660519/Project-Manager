@@ -1,6 +1,6 @@
 # 專案進度儀表板更新指南
 
-> **建立日期**: 2026-05-21 | **更新日期**: 2026-05-21 | **位置**: `docs/engineering/update-project-progress-dashboard-guide.md`
+> **建立日期**: 2026-05-21 | **更新日期**: 2026-05-26 | **位置**: `docs/engineering/update-project-progress-dashboard-guide.md`
 > **用途**: 更新專案開發進度儀表板時，請依本指南操作（欄位、格式、連結規則、流程）。
 > **文件格式**: 本專案採 **Markdown 優先**，各項 Spec / Progress Report 等文件一律使用 `.md`。
 
@@ -55,6 +55,8 @@
 | `featureFolder`                 | 該 Feature 的專屬資料夾，例如 `.project-manager/features/F01/`。                 |
 | `spec`                          | 規格書路徑，例如 `.project-manager/features/F01/feature-spec.md`。               |
 | `tdd`                           | TDD 測試規格書，例如 `.project-manager/features/F01/tdd-spec.md`。               |
+| `debugRetro`                    | Debug 復盤文件，例如 `.project-manager/features/F01/debug-retro.md`。            |
+| `testScenarios`                 | 測試情境映射，例如 `.project-manager/features/F01/test-scenarios.md`。           |
 | `implementation`                | 主要實作的程式碼路徑（如 `app/ui/Sidebar.tsx`）。                                |
 | `test` / `unitIntegrationTest` | 測試腳本路徑。                                                                   |
 | `developmentLogSummaryFolder`   | 開發日誌匯總的資料夾，通常與 `featureFolder` 相同。                              |
@@ -87,6 +89,8 @@
 | `README.md`                       | 該功能的匯總說明或導覽文件         | `readmePath`            |
 | `feature-spec.md`                 | 功能規格說明書 (Feature Spec)      | `paths.spec`            |
 | `tdd-spec.md`                     | 測試規格說明書 (TDD Spec)          | `paths.tdd`             |
+| `debug-retro.md`                  | Debug 復盤：復現、根因、修復、驗證、經驗留存 | `paths.debugRetro`      |
+| `test-scenarios.md`               | 使用者情境到 unit/integration/E2E 測試的映射 | `paths.testScenarios`   |
 | 開發日誌 (Development Logs)       | 若有額外日誌，存放於此資料夾       | `paths.developmentLogSummaryFolder` |
 
 ---
@@ -126,6 +130,8 @@
     "featureFolder": ".project-manager/features/F17/",
     "spec": ".project-manager/features/F17/feature-spec.md",
     "tdd": ".project-manager/features/F17/tdd-spec.md",
+    "debugRetro": ".project-manager/features/F17/debug-retro.md",
+    "testScenarios": ".project-manager/features/F17/test-scenarios.md",
     "implementation": "app/ui/views/NewFeature.tsx",
     "developmentLogSummaryFolder": ".project-manager/features/F17/"
   },

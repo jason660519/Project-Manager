@@ -6,7 +6,9 @@
 use std::collections::HashSet;
 use std::sync::Mutex;
 
-use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, State, Url, WebviewUrl};
+use tauri::{
+    AppHandle, LogicalPosition, LogicalSize, Manager, Rect, State, Url, WebviewUrl,
+};
 use tauri::webview::WebviewBuilder;
 
 pub struct XmuxWebviewState(pub Mutex<HashSet<String>>);
@@ -35,6 +37,14 @@ fn parse_url(url: &str) -> Result<Url, String> {
 fn get_child(app: &AppHandle, label: &str) -> Result<tauri::Webview, String> {
     app.get_webview(label)
         .ok_or_else(|| format!("xmux webview '{label}' not found"))
+}
+
+fn park_webview(webview: &tauri::Webview) {
+    let _ = webview.set_bounds(Rect {
+        position: LogicalPosition::new(-100_000.0, -100_000.0).into(),
+        size: LogicalSize::new(1.0, 1.0).into(),
+    });
+    let _ = webview.hide();
 }
 
 #[tauri::command]
@@ -77,10 +87,10 @@ pub async fn xmux_webview_set_bounds(
 ) -> Result<(), String> {
     let webview = get_child(&app, &label)?;
     webview
-        .set_position(LogicalPosition::new(x, y))
-        .map_err(|e| e.to_string())?;
-    webview
-        .set_size(LogicalSize::new(width.max(1.0), height.max(1.0)))
+        .set_bounds(Rect {
+            position: LogicalPosition::new(x, y).into(),
+            size: LogicalSize::new(width.max(1.0), height.max(1.0)).into(),
+        })
         .map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -95,7 +105,7 @@ pub async fn xmux_webview_set_visible(
     if visible {
         webview.show().map_err(|e| e.to_string())?;
     } else {
-        webview.hide().map_err(|e| e.to_string())?;
+        park_webview(&webview);
     }
     Ok(())
 }
@@ -119,7 +129,7 @@ pub async fn xmux_webview_destroy(
     label: String,
 ) -> Result<(), String> {
     if let Some(webview) = app.get_webview(&label) {
-        let _ = webview.hide();
+        park_webview(&webview);
         webview.close().map_err(|e| e.to_string())?;
     }
     if let Ok(mut guard) = state.0.lock() {
@@ -143,7 +153,7 @@ pub async fn xmux_webview_destroy_all(
         .collect();
     for label in tracked {
         if let Some(webview) = app.get_webview(&label) {
-            let _ = webview.hide();
+            park_webview(&webview);
             let _ = webview.close();
         }
     }
@@ -152,7 +162,7 @@ pub async fn xmux_webview_destroy_all(
     }
     for (label, webview) in app.webviews() {
         if label.starts_with("xmux-browser-") {
-            let _ = webview.hide();
+            park_webview(&webview);
             let _ = webview.close();
         }
     }

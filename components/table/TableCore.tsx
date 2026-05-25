@@ -33,14 +33,14 @@ const STATUS_LABELS: Record<FeatureStatus, string> = {
 
 const columnHelper = createColumnHelper<Feature>();
 
-function renderPathCell(value?: string) {
+function renderPathCell(value?: string, label?: string) {
   if (!value) {
     return <span className="text-xs text-stone-500">—</span>;
   }
 
   return (
     <span className="block max-w-[200px] truncate font-mono text-xs text-stone-300" title={value}>
-      {value}
+      {label ?? value}
     </span>
   );
 }
@@ -93,17 +93,27 @@ export function TableCore({ data, onDispatch, onRowClick, selectedIds, onToggleS
       columnHelper.accessor((row) => row.paths?.spec, {
         id: 'col-spec',
         header: 'Feature Dev Spec',
-        cell: (info) => renderPathCell(info.getValue()),
+        cell: (info) => renderPathCell(info.getValue(), 'feature-spec.md'),
       }),
       columnHelper.accessor((row) => row.paths?.tdd, {
         id: 'col-tdd',
         header: 'TDD Spec',
-        cell: (info) => renderPathCell(info.getValue()),
+        cell: (info) => renderPathCell(info.getValue(), 'tdd-spec.md'),
+      }),
+      columnHelper.accessor((row) => row.paths?.debugRetro, {
+        id: 'col-debug-retro',
+        header: 'Debug Retro',
+        cell: (info) => renderPathCell(info.getValue(), 'debug-retro.md'),
+      }),
+      columnHelper.accessor((row) => row.paths?.testScenarios, {
+        id: 'col-test-scenarios',
+        header: 'Test Scenarios',
+        cell: (info) => renderPathCell(info.getValue(), 'test-scenarios.md'),
       }),
       columnHelper.accessor((row) => row.paths?.tddProgressReport, {
         id: 'col-tdd-report',
         header: 'TDD Progress Report',
-        cell: (info) => renderPathCell(info.getValue()),
+        cell: (info) => renderPathCell(info.getValue(), 'tdd-report.md'),
       }),
       columnHelper.accessor((row) => row.paths?.unitIntegrationTest, {
         id: 'col-unit-test',
@@ -118,7 +128,7 @@ export function TableCore({ data, onDispatch, onRowClick, selectedIds, onToggleS
       columnHelper.accessor((row) => row.paths?.developmentLogSummaryFolder, {
         id: 'col-dev-log',
         header: 'Dev Log Summary',
-        cell: (info) => renderPathCell(info.getValue()),
+        cell: (info) => renderPathCell(info.getValue(), 'dev-log.md'),
       }),
       columnHelper.accessor('status', {
         header: 'Status',

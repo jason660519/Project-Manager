@@ -82,6 +82,8 @@ describe('dashboard artifact recovery', () => {
       relativePaths: [
         '.project-manager/features/F11/feature-spec.md',
         '.project-manager/features/F11/tdd-spec.md',
+        '.project-manager/features/F11/debug-retro.md',
+        '.project-manager/features/F11/test-scenarios.md',
         '.project-manager/features/F11/dev-log.md',
       ],
     });
@@ -116,6 +118,8 @@ describe('dashboard artifact recovery', () => {
         implementation: 'lib/i18n/',
         spec: '.project-manager/features/F11/feature-spec.md',
         tdd: '.project-manager/features/F11/tdd-spec.md',
+        debugRetro: '.project-manager/features/F11/debug-retro.md',
+        testScenarios: '.project-manager/features/F11/test-scenarios.md',
         developmentLogSummaryFolder: '.project-manager/features/F11/',
       },
     });

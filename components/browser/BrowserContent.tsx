@@ -172,7 +172,12 @@ export function BrowserContent({
           </button>
         </div>
       ) : null}
-      <BrowserSlot key={embedRetryKey} itemId={itemId} url={url} isActive={isActive} />
+      <BrowserSlot
+        key={embedRetryKey}
+        itemId={itemId}
+        url={url}
+        isActive={isActive}
+      />
     </div>
   );
 }

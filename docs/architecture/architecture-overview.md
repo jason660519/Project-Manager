@@ -76,7 +76,7 @@ Project Manager uses a **hybrid format** policy based on the document's role in 
 
 ### Markdown paths (source of truth, editable by AI and humans)
 
-`spec`, `tdd`, `tddProgressReport`, `unitIntegrationTest`, `e2eAcceptanceTestScriptFolder`, `developmentLogSummaryFolder`
+`spec`, `tdd`, `tddProgressReport`, `debugRetro`, `testScenarios`, `unitIntegrationTest`, `e2eAcceptanceTestScriptFolder`, `developmentLogSummaryFolder`
 
 ### HTML artifact paths (generated, read-only, for human review)
 
@@ -198,7 +198,7 @@ Project Manager 採用**混合格式**原則，依文件在工作流中的角色
 
 ### Markdown 路徑（來源真相，AI 與人類均可編輯）
 
-`spec`、`tdd`、`tddProgressReport`、`unitIntegrationTest`、`e2eAcceptanceTestScriptFolder`、`developmentLogSummaryFolder`
+`spec`、`tdd`、`tddProgressReport`、`debugRetro`、`testScenarios`、`unitIntegrationTest`、`e2eAcceptanceTestScriptFolder`、`developmentLogSummaryFolder`
 
 ### HTML 產物路徑（生成、唯讀、供人工審閱）
 

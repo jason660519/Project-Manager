@@ -201,6 +201,8 @@ export function buildTemplatePrompt(
   const readme = resolvePath(projectRoot, feature.readmePath) ?? u;
   const spec = resolvePath(projectRoot, feature.paths.spec) ?? u;
   const tdd = resolvePath(projectRoot, feature.paths.tdd) ?? u;
+  const debugRetro = resolvePath(projectRoot, feature.paths.debugRetro) ?? u;
+  const testScenarios = resolvePath(projectRoot, feature.paths.testScenarios) ?? u;
   const unit = resolvePath(projectRoot, feature.paths.unitIntegrationTest) ?? u;
   const e2e = resolvePath(projectRoot, feature.paths.e2eAcceptanceTestScriptFolder) ?? u;
   const devLogs = resolvePath(projectRoot, feature.paths.developmentLogSummaryFolder) ?? u;
@@ -214,6 +216,8 @@ export function buildTemplatePrompt(
     { label: 'README', value: readme },
     { label: d.promptFeatureSpecPath, value: spec },
     { label: d.promptTddSpecPath, value: tdd },
+    { label: 'Debug Retro', value: debugRetro },
+    { label: 'Test Scenarios', value: testScenarios },
     { label: d.promptImplPath, value: impl },
     { label: d.promptTestPath, value: test },
     { label: d.promptDevLogsPath, value: devLogs },
@@ -260,6 +264,7 @@ export function buildTemplatePrompt(
       objective: 'Drive the task from the TDD specification and acceptance criteria when they are configured.',
       steps: [
         referenceStep('TDD spec', tdd, 'Use existing tests, README, notes, and the feature row to infer the acceptance criteria conservatively.'),
+        referenceStep('test scenarios', testScenarios, 'If no scenario map exists, derive scenarios from recent debug retros, dev logs, screenshots, and user-reported reproduction steps.'),
         'Translate each relevant test case into implementation or verification work.',
         'Update or add focused tests before calling the task done.',
       ],
@@ -295,6 +300,7 @@ export function buildTemplatePrompt(
     'e2e-test': {
       objective: 'Validate the user-facing workflow from entry point to expected result.',
       steps: [
+        referenceStep('test scenarios', testScenarios, 'Use README, debug retro, feature spec, and dev logs to reconstruct the most important user path.'),
         referenceStep('E2E test folder or script', e2e, 'Identify the route and user workflow manually from the feature row, README, notes, or implementation path.'),
         'Identify the route, user actions, expected state changes, and failure visibility.',
         'Add or update the smallest E2E coverage that proves the workflow still works.',
@@ -333,13 +339,15 @@ export function buildTemplatePrompt(
       objective: 'Diagnose and fix a failing test, runtime issue, or unexpected behavior.',
       steps: [
         'Reproduce the failure first and capture the exact command, route, or user action.',
+        referenceStep('debug retro', debugRetro, 'Create or update debug-retro.md after reproducing the issue and proving the fix.'),
         referenceStep('likely implementation path', impl, 'Locate the relevant code through error output, route names, feature row metadata, or repository search.'),
         referenceStep('relevant test path', test, 'Search for the closest regression test and state if no focused test exists yet.'),
         'Make the smallest fix that addresses the root cause, then rerun the focused verification.',
+        'Update the test scenario map when the debug path reveals a real user workflow or boundary case.',
       ],
       success: [
         'The root cause is named in plain language.',
-        'The fix includes regression coverage or a clear reason why coverage was not added.',
+        'The fix includes regression coverage, debug-retro updates, scenario-map updates, or a clear reason why coverage was not added.',
       ],
     },
     'code-review': {

@@ -24,6 +24,8 @@ export interface PhaseRow extends PhaseRowMeta {
   specPath?: string;
   tddPath?: string;
   tddReportPath?: string;
+  debugRetroPath?: string;
+  testScenariosPath?: string;
   unitIntegrationTestPath?: string;
   e2eAcceptanceTestScriptFolder?: string;
   devLogFolder?: string;
@@ -76,6 +78,8 @@ export function featureToPhaseRow(feature: Feature, defaultProjectName?: string)
     specPath: feature.paths?.spec,
     tddPath: feature.paths?.tdd,
     tddReportPath: feature.paths?.tddProgressReport,
+    debugRetroPath: feature.paths?.debugRetro,
+    testScenariosPath: feature.paths?.testScenarios,
     unitIntegrationTestPath: feature.paths?.unitIntegrationTest,
     e2eAcceptanceTestScriptFolder: feature.paths?.e2eAcceptanceTestScriptFolder,
     devLogFolder: feature.paths?.developmentLogSummaryFolder,
@@ -118,6 +122,8 @@ export function customRowToPhaseRow(row: CustomProjectProgressRow, defaultProjec
     specPath: row.specPath,
     tddPath: row.tddPath,
     tddReportPath: row.tddReportPath,
+    debugRetroPath: row.debugRetroPath,
+    testScenariosPath: row.testScenariosPath,
     unitIntegrationTestPath: row.unitIntegrationTestPath,
     e2eAcceptanceTestScriptFolder: row.e2eAcceptanceTestScriptFolder,
     devLogFolder: row.developmentLogSummaryFolder,

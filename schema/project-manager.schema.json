@@ -248,6 +248,8 @@
             "tdd": { "type": "string", "description": "TDD spec (.md)" },
             "tddProgressReport": { "type": "string", "description": "TDD progress raw data (.md)" },
             "tddProgressReportHtml": { "type": "string", "description": "TDD progress report (.html, generated)" },
+            "debugRetro": { "type": "string", "description": "Debug retrospective (.md). Stores reproduction, root cause, fix, verification, and reusable lessons." },
+            "testScenarios": { "type": "string", "description": "Test scenario map (.md). Translates real user paths into unit, integration, and E2E coverage candidates." },
             "unitIntegrationTest": { "type": "string", "description": "Unit & integration test path" },
             "e2eAcceptanceTestScriptFolder": { "type": "string", "description": "E2E acceptance test script folder" },
             "developmentLogSummaryFolder": { "type": "string", "description": "Raw dev log folder" },

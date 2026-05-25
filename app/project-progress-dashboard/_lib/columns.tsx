@@ -789,6 +789,32 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
       ),
     },
     {
+      id: 'debugRetro',
+      header: 'Debug Retro',
+      accessor: (r) => r.debugRetroPath ?? '',
+      cell: (r, h) => (
+        <PathCell
+          projectRoot={r.sourceProjectRoot ?? h.projectRoot}
+          value={r.debugRetroPath}
+          label="debug-retro.md"
+          onOpenPanel={h.onOpenNotePanel}
+        />
+      ),
+    },
+    {
+      id: 'testScenarios',
+      header: 'Test Scenarios',
+      accessor: (r) => r.testScenariosPath ?? '',
+      cell: (r, h) => (
+        <PathCell
+          projectRoot={r.sourceProjectRoot ?? h.projectRoot}
+          value={r.testScenariosPath}
+          label="test-scenarios.md"
+          onOpenPanel={h.onOpenNotePanel}
+        />
+      ),
+    },
+    {
       id: 'devLog',
       header: 'Dev Logs',
       accessor: (r) => r.devLogFolder ?? '',

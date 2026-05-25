@@ -28,6 +28,7 @@ $ARGUMENTS
    - 新 `#[tauri::command]` → 確認 `capabilities/default.json` + `lib/bridge/index.ts` 都加了
    - ADR 衝突（004 key / 003 prompt / `app/api/` 被靜態 build 引用）→ 確認 ADR 修訂 OR 退回變更
    - `app/ui/**` 大幅變動 → DESIGN.md 還對得上嗎
+   - bugfix / regression 類 feature → 是否已更新 `debug-retro.md` 與 `test-scenarios.md`，並在 `config.json` 的 `paths.debugRetro` / `paths.testScenarios` 登記
    - 大 diff（>3 檔）且本 session 沒跑 `/pre-landing-review` → 建議先跑
    - Override 要記在 commit footer：`Override: <reason>`
 5. **Commit** — Conventional commit（`feat(area):` / `fix(area):` 等，area 例：bridge / ingestion / ui / adapter / schema / rust）；body 寫**為什麼**不是**是什麼**；附 `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>`；HEREDOC 傳訊息
@@ -45,5 +46,6 @@ $ARGUMENTS
 - ❌ pre-commit hook fail → 修問題 → re-stage → 建**新 commit**（不 amend）
 - ✅ verification 紅 → 停下叫 `/investigate`，修完再回來 ship
 - ✅ Schema 動到 → bump `schemaVersion`（ADR-002）
+- ✅ 高成本 debug / regression → 補 `.project-manager/features/<ID>/debug-retro.md` + `test-scenarios.md`，讓 TDD/E2E 能重用真實使用情境
 - ✅ 新 Tauri command → 同時更新 `capabilities/default.json` + `lib/bridge/index.ts` wrapper
 - ✅ skip 任何驗證步驟 → 在輸出明說（例：`Skipped: cargo test (doc-only change)`）

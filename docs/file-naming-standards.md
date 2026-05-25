@@ -2,9 +2,9 @@
 
 > **Created Date**: 2026-05-12
 > **Created By**: GitHub Copilot
-> **Last Modified**: 2026-05-21
-> **Modified By**: Gemini Agent
-> **Version**: 1.8
+> **Last Modified**: 2026-05-26
+> **Modified By**: Codex
+> **Version**: 1.9
 > **Document Type**: Technical Documentation
 > **Alignment Scope**: Company AI App Standards, Project Manager, SayDo
 
@@ -53,6 +53,8 @@ Feature-owned Project Manager artifacts live under `.project-manager/features/<f
 | Feature overview | `README.md` | `feature.readmePath` | Human overview shown/opened from the dashboard. |
 | Feature spec | `feature-spec.md` | `feature.paths.spec` | Detailed implementation/product spec. |
 | TDD spec | `tdd-spec.md` | `feature.paths.tdd` | Test-first acceptance and regression plan. |
+| Debug retrospective | `debug-retro.md` | `feature.paths.debugRetro` | Standardized reproduction, root cause, fix, verification, and lessons from expensive debugging sessions. |
+| Test scenario map | `test-scenarios.md` | `feature.paths.testScenarios` | Real user paths translated into unit, integration, and E2E coverage candidates. |
 | Development log | `dev-log.md` | `feature.paths.developmentLogSummaryFolder` points to the folder | Feature-local work history. |
 
 Rules:
@@ -61,7 +63,7 @@ Rules:
 2. `feature.readmePath` is the canonical README pointer.
 3. `feature.paths.spec` is for an actual spec file, not the README.
 4. Feature IDs use stable uppercase IDs such as `F01`, `F02`, `F11`; do not rename the folder to match a changing feature title.
-5. Dashboard tables display fixed document labels (`README.md`, `feature-spec.md`, `tdd-spec.md`, `dev-log.md`) instead of raw paths; the full path belongs in the link tooltip/title only.
+5. Dashboard tables display fixed document labels (`README.md`, `feature-spec.md`, `tdd-spec.md`, `debug-retro.md`, `test-scenarios.md`, `dev-log.md`) instead of raw paths; the full path belongs in the link tooltip/title only.
 6. Dashboard Markdown document links open in the right-side document panel. They must not rely on the OS default Markdown application.
 
 ## 5. Folder Conventions
@@ -159,6 +161,7 @@ All external integrations and plugins must strictly follow our Three-Tier Plugin
 
 | Date | Version | Modified By | Changes |
 | --- | --- | --- | --- |
+| 2026-05-26 | 1.9 | Codex | Added debug-retro.md and test-scenarios.md as standard feature artifacts |
 | 2026-05-21 | 1.8 | Gemini Agent | Added GEMINI.md to root directory rules |
 | 2026-05-21 | 1.7 | AI Agent | Added Three-Tier Plugin and Vendor standards |
 | 2026-05-19 | 1.6 | Codex | Added Project Manager feature artifact naming rules for README, spec, TDD spec, and dev log |
@@ -214,6 +217,8 @@ Project Manager 管理的 feature artifacts 固定放在 `.project-manager/featu
 | Feature overview | `README.md` | `feature.readmePath` | Dashboard 開啟的人讀 overview。 |
 | Feature spec | `feature-spec.md` | `feature.paths.spec` | 詳細實作或產品規格。 |
 | TDD spec | `tdd-spec.md` | `feature.paths.tdd` | Test-first acceptance 與 regression plan。 |
+| Debug retrospective | `debug-retro.md` | `feature.paths.debugRetro` | 高成本 debug 的復現、根因、修復、驗證與經驗沉澱。 |
+| Test scenario map | `test-scenarios.md` | `feature.paths.testScenarios` | 將真實使用者路徑轉成 unit、integration、E2E 覆蓋候選。 |
 | Development log | `dev-log.md` | `feature.paths.developmentLogSummaryFolder` 指向資料夾 | Feature-local 工作紀錄。 |
 
 規則：
@@ -222,7 +227,7 @@ Project Manager 管理的 feature artifacts 固定放在 `.project-manager/featu
 2. `feature.readmePath` 是 README 的唯一標準指標。
 3. `feature.paths.spec` 只放真正 spec，不放 README。
 4. Feature ID 使用穩定大寫 ID，例如 `F01`、`F02`、`F11`；不要因 feature title 變動就改資料夾名稱。
-5. Dashboard table 只顯示固定文件 label（`README.md`、`feature-spec.md`、`tdd-spec.md`、`dev-log.md`），不顯示 raw path；完整路徑只放在 link tooltip/title。
+5. Dashboard table 只顯示固定文件 label（`README.md`、`feature-spec.md`、`tdd-spec.md`、`debug-retro.md`、`test-scenarios.md`、`dev-log.md`），不顯示 raw path；完整路徑只放在 link tooltip/title。
 6. Dashboard Markdown 文件連結從右側文件面板開啟，不依賴作業系統預設 Markdown app。
 
 ## 5. 資料夾慣例
@@ -320,6 +325,7 @@ Project Manager docs checker 會檢查：
 
 | 日期 | 版本 | 修改者 | 變更 |
 | --- | --- | --- | --- |
+| 2026-05-26 | 1.9 | Codex | 新增 debug-retro.md 與 test-scenarios.md 為標準 feature artifacts |
 | 2026-05-21 | 1.8 | Gemini Agent | 於根目錄規則新增 GEMINI.md 規範 |
 | 2026-05-21 | 1.7 | AI Agent | 新增三維度外掛與第三方資源規範 |
 | 2026-05-19 | 1.6 | Codex | 新增 Project Manager feature artifact 命名規則，固定 README、spec、TDD spec、dev log 欄位用途 |
