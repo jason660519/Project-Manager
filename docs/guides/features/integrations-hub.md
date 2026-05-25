@@ -12,13 +12,13 @@ The **Integrations Hub** is the single inventory page for every external surface
 
 Each surface gets its own **sheet** (Excel-style bottom tab). All sheets share the same TanStack table contract — same columns, same selection, same detail slide-out — so you only learn one workflow.
 
-Open it from the sidebar (plug icon) or navigate to `/integrations-hub`. The page auto-redirects to `/integrations-hub/plugins` if you land on the root.
+Open it from the sidebar (plug icon) or navigate to `/integrations-hub`. The page auto-redirects to `/integrations-hub/system_installed_apps` if you land on the root.
 
 ## At a glance
 
 | Sheet | What's in it |
 |---|---|
-| **Plugins** | Marketplace + installed providers, helpers, and non-coding CLIs (GitHub, Linear, Slack, Sentry, …). |
+| **System Installed Apps** | Marketplace + installed providers, helpers, and non-coding CLIs (GitHub, Linear, Slack, Sentry, …). |
 | **Coding Tools** | Subset of Plugins whose marketplace category is `dev` — IDEs, AI coding CLIs, code-editor surfaces. |
 | **MCP** | Model Context Protocol servers (stdio transport). Start / stop / restart, view live logs. |
 | **Skills** | Claude Code Skills installed under your `~/.claude/skills` directory. Install from a Git URL, uninstall, inspect frontmatter. |

@@ -12,7 +12,8 @@ export const ja: Translations = {
     dashboard: 'プロジェクトダッシュボード',
     engineers: 'エンジニア',
     integrationsHub: '統合ハブ',
-    xmux: 'xmux',
+    cmux: 'cmux',
+    xmux: 'cmux',
     channels: 'チャンネル',
     cronJobs: 'Cronジョブ',
     skills: 'スキル',
@@ -281,7 +282,7 @@ export const ja: Translations = {
   integrations: {
     title: 'インテグレーション Hub',
     subtitle: 'プラグイン・スキル・チャネル・Memory・Commands を一覧管理。行をクリックして詳細。',
-    sheetPlugins: 'プラグイン',
+    sheetPlugins: 'System Installed Apps',
     sheetMcp: 'MCP',
     sheetSkills: 'スキル',
     sheetChannels: 'チャネル',

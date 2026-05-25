@@ -12,7 +12,8 @@ export const zhHant: Translations = {
     dashboard: '專案儀表板',
     engineers: '工程師',
     integrationsHub: '整合中樞',
-    xmux: 'xmux',
+    cmux: 'cmux',
+    xmux: 'cmux',
     channels: '頻道',
     cronJobs: '排程任務',
     skills: '技能庫',
@@ -280,7 +281,7 @@ export const zhHant: Translations = {
   integrations: {
     title: '整合中心',
     subtitle: '插件、技能、頻道、Memory、Commands 統一清單；點選列開啟詳細設定。',
-    sheetPlugins: '插件',
+    sheetPlugins: 'System Installed Apps',
     sheetMcp: 'MCP',
     sheetSkills: '技能',
     sheetChannels: '頻道',

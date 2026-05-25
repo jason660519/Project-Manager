@@ -1,6 +1,7 @@
 'use client';
 
 import { Bot, ChevronDown, Download, MessageSquareText, Mic, Send, Trash2 } from 'lucide-react';
+import { clsx } from 'clsx';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '../../lib/i18n';
@@ -115,9 +116,10 @@ import type { ChatContext } from '../../lib/chat/types';
 
 interface ChatPageClientProps {
   initialChatContext?: ChatContext;
+  embedded?: boolean;
 }
 
-export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
+export function ChatPageClient({ initialChatContext, embedded = false }: ChatPageClientProps) {
   const router = useRouter();
   const { t } = useI18n();
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -393,7 +395,7 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
   }, []);
 
   return (
-    <div className="flex h-[calc(100vh-var(--pm-topbar-h,48px)-40px)] gap-0 lg:gap-4">
+    <div className={clsx('flex gap-0 lg:gap-4', embedded ? 'h-full min-h-0' : 'h-[calc(100vh-var(--pm-topbar-h,48px)-40px)]')}>
       {/* ── History sidebar ──────────────────────────────────────────────── */}
       {/* Overlay backdrop for mobile */}
       {showHistory && (
@@ -404,7 +406,7 @@ export function ChatPageClient({ initialChatContext }: ChatPageClientProps) {
       )}
       <div
         className={[
-          'flex flex-col border-stone-200/15 bg-[#1a1a1a] lg:bg-white/[0.02] z-20',
+          'flex flex-col border-stone-200/15 bg-stone-950/95 lg:bg-white/[0.02] z-20',
           showHistory
             ? 'fixed inset-y-0 left-0 z-20 w-[260px] border-r lg:static lg:z-auto lg:w-[220px] lg:flex lg:border-r-0'
             : 'hidden',

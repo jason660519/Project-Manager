@@ -148,3 +148,72 @@ The F31 debugging work exposed a process gap: expensive real-user reproduction p
 ### Verification
 
 Verification for this artifact/dashboard update is recorded in the final command output for the implementation session.
+
+## 2026-05-26 AEST - Split Resize Ghost And Browser Pane Close Fixed
+
+User reported that the desktop/Tauri browser still left sticky native content when resizing split panes left/right or up/down, and that the browser pane could not be removed cleanly.
+
+### Reproduction And Trigger Conditions
+
+- Browser-mode smoke at `1440x900` reproduced the split geometry changes and verified the DOM iframe path tracks pane size.
+- The native/Tauri risk path is specific to OS child webviews: during a split drag, the child webview can intercept pointer events and keep drawing at stale bounds while React layout moves.
+- A second lifecycle bug was found in code review and regression testing: after a native webview had been parked offscreen, `setBounds()` and `forceNativeBoundsSync()` set `session.visible = true` before checking whether `show()` was required. That made the restore branch unreachable.
+- Pane removal depended on the leaf component destroying sessions before asking the layout to remove the block. The layout-level close path now destroys all block items before removal, so future callers cannot remove a block without browser cleanup.
+
+### Fixes Implemented
+
+- Added native browser paint suspension during xmux split/sidebar resize. On drag start all native browser webviews are parked offscreen; during drag, bounds are recorded but native views are not shown or created; after drag end, the active `BrowserSlot` restores the latest bounds.
+- Added a split-resize overlay in `LayoutRenderer` so browser/iframe content cannot steal drag events in browser mode, and native webviews are already parked in Tauri mode.
+- Fixed the native restore state bug by capturing `wasVisible` before mutating `session.visible`, then calling `xmuxWebviewSetVisible(label, true)` when a parked webview becomes active again.
+- Centralized pane close cleanup in `XmuxView.handleCloseBlock()` using `findBlock()` + `destroyBlockItems()` before `removeBlock()`.
+- Adjusted `Block` so closing the last tab or closing a pane delegates teardown to the layout-level close path instead of doing partial local cleanup first.
+
+### Verification
+
+| Command / Check | Result |
+| --- | --- |
+| `npm run test -- --run __tests__/BrowserRegistry.native-lifecycle.test.ts __tests__/BrowserSlot.native-bounds.test.tsx __tests__/xmux.browser-url-chrome.test.tsx __tests__/xmux.registry.test.tsx __tests__/blockLayout.destroy.test.ts` | Pass: 5 files / 23 tests. Existing jsdom canvas warning only. |
+| `npm run typecheck` | Pass |
+| `cargo check --manifest-path src-tauri/Cargo.toml` | Pass |
+| `npm run docs:check` | Pass |
+| `npm run standards:check` | Pass with existing P2 hard-coded color warning. |
+| `npm run build` | Pass. Existing Turbopack dynamic file-tracing warnings remain in `app/api/chat/tools/file/route.ts`. |
+| Browser smoke at `1440x900` | Pass. Left/right resize changed browser slot width from `462px` to `722px`; adding a bottom split and resizing up/down changed browser slot height from `346px` to `216px`. |
+| Browser smoke repeated browser lifecycle | Pass. Created and closed browser tabs 20 times, then removed the browser pane without exceptions or leftover iframe DOM. |
+| Browser smoke at `1024x700` | Pass after pane removal; no browser pane/iframe remained. |
+
+### Remaining Manual Check
+
+This environment can validate current macOS code, browser-mode behavior, Rust compile integrity, and registry lifecycle calls. It cannot genuinely validate Windows/Linux native webview rendering. A follow-up Tauri-native visual smoke should repeat the same split-resize and close-pane loop on packaged macOS, Windows, and Linux builds before claiming cross-OS completion.
+
+## 2026-05-26 AEST - Expected Native Cleanup Race No Longer Trips Next Error Overlay
+
+User reported a Next.js dev overlay with repeated console errors:
+
+```text
+[BrowserRegistry] park failed (detach) "xmux webview 'xmux-browser-...' not found"
+```
+
+### Root Cause
+
+The previous resize/cleanup hardening made `detach`, `setSlotHidden`, and resize suspension more aggressive, but `parkNativeWebview()` still called Tauri `set_bounds` and `set_visible(false)` even when the registry session had not created a native child webview yet. When React detached a browser slot before `xmuxWebviewCreate` completed, Rust correctly returned `not found`; the frontend incorrectly logged it as `console.error`, which made Next.js show the error overlay.
+
+A second related case existed when Rust had already destroyed a stale child webview and a late park/hide call raced behind it. That `not found` response is an idempotent cleanup result, not a user-facing failure.
+
+### Fixes Implemented
+
+- `parkNativeWebview()` now updates frontend state but skips Tauri bridge calls until `session.created` is true.
+- Missing native webview errors during park/hide/destroy are treated as cleanup races and do not call `console.error`.
+- `destroyNativeWebview()` only sends park/hide/destroy bridge calls when the registry knows a native child had been created; pending-create cleanup is still handled by the existing post-create disposed guard.
+
+### Verification
+
+| Command / Check | Result |
+| --- | --- |
+| `npm run test -- --run __tests__/BrowserRegistry.native-lifecycle.test.ts __tests__/BrowserSlot.native-bounds.test.tsx __tests__/xmux.browser-url-chrome.test.tsx __tests__/xmux.registry.test.tsx __tests__/blockLayout.destroy.test.ts` | Pass: 5 files / 25 tests. Existing jsdom canvas warning only. |
+| `npm run typecheck` | Pass |
+| `cargo check --manifest-path src-tauri/Cargo.toml` | Pass |
+| Browser console check on `/xmux` | Pass. Added and closed a browser tab; `registryErrorsAfter 0`. |
+| `npm run docs:check` | Pass |
+| `npm run standards:check` | Pass with existing P2 hard-coded color warning. |
+| `npm run build` | Pass. Existing Turbopack dynamic file-tracing warnings remain in `app/api/chat/tools/file/route.ts`. |

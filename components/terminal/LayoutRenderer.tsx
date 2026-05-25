@@ -2,10 +2,15 @@
 
 import {
   useCallback,
+  useEffect,
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
+import {
+  resumeNativeBrowserPainting,
+  suspendNativeBrowserPainting,
+} from '../browser/BrowserRegistry';
 import { Block } from './Block';
 import type {
   Block as BlockModel,
@@ -40,15 +45,19 @@ function beginDrag(
 ) {
   let frameId: number | null = null;
   let latest: MouseEvent | null = null;
+  let ended = false;
   const flush = () => {
     frameId = null;
     if (latest) onMove(latest);
   };
   const handleMove = (event: MouseEvent) => {
+    if (ended) return;
     latest = event;
     if (frameId === null) frameId = requestAnimationFrame(flush);
   };
   const handleUp = () => {
+    if (ended) return;
+    ended = true;
     if (frameId !== null) {
       cancelAnimationFrame(frameId);
       frameId = null;
@@ -56,14 +65,23 @@ function beginDrag(
     if (latest) onMove(latest);
     document.removeEventListener('mousemove', handleMove);
     document.removeEventListener('mouseup', handleUp);
+    window.removeEventListener('mouseup', handleUp, true);
+    window.removeEventListener('blur', handleUp);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
     document.body.style.userSelect = '';
     document.body.style.cursor = '';
     onEnd();
+  };
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'hidden') handleUp();
   };
   document.body.style.userSelect = 'none';
   document.body.style.cursor = cursor;
   document.addEventListener('mousemove', handleMove);
   document.addEventListener('mouseup', handleUp);
+  window.addEventListener('mouseup', handleUp, true);
+  window.addEventListener('blur', handleUp);
+  document.addEventListener('visibilitychange', handleVisibilityChange);
 }
 
 export function LayoutRenderer(props: RendererProps) {
@@ -91,8 +109,18 @@ function SplitView({
   ...rest
 }: RendererProps & { split: SplitNode }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const nativeResizeSuspendedRef = useRef(false);
   const [dragging, setDragging] = useState(false);
   const isVertical = split.direction === 'vertical';
+
+  useEffect(() => {
+    return () => {
+      if (nativeResizeSuspendedRef.current) {
+        nativeResizeSuspendedRef.current = false;
+        resumeNativeBrowserPainting();
+      }
+    };
+  }, []);
 
   const startResize = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
@@ -102,6 +130,10 @@ function SplitView({
       const rect = container.getBoundingClientRect();
       const cursor = isVertical ? 'col-resize' : 'row-resize';
       setDragging(true);
+      if (!nativeResizeSuspendedRef.current) {
+        nativeResizeSuspendedRef.current = true;
+        suspendNativeBrowserPainting('split resize');
+      }
       beginDrag(
         (moveEvent) => {
           const ratio = isVertical
@@ -110,7 +142,13 @@ function SplitView({
           rest.onUpdateRatio(split.id, clamp(ratio, 0.1, 0.9));
         },
         cursor,
-        () => setDragging(false),
+        () => {
+          setDragging(false);
+          if (nativeResizeSuspendedRef.current) {
+            nativeResizeSuspendedRef.current = false;
+            resumeNativeBrowserPainting();
+          }
+        },
       );
     },
     [isVertical, rest, split.id],
@@ -143,6 +181,18 @@ function SplitView({
           dragging ? 'bg-sky-400/80' : '',
         ].join(' ')}
       />
+      {dragging ? (
+        <div
+          data-split-resize-overlay
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            cursor: isVertical ? 'col-resize' : 'row-resize',
+            zIndex: 50,
+          }}
+        />
+      ) : null}
       <div className="min-h-0 min-w-0 flex-1">
         <LayoutRenderer {...rest} node={split.second} />
       </div>

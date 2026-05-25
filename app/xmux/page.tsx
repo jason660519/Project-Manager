@@ -1,6 +1,5 @@
-import { MainClient } from '../ui/MainClient';
+import { redirect } from 'next/navigation';
 
-export default function XmuxPage() {
-  return <MainClient currentView="xmux" />;
+export default function LegacyXmuxPage() {
+  redirect('/cmux');
 }
-

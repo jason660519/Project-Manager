@@ -47,6 +47,8 @@ import { DocumentationView } from './views/DocumentationView';
 import { CompanyStandardsView } from './views/CompanyStandardsView';
 import { DOCUMENTATION_SITE_PUBLIC_MANIFEST } from '../../lib/generated/documentation-site-public';
 import { ChatPageClient } from '../chat/ChatPageClient';
+import { AIAssistantsConsoleClient } from '../ai_assistants/AIAssistantsConsoleClient';
+import type { AIAssistantSheetId } from '../../lib/ai-assistants/types';
 
 type BridgeFileNode = {
   name: string;
@@ -126,9 +128,10 @@ interface MainClientProps {
   integrationsSheet?: import('../../lib/integrations/types').IntegrationSheet;
   keysSheet?: import('../../lib/keys/sheetSlugs').KeysSheetSlug;
   documentationSlug?: string[];
+  assistantSheet?: AIAssistantSheetId;
 }
 
-export function MainClient({ currentView, initialProjectId, integrationsSheet, keysSheet, documentationSlug }: MainClientProps) {
+export function MainClient({ currentView, initialProjectId, integrationsSheet, keysSheet, documentationSlug, assistantSheet }: MainClientProps) {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectEntry[]>(SEED_PROJECTS);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
@@ -1223,7 +1226,7 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
           initialSheet={integrationsSheet}
         />
       )}
-      {currentView === 'xmux' && (
+      {(currentView === 'cmux' || currentView === 'xmux') && (
         <XmuxView
           projects={projects}
           selectedDashboardProjectIds={selectedDashboardProjectIds}
@@ -1259,23 +1262,44 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
       )}
       {currentView === 'settings' && <SettingsView />}
       {currentView === 'chat' && (
-        <ChatPageClient
-          initialChatContext={{
-            currentView,
-            selectedProject,
-            adapters,
-            activeRunCount: activeRuns.length,
-            activeRuns: activeRuns.map((run) => ({
-              featureId: run.featureId,
-              featureName: run.featureName,
-              phase: run.phase,
-              startedAt: run.startedAt,
-            })),
-            recentRuns: runHistory.slice(0, 5),
-            features: dashboardFeatures,
-            dashboardProjects: effectiveDashboardProjects.map((p) => p.config.project.name),
-          }}
-        />
+        assistantSheet ? (
+          <AIAssistantsConsoleClient
+            activeSheet={assistantSheet}
+            initialChatContext={{
+              currentView,
+              selectedProject,
+              adapters,
+              activeRunCount: activeRuns.length,
+              activeRuns: activeRuns.map((run) => ({
+                featureId: run.featureId,
+                featureName: run.featureName,
+                phase: run.phase,
+                startedAt: run.startedAt,
+              })),
+              recentRuns: runHistory.slice(0, 5),
+              features: dashboardFeatures,
+              dashboardProjects: effectiveDashboardProjects.map((p) => p.config.project.name),
+            }}
+          />
+        ) : (
+          <ChatPageClient
+            initialChatContext={{
+              currentView,
+              selectedProject,
+              adapters,
+              activeRunCount: activeRuns.length,
+              activeRuns: activeRuns.map((run) => ({
+                featureId: run.featureId,
+                featureName: run.featureName,
+                phase: run.phase,
+                startedAt: run.startedAt,
+              })),
+              recentRuns: runHistory.slice(0, 5),
+              features: dashboardFeatures,
+              dashboardProjects: effectiveDashboardProjects.map((p) => p.config.project.name),
+            }}
+          />
+        )
       )}
       {currentView === 'engineers' && selectedProject && (
         <EngineersView

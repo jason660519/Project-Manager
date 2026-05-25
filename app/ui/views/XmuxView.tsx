@@ -13,11 +13,14 @@ import {
   destroyAllBrowserSessions,
   migrateStaleIframeSessions,
   purgeOrphanNativeWebviews,
+  resumeNativeBrowserPainting,
+  suspendNativeBrowserPainting,
 } from '../../../components/browser/BrowserRegistry';
 import { LayoutRenderer } from '../../../components/terminal/LayoutRenderer';
 import {
   createBlock,
   createInitialLayout,
+  findBlock,
   removeBlock,
   splitLeaf,
   updateBlock,
@@ -26,6 +29,7 @@ import {
   type LayoutNode,
   type SplitDirection,
 } from '../../../components/terminal/blockLayout';
+import { destroyBlockItems } from '../../../components/terminal/destroyBlockItems';
 import { deriveProjectWorkspacePath } from '../../../lib/xmux/workspacePaths';
 import type { ProjectEntry } from '../../../lib/types';
 import { waitForTauriRuntime } from '../../../lib/runtime/tauri-ready';
@@ -269,6 +273,7 @@ function InteropConsole({
   const [dragCursor, setDragCursor] = useState<DragCursor>(null);
   const [layouts, setLayouts] = useState<Record<string, LayoutNode>>({});
   const pendingLayoutsRef = useRef<Record<string, LayoutNode>>({});
+  const nativeResizeSuspendedRef = useRef(false);
 
   const activeWorkspace =
     workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? workspaces[0];
@@ -286,6 +291,10 @@ function InteropConsole({
       if (ready) migrateStaleIframeSessions();
     });
     return () => {
+      if (nativeResizeSuspendedRef.current) {
+        nativeResizeSuspendedRef.current = false;
+        resumeNativeBrowserPainting();
+      }
       destroyAllBrowserSessions();
     };
   }, []);
@@ -350,9 +359,13 @@ function InteropConsole({
   const handleCloseBlock = useCallback(
     (blockId: string) => {
       if (!activeWorkspace) return;
+      const closingBlock = activeLayout ? findBlock(activeLayout, blockId) : null;
+      if (closingBlock) {
+        destroyBlockItems(closingBlock);
+      }
       mutateLayout(activeWorkspace.id, (layout) => removeBlock(layout, blockId));
     },
-    [activeWorkspace, mutateLayout],
+    [activeLayout, activeWorkspace, mutateLayout],
   );
 
   const handleUpdateBlock = useCallback(
@@ -382,15 +395,19 @@ function InteropConsole({
     (onMove: (event: MouseEvent) => void, cursor: 'col-resize' | 'row-resize') => {
       let frameId: number | null = null;
       let latest: MouseEvent | null = null;
+      let ended = false;
       const flush = () => {
         frameId = null;
         if (latest) onMove(latest);
       };
       const onMouseMove = (event: MouseEvent) => {
+        if (ended) return;
         latest = event;
         if (frameId === null) frameId = requestAnimationFrame(flush);
       };
       const onMouseUp = () => {
+        if (ended) return;
+        ended = true;
         if (frameId !== null) {
           cancelAnimationFrame(frameId);
           frameId = null;
@@ -398,13 +415,30 @@ function InteropConsole({
         if (latest) onMove(latest);
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
+        window.removeEventListener('mouseup', onMouseUp, true);
+        window.removeEventListener('blur', onMouseUp);
+        document.removeEventListener('visibilitychange', onVisibilityChange);
         document.body.style.userSelect = '';
         setDragCursor(null);
+        if (nativeResizeSuspendedRef.current) {
+          nativeResizeSuspendedRef.current = false;
+          resumeNativeBrowserPainting();
+        }
+      };
+      const onVisibilityChange = () => {
+        if (document.visibilityState === 'hidden') onMouseUp();
       };
       document.body.style.userSelect = 'none';
       setDragCursor(cursor);
+      if (!nativeResizeSuspendedRef.current) {
+        nativeResizeSuspendedRef.current = true;
+        suspendNativeBrowserPainting('workspace resize');
+      }
       document.addEventListener('mousemove', onMouseMove);
       document.addEventListener('mouseup', onMouseUp);
+      window.addEventListener('mouseup', onMouseUp, true);
+      window.addEventListener('blur', onMouseUp);
+      document.addEventListener('visibilitychange', onVisibilityChange);
     },
     [],
   );

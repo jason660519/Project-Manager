@@ -1,7 +1,7 @@
 # Verification Runbook
 
 > Status: Active  
-> Last updated: 2026-05-15  
+> Last updated: 2026-05-26
 > Primary files: `package.json`, `scripts/docs-governance-check.sh`, `src-tauri/Cargo.toml`, `vitest.config.ts`
 
 ---
@@ -13,6 +13,7 @@
 Run these before handing off meaningful changes:
 
 ```bash
+npm run guard:legacy-surfaces
 npm run docs:check
 npm run standards:check
 npm run typecheck
@@ -27,6 +28,7 @@ Use narrower checks for small documentation-only changes, but `docs:check` and `
 
 | Command | Covers | Notes |
 | --- | --- | --- |
+| `npm run guard:legacy-surfaces` | Retired Coding Editor entry, current `/cmux` route, draggable dashboard sheets | Also runs automatically before `npm run build`. |
 | `npm run docs:check` | Filename safety, repo-local docs layout, bilingual heading order | Required after docs edits. |
 | `npm run standards:check` | Company baseline standards | May report P2 advisory findings. |
 | `npm run typecheck` | Next typegen and TypeScript correctness | Required after TS or UI edits. |
@@ -50,12 +52,13 @@ If docs include code snippets that refer to command names or schema fields, also
 Before a packaged desktop build:
 
 1. Run the full check order.
-2. Run `npm run tauri:build`.
-3. Verify Browser mode still starts on port `43187`.
-4. Verify Tauri mode can read a local `.project-manager.json`.
-5. Verify secrets show configured state without rendering raw values.
-6. Verify live agent dispatch shows command, working directory, PID, logs, and exit state.
-7. Verify failed or blocked commands are not shown as successful.
+2. Run `npm run branch:check`; confirm stale local branches are not the source of old UI behavior.
+3. Run `npm run tauri:build`; the release secret backend guard must pass and fail if `PM_DEV_PLAINTEXT_SECRETS=1`.
+4. Verify Browser mode still starts on port `43187`.
+5. Verify Tauri mode can read a local `.project-manager.json`.
+6. Verify secrets show configured state without rendering raw values.
+7. Verify live agent dispatch shows command, working directory, PID, logs, and exit state.
+8. Verify failed or blocked commands are not shown as successful.
 
 ## 5. Current Advisory
 
@@ -70,6 +73,7 @@ Before a packaged desktop build:
 有實質變更時，交付前執行：
 
 ```bash
+npm run guard:legacy-surfaces
 npm run docs:check
 npm run standards:check
 npm run typecheck
@@ -84,6 +88,7 @@ npm run build
 
 | Command | Covers | 說明 |
 | --- | --- | --- |
+| `npm run guard:legacy-surfaces` | Retired Coding Editor entry、current `/cmux` route、draggable dashboard sheets | `npm run build` 前會自動執行。 |
 | `npm run docs:check` | Filename safety、repo-local docs layout、bilingual heading order | Docs edits 後必跑。 |
 | `npm run standards:check` | Company baseline standards | 可能回報 P2 advisory findings。 |
 | `npm run typecheck` | Next typegen 與 TypeScript correctness | TS 或 UI edits 後必跑。 |
@@ -107,12 +112,13 @@ npm run standards:check
 Desktop packaged build 前：
 
 1. 執行 full check order。
-2. 執行 `npm run tauri:build`。
-3. 確認 Browser mode 仍在 port `43187` 啟動。
-4. 確認 Tauri mode 可讀本機 `.project-manager.json`。
-5. 確認 secrets 只顯示 configured state，不 render raw values。
-6. 確認 live agent dispatch 顯示 command、working directory、PID、logs、exit state。
-7. 確認 failed 或 blocked commands 不會被顯示為 successful。
+2. 執行 `npm run branch:check`；確認 stale local branch 不是舊 UI 復活來源。
+3. 執行 `npm run tauri:build`；release secret backend guard 必須通過，若 `PM_DEV_PLAINTEXT_SECRETS=1` 必須失敗。
+4. 確認 Browser mode 仍在 port `43187` 啟動。
+5. 確認 Tauri mode 可讀本機 `.project-manager.json`。
+6. 確認 secrets 只顯示 configured state，不 render raw values。
+7. 確認 live agent dispatch 顯示 command、working directory、PID、logs、exit state。
+8. 確認 failed 或 blocked commands 不會被顯示為 successful。
 
 ## 5. Current Advisory
 

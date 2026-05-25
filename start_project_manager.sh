@@ -49,6 +49,26 @@ warn()    { echo -e "${YELLOW}⚠ $*${RESET}"; }
 error()   { echo -e "${RED}✗ $*${RESET}" >&2; }
 header()  { echo -e "\n${BOLD}$*${RESET}"; }
 
+configure_tauri_dev_secret_backend() {
+  if [[ -z "${PM_DEV_PLAINTEXT_SECRETS+x}" ]]; then
+    export PM_DEV_PLAINTEXT_SECRETS=1
+    success "Dev secret backend: ~/.project-manager/dev-secrets.json (Keychain prompts disabled)"
+    return 0
+  fi
+
+  case "$(printf '%s' "$PM_DEV_PLAINTEXT_SECRETS" | tr '[:upper:]' '[:lower:]')" in
+    1|true|yes)
+      success "Dev secret backend: ~/.project-manager/dev-secrets.json (Keychain prompts disabled)"
+      ;;
+    0|false|no)
+      warn "PM_DEV_PLAINTEXT_SECRETS=$PM_DEV_PLAINTEXT_SECRETS forces macOS Keychain during dev; prompts may appear."
+      ;;
+    *)
+      warn "PM_DEV_PLAINTEXT_SECRETS=$PM_DEV_PLAINTEXT_SECRETS is not a standard value; Rust will decide the secret backend."
+      ;;
+  esac
+}
+
 require_cmd() {
   if ! command -v "$1" &>/dev/null; then
     return 1
@@ -928,6 +948,7 @@ start_project_manager() {
   fi
 
   cd "$SCRIPT_DIR"
+  configure_tauri_dev_secret_backend
   ensure_dev_port_available
 
   if [[ "$mode" == "background" ]]; then

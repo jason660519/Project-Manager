@@ -14,7 +14,7 @@ import { LocalIDEAdapter } from './local-ide-adapter';
 import { loadPluginCatalog, selectCli } from '../storage/plugins';
 
 const PLUGIN_AGENT_IDS = new Set(['hermes-agent', 'openclaw']);
-const ADAPTER_ID_ALIASES = new Map<string, string>([['cmux', 'xmux']]);
+const ADAPTER_ID_ALIASES = new Map<string, string>([['xmux', 'cmux']]);
 
 function canonicalAdapterId(id: string): string {
   return ADAPTER_ID_ALIASES.get(id) ?? id;
@@ -54,8 +54,8 @@ const BUILT_IN_AGENT_CLIS: AgentAdapterConfig[] = [
     argsTemplate: ['api', 'responses.create', '-m', '{prompt}'],
   },
   {
-    id: 'xmux',
-    name: 'xmux',
+    id: 'cmux',
+    name: 'cmux',
     type: 'agent',
     targetKind: 'agent-cli',
     command: 'cmux',

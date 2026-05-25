@@ -1,6 +1,9 @@
 /** Unified integration inventory row — shared across Integrations Hub sheets. */
 
 export const INTEGRATION_SHEETS = [
+  'system_installed_apps',
+  // Legacy URL/storage sheet id. Keep it in the route set so old links can redirect
+  // without changing existing manual metadata row keys such as `plugins:codex`.
   'plugins',
   'coding-tools',
   'mcp',
@@ -18,6 +21,13 @@ export const INTEGRATION_SHEETS = [
 ] as const;
 
 export type IntegrationSheet = typeof INTEGRATION_SHEETS[number];
+
+export const SYSTEM_INSTALLED_APPS_SHEET: IntegrationSheet = 'system_installed_apps';
+export const LEGACY_PLUGINS_SHEET: IntegrationSheet = 'plugins';
+
+export function normalizeIntegrationSheet(sheet: IntegrationSheet): IntegrationSheet {
+  return sheet === LEGACY_PLUGINS_SHEET ? SYSTEM_INSTALLED_APPS_SHEET : sheet;
+}
 
 /** Sheets that surface F23 capability candidates (schema v7). */
 export const CAPABILITY_SHEETS = ['vla', 'tts', 'stt', 'hands', 'tools'] as const;

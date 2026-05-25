@@ -51,8 +51,8 @@ const NAV_GROUPS: NavGroup[] = [
     groupKey: 'execution',
     items: [
       { id: 'keys',             itemKey: 'keys',            href: '/keys',                     icon: KeyRound },
-      { id: 'integrations-hub', itemKey: 'integrationsHub', href: '/integrations-hub/plugins', icon: Plug },
-      { id: 'xmux',             itemKey: 'xmux',            href: '/xmux',                     icon: SquareTerminal },
+      { id: 'integrations-hub', itemKey: 'integrationsHub', href: '/integrations-hub/system_installed_apps', icon: Plug },
+      { id: 'cmux',             itemKey: 'cmux',            href: '/cmux',                     icon: SquareTerminal },
       { id: 'cron-jobs',        itemKey: 'cronJobs',        href: '/cron-jobs',                icon: Timer },
       { id: 'engineers',        itemKey: 'engineers',       href: '/engineers',                icon: Users2 },
     ],

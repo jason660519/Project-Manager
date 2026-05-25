@@ -4,10 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 43187",
-    "prebuild": "npm run docs:site:sync",
+    "prebuild": "npm run guard:legacy-surfaces && npm run docs:site:sync",
     "build": "next build",
     "start": "next start",
     "typecheck": "next typegen && tsc --noEmit",
+    "guard:legacy-surfaces": "node scripts/check-legacy-surfaces.mjs",
+    "branch:check": "node scripts/check-branch-hygiene.mjs",
     "bridge:typecheck": "tsc --noEmit --project ../shared-bridge/tsconfig.json",
     "standards:check": "/Volumes/KLEVV-4T-1/Company-AI-App-Standards/scripts/company-standards.sh check .",
     "standards:fix": "/Volumes/KLEVV-4T-1/Company-AI-App-Standards/scripts/company-standards.sh fix .",
@@ -52,8 +54,9 @@
     "eval:auto-score": "node eval/scoring/auto-score-rows.mjs --input eval/runs/run-rows.jsonl --dataset eval/datasets/llm-sample-tasks.v1.json --output eval/runs/run-rows.scored.jsonl",
     "eval:judge-human": "node eval/scoring/judge-human-rows.mjs --input eval/runs/run-rows.scored.jsonl --dataset eval/datasets/llm-sample-tasks.v1.json --promptDir eval/prompts --promptVersion v1 --command 'node eval/runners/adapters/mock-judge-adapter.mjs --prompt \"{{prompt}}\"' --output eval/runs/run-rows.judged.jsonl",
     "eval:summary": "node eval/scoring/report-to-markdown.mjs --input eval/reports/arena-report.v1.json --output eval/reports/arena-report.v1.md",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
+    "tauri:dev": "node scripts/run-tauri-dev.mjs",
+    "tauri:dev:keychain": "node scripts/run-tauri-dev.mjs --keychain",
+    "tauri:build": "node scripts/check-release-secrets.mjs && tauri build",
     "tauri:icon": "tauri icon"
   },
   "dependencies": {

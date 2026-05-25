@@ -12,7 +12,8 @@ export const zh: Translations = {
     dashboard: '项目仪表盘',
     engineers: '工程师',
     integrationsHub: '集成中枢',
-    xmux: 'xmux',
+    cmux: 'cmux',
+    xmux: 'cmux',
     channels: '频道',
     cronJobs: '定时任务',
     skills: '技能库',
@@ -280,7 +281,7 @@ export const zh: Translations = {
   integrations: {
     title: '整合中心',
     subtitle: '插件、技能、频道、Memory、Commands 统一清单；点选行打开详细设置。',
-    sheetPlugins: '插件',
+    sheetPlugins: 'System Installed Apps',
     sheetMcp: 'MCP',
     sheetSkills: '技能',
     sheetChannels: '频道',

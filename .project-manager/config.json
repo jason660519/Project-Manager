@@ -952,7 +952,7 @@
       "name": "xmux Native Browser URL Chrome Stability",
       "category": "Execution",
       "status": "in_progress",
-      "progress": 90,
+      "progress": 95,
       "phase": "development",
       "points": 3,
       "locatedSection": "/xmux",
@@ -964,12 +964,12 @@
         "debugRetro": ".project-manager/features/F31/debug-retro.md",
         "testScenarios": ".project-manager/features/F31/test-scenarios.md",
         "developmentLogSummaryFolder": ".project-manager/features/F31/",
-        "implementation": "components/browser/BrowserContent.tsx",
-        "test": "__tests__/xmux.browser-url-chrome.test.tsx"
+        "implementation": "components/browser/BrowserRegistry.ts",
+        "test": "__tests__/BrowserRegistry.native-lifecycle.test.ts"
       },
-      "notes": "Fix xmux native browser URL chrome, focus black-pane, and orphan overlay bugs. Active browser content remains visible while editing the URL input; native webviews are only parked for inactive tabs, invalid bounds, detach, close, route leave, and pending-create orphan cleanup.",
+      "notes": "Fix xmux native browser URL chrome, focus black-pane, orphan overlay, split-resize ghosting, and browser-pane close cleanup. Native browser webviews are parked during pane/sidebar resize, restored from latest bounds after drag end, and destroyed from the layout-level close path before block removal.",
       "createdAt": "2026-05-25T20:51:52Z",
-      "updatedAt": "2026-05-25T21:41:01Z",
+      "updatedAt": "2026-05-25T22:10:47Z",
       "updatedBy": "Codex"
     }
   ],
@@ -981,6 +981,6 @@
     "root": "/Volumes/KLEVV-4T-1/Project-Manager"
   },
   "schemaVersion": 8,
-  "updatedAt": "2026-05-25T21:41:01Z",
+  "updatedAt": "2026-05-25T22:10:47Z",
   "updatedBy": "Codex"
 }

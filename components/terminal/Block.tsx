@@ -150,17 +150,12 @@ export function Block({
     (tabId: string) => {
       const closing = block.items.find((item) => item.id === tabId);
       const nextItems = block.items.filter((item) => item.id !== tabId);
-      if (closing) {
-        destroyBlockItem(closing);
-      }
       if (nextItems.length === 0) {
-        for (const item of block.items) {
-          if (item.id !== tabId) {
-            destroyBlockItem(item);
-          }
-        }
         onClose();
         return;
+      }
+      if (closing) {
+        destroyBlockItem(closing);
       }
       const nextActive =
         block.activeItemId === tabId
@@ -186,11 +181,8 @@ export function Block({
   );
 
   const closePane = useCallback(() => {
-    for (const item of block.items) {
-      destroyBlockItem(item);
-    }
     onClose();
-  }, [block.items, onClose]);
+  }, [onClose]);
 
   const actions: PaneActions = useMemo(
     () => ({

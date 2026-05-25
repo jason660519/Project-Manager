@@ -40,7 +40,7 @@ export function AppShell({
           <TopBar currentView={currentView} activeRunCount={activeRunCount} chatContext={chatContext} />
           <div
             className={
-              currentView === 'xmux'
+              currentView === 'cmux' || currentView === 'xmux'
                 ? 'flex-1 min-h-0 overflow-hidden'
                 : 'flex-1 overflow-y-auto px-5 py-5'
             }

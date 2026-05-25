@@ -50,7 +50,13 @@ const embedFailures = new Map<string, string>();
 let limboDiv: HTMLDivElement | null = null;
 // Serialize native webview creates — concurrent add_child calls often fail on macOS.
 let createChain: Promise<void> = Promise.resolve();
+let nativePaintSuspendCount = 0;
 const OFFSCREEN_BOUNDS = { x: -100_000, y: -100_000, width: 1, height: 1 };
+
+function isMissingNativeWebviewError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /xmux webview 'xmux-browser-[^']+' not found/i.test(message);
+}
 
 function enqueueCreate(task: () => Promise<void>): Promise<void> {
   const run = createChain.then(task, task);
@@ -103,8 +109,32 @@ function createTauriSession(itemId: string, url: string): TauriSession {
   };
 }
 
-function parkNativeWebview(session: TauriSession, context: string): void {
-  session.visible = false;
+function markMissingNativeWebview(session: TauriSession): void {
+  session.created = false;
+}
+
+function logNativeBridgeError(
+  session: TauriSession,
+  message: string,
+  err: unknown,
+): boolean {
+  if (isMissingNativeWebviewError(err)) {
+    markMissingNativeWebview(session);
+    return false;
+  }
+  console.error(message, err);
+  return true;
+}
+
+function parkNativeWebview(
+  session: TauriSession,
+  context: string,
+  options: { preserveDesiredVisibility?: boolean } = {},
+): void {
+  if (!options.preserveDesiredVisibility) {
+    session.visible = false;
+  }
+  if (!session.created) return;
   void xmuxWebviewSetBounds(
     session.label,
     OFFSCREEN_BOUNDS.x,
@@ -112,17 +142,19 @@ function parkNativeWebview(session: TauriSession, context: string): void {
     OFFSCREEN_BOUNDS.width,
     OFFSCREEN_BOUNDS.height,
   ).catch((err) => {
-    console.error(`[BrowserRegistry] park failed (${context})`, err);
+    logNativeBridgeError(session, `[BrowserRegistry] park failed (${context})`, err);
   });
   void xmuxWebviewSetVisible(session.label, false).catch((err) => {
-    console.error(`[BrowserRegistry] hide failed (${context})`, err);
+    logNativeBridgeError(session, `[BrowserRegistry] hide failed (${context})`, err);
   });
 }
 
 function destroyNativeWebview(session: TauriSession, context: string): void {
+  const hadNativeWebview = session.created;
   session.disposed = true;
   session.visible = false;
   session.created = false;
+  if (!hadNativeWebview) return;
   void xmuxWebviewSetBounds(
     session.label,
     OFFSCREEN_BOUNDS.x,
@@ -132,6 +164,7 @@ function destroyNativeWebview(session: TauriSession, context: string): void {
   ).catch(() => {});
   void xmuxWebviewSetVisible(session.label, false).catch(() => {});
   void xmuxWebviewDestroy(session.label).catch((err) => {
+    if (isMissingNativeWebviewError(err)) return;
     console.error(`[BrowserRegistry] destroy failed (${context})`, err);
   });
 }
@@ -196,7 +229,11 @@ function ensureCreated(
       bounds.width,
       bounds.height,
     ).catch((err) => {
-      console.error('[BrowserRegistry] set_bounds failed', err);
+      if (!logNativeBridgeError(session, '[BrowserRegistry] set_bounds failed', err)) {
+        if (session.visible && sessions.get(itemId) === session && !session.pendingCreate) {
+          return ensureCreated(itemId, session, bounds);
+        }
+      }
     });
   }
   if (session.pendingCreate) return session.pendingCreate;
@@ -259,6 +296,69 @@ function ensureNativeSession(itemId: string, url: string): Session | undefined {
   return session;
 }
 
+function isNativePaintingSuspended(): boolean {
+  return nativePaintSuspendCount > 0;
+}
+
+function parkAllNativeWebviews(context: string): void {
+  if (!isTauri()) return;
+  for (const session of sessions.values()) {
+    if (session.kind === 'tauri') {
+      parkNativeWebview(session, context, { preserveDesiredVisibility: true });
+    }
+  }
+}
+
+function showNativeWebviewAfterCreate(itemId: string, session: TauriSession): void {
+  const current = sessions.get(itemId);
+  if (!current || current !== session || current.kind !== 'tauri') return;
+  if (current.disposed || !current.visible) return;
+  void xmuxWebviewSetVisible(current.label, true).catch((err) => {
+    logNativeBridgeError(current, '[BrowserRegistry] show (post-create) failed', err);
+  });
+}
+
+function restoreNativeWebview(itemId: string, session: TauriSession, context: string): void {
+  if (session.disposed || sessions.get(itemId) !== session || !session.visible) return;
+  const bounds = session.lastBounds;
+  if (!bounds || bounds.width < 1 || bounds.height < 1) return;
+  if (!session.created) {
+    if (!session.pendingCreate) {
+      void ensureCreated(itemId, session, bounds).then(() =>
+        showNativeWebviewAfterCreate(itemId, session),
+      );
+    }
+    return;
+  }
+  void xmuxWebviewSetBounds(
+    session.label,
+    bounds.x,
+    bounds.y,
+    bounds.width,
+    bounds.height,
+  )
+    .then(() => xmuxWebviewSetVisible(session.label, true))
+    .catch((err) => {
+      const shouldLog = logNativeBridgeError(
+        session,
+        `[BrowserRegistry] restore failed (${context})`,
+        err,
+      );
+      if (!shouldLog && session.visible && sessions.get(itemId) === session) {
+        restoreNativeWebview(itemId, session, `${context} recreate`);
+      }
+    });
+}
+
+function restoreAllNativeWebviews(context: string): void {
+  if (!isTauri()) return;
+  for (const [itemId, session] of sessions.entries()) {
+    if (session.kind === 'tauri') {
+      restoreNativeWebview(itemId, session, context);
+    }
+  }
+}
+
 export function attach(itemId: string, slot: HTMLElement, initialUrl: string): void {
   let session = sessions.get(itemId);
   if (!session) {
@@ -279,7 +379,7 @@ export function attach(itemId: string, slot: HTMLElement, initialUrl: string): v
   if (session.kind === 'tauri' && session.created && !session.visible) {
     session.visible = true;
     void xmuxWebviewSetVisible(session.label, true).catch((err) => {
-      console.error('[BrowserRegistry] show failed', err);
+      logNativeBridgeError(session, '[BrowserRegistry] show failed', err);
     });
   }
 
@@ -350,6 +450,8 @@ export function retryNativeEmbed(itemId: string, url: string): void {
 export function notifySlotVisible(itemId: string): void {
   const session = sessions.get(itemId);
   if (!session || session.kind !== 'tauri') return;
+  session.visible = true;
+  if (isNativePaintingSuspended()) return;
   const bounds = session.lastBounds;
   if (!bounds || bounds.width < 1 || bounds.height < 1) return;
   if (!session.created && !session.pendingCreate) {
@@ -382,7 +484,7 @@ export function navigate(itemId: string, url: string): void {
   }
   if (!session.created) return;
   void xmuxWebviewNavigate(session.label, url).catch((err) => {
-    console.error('[BrowserRegistry] navigate failed', err);
+    logNativeBridgeError(session, '[BrowserRegistry] navigate failed', err);
   });
 }
 
@@ -391,22 +493,22 @@ export function forceNativeBoundsSync(itemId: string, bounds: ViewBounds): void 
   const session = sessions.get(itemId);
   if (!session || session.kind !== 'tauri') return;
   session.lastBounds = bounds;
+  if (isNativePaintingSuspended()) {
+    session.visible = true;
+    return;
+  }
+  const wasVisible = session.visible;
   session.visible = true;
   if (!session.created && !session.pendingCreate) {
     void ensureCreated(itemId, session, bounds).then(() => {
-      const current = sessions.get(itemId);
-      if (!current || current.kind !== 'tauri' || current.disposed || !current.visible) return;
-      void xmuxWebviewSetVisible(current.label, true).catch((err) => {
-        console.error('[BrowserRegistry] show (post-create) failed', err);
-      });
+      showNativeWebviewAfterCreate(itemId, session);
     });
     return;
   }
   if (!session.created) return;
-  if (!session.visible) {
-    session.visible = true;
+  if (!wasVisible) {
     void xmuxWebviewSetVisible(session.label, true).catch((err) => {
-      console.error('[BrowserRegistry] show failed', err);
+      logNativeBridgeError(session, '[BrowserRegistry] show failed', err);
     });
   }
   void xmuxWebviewSetBounds(
@@ -416,7 +518,9 @@ export function forceNativeBoundsSync(itemId: string, bounds: ViewBounds): void 
     bounds.width,
     bounds.height,
   ).catch((err) => {
-    console.error('[BrowserRegistry] force set_bounds failed', err);
+    if (!logNativeBridgeError(session, '[BrowserRegistry] force set_bounds failed', err)) {
+      restoreNativeWebview(itemId, session, 'force set_bounds missing');
+    }
   });
 }
 
@@ -437,27 +541,28 @@ export function setBounds(
   if (!session || session.kind !== 'tauri') return;
   const bounds = { x, y, width, height };
   session.lastBounds = bounds;
+  if (isNativePaintingSuspended()) {
+    session.visible = true;
+    return;
+  }
+  const wasVisible = session.visible;
   session.visible = true;
   if (!session.created && !session.pendingCreate) {
     void ensureCreated(itemId, session, bounds).then(() => {
-      const current = sessions.get(itemId);
-      if (!current || current.kind !== 'tauri') return;
-      if (current.disposed || !current.visible) return;
-      return xmuxWebviewSetVisible(current.label, true).catch((err) => {
-        console.error('[BrowserRegistry] show (post-create) failed', err);
-      });
+      showNativeWebviewAfterCreate(itemId, session);
     });
     return;
   }
   if (!session.created) return;
-  if (!session.visible) {
-    session.visible = true;
+  if (!wasVisible) {
     void xmuxWebviewSetVisible(session.label, true).catch((err) => {
-      console.error('[BrowserRegistry] show failed', err);
+      logNativeBridgeError(session, '[BrowserRegistry] show failed', err);
     });
   }
   void xmuxWebviewSetBounds(session.label, x, y, width, height).catch((err) => {
-    console.error('[BrowserRegistry] set_bounds failed', err);
+    if (!logNativeBridgeError(session, '[BrowserRegistry] set_bounds failed', err)) {
+      restoreNativeWebview(itemId, session, 'set_bounds missing');
+    }
   });
 }
 
@@ -465,6 +570,22 @@ export function setSlotHidden(itemId: string): void {
   const session = sessions.get(itemId);
   if (!session || session.kind !== 'tauri') return;
   parkNativeWebview(session, 'slot hidden');
+}
+
+export function suspendNativeBrowserPainting(reason: string = 'layout resize'): void {
+  if (!isTauri()) return;
+  nativePaintSuspendCount += 1;
+  if (nativePaintSuspendCount === 1) {
+    parkAllNativeWebviews(reason);
+  }
+}
+
+export function resumeNativeBrowserPainting(): void {
+  if (!isTauri()) return;
+  nativePaintSuspendCount = Math.max(0, nativePaintSuspendCount - 1);
+  if (nativePaintSuspendCount === 0) {
+    restoreAllNativeWebviews('paint resume');
+  }
 }
 
 export function getCurrentUrl(itemId: string): string | null {
@@ -501,6 +622,7 @@ export function __resetForTests(): void {
   destroyAllBrowserSessions();
   embedFailures.clear();
   createChain = Promise.resolve();
+  nativePaintSuspendCount = 0;
   if (limboDiv?.parentElement) {
     limboDiv.remove();
   }

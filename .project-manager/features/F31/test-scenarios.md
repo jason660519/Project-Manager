@@ -20,6 +20,8 @@ This scenario map converts the F31 debugging experience into reusable TDD and E2
 | F31-S10 | Close browser tab/pane while page is loading. | Pending native create resolves after close and leaves sticky overlay. | `BrowserRegistry.native-lifecycle.test.ts` destroys pending-create webview after close. | Tauri desktop: close tabs quickly during navigation; verify no residual surface. | Unit covered; Tauri E2E candidate. | User residual overlay report |
 | F31-S11 | Navigate away from `/xmux`. | Native webview survives route change. | `XmuxView` route-leave cleanup plus registry tests. | Leave `/xmux` for dashboard; verify no browser surface remains. | Integration covered; Tauri E2E candidate. | Debug finding |
 | F31-S12 | Browser slot has invalid or overlapping bounds during layout settle. | Native webview covers URL chrome. | `BrowserSlot.native-bounds.test.tsx` and `browser-bounds.test.ts` reject unsafe bounds and hide slot. | Resize xmux panes; verify URL chrome remains usable. | Unit covered; E2E candidate. | Root cause |
+| F31-S13 | Drag split dividers left/right and up/down while a native browser page is visible. | Native webview keeps drawing stale content at old bounds or intercepts drag events. | `BrowserRegistry.native-lifecycle.test.ts` asserts resize suspension parks native webviews and restores them only after resume. | Tauri desktop: drag vertical and horizontal split handles around GitHub/Google and verify no stale native surface remains. | Unit covered; browser smoke covered; Tauri E2E candidate. | User resize ghost report |
+| F31-S14 | Close the browser pane after split resizing and browser tab churn. | React block disappears but native webview remains as an undeletable overlay. | `XmuxView.handleCloseBlock` now tears down block items before `removeBlock`; `blockLayout.destroy.test.ts` keeps destroy coverage. | Tauri desktop: create/close browser tabs 20 times, close the browser pane, verify no native surface remains. | Unit covered; browser smoke covered; Tauri E2E candidate. | User cannot delete browser pane report |
 
 ## Unit Test Backlog
 
@@ -27,8 +29,10 @@ This scenario map converts the F31 debugging experience into reusable TDD and E2
 | --- | --- | --- |
 | P1 | S03 focus black pane | Keep existing `does not hide the active browser content when the URL input receives focus` test as required regression coverage. |
 | P1 | S10 pending create close race | Keep native lifecycle test; extend if new registry states are added. |
+| P1 | S13 resize suspension | Keep `parks native webviews during split resize and restores them only after resume` as required regression coverage. |
 | P2 | S11 route leave cleanup | Add a focused `XmuxView` unmount test if future route cleanup changes. |
-| P2 | S12 resize/pane movement | Add a test that bounds are recomputed after split resize if pane resizing is refactored. |
+| P2 | S12 resize/pane movement | Add a BrowserSlot event-level test if pane resizing is refactored away from continuous bounds polling. |
+| P2 | S14 pane close ownership | Add a focused `XmuxView` close-pane test if close handling moves out of `handleCloseBlock`. |
 
 ## E2E Candidate Backlog
 
@@ -36,6 +40,7 @@ This scenario map converts the F31 debugging experience into reusable TDD and E2
 | --- | --- | --- |
 | P0 | S02 + S03 + S04 | Tauri desktop: open `/xmux`, select Project Manager, focus URL, type `google.com`, submit, verify pane does not black out. |
 | P0 | S09 + S10 | Tauri desktop: open two browser tabs, navigate remote URLs, close/switch rapidly, verify no residual native surface. |
+| P0 | S13 + S14 | Tauri desktop: drag vertical and horizontal splits around a browser pane, then create/delete browser tabs at least 20 times and close the pane. |
 | P1 | S07 | Browser mode or Tauri: submit localhost dashboard URL and assert iframe/pane renders expected page content. |
 | P1 | S12 | Resize split panes around a native browser and assert URL chrome remains clickable. |
 

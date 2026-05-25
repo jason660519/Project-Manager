@@ -103,6 +103,7 @@ npm run docs:check
 For code or config changes, prefer:
 
 ```bash
+npm run guard:legacy-surfaces
 npm run typecheck
 npm run build
 ```
@@ -111,6 +112,12 @@ For repo standards changes, also run:
 
 ```bash
 npm run standards:check
+```
+
+For navigation, dashboard sheet, branch hygiene, or cmux/browser-surface work, also run:
+
+```bash
+npm run branch:check
 ```
 
 If a command fails, include the exact command, status, and cause.

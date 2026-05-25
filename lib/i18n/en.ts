@@ -12,7 +12,8 @@ export const en: Translations = {
     dashboard: 'Project Dashboard',
     engineers: 'Engineers',
     integrationsHub: 'Integrations Hub',
-    xmux: 'xmux',
+    cmux: 'cmux',
+    xmux: 'cmux',
     channels: 'Channels',
     cronJobs: 'Cron Jobs',
     skills: 'Skills',
@@ -279,7 +280,7 @@ export const en: Translations = {
   integrations: {
     title: 'Integrations Hub',
     subtitle: 'Plugins, skills, channels, memory, and commands in one inventory table. Click a row for details.',
-    sheetPlugins: 'Plugins',
+    sheetPlugins: 'System Installed Apps',
     sheetMcp: 'MCP',
     sheetSkills: 'Skills',
     sheetChannels: 'Channels',

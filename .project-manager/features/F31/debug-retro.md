@@ -54,6 +54,9 @@ Both failures were caused by treating Tauri child webviews like DOM content. Nat
 | URL chrome covered | Native webview bounds could include the BrowserContent root instead of the content slot below the URL toolbar. | React z-index can keep chrome above webview. |
 | Black pane on URL focus | URL chrome focus set a chrome-interaction state that made BrowserSlot call `setSlotHidden(itemId)` for the active tab. | Focusing the URL bar is equivalent to hiding the native webview to protect chrome. |
 | Sticky overlay | A pending native webview create could resolve after React already removed the session. | Destroying React state is enough to remove the OS child webview. |
+| Split-resize ghost | Native webviews remained visible during pane drag and could keep drawing at stale OS-level bounds while React layout moved. | DOM resize overlays and React reflow are enough to control native child views. |
+| Parked webview fails to restore | `setBounds()` and `forceNativeBoundsSync()` set `session.visible = true` before checking whether `show()` was needed. | Mutating the logical visible flag is equivalent to showing the native webview. |
+| Browser pane close leak risk | Block removal did not own session teardown; some paths relied on the leaf component destroying sessions first. | Removing the React block always implies native browser cleanup happened. |
 
 ## Final Fix
 
@@ -62,6 +65,9 @@ Both failures were caused by treating Tauri child webviews like DOM content. Nat
 | Browser bounds | Native webview bounds are derived from the settled browser slot and adjusted with a chrome-safe top guard. |
 | Browser focus | URL input focus no longer hides or parks the active native webview. |
 | Browser lifecycle | `detach`, `destroy`, inactive slots, invalid bounds, route leave, and orphan cleanup still park native webviews offscreen before hiding or closing. |
+| Split resize lifecycle | Split/sidebar drag start suspends native browser painting and parks native webviews; drag end lets active slots restore from the latest measured bounds. |
+| Visibility restore | Bounds sync captures `wasVisible` before mutating `session.visible`, so a parked active webview calls native `show()` when restored. |
+| Pane removal | Layout-level block close now destroys all terminal/browser/folder sessions before removing the block from the tree. |
 | Native bridge | Tauri `set_bounds` uses an atomic rect update, and hide/destroy paths park the webview offscreen before visibility changes. |
 | Route cleanup | Leaving `/xmux` destroys all browser sessions to prevent orphan OS surfaces. |
 
@@ -72,7 +78,7 @@ Both failures were caused by treating Tauri child webviews like DOM content. Nat
 | `__tests__/xmux.browser-url-chrome.test.tsx` | Default GitHub URL editing, URL focus must not call `setSlotHidden`, Enter/Go submit, `google.com`, full HTTPS URL, `about:blank`, localhost URL, empty draft. |
 | `__tests__/BrowserSlot.native-bounds.test.tsx` | Chrome-safe native bounds, invalid bounds hide, inactive slot hide. |
 | `__tests__/browser-bounds.test.ts` | Native bounds add chrome guard and reject unsafe geometry. |
-| `__tests__/BrowserRegistry.native-lifecycle.test.ts` | Pending create after close is destroyed, hidden sessions park offscreen, orphan purge destroys registry sessions. |
+| `__tests__/BrowserRegistry.native-lifecycle.test.ts` | Pending create after close is destroyed, hidden sessions park offscreen, resize suspension parks/restores native sessions, orphan purge destroys registry sessions. |
 | `__tests__/xmux.registry.test.tsx` | Existing browser input and tab lifecycle coverage. |
 | `__tests__/blockLayout.destroy.test.ts` | Browser sessions are destroyed when layout blocks are removed. |
 
@@ -80,13 +86,14 @@ Both failures were caused by treating Tauri child webviews like DOM content. Nat
 
 | Command / Check | Result |
 | --- | --- |
-| `npm run test -- --run __tests__/BrowserRegistry.native-lifecycle.test.ts __tests__/BrowserSlot.native-bounds.test.tsx __tests__/browser-bounds.test.ts __tests__/xmux.browser-url-chrome.test.tsx __tests__/xmux.registry.test.tsx __tests__/blockLayout.destroy.test.ts` | Pass: 6 files / 24 tests. Existing jsdom canvas warning only. |
+| `npm run test -- --run __tests__/BrowserRegistry.native-lifecycle.test.ts __tests__/BrowserSlot.native-bounds.test.tsx __tests__/xmux.browser-url-chrome.test.tsx __tests__/xmux.registry.test.tsx __tests__/blockLayout.destroy.test.ts` | Pass: 5 files / 23 tests. Existing jsdom canvas warning only. |
 | `npm run typecheck` | Pass |
 | `cargo check --manifest-path src-tauri/Cargo.toml` | Pass |
 | `npm run build` | Pass. Existing Turbopack dynamic file-tracing warnings remain in `app/api/chat/tools/file/route.ts`. |
 | `npm run docs:check` | Pass |
 | `npm run standards:check` | Pass with existing P2 hard-coded color warning. |
 | Browser smoke on `http://localhost:43187/xmux` | Pass. Selected `@project-manager/app`, focused `Browser URL`, submitted `google.com`, `about:blank`, and `localhost:43187/project-progress-dashboard`; input stayed connected/visible and localhost rendered in the pane. |
+| Browser resize smoke on `http://localhost:43187/xmux` | Pass at `1440x900`: left/right resize changed browser slot width `462px -> 722px`; up/down resize changed height `346px -> 216px`; 20 browser create/close cycles completed and browser pane removal left no iframe DOM. |
 
 ## Lessons For Future TDD / E2E
 
@@ -95,11 +102,14 @@ Both failures were caused by treating Tauri child webviews like DOM content. Nat
 3. Fixes for native overlays must include close/switch/route-leave races, not only the visible active-pane path.
 4. User-reported screenshots should be converted into at least one unit regression and one E2E candidate before the feature is considered stable.
 5. Real URL drafts must include remote, protocol-less, special-scheme, and localhost cases.
+6. A session state flag is not a native UI operation. Tests should assert the bridge call (`show`, `hide`, `set_bounds`, `destroy`) that must occur after state changes.
+7. Any operation that removes a layout block should own teardown for all items in that block; do not rely on a child component's unmount path for native resources.
 
 ## Follow-Up Candidates
 
 | Candidate | Reason |
 | --- | --- |
 | Tauri E2E smoke for `/xmux` native browser URL editing | Browser-mode automation cannot fully verify OS child webview layering. |
+| Tauri E2E smoke for split resize and pane removal | The resize ghost is a native child-view issue; browser-mode iframe checks only validate layout geometry and React lifecycle. |
 | Native webview lifecycle trace logging in debug builds | Would make future orphan/black-pane reports easier to correlate with registry state. |
 | Dashboard artifact gate for `debug-retro.md` and `test-scenarios.md` | Prevent expensive debugging knowledge from remaining only in chat transcripts. |

@@ -5,7 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, ExternalLink, FileText, MessageCircle, RefreshCw, RotateCw, Snowflake, X } from 'lucide-react';
 import type { IntegrationRow, IntegrationSheet } from '../../../../lib/integrations/types';
-import { isCapabilitySheet } from '../../../../lib/integrations/types';
+import {
+  LEGACY_PLUGINS_SHEET,
+  SYSTEM_INSTALLED_APPS_SHEET,
+  isCapabilitySheet,
+  normalizeIntegrationSheet,
+} from '../../../../lib/integrations/types';
 import { diffRows, type ScanOutcome, type ScanReport } from '../../../../lib/integrations/scan-diff';
 import type { IntegrationRuntimeCommand } from '../../../../lib/integrations/registry';
 import { mergeAllManual } from '../../../../lib/integrations/manual-metadata';
@@ -131,14 +136,14 @@ type PluginsRowDensity = 'compact' | 'comfortable';
 
 export interface PluginsHubViewProps {
   projectRoot?: string;
-  /** Sheet driven by the URL (`/integrations-hub/<sheet>`). Defaults to `plugins`. */
+  /** Sheet driven by the URL (`/integrations-hub/<sheet>`). Defaults to System Installed Apps. */
   initialSheet?: IntegrationSheet;
 }
 
 export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubViewProps) {
   const { t } = useI18n();
   const router = useRouter();
-  const activeSheet: IntegrationSheet = initialSheet ?? 'plugins';
+  const activeSheet: IntegrationSheet = normalizeIntegrationSheet(initialSheet ?? SYSTEM_INSTALLED_APPS_SHEET);
   const [pluginsFilter, setPluginsFilter] = useState<PluginsFilter>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
@@ -188,6 +193,12 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     setSelectedRow(null);
     setCategoryFilter('all');
   }, [activeSheet]);
+
+  useEffect(() => {
+    if (initialSheet === LEGACY_PLUGINS_SHEET) {
+      router.replace(`/integrations-hub/${SYSTEM_INSTALLED_APPS_SHEET}`);
+    }
+  }, [initialSheet, router]);
 
   useEffect(() => {
     const c = loadPluginCatalog();
@@ -943,7 +954,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
       const startedAt = Date.now();
       let outcome: ScanOutcome | undefined;
       try {
-        if (sheet === 'plugins') outcome = await rescanPlugins();
+        if (sheet === SYSTEM_INSTALLED_APPS_SHEET || sheet === LEGACY_PLUGINS_SHEET) outcome = await rescanPlugins();
         else if (sheet === 'coding-tools') outcome = await rescanCodingTools();
         else if (sheet === 'mcp') outcome = await rescanMcp();
         else if (sheet === 'skills') outcome = await rescanSkills();
@@ -986,7 +997,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
 
   const activeRows = useMemo(() => {
     let rows =
-      activeSheet === 'plugins'
+      activeSheet === SYSTEM_INSTALLED_APPS_SHEET
         ? pluginRows
         : activeSheet === 'coding-tools'
           ? codingToolRows
@@ -1319,7 +1330,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
   };
 
   const sheetTabs: ReadonlyArray<SheetTabItem<IntegrationSheet>> = [
-    { key: 'plugins', label: t.integrations.sheetPlugins, badge: pluginRows.length },
+    { key: SYSTEM_INSTALLED_APPS_SHEET, label: t.integrations.sheetPlugins, badge: pluginRows.length },
     { key: 'coding-tools', label: 'Coding Tools', badge: codingToolRows.length },
     { key: 'mcp', label: t.integrations.sheetMcp, badge: mcpRows.length },
     { key: 'skills', label: t.integrations.sheetSkills, badge: skillsRowsMerged.length },
@@ -1354,8 +1365,9 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     });
   }, []);
 
-  const isTestableSheet =
-    activeSheet === 'plugins' || activeSheet === 'coding-tools' || activeSheet === 'mcp';
+  const isPluginSystemSheet =
+    activeSheet === SYSTEM_INSTALLED_APPS_SHEET || activeSheet === 'coding-tools' || activeSheet === 'mcp';
+  const isTestableSheet = isPluginSystemSheet;
 
   const handleTestAll = useCallback(async () => {
     if (!isTestableSheet) return;
@@ -1388,7 +1400,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
           : null;
 
   const RESCANABLE_SHEETS = new Set<IntegrationSheet>([
-    'plugins',
+    SYSTEM_INSTALLED_APPS_SHEET,
     'coding-tools',
     'mcp',
     'skills',
@@ -1429,7 +1441,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
           </option>
         ))}
       </select>
-      {(activeSheet === 'plugins' || activeSheet === 'coding-tools' || activeSheet === 'mcp') && (
+      {isPluginSystemSheet && (
         <select
           value={pluginsFilter}
           onChange={(e) => setPluginsFilter(e.target.value as PluginsFilter)}
@@ -1659,22 +1671,22 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
                 frozenDataColCount={frozenDataColCount}
                 rowDensity={rowDensity}
                 onTestRow={
-                  activeSheet === 'plugins' || activeSheet === 'coding-tools' || activeSheet === 'mcp'
+                  isPluginSystemSheet
                     ? handleTestPluginRow
                     : undefined
                 }
                 testResults={
-                  activeSheet === 'plugins' || activeSheet === 'coding-tools' || activeSheet === 'mcp'
+                  isPluginSystemSheet
                     ? pluginTestResults
                     : undefined
                 }
                 testingKeys={
-                  activeSheet === 'plugins' || activeSheet === 'coding-tools' || activeSheet === 'mcp'
+                  isPluginSystemSheet
                     ? pluginTestingKeys
                     : undefined
                 }
                 onToggleEnabled={
-                  activeSheet === 'plugins' || activeSheet === 'coding-tools' || activeSheet === 'mcp'
+                  isPluginSystemSheet
                     ? (row, _enabled) => {
                         if (row.sourceKind === 'plugin-installed') {
                           updateCatalog(togglePluginEnabled(catalog, row.sourceId));
