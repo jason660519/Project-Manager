@@ -12,7 +12,7 @@ import {
   PanelsTopLeft,
   SquareTerminal,
 } from 'lucide-react';
-import { EmbeddedXtermPane } from '../../../components/terminal/EmbeddedXtermPane';
+import { TerminalPaneGroup } from '../../../components/terminal/TerminalPaneGroup';
 import type { ProjectEntry } from '../../../lib/types';
 
 interface WorkspaceRow {
@@ -71,11 +71,6 @@ const fallbackWorkspaces: WorkspaceRow[] = [
     branch: 'main*',
     cwd: '/Volumes/KLEVV-4T-1/Company-AI-App-Standards',
   },
-];
-
-const leftPaneTabs: PaneTab[] = [
-  { label: 'Terminal', icon: 'terminal' },
-  { label: 'Terminal', active: true, icon: 'terminal' },
 ];
 
 function deriveWorkspaceRows(
@@ -474,11 +469,9 @@ function InteropConsole({
                 className={splitLayout === 'vertical' ? 'min-h-0 min-w-[260px] border-r border-stone-800' : 'min-h-[180px] border-b border-stone-800'}
                 style={browserVisible ? (splitLayout === 'vertical' ? { width: `${primarySplitPercent}%` } : { height: `${primarySplitPercent}%` }) : undefined}
               >
-                <PaneTabs tabs={leftPaneTabs} />
-                <EmbeddedXtermPane
-                  key={`terminal-a-${activeWorkspace?.id ?? 'workspace'}`}
-                  sessionKey={`terminal-a-${activeWorkspace?.id ?? 'workspace'}`}
-                  title="Terminal A"
+                <TerminalPaneGroup
+                  paneId="terminal-a"
+                  workspaceId={activeWorkspace?.id ?? 'workspace'}
                   cwd={activeWorkspace?.cwd ?? '/'}
                 />
               </div>
@@ -508,11 +501,9 @@ function InteropConsole({
             aria-label="Resize terminal rows"
           />
           <div className="min-h-[150px] min-w-0 flex-1 border-t border-stone-800">
-            <PaneTabs tabs={[{ label: 'Terminal', icon: 'terminal' }, { label: 'Terminal', active: true, icon: 'terminal' }]} />
-            <EmbeddedXtermPane
-              key={`terminal-b-${activeWorkspace?.id ?? 'workspace'}`}
-              sessionKey={`terminal-b-${activeWorkspace?.id ?? 'workspace'}`}
-              title="Terminal B"
+            <TerminalPaneGroup
+              paneId="terminal-b"
+              workspaceId={activeWorkspace?.id ?? 'workspace'}
               cwd={activeWorkspace?.cwd ?? '/'}
             />
           </div>
@@ -579,7 +570,9 @@ export function XmuxView({
         <h1 className="text-[13px] font-semibold text-stone-100">xmux</h1>
         <p className="mt-1">xmux -&gt; cmux</p>
         <p>xmux does not prescribe how developers must use AI.</p>
-        <p>Terminal panes embed a real shell (xterm + PTY) in each block, rooted at the active workspace folder.</p>
+        <p>
+          Terminal panes use native PTY + GPU xterm (WebGL) today; Phase 2 targets libghostty rendering like cmux.
+        </p>
         <div className="mt-1 flex gap-3 text-stone-400">
           <span>Built-In Browser</span>
           <span>Notification Panel</span>
