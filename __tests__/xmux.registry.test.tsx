@@ -105,9 +105,10 @@ describe('xmux registry integration', () => {
     expect(screen.getByText('xmux -> cmux')).toBeInTheDocument();
     expect(screen.getAllByText('Realestate_Management_Apps').length).toBeGreaterThan(0);
     expect(screen.getByText('Project Management')).toBeInTheDocument();
-    expect(screen.getByText(/terminal panes embed a real shell/i)).toBeInTheDocument();
-    expect(screen.getByText(/rooted at the active workspace folder/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Embedded terminal requires the Project Manager desktop app/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/native PTY \+ GPU xterm/i)).toBeInTheDocument();
+    expect(screen.getByText(/libghostty rendering like cmux/i)).toBeInTheDocument();
+    expect(screen.getAllByLabelText('New terminal tab').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Embedded terminal requires/i).length).toBeGreaterThan(0);
     expect(screen.getByText('Built-In Browser')).toBeInTheDocument();
     expect(screen.getByText('Notification Panel')).toBeInTheDocument();
     expect(screen.getByText('Split Pane Layout')).toBeInTheDocument();
