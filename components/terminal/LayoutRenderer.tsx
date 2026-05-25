@@ -69,16 +69,18 @@ export function LayoutRenderer(props: RendererProps) {
   const { node } = props;
   if (node.type === 'leaf') {
     return (
-      <Block
-        block={node.block}
-        workspaceId={props.workspaceId}
-        cwd={props.cwd}
-        homepageUrl={props.homepageUrl}
-        onUpdate={(updater) => props.onUpdateBlock(node.block.id, updater)}
-        onClose={() => props.onCloseBlock(node.block.id)}
-        onSplitRight={() => props.onSplit(node.block.id, 'vertical')}
-        onSplitDown={() => props.onSplit(node.block.id, 'horizontal')}
-      />
+      <div className="h-full min-h-0 min-w-0 overflow-hidden">
+        <Block
+          block={node.block}
+          workspaceId={props.workspaceId}
+          cwd={props.cwd}
+          homepageUrl={props.homepageUrl}
+          onUpdate={(updater) => props.onUpdateBlock(node.block.id, updater)}
+          onClose={() => props.onCloseBlock(node.block.id)}
+          onSplitRight={() => props.onSplit(node.block.id, 'vertical')}
+          onSplitDown={() => props.onSplit(node.block.id, 'horizontal')}
+        />
+      </div>
     );
   }
   return <SplitView split={node} {...props} />;
@@ -123,11 +125,11 @@ function SplitView({
       ref={containerRef}
       className={
         isVertical
-          ? 'flex h-full min-h-0 w-full min-w-0'
-          : 'flex h-full min-h-0 w-full min-w-0 flex-col'
+          ? 'flex h-full min-h-0 w-full min-w-0 overflow-hidden'
+          : 'flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden'
       }
     >
-      <div className="min-h-0 min-w-0" style={firstStyle}>
+      <div className="min-h-0 min-w-0 overflow-hidden" style={firstStyle}>
         <LayoutRenderer {...rest} node={split.first} />
       </div>
       <div
@@ -141,7 +143,7 @@ function SplitView({
           dragging ? 'bg-sky-400/80' : '',
         ].join(' ')}
       />
-      <div className="min-h-0 min-w-0 flex-1">
+      <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
         <LayoutRenderer {...rest} node={split.second} />
       </div>
     </div>

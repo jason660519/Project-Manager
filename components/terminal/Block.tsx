@@ -1,9 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { EmbeddedXtermPane } from './EmbeddedXtermPane';
+import { TerminalSlot } from './TerminalSlot';
+import { destroy as destroyTerminal } from './TerminalRegistry';
 import { PaneShell, type PaneActions, type PaneShellTab } from './PaneShell';
 import { BrowserContent } from '../browser/BrowserContent';
+import { destroy as destroyBrowser } from '../browser/BrowserRegistry';
 import { FolderContent } from '../folder/FolderContent';
 import {
   deriveBrowserLabel,
@@ -58,8 +60,8 @@ export function Block({
   // Lazy-mount: only mount an item the first time it becomes active. Once
   // mounted, the item stays mounted (hidden via display:none when inactive)
   // so terminal PTY sessions and browser iframe state survive tab switches.
-  const [seenItemIds, setSeenItemIds] = useState<Set<string>>(() =>
-    activeItem ? new Set([activeItem.id]) : new Set(),
+  const [seenItemIds, setSeenItemIds] = useState<Set<string>>(
+    () => new Set(block.items.map((item) => item.id)),
   );
   useEffect(() => {
     if (!activeItem) return;
@@ -138,7 +140,16 @@ export function Block({
 
   const closeTab = useCallback(
     (tabId: string) => {
+      const closing = block.items.find((item) => item.id === tabId);
       const nextItems = block.items.filter((item) => item.id !== tabId);
+      // Tell the appropriate registry the user has permanently dismissed this
+      // item. Deferred so the React detach (slot unmount) runs first; otherwise
+      // we'd remove the host DIV out from under React's commit phase.
+      if (closing?.kind === 'terminal') {
+        queueMicrotask(() => destroyTerminal(tabId));
+      } else if (closing?.kind === 'browser') {
+        queueMicrotask(() => destroyBrowser(tabId));
+      }
       if (nextItems.length === 0) {
         onClose();
         return;
@@ -200,10 +211,7 @@ export function Block({
             className={visible ? 'flex h-full min-h-0 flex-col' : 'hidden'}
           >
             {isTerminal(item) ? (
-              <EmbeddedXtermPane
-                sessionKey={`${workspaceId}::${block.id}::${item.id}`}
-                cwd={cwd}
-              />
+              <TerminalSlot itemId={item.id} cwd={cwd} />
             ) : isBrowser(item) ? (
               <BrowserContent
                 itemId={item.id}

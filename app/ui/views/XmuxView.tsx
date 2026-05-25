@@ -13,6 +13,8 @@ import { LayoutRenderer } from '../../../components/terminal/LayoutRenderer';
 import {
   createBlock,
   createInitialLayout,
+  countBlocks,
+  checkLayoutFits,
   removeBlock,
   splitLeaf,
   updateBlock,
@@ -269,6 +271,10 @@ function InteropConsole({
   const [sidebarWidth, setSidebarWidth] = useState(300);
   const [dragCursor, setDragCursor] = useState<DragCursor>(null);
   const [layouts, setLayouts] = useState<Record<string, LayoutNode>>({});
+  const pendingLayoutsRef = useRef<Record<string, LayoutNode>>({});
+  const [splitNotice, setSplitNotice] = useState<string | null>(null);
+  const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [layoutViewport, setLayoutViewport] = useState({ width: 0, height: 0 });
 
   const activeWorkspace =
     workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? workspaces[0];
@@ -279,20 +285,56 @@ function InteropConsole({
   );
 
   const rootRef = useRef<HTMLElement | null>(null);
+  const layoutViewportRef = useRef<HTMLDivElement | null>(null);
 
-  // Lazily initialise a layout the first time each workspace is shown.
+  const activeLayout = useMemo(() => {
+    if (!activeWorkspace) return undefined;
+    const stored = layouts[activeWorkspace.id];
+    if (stored) return stored;
+    const pending = pendingLayoutsRef.current[activeWorkspace.id];
+    if (pending) return pending;
+    const created = createInitialLayout(activeWorkspace.homepageUrl);
+    pendingLayoutsRef.current[activeWorkspace.id] = created;
+    return created;
+  }, [activeWorkspace, layouts]);
+
+  // Persist the first-paint layout so pane ids stay stable after hydration.
   useEffect(() => {
     if (!activeWorkspace) return;
     setLayouts((current) => {
       if (current[activeWorkspace.id]) return current;
-      return {
-        ...current,
-        [activeWorkspace.id]: createInitialLayout(activeWorkspace.homepageUrl),
-      };
+      const pending = pendingLayoutsRef.current[activeWorkspace.id];
+      if (pending) {
+        return { ...current, [activeWorkspace.id]: pending };
+      }
+      const created = createInitialLayout(activeWorkspace.homepageUrl);
+      pendingLayoutsRef.current[activeWorkspace.id] = created;
+      return { ...current, [activeWorkspace.id]: created };
     });
   }, [activeWorkspace]);
 
-  const activeLayout = activeWorkspace ? layouts[activeWorkspace.id] : undefined;
+  useEffect(() => {
+    const el = layoutViewportRef.current;
+    if (!el) return;
+    const update = () =>
+      setLayoutViewport({ width: el.clientWidth, height: el.clientHeight });
+    update();
+    const observer = new ResizeObserver(() => update());
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const showSplitBlocked = useCallback((message: string) => {
+    setSplitNotice(message);
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = setTimeout(() => setSplitNotice(null), 2600);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    };
+  }, []);
 
   const mutateLayout = useCallback(
     (
@@ -319,10 +361,40 @@ function InteropConsole({
     (blockId: string, direction: SplitDirection) => {
       if (!activeWorkspace) return;
       mutateLayout(activeWorkspace.id, (layout) =>
-        splitLeaf(layout, blockId, direction, createBlock()),
+        {
+          const { width, height } = layoutViewport;
+          const hasViewport = width > 0 && height > 0;
+          const minBlockWidth = width < 900 ? 240 : 300;
+          const minBlockHeight = height < 600 ? 160 : 200;
+          const maxBlocks = hasViewport
+            ? Math.max(
+                1,
+                Math.floor(width / minBlockWidth) * Math.floor(height / minBlockHeight),
+              )
+            : Number.POSITIVE_INFINITY;
+          const currentBlocks = countBlocks(layout);
+          if (hasViewport && currentBlocks >= maxBlocks) {
+            showSplitBlocked(
+              `已達到此視窗可合理顯示的最大區塊數（${maxBlocks}）。請先關閉部分區塊或放大視窗後再分割。`,
+            );
+            return layout;
+          }
+
+          const next = splitLeaf(layout, blockId, direction, createBlock());
+          if (next === layout) return layout;
+
+          if (hasViewport) {
+            const fit = checkLayoutFits(next, width, height, minBlockWidth, minBlockHeight);
+            if (!fit.ok) {
+              showSplitBlocked('此視窗尺寸下無法再分割，避免區塊過小或導致版面超出可視範圍。');
+              return layout;
+            }
+          }
+          return next;
+        },
       );
     },
-    [activeWorkspace, mutateLayout],
+    [activeWorkspace, layoutViewport, mutateLayout, showSplitBlocked],
   );
 
   const handleCloseBlock = useCallback(
@@ -402,7 +474,7 @@ function InteropConsole({
   return (
     <section
       ref={rootRef}
-      className="flex h-full min-h-0 w-full flex-col overflow-hidden border border-stone-700/80 bg-[#1b1b1b] shadow-2xl lg:flex-row"
+      className="relative flex h-full min-h-0 w-full flex-col overflow-hidden border border-stone-700/80 bg-[#1b1b1b] shadow-2xl lg:flex-row"
     >
       <div className="shrink-0" style={{ width: `min(100%, ${sidebarWidth}px)` }}>
         <WorkspaceSidebar
@@ -422,7 +494,11 @@ function InteropConsole({
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <WorkspaceHeader workspaceName={activeWorkspace?.name ?? 'Workspace'} />
-        <div className="flex min-h-0 flex-1 flex-col">
+        <div
+          ref={layoutViewportRef}
+          data-xmux-viewport
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        >
           {activeWorkspace && activeLayout ? (
             <LayoutRenderer
               node={activeLayout}
@@ -442,6 +518,15 @@ function InteropConsole({
           onClose={() => setNotificationOpen(false)}
           workspaceName={activeWorkspace?.name ?? 'Workspace'}
         />
+      ) : null}
+      {splitNotice ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none absolute bottom-3 right-3 z-40 max-w-[420px] border border-amber-300/40 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-100 shadow-[0_10px_30px_rgba(0,0,0,0.35)]"
+        >
+          {splitNotice}
+        </div>
       ) : null}
       {dragCursor ? (
         <div
@@ -494,7 +579,7 @@ export function XmuxView({
   }, [activeWorkspaceId, workspaces]);
 
   return (
-    <section className="flex h-full w-full flex-col gap-3">
+    <section className="flex h-full min-h-0 w-full flex-col overflow-hidden">
       {workspaces.length === 0 ? (
         <div className="flex h-full min-h-[280px] items-center justify-center rounded border border-stone-700/80 bg-[#1b1b1b] text-stone-400">
           目前沒有可顯示的 workspace，請先在 Project Dashboard 勾選專案。

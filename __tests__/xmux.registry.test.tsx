@@ -119,36 +119,32 @@ describe('xmux registry integration', () => {
 
     expect(screen.getAllByText('Realestate_Management_Apps').length).toBeGreaterThan(0);
     expect(screen.getByText('Project Management')).toBeInTheDocument();
-    expect(screen.getAllByText(/Embedded terminal requires/i).length).toBeGreaterThan(0);
-    expect(screen.getByLabelText('Right top xmux toolbar')).toBeInTheDocument();
-    expect(screen.getByLabelText('Built-in browser')).toBeInTheDocument();
+    // F29: TerminalSlot is stubbed in setup.ts; assert the mock placeholder.
+    expect(screen.getAllByTestId('terminal-slot-mock').length).toBeGreaterThan(0);
+    expect(screen.getByTitle('xmux browser pane')).toBeInTheDocument();
     expect(screen.getByLabelText('Notification panel')).toBeInTheDocument();
-    expect(screen.getByLabelText('Split pane layout')).toBeInTheDocument();
-    expect(screen.getAllByLabelText('New terminal in this pane').length).toBeGreaterThanOrEqual(3);
-    expect(screen.getAllByLabelText('New browser tab').length).toBeGreaterThanOrEqual(3);
-    expect(screen.getAllByLabelText('Split pane to the right').length).toBeGreaterThanOrEqual(3);
-    expect(screen.getAllByLabelText('Split pane downward').length).toBeGreaterThanOrEqual(3);
+    // F29 initial layout = 2 leaf blocks (terminal+browser side-by-side).
+    // Each block carries its own 5-button toolbar.
+    expect(screen.getAllByLabelText('New terminal in this pane').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByLabelText('New browser tab').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByLabelText('New folder tab').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByLabelText('Split pane to the right').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByLabelText('Split pane downward').length).toBeGreaterThanOrEqual(2);
   });
 
-  it('makes the xmux toolbar controls interactive', async () => {
+  it('makes the xmux pane controls interactive', async () => {
     const user = userEvent.setup();
     render(<XmuxView />);
 
     expect(screen.getByTitle('xmux browser pane')).toBeInTheDocument();
-    expect(screen.getByLabelText('vertical split workspace')).toBeInTheDocument();
-
-    await user.click(screen.getByLabelText('Built-in browser'));
-    expect(screen.queryByTitle('xmux browser pane')).not.toBeInTheDocument();
-
-    await user.click(screen.getByLabelText('Built-in browser'));
-    expect(screen.getByTitle('xmux browser pane')).toBeInTheDocument();
+    expect(screen.getByLabelText('Browser URL')).toBeInTheDocument();
 
     await user.click(screen.getByLabelText('Notification panel'));
     expect(screen.getByText('Notifications')).toBeInTheDocument();
     expect(screen.getAllByText('Codex waiting for input').length).toBeGreaterThan(0);
 
-    await user.click(screen.getByLabelText('Split pane layout'));
-    expect(screen.getByLabelText('horizontal split workspace')).toBeInTheDocument();
+    await user.click(screen.getAllByLabelText('New browser tab')[0]);
+    expect(screen.getAllByLabelText('Browser URL').length).toBeGreaterThanOrEqual(2);
   });
 
   it('only shows dashboard-selected projects when project data is provided', () => {

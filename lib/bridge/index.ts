@@ -150,6 +150,48 @@ export async function listDirectoryEntries(path: string): Promise<DirEntry[]> {
   return invoke<DirEntry[]>('list_directory_entries', { path });
 }
 
+// ── xmux native webview overlay (B1) ────────────────────────────────────────
+// Native OS-level child webview, not an iframe — bypasses X-Frame-Options.
+// Caller is responsible for sync'ing bounds via ResizeObserver in the slot.
+
+export async function xmuxWebviewCreate(
+  label: string,
+  url: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): Promise<void> {
+  if (!isTauri()) throw new Error('xmuxWebviewCreate requires Tauri runtime');
+  return invoke<void>('xmux_webview_create', { label, url, x, y, width, height });
+}
+
+export async function xmuxWebviewSetBounds(
+  label: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): Promise<void> {
+  if (!isTauri()) throw new Error('xmuxWebviewSetBounds requires Tauri runtime');
+  return invoke<void>('xmux_webview_set_bounds', { label, x, y, width, height });
+}
+
+export async function xmuxWebviewSetVisible(label: string, visible: boolean): Promise<void> {
+  if (!isTauri()) throw new Error('xmuxWebviewSetVisible requires Tauri runtime');
+  return invoke<void>('xmux_webview_set_visible', { label, visible });
+}
+
+export async function xmuxWebviewNavigate(label: string, url: string): Promise<void> {
+  if (!isTauri()) throw new Error('xmuxWebviewNavigate requires Tauri runtime');
+  return invoke<void>('xmux_webview_navigate', { label, url });
+}
+
+export async function xmuxWebviewDestroy(label: string): Promise<void> {
+  if (!isTauri()) throw new Error('xmuxWebviewDestroy requires Tauri runtime');
+  return invoke<void>('xmux_webview_destroy', { label });
+}
+
 /** Detect a local Git repository's GitHub origin URL. Returns null when no GitHub origin exists. */
 export async function detectGithubRepoUrl(projectRoot: string): Promise<string | null> {
   if (!isTauri()) return null;
@@ -452,6 +494,29 @@ export async function resolveInstallPath(
   };
 }
 
+export interface TestCommandOutput {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  ok: boolean;
+}
+
+/**
+ * Run an arbitrary command string (split on whitespace, 10 s timeout).
+ * Returns full stdout/stderr/exitCode so the UI can display raw output.
+ * Outside Tauri, always rejects — callers should guard with isTauri check or catch.
+ */
+export async function runTestCommand(command: string): Promise<TestCommandOutput> {
+  if (!isTauri()) {
+    return { stdout: '', stderr: 'Not available outside Tauri', exitCode: -1, ok: false };
+  }
+  try {
+    return await invoke<TestCommandOutput>('run_test_command', { command });
+  } catch (err) {
+    throw new Error(err instanceof Error ? err.message : String(err));
+  }
+}
+
 /**
  * Run `command --version` (4 s timeout) and return the first line of output.
  * Resolves with the version string on success, rejects with an error message on failure.
@@ -463,6 +528,30 @@ export async function probeCommandVersion(command: string): Promise<string | nul
     return await invoke<string>('probe_command_version', { command });
   } catch (err) {
     throw new Error(err instanceof Error ? err.message : String(err));
+  }
+}
+
+// ── IDE MCP config scanner ────────────────────────────────────────────────────
+
+export interface IdeConfigEntry {
+  ide: string;
+  configPath: string;
+  exists: boolean;
+  readable: boolean;
+  entryCount: number;
+  parseError: string | null;
+}
+
+/**
+ * Scan known IDE MCP config file locations and return per-IDE status.
+ * macOS only — returns an empty array outside Tauri or on other platforms.
+ */
+export async function scanIdeMcpConfigs(): Promise<IdeConfigEntry[]> {
+  if (!isTauri()) return [];
+  try {
+    return await invoke<IdeConfigEntry[]>('scan_ide_mcp_configs');
+  } catch {
+    return [];
   }
 }
 

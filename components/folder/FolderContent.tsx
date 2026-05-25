@@ -114,7 +114,7 @@ export function FolderContent({ itemId, rootPath, onOpenFile }: FolderContentPro
   }, [loadDir]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#1e1e1e] text-stone-200">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-[#1e1e1e] text-stone-200">
       <div className="flex h-8 shrink-0 items-center gap-2 border-b border-stone-800 px-2 text-[11px] text-stone-400">
         <FolderOpen size={13} className="shrink-0 text-amber-300" />
         <span className="min-w-0 flex-1 truncate font-mono text-stone-300" title={rootPath}>
