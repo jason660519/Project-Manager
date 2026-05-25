@@ -5,7 +5,6 @@ import { TerminalSlot } from './TerminalSlot';
 import { destroy as destroyTerminal } from './TerminalRegistry';
 import { PaneShell, type PaneActions, type PaneShellTab } from './PaneShell';
 import { BrowserContent } from '../browser/BrowserContent';
-import { destroy as destroyBrowser } from '../browser/BrowserRegistry';
 import { FolderContent } from '../folder/FolderContent';
 import {
   deriveBrowserLabel,
@@ -16,6 +15,7 @@ import {
   type FolderItem,
   type TerminalItem,
 } from './blockLayout';
+import { destroyBlockItem } from './destroyBlockItems';
 
 interface BlockProps {
   block: BlockModel;
@@ -63,25 +63,25 @@ export function Block({
   const [seenItemIds, setSeenItemIds] = useState<Set<string>>(
     () => new Set(block.items.map((item) => item.id)),
   );
-  useEffect(() => {
-    if (!activeItem) return;
-    setSeenItemIds((prev) => {
-      if (prev.has(activeItem.id)) return prev;
-      const next = new Set(prev);
-      next.add(activeItem.id);
-      return next;
-    });
-  }, [activeItem?.id]);
-  // Drop ids for items that have been closed so the Set doesn't grow unbounded.
+  // Keep seenItemIds in sync with block.items so new tabs mount immediately.
   useEffect(() => {
     setSeenItemIds((prev) => {
       const aliveIds = new Set(block.items.map((item) => item.id));
-      for (const id of prev) {
-        if (!aliveIds.has(id)) {
-          return new Set(Array.from(prev).filter((entry) => aliveIds.has(entry)));
+      let changed = false;
+      const next = new Set(prev);
+      for (const id of aliveIds) {
+        if (!next.has(id)) {
+          next.add(id);
+          changed = true;
         }
       }
-      return prev;
+      for (const id of prev) {
+        if (!aliveIds.has(id)) {
+          next.delete(id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
     });
   }, [block.items]);
 
@@ -142,15 +142,15 @@ export function Block({
     (tabId: string) => {
       const closing = block.items.find((item) => item.id === tabId);
       const nextItems = block.items.filter((item) => item.id !== tabId);
-      // Tell the appropriate registry the user has permanently dismissed this
-      // item. Deferred so the React detach (slot unmount) runs first; otherwise
-      // we'd remove the host DIV out from under React's commit phase.
-      if (closing?.kind === 'terminal') {
-        queueMicrotask(() => destroyTerminal(tabId));
-      } else if (closing?.kind === 'browser') {
-        queueMicrotask(() => destroyBrowser(tabId));
+      if (closing) {
+        destroyBlockItem(closing);
       }
       if (nextItems.length === 0) {
+        for (const item of block.items) {
+          if (item.id !== tabId) {
+            destroyBlockItem(item);
+          }
+        }
         onClose();
         return;
       }
@@ -177,6 +177,13 @@ export function Block({
     [onUpdate],
   );
 
+  const closePane = useCallback(() => {
+    for (const item of block.items) {
+      destroyBlockItem(item);
+    }
+    onClose();
+  }, [block.items, onClose]);
+
   const actions: PaneActions = useMemo(
     () => ({
       onAddTerminal: addTerminal,
@@ -184,8 +191,9 @@ export function Block({
       onAddFolder: addFolder,
       onSplitRight,
       onSplitDown,
+      onClosePane: closePane,
     }),
-    [addTerminal, addBrowser, addFolder, onSplitRight, onSplitDown],
+    [addTerminal, addBrowser, addFolder, onSplitRight, onSplitDown, closePane],
   );
 
   const shellTabs: PaneShellTab[] = block.items.map((item) => ({

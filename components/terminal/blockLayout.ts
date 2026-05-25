@@ -103,16 +103,18 @@ export function createBlock(seed?: BlockItem): Block {
   return { id: uniqueId('block'), items: [item], activeItemId: item.id };
 }
 
-// First-time layout for a workspace: terminal (left) + browser (right) so both
-// surfaces are visible without hunting through tabs.
+// One tabbed block: terminal + browser tabs (cmux-style). Terminal is active first;
+// browser is one click away and can be closed with the tab × without a orphan overlay.
 export function createInitialLayout(homepageUrl: string): LayoutNode {
+  const terminal = createTerminalItem();
+  const browser = createBrowserItem(homepageUrl);
   return {
-    type: 'split',
-    id: uniqueId('split'),
-    direction: 'vertical',
-    ratio: 0.5,
-    first: { type: 'leaf', block: createBlock(createTerminalItem()) },
-    second: { type: 'leaf', block: createBlock(createBrowserItem(homepageUrl)) },
+    type: 'leaf',
+    block: {
+      id: uniqueId('block'),
+      items: [terminal, browser],
+      activeItemId: terminal.id,
+    },
   };
 }
 
@@ -184,6 +186,22 @@ export function updateSplitRatio(
   const second = updateSplitRatio(tree.second, splitId, ratio);
   if (first === tree.first && second === tree.second) return tree;
   return { ...tree, first, second };
+}
+
+export function findBlock(tree: LayoutNode, blockId: string): Block | null {
+  if (tree.type === 'leaf') {
+    return tree.block.id === blockId ? tree.block : null;
+  }
+  return findBlock(tree.first, blockId) ?? findBlock(tree.second, blockId);
+}
+
+export function forEachBlock(tree: LayoutNode, visit: (block: Block) => void): void {
+  if (tree.type === 'leaf') {
+    visit(tree.block);
+    return;
+  }
+  forEachBlock(tree.first, visit);
+  forEachBlock(tree.second, visit);
 }
 
 export function countBlocks(tree: LayoutNode): number {

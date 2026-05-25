@@ -192,6 +192,12 @@ export async function xmuxWebviewDestroy(label: string): Promise<void> {
   return invoke<void>('xmux_webview_destroy', { label });
 }
 
+/** Remove orphan native browser overlays from older xmux builds. */
+export async function xmuxWebviewDestroyAll(): Promise<void> {
+  if (!isTauri()) return;
+  return invoke<void>('xmux_webview_destroy_all');
+}
+
 /** Detect a local Git repository's GitHub origin URL. Returns null when no GitHub origin exists. */
 export async function detectGithubRepoUrl(projectRoot: string): Promise<string | null> {
   if (!isTauri()) return null;

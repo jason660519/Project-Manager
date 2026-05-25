@@ -1,6 +1,11 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../components/terminal/TerminalSlot', () => ({
+  TerminalSlot: () => <div data-testid="terminal-slot-mock" className="h-full min-h-0" />,
+}));
+
 import { createRuntimeAdapter, listAdapters } from '../lib/adapters/registry';
 import { BUILT_IN_ADAPTER_SUPPORTS } from '../lib/capabilities/registry';
 import { CURRENT_SCHEMA_VERSION } from '../lib/storage/migrate';
@@ -123,21 +128,17 @@ describe('xmux registry integration', () => {
     expect(screen.getAllByTestId('terminal-slot-mock').length).toBeGreaterThan(0);
     expect(screen.getByTitle('xmux browser pane')).toBeInTheDocument();
     expect(screen.getByLabelText('Notification panel')).toBeInTheDocument();
-    // F29 initial layout = 2 leaf blocks (terminal+browser side-by-side).
-    // Each block carries its own 5-button toolbar.
-    expect(screen.getAllByLabelText('New terminal in this pane').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByLabelText('New browser tab').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByLabelText('New folder tab').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByLabelText('Split pane to the right').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByLabelText('Split pane downward').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByLabelText('Close pane')).toBeInTheDocument();
+    expect(screen.getAllByLabelText('New terminal in this pane').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByLabelText('New browser tab').length).toBeGreaterThanOrEqual(1);
   });
 
   it('makes the xmux pane controls interactive', async () => {
     const user = userEvent.setup();
     render(<XmuxView />);
 
-    expect(screen.getByTitle('xmux browser pane')).toBeInTheDocument();
-    expect(screen.getByLabelText('Browser URL')).toBeInTheDocument();
+    expect(screen.getAllByTitle('xmux browser pane').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByLabelText('Browser URL').length).toBeGreaterThanOrEqual(1);
 
     await user.click(screen.getByLabelText('Notification panel'));
     expect(screen.getByText('Notifications')).toBeInTheDocument();

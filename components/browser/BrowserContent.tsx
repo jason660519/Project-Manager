@@ -1,11 +1,11 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Chrome, ExternalLink, Info } from 'lucide-react';
 import { deriveBrowserLabel } from '../terminal/blockLayout';
 import { openExternalUrl } from '../../lib/bridge';
 import { BrowserSlot } from './BrowserSlot';
-import { backendKind } from './BrowserRegistry';
+import { backendKind, sessionKind } from './BrowserRegistry';
 
 export const deriveBrowserTabLabel = deriveBrowserLabel;
 
@@ -17,19 +17,25 @@ function normalizeUrl(input: string): string | null {
   return `http://${trimmed}`;
 }
 
-// localhost / 127.* / our own dev host won't set X-Frame-Options, so we don't
-// need the "may be blank" warning. Everything else: warn the user that the
-// remote site may refuse iframe embedding.
+// localhost / same-origin dev URLs embed cleanly in iframe; remote sites need the
+// native Tauri webview (cmux-style) or "open externally" fallback.
 function isLikelyEmbeddable(url: string): boolean {
   try {
     const u = new URL(url);
     const host = u.hostname;
-    return (
+    if (
       host === 'localhost' ||
       host === '127.0.0.1' ||
       host === '0.0.0.0' ||
       host.endsWith('.local')
-    );
+    ) {
+      return true;
+    }
+    if (u.port === '43187') return true;
+    if (typeof window !== 'undefined' && u.host === window.location.host) {
+      return true;
+    }
+    return false;
   } catch {
     return true;
   }
@@ -46,40 +52,41 @@ export function BrowserContent({
   homepageUrl: string;
   onNavigate: (url: string) => void;
 }) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  // Native Tauri webview overlay embeds any URL (X-Frame-Options doesn't
-  // apply); only the iframe fallback ever needs the "may be blank" warning.
-  const showBlockedHint = useMemo(
-    () => backendKind() === 'iframe' && !isLikelyEmbeddable(url),
-    [url],
-  );
+  const [draftUrl, setDraftUrl] = useState(url);
+
+  useEffect(() => {
+    setDraftUrl(url);
+  }, [itemId, url]);
+
+  const showBlockedHint = useMemo(() => {
+    // Native in-window embed handles google/youtube/github; hint only for iframe fallback.
+    if (sessionKind(itemId) === 'tauri') return false;
+    return !isLikelyEmbeddable(url);
+  }, [itemId, url]);
 
   const navigate = () => {
-    const value = inputRef.current?.value ?? '';
-    const next = normalizeUrl(value);
+    const next = normalizeUrl(draftUrl);
     if (!next) return;
-    if (inputRef.current) inputRef.current.value = next;
+    setDraftUrl(next);
     onNavigate(next);
   };
 
   const openExternally = () => {
-    void openExternalUrl(url).catch(() => {
-      // Last-resort fallback: try a plain window.open in case the bridge
-      // policy denies the URL (e.g., file:// or chrome-internal scheme).
+    const target = normalizeUrl(draftUrl) ?? url;
+    void openExternalUrl(target).catch(() => {
       if (typeof window !== 'undefined') {
-        window.open(url, '_blank', 'noopener,noreferrer');
+        window.open(target, '_blank', 'noopener,noreferrer');
       }
     });
   };
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#1e1e1e]">
-      <div className="flex h-8 shrink-0 items-center gap-2 border-b border-stone-800 px-2 text-[11px] text-stone-400">
+      <div className="relative z-10 flex h-8 shrink-0 items-center gap-2 border-b border-stone-800 px-2 text-[11px] text-stone-400">
         <Chrome size={13} className="shrink-0 text-stone-300" />
         <input
-          key={itemId}
-          ref={inputRef}
-          defaultValue={url}
+          value={draftUrl}
+          onChange={(event) => setDraftUrl(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter') navigate();
           }}
@@ -105,10 +112,12 @@ export function BrowserContent({
         </button>
       </div>
       {showBlockedHint ? (
-        <div className="flex shrink-0 items-center gap-2 border-b border-amber-900/40 bg-amber-950/40 px-2 py-1 text-[11px] text-amber-200">
+        <div className="relative z-10 flex shrink-0 items-center gap-2 border-b border-amber-900/40 bg-amber-950/40 px-2 py-1 text-[11px] text-amber-200">
           <Info size={12} className="shrink-0" />
-          <span className="min-w-0 flex-1 truncate">
-            部分站台拒絕被 iframe 嵌入；若下方頁面空白，請改用
+          <span className="min-w-0 flex-1">
+            此網址無法在 iframe 預覽中顯示（例如 Google、YouTube）。請用
+            <code className="mx-1 text-amber-100">npm run tauri:dev</code>
+            開桌面版以載入內嵌瀏覽器，或點
           </span>
           <button
             type="button"
