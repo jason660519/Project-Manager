@@ -34,6 +34,8 @@ import { AiEngineersTable } from './Engineers/AiEngineersTable';
 import { EngineerDetailSheet } from './Engineers/EngineerDetailSheet';
 import { DEFAULT_ENGINEERS_TAB, type EngineersTab, uid } from './Engineers/shared';
 
+const ENGINEERS_SHEET_ORDER_STORAGE_KEY = 'projectManager.engineers.sheetOrder';
+
 interface EngineersViewProps {
   roles: EngineerRole[];
   agents: AnyAdapterConfig[];
@@ -147,7 +149,13 @@ export function EngineersView({ roles, agents, onRolesChange }: EngineersViewPro
         panelClassName="border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72"
         scrollChildren={false}
         bottomTabs={
-          <BottomSheetTabs tabs={TABS} activeKey={activeTab} onSelect={setActiveTab} />
+          <BottomSheetTabs
+            tabs={TABS}
+            activeKey={activeTab}
+            onSelect={setActiveTab}
+            reorderable
+            orderStorageKey={ENGINEERS_SHEET_ORDER_STORAGE_KEY}
+          />
         }
       >
         {/* Both sheets mounted in parallel so TanStack column state survives tab swaps */}

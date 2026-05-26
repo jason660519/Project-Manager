@@ -114,7 +114,7 @@ For repo standards changes, also run:
 npm run standards:check
 ```
 
-For navigation, dashboard sheet, branch hygiene, or cmux/browser-surface work, also run:
+For navigation, dashboard sheet, branch hygiene, or xmux/browser-surface work, also run:
 
 ```bash
 npm run branch:check

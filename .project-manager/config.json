@@ -758,17 +758,19 @@
       "id": "F19",
       "locatedSection": "/plugins",
       "name": "Plugins → Connect Sheet",
-      "notes": "",
+      "notes": "Integration Hub scan/test actions are decoupled per inventory sheet; System Installed Apps now scans and tests independently.",
       "paths": {
+        "debugRetro": ".project-manager/features/F19/debug-retro.md",
         "implementation": "app/integrations-hub",
         "spec": "",
-        "test": "__tests__/integrations.connectedInstances.test.ts"
+        "test": "__tests__/integrations.sheetActions.test.ts",
+        "testScenarios": ".project-manager/features/F19/test-scenarios.md"
       },
       "phase": "development",
       "points": 1,
       "progress": 100,
       "status": "done",
-      "updatedAt": "2026-05-25T00:00:00.000Z"
+      "updatedAt": "2026-05-26T00:36:38.000Z"
     },
     {
       "category": "Integration/API",
@@ -981,6 +983,6 @@
     "root": "/Volumes/KLEVV-4T-1/Project-Manager"
   },
   "schemaVersion": 8,
-  "updatedAt": "2026-05-25T22:10:47Z",
+  "updatedAt": "2026-05-26T00:36:38.000Z",
   "updatedBy": "Codex"
 }

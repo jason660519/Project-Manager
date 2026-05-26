@@ -332,7 +332,7 @@ export interface EngineerRole {
   capabilities?: RoleCapability[];
 }
 
-export type ViewId = 'dashboard' | 'features' | 'integrations-hub' | 'cmux' | 'xmux' | 'settings' | 'engineers' | 'channels' | 'sessions' | 'cron-jobs' | 'logs' | 'keys' | 'documentation' | 'company-standards' | 'chat' | 'keyboard-shortcuts';
+export type ViewId = 'dashboard' | 'features' | 'integrations-hub' | 'xmux' | 'settings' | 'engineers' | 'channels' | 'sessions' | 'cron-jobs' | 'logs' | 'keys' | 'documentation' | 'company-standards' | 'chat' | 'keyboard-shortcuts';
 
 export type IssueState = 'open' | 'closed';
 

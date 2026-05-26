@@ -62,20 +62,20 @@ describe('xmux registry integration', () => {
     resetBrowserRegistry();
   });
 
-  it('exposes cmux as the built-in agent CLI target', async () => {
+  it('exposes xmux as the built-in cmux-backed agent CLI target', async () => {
     const adapters = listAdapters(baseConfig);
-    const cmux = adapters.find((adapter) => adapter.id === 'cmux');
+    const xmux = adapters.find((adapter) => adapter.id === 'xmux');
 
-    expect(cmux).toMatchObject({
-      id: 'cmux',
-      name: 'cmux',
+    expect(xmux).toMatchObject({
+      id: 'xmux',
+      name: 'xmux',
       type: 'agent',
       targetKind: 'agent-cli',
       command: 'cmux',
     });
-    expect(adapters.some((adapter) => adapter.id === 'xmux')).toBe(false);
+    expect(adapters.some((adapter) => adapter.id === 'cmux')).toBe(false);
 
-    const runtime = createRuntimeAdapter(baseConfig, 'cmux');
+    const runtime = createRuntimeAdapter(baseConfig, 'xmux');
     expect(runtime).not.toBeNull();
 
     const result = await runtime!.execute({
@@ -88,15 +88,15 @@ describe('xmux registry integration', () => {
     expect(result.command).toBe('cmux');
   });
 
-  it('normalizes a legacy configured xmux adapter into the cmux built-in slot', () => {
+  it('normalizes a legacy configured cmux adapter into the xmux built-in slot', () => {
     const config: ProjectManagerConfig = {
       ...baseConfig,
       adapters: {
         ides: [],
         agents: [
           {
-            id: 'xmux',
-            name: 'xmux CLI',
+            id: 'cmux',
+            name: 'Cmux CLI',
             type: 'agent',
             targetKind: 'agent-cli',
             command: '/custom/bin/cmux',
@@ -107,19 +107,19 @@ describe('xmux registry integration', () => {
     };
 
     const adapters = listAdapters(config);
-    const cmux = adapters.find((adapter) => adapter.id === 'cmux');
+    const xmux = adapters.find((adapter) => adapter.id === 'xmux');
 
-    expect(adapters.filter((adapter) => adapter.id === 'cmux')).toHaveLength(1);
-    expect(adapters.some((adapter) => adapter.id === 'xmux')).toBe(false);
-    expect(cmux).toMatchObject({
-      id: 'cmux',
+    expect(adapters.filter((adapter) => adapter.id === 'xmux')).toHaveLength(1);
+    expect(adapters.some((adapter) => adapter.id === 'cmux')).toBe(false);
+    expect(xmux).toMatchObject({
+      id: 'xmux',
       command: '/custom/bin/cmux',
       argsTemplate: ['send', '{prompt}'],
     });
   });
 
-  it('grants cmux the agent capability preset', () => {
-    expect(BUILT_IN_ADAPTER_SUPPORTS.cmux).toEqual(
+  it('grants xmux the agent capability preset', () => {
+    expect(BUILT_IN_ADAPTER_SUPPORTS.xmux).toEqual(
       expect.arrayContaining(['eyes', 'voice-tts', 'voice-stt', 'hands', 'recording']),
     );
   });

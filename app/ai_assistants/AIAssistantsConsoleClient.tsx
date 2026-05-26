@@ -70,6 +70,8 @@ const SHEET_TABS: ReadonlyArray<SheetTabItem<AIAssistantSheetId>> = [
   { key: 'audit', label: 'Audit', icon: <History size={14} /> },
 ];
 
+const AI_ASSISTANTS_SHEET_ORDER_STORAGE_KEY = 'projectManager.aiAssistants.sheetOrder';
+
 const LOG_CATEGORIES: Array<DailyLogCategory | 'all'> = [
   'all',
   'chat',
@@ -844,7 +846,15 @@ export function AIAssistantsConsoleClient({
           onReset={onReset}
         />
       }
-      bottomTabs={<BottomSheetTabs tabs={tabs} activeKey={activeSheet} onSelect={onSelectSheet} />}
+      bottomTabs={
+        <BottomSheetTabs
+          tabs={tabs}
+          activeKey={activeSheet}
+          onSelect={onSelectSheet}
+          reorderable
+          orderStorageKey={AI_ASSISTANTS_SHEET_ORDER_STORAGE_KEY}
+        />
+      }
       scrollChildren={false}
       panelClassName="rounded border border-stone-200/15 bg-stone-950/30"
     >

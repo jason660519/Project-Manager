@@ -26,6 +26,7 @@ export interface ScanOutcome {
 }
 
 export interface ScanReport {
+  kind?: 'scan' | 'test';
   startedAt: number;
   durationMs: number;
   outcomes: ScanOutcome[];

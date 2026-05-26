@@ -57,6 +57,9 @@ Both failures were caused by treating Tauri child webviews like DOM content. Nat
 | Split-resize ghost | Native webviews remained visible during pane drag and could keep drawing at stale OS-level bounds while React layout moved. | DOM resize overlays and React reflow are enough to control native child views. |
 | Parked webview fails to restore | `setBounds()` and `forceNativeBoundsSync()` set `session.visible = true` before checking whether `show()` was needed. | Mutating the logical visible flag is equivalent to showing the native webview. |
 | Browser pane close leak risk | Block removal did not own session teardown; some paths relied on the leaf component destroying sessions first. | Removing the React block always implies native browser cleanup happened. |
+| Local URL submit stays on old page | `BrowserRegistry.navigate()` updated `session.url` but returned when native create was pending or the native child had been removed; no post-create or recreate navigation replay existed. | Changing React URL state is equivalent to sending native WebKit/WebView2 a navigation request. |
+| Suspected PID/singleton issue | Browser URL assembly does not use process PID. The observable failure came from per-session native lifecycle state, not a single local-project browser limit. | A local Project Manager URL requires a PID parameter or only one browser can load it. |
+| Same-pane old browser tab turns black | `setSlotHidden()` sent async native hide for inactive tabs; when the user switched back, `notifySlotVisible()` only flipped frontend `session.visible` and did not guarantee a native `show()`. A late hide could leave native hidden while frontend state said visible. | Frontend visibility state and native child-view visibility cannot diverge. |
 
 ## Final Fix
 
@@ -70,6 +73,8 @@ Both failures were caused by treating Tauri child webviews like DOM content. Nat
 | Pane removal | Layout-level block close now destroys all terminal/browser/folder sessions before removing the block from the tree. |
 | Native bridge | Tauri `set_bounds` uses an atomic rect update, and hide/destroy paths park the webview offscreen before visibility changes. |
 | Route cleanup | Leaving `/xmux` destroys all browser sessions to prevent orphan OS surfaces. |
+| Native navigation replay | Tauri sessions now track `pendingNavigateUrl` and `lastNativeUrl`; pending creates replay the latest URL after create, missing native children are recreated with the submitted URL, and multiple panes may navigate to the same localhost route independently. |
+| Native visibility restore | Tauri sessions now track `nativeVisible` separately from desired frontend visibility. Active-tab restore always pushes bounds and `setVisible(true)`, and late hide completion re-restores the tab if it became desired-visible again. |
 
 ## Tests Added Or Updated
 
@@ -79,6 +84,8 @@ Both failures were caused by treating Tauri child webviews like DOM content. Nat
 | `__tests__/BrowserSlot.native-bounds.test.tsx` | Chrome-safe native bounds, invalid bounds hide, inactive slot hide. |
 | `__tests__/browser-bounds.test.ts` | Native bounds add chrome guard and reject unsafe geometry. |
 | `__tests__/BrowserRegistry.native-lifecycle.test.ts` | Pending create after close is destroyed, hidden sessions park offscreen, resize suspension parks/restores native sessions, orphan purge destroys registry sessions. |
+| `__tests__/BrowserRegistry.native-lifecycle.test.ts` | Pending-create URL changes replay the latest local URL, stale native children recreate with the requested local URL, and two native panes can open the same local Project Manager URL. |
+| `__tests__/BrowserRegistry.native-lifecycle.test.ts` | Older browser tabs in the same pane are shown again after being hidden; late native hide completion cannot leave the active tab black. |
 | `__tests__/xmux.registry.test.tsx` | Existing browser input and tab lifecycle coverage. |
 | `__tests__/blockLayout.destroy.test.ts` | Browser sessions are destroyed when layout blocks are removed. |
 
@@ -94,6 +101,8 @@ Both failures were caused by treating Tauri child webviews like DOM content. Nat
 | `npm run standards:check` | Pass with existing P2 hard-coded color warning. |
 | Browser smoke on `http://localhost:43187/xmux` | Pass. Selected `@project-manager/app`, focused `Browser URL`, submitted `google.com`, `about:blank`, and `localhost:43187/project-progress-dashboard`; input stayed connected/visible and localhost rendered in the pane. |
 | Browser resize smoke on `http://localhost:43187/xmux` | Pass at `1440x900`: left/right resize changed browser slot width `462px -> 722px`; up/down resize changed height `346px -> 216px`; 20 browser create/close cycles completed and browser pane removal left no iframe DOM. |
+| `npm run test -- --run __tests__/BrowserRegistry.native-lifecycle.test.ts __tests__/BrowserSlot.native-bounds.test.tsx __tests__/xmux.browser-url-chrome.test.tsx __tests__/xmux.registry.test.tsx __tests__/blockLayout.destroy.test.ts __tests__/browser.embed.test.ts` | Pass: 6 files / 31 tests. Existing jsdom canvas warning only. |
+| `npm run test -- --run __tests__/BrowserRegistry.native-lifecycle.test.ts __tests__/BrowserSlot.native-bounds.test.tsx __tests__/xmux.browser-url-chrome.test.tsx __tests__/xmux.registry.test.tsx __tests__/blockLayout.destroy.test.ts __tests__/browser.embed.test.ts` | Pass: 6 files / 33 tests. Existing jsdom canvas warning only. |
 
 ## Lessons For Future TDD / E2E
 
@@ -104,6 +113,9 @@ Both failures were caused by treating Tauri child webviews like DOM content. Nat
 5. Real URL drafts must include remote, protocol-less, special-scheme, and localhost cases.
 6. A session state flag is not a native UI operation. Tests should assert the bridge call (`show`, `hide`, `set_bounds`, `destroy`) that must occur after state changes.
 7. Any operation that removes a layout block should own teardown for all items in that block; do not rely on a child component's unmount path for native resources.
+8. URL edits must be treated as commands that may occur while create/destroy/recreate is in flight; native browser registries need a replayable "latest desired URL" state.
+9. Before adding PID parameters or singleton guards for local URLs, verify whether the browser pipeline uses PID at all. In this path it does not.
+10. Native visibility needs its own confirmed state. A tab can be desired-visible while the OS child view is actually hidden because an older async hide finished late.
 
 ## Follow-Up Candidates
 

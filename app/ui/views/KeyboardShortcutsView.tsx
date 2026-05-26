@@ -1,5 +1,6 @@
 'use client';
 
+import type { ComponentType } from 'react';
 import { Keyboard, MousePointerClick, Navigation, Play, Search, Settings2 } from 'lucide-react';
 
 interface ShortcutRow {
@@ -11,7 +12,7 @@ interface ShortcutRow {
 
 const SHORTCUT_GROUPS: Array<{
   title: string;
-  icon: React.ComponentType<{ size: number; className?: string }>;
+  icon: ComponentType<{ size: number; className?: string }>;
   rows: ShortcutRow[];
 }> = [
   {
@@ -75,7 +76,68 @@ function StatusBadge({ status }: { status: ShortcutRow['status'] }) {
   );
 }
 
-export function KeyboardShortcutsView() {
+export function KeyboardShortcutsView({ embedded = false }: { embedded?: boolean }) {
+  const rows = SHORTCUT_GROUPS.flatMap((group) =>
+    group.rows.map((row) => ({ ...row, group: group.title, icon: group.icon })),
+  );
+
+  const table = (
+    <div className="overflow-x-auto bg-transparent">
+      <table className="w-full min-w-[820px] border-collapse text-left text-xs">
+        <thead className="sticky top-0 z-10 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))] uppercase tracking-[0.12em] text-stone-400">
+          <tr>
+            <th className="w-[18%] px-4 py-3 font-semibold">Group</th>
+            <th className="w-[24%] px-4 py-3 font-semibold">Keys</th>
+            <th className="px-4 py-3 font-semibold">Action</th>
+            <th className="w-[22%] px-4 py-3 font-semibold">Scope</th>
+            <th className="w-[14%] px-4 py-3 text-right font-semibold">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const Icon = row.icon;
+            return (
+              <tr key={`${row.group}-${row.action}`} className="border-b border-stone-200/10 hover:bg-white/[0.045]">
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2 text-stone-300">
+                    <Icon size={14} className="text-stone-500" />
+                    <span className="font-medium text-stone-200">{row.group}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {row.keys.map((key, index) => (
+                      <span key={`${row.action}-${key}-${index}`} className="flex items-center gap-1.5">
+                        {index > 0 && <span className="text-stone-600">+</span>}
+                        <KeyCap value={key} />
+                      </span>
+                    ))}
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-stone-200">{row.action}</td>
+                <td className="px-4 py-3 text-stone-400">{row.scope}</td>
+                <td className="px-4 py-3 text-right">
+                  <StatusBadge status={row.status} />
+                </td>
+              </tr>
+            );
+          })}
+          {rows.length === 0 && (
+            <tr>
+              <td colSpan={5} className="px-4 py-8 text-center text-xs text-stone-500">
+                No keyboard shortcuts configured.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  if (embedded) {
+    return table;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72 p-4 lg:flex-row lg:items-center lg:justify-between">
@@ -97,52 +159,9 @@ export function KeyboardShortcutsView() {
           <span>Press <kbd className="border border-stone-200/20 bg-[rgb(var(--pm-input))] px-1 font-mono text-[10px]">Shift</kbd> + <kbd className="border border-stone-200/20 bg-[rgb(var(--pm-input))] px-1 font-mono text-[10px]">?</kbd> from anywhere to jump here.</span>
         </div>
       </div>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        {SHORTCUT_GROUPS.map((group) => (
-          <section key={group.title} className="border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72">
-            <div className="flex items-center gap-3 border-b border-stone-200/12 px-4 py-3">
-              <group.icon size={15} className="text-stone-300" />
-              <h3 className="text-sm font-medium uppercase tracking-[0.16em] text-stone-100">
-                {group.title}
-              </h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[520px] border-collapse text-left text-xs">
-                <thead className="sticky top-0 z-10 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))] text-xs uppercase tracking-[0.12em] text-stone-400">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold">Keys</th>
-                    <th className="px-4 py-3 font-semibold">Action</th>
-                    <th className="px-4 py-3 font-semibold">Scope</th>
-                    <th className="px-4 py-3 text-right font-semibold">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-200/10">
-                  {group.rows.map((row) => (
-                    <tr key={`${group.title}-${row.action}`} className="hover:bg-white/[0.045]">
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {row.keys.map((key, index) => (
-                            <span key={`${row.action}-${key}-${index}`} className="flex items-center gap-1.5">
-                              {index > 0 && <span className="text-stone-600">+</span>}
-                              <KeyCap value={key} />
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-stone-200">{row.action}</td>
-                      <td className="px-4 py-3 text-stone-400">{row.scope}</td>
-                      <td className="px-4 py-3 text-right">
-                        <StatusBadge status={row.status} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        ))}
-      </div>
+      <section className="border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72">
+        {table}
+      </section>
     </div>
   );
 }

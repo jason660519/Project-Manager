@@ -13,8 +13,7 @@ import { docsUrlForView } from '../../lib/docsRegistry';
 const VIEW_LABELS: Record<ViewId, string> = {
   dashboard:           'Project Progress Dashboard',
   'integrations-hub':  'Integrations Hub',
-  cmux:                'cmux',
-  xmux:                'cmux',
+  xmux:                'xmux',
   engineers:           'AI Engineers',
   sessions:            'Sessions',
   channels:            'Channels',

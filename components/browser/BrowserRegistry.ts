@@ -14,6 +14,7 @@ import {
   xmuxWebviewDestroyAll,
 } from '../../lib/bridge';
 import { isTauriRuntime, waitForTauriRuntime } from '../../lib/runtime/tauri-ready';
+import { EDITOR_BG } from '../../lib/tokens/editor-colors';
 import type { ViewBounds } from './browser-bounds';
 
 function isTauri(): boolean {
@@ -37,9 +38,12 @@ interface TauriSession {
   label: string;
   url: string;
   visible: boolean;
+  nativeVisible: boolean;
   created: boolean;
   disposed: boolean;
   pendingCreate: Promise<void> | null;
+  pendingNavigateUrl: string | null;
+  lastNativeUrl: string | null;
   lastBounds: { x: number; y: number; width: number; height: number } | null;
 }
 
@@ -94,7 +98,7 @@ function createIframeSession(url: string): IframeSession {
 function createTauriSession(itemId: string, url: string): TauriSession {
   const hostDiv = document.createElement('div');
   hostDiv.setAttribute('data-browser-anchor', itemId);
-  hostDiv.style.cssText = 'width:100%;height:100%;min-height:0;background:#1e1e1e;';
+  hostDiv.style.cssText = `width:100%;height:100%;min-height:0;background:${EDITOR_BG};`;
 
   return {
     kind: 'tauri',
@@ -102,15 +106,20 @@ function createTauriSession(itemId: string, url: string): TauriSession {
     label: webviewLabel(itemId),
     url,
     visible: false,
+    nativeVisible: false,
     created: false,
     disposed: false,
     pendingCreate: null,
+    pendingNavigateUrl: null,
+    lastNativeUrl: null,
     lastBounds: null,
   };
 }
 
 function markMissingNativeWebview(session: TauriSession): void {
   session.created = false;
+  session.nativeVisible = false;
+  session.lastNativeUrl = null;
 }
 
 function logNativeBridgeError(
@@ -126,6 +135,66 @@ function logNativeBridgeError(
   return true;
 }
 
+function nativeItemId(target: TauriSession): string | null {
+  for (const [itemId, session] of sessions.entries()) {
+    if (session === target) return itemId;
+  }
+  return null;
+}
+
+function flushPendingNavigation(itemId: string, session: TauriSession, context: string): void {
+  if (session.disposed || sessions.get(itemId) !== session) return;
+  const target = session.pendingNavigateUrl ?? session.url;
+  if (!target) return;
+  if (!session.created) {
+    if (session.pendingCreate) {
+      void session.pendingCreate.then(() =>
+        flushPendingNavigation(itemId, session, `${context} post-create`),
+      );
+      return;
+    }
+    const bounds = session.lastBounds;
+    if (bounds && bounds.width >= 1 && bounds.height >= 1) {
+      void ensureCreated(itemId, session, bounds).then(() =>
+        flushPendingNavigation(itemId, session, `${context} recreate`),
+      );
+    }
+    return;
+  }
+  if (target === session.lastNativeUrl) {
+    if (session.pendingNavigateUrl === target) {
+      session.pendingNavigateUrl = null;
+    }
+    return;
+  }
+  void xmuxWebviewNavigate(session.label, target)
+    .then(() => {
+      if (session.disposed || sessions.get(itemId) !== session) return;
+      session.lastNativeUrl = target;
+      if (session.pendingNavigateUrl === target) {
+        session.pendingNavigateUrl = null;
+      }
+      if (session.pendingNavigateUrl && session.pendingNavigateUrl !== target) {
+        flushPendingNavigation(itemId, session, `${context} latest`);
+      }
+    })
+    .catch((err) => {
+      const shouldLog = logNativeBridgeError(
+        session,
+        `[BrowserRegistry] navigate failed (${context})`,
+        err,
+      );
+      if (shouldLog || session.disposed || sessions.get(itemId) !== session) return;
+      session.pendingNavigateUrl = target;
+      const bounds = session.lastBounds;
+      if (bounds && bounds.width >= 1 && bounds.height >= 1) {
+        void ensureCreated(itemId, session, bounds).then(() =>
+          flushPendingNavigation(itemId, session, `${context} missing recreate`),
+        );
+      }
+    });
+}
+
 function parkNativeWebview(
   session: TauriSession,
   context: string,
@@ -135,24 +204,39 @@ function parkNativeWebview(
     session.visible = false;
   }
   if (!session.created) return;
+  session.nativeVisible = false;
+  const restoreIfStillDesired = () => {
+    if (session.visible && !isNativePaintingSuspended()) {
+      const itemId = nativeItemId(session);
+      if (itemId) restoreNativeWebview(itemId, session, `${context} stale hide`);
+    }
+  };
   void xmuxWebviewSetBounds(
     session.label,
     OFFSCREEN_BOUNDS.x,
     OFFSCREEN_BOUNDS.y,
     OFFSCREEN_BOUNDS.width,
     OFFSCREEN_BOUNDS.height,
-  ).catch((err) => {
-    logNativeBridgeError(session, `[BrowserRegistry] park failed (${context})`, err);
-  });
-  void xmuxWebviewSetVisible(session.label, false).catch((err) => {
-    logNativeBridgeError(session, `[BrowserRegistry] hide failed (${context})`, err);
-  });
+  )
+    .then(restoreIfStillDesired)
+    .catch((err) => {
+      logNativeBridgeError(session, `[BrowserRegistry] park failed (${context})`, err);
+    });
+  void xmuxWebviewSetVisible(session.label, false)
+    .then(() => {
+      session.nativeVisible = false;
+      restoreIfStillDesired();
+    })
+    .catch((err) => {
+      logNativeBridgeError(session, `[BrowserRegistry] hide failed (${context})`, err);
+    });
 }
 
 function destroyNativeWebview(session: TauriSession, context: string): void {
   const hadNativeWebview = session.created;
   session.disposed = true;
   session.visible = false;
+  session.nativeVisible = false;
   session.created = false;
   if (!hadNativeWebview) return;
   void xmuxWebviewSetBounds(
@@ -237,23 +321,32 @@ function ensureCreated(
     });
   }
   if (session.pendingCreate) return session.pendingCreate;
-  session.pendingCreate = enqueueCreate(() =>
-    (session.disposed || sessions.get(itemId) !== session
-      ? Promise.resolve()
-      : xmuxWebviewCreate(
-          session.label,
-          session.url,
-          bounds.x,
-          bounds.y,
-          bounds.width,
-          bounds.height,
-        ))
+  session.pendingCreate = enqueueCreate(() => {
+    if (session.disposed || sessions.get(itemId) !== session) {
+      return Promise.resolve();
+    }
+    const createUrl = session.url;
+    return xmuxWebviewCreate(
+      session.label,
+      createUrl,
+      bounds.x,
+      bounds.y,
+      bounds.width,
+      bounds.height,
+    )
       .then(() => {
         if (session.disposed || sessions.get(itemId) !== session) {
           return xmuxWebviewDestroy(session.label).catch(() => {});
         }
         embedFailures.delete(itemId);
         session.created = true;
+        session.nativeVisible = session.visible;
+        session.lastNativeUrl = createUrl;
+        if (session.pendingNavigateUrl === createUrl) {
+          session.pendingNavigateUrl = null;
+        } else if (session.pendingNavigateUrl) {
+          flushPendingNavigation(itemId, session, 'post-create');
+        }
         if (!session.visible) {
           parkNativeWebview(session, 'post-create hidden session');
           return;
@@ -282,8 +375,8 @@ function ensureCreated(
       })
       .finally(() => {
         session.pendingCreate = null;
-      }),
-  );
+      });
+  });
   return session.pendingCreate;
 }
 
@@ -313,9 +406,13 @@ function showNativeWebviewAfterCreate(itemId: string, session: TauriSession): vo
   const current = sessions.get(itemId);
   if (!current || current !== session || current.kind !== 'tauri') return;
   if (current.disposed || !current.visible) return;
-  void xmuxWebviewSetVisible(current.label, true).catch((err) => {
-    logNativeBridgeError(current, '[BrowserRegistry] show (post-create) failed', err);
-  });
+  void xmuxWebviewSetVisible(current.label, true)
+    .then(() => {
+      current.nativeVisible = true;
+    })
+    .catch((err) => {
+      logNativeBridgeError(current, '[BrowserRegistry] show (post-create) failed', err);
+    });
 }
 
 function restoreNativeWebview(itemId: string, session: TauriSession, context: string): void {
@@ -338,6 +435,9 @@ function restoreNativeWebview(itemId: string, session: TauriSession, context: st
     bounds.height,
   )
     .then(() => xmuxWebviewSetVisible(session.label, true))
+    .then(() => {
+      session.nativeVisible = true;
+    })
     .catch((err) => {
       const shouldLog = logNativeBridgeError(
         session,
@@ -376,11 +476,9 @@ export function attach(itemId: string, slot: HTMLElement, initialUrl: string): v
   if (session.hostDiv.parentElement !== slot) {
     slot.appendChild(session.hostDiv);
   }
-  if (session.kind === 'tauri' && session.created && !session.visible) {
+  if (session.kind === 'tauri' && session.created && (!session.visible || !session.nativeVisible)) {
     session.visible = true;
-    void xmuxWebviewSetVisible(session.label, true).catch((err) => {
-      logNativeBridgeError(session, '[BrowserRegistry] show failed', err);
-    });
+    restoreNativeWebview(itemId, session, 'attach');
   }
 
   void waitForTauriRuntime().then((ready) => {
@@ -439,10 +537,16 @@ export function retryNativeEmbed(itemId: string, url: string): void {
     tauriSession.disposed = false;
     tauriSession.created = false;
     tauriSession.pendingCreate = null;
+    tauriSession.pendingNavigateUrl = url;
+    tauriSession.lastNativeUrl = null;
+    tauriSession.nativeVisible = false;
     tauriSession.visible = false;
+    tauriSession.url = url;
     const bounds = tauriSession.lastBounds;
     if (bounds && bounds.width >= 1 && bounds.height >= 1) {
-      void ensureCreated(itemId, tauriSession, bounds);
+      void ensureCreated(itemId, tauriSession, bounds).then(() =>
+        flushPendingNavigation(itemId, tauriSession, 'retry native embed'),
+      );
     }
   }
 }
@@ -456,6 +560,10 @@ export function notifySlotVisible(itemId: string): void {
   if (!bounds || bounds.width < 1 || bounds.height < 1) return;
   if (!session.created && !session.pendingCreate) {
     void ensureCreated(itemId, session, bounds);
+    return;
+  }
+  if (session.created) {
+    restoreNativeWebview(itemId, session, 'slot visible');
   }
 }
 
@@ -482,10 +590,8 @@ export function navigate(itemId: string, url: string): void {
     }
     return;
   }
-  if (!session.created) return;
-  void xmuxWebviewNavigate(session.label, url).catch((err) => {
-    logNativeBridgeError(session, '[BrowserRegistry] navigate failed', err);
-  });
+  session.pendingNavigateUrl = url;
+  flushPendingNavigation(itemId, session, 'navigate');
 }
 
 /** Always push bounds to the native webview (e.g. after URL change / layout settle). */
@@ -498,6 +604,7 @@ export function forceNativeBoundsSync(itemId: string, bounds: ViewBounds): void 
     return;
   }
   const wasVisible = session.visible;
+  const shouldShow = !wasVisible || !session.nativeVisible;
   session.visible = true;
   if (!session.created && !session.pendingCreate) {
     void ensureCreated(itemId, session, bounds).then(() => {
@@ -506,10 +613,14 @@ export function forceNativeBoundsSync(itemId: string, bounds: ViewBounds): void 
     return;
   }
   if (!session.created) return;
-  if (!wasVisible) {
-    void xmuxWebviewSetVisible(session.label, true).catch((err) => {
-      logNativeBridgeError(session, '[BrowserRegistry] show failed', err);
-    });
+  if (shouldShow) {
+    void xmuxWebviewSetVisible(session.label, true)
+      .then(() => {
+        session.nativeVisible = true;
+      })
+      .catch((err) => {
+        logNativeBridgeError(session, '[BrowserRegistry] show failed', err);
+      });
   }
   void xmuxWebviewSetBounds(
     session.label,
@@ -546,6 +657,7 @@ export function setBounds(
     return;
   }
   const wasVisible = session.visible;
+  const shouldShow = !wasVisible || !session.nativeVisible;
   session.visible = true;
   if (!session.created && !session.pendingCreate) {
     void ensureCreated(itemId, session, bounds).then(() => {
@@ -554,10 +666,14 @@ export function setBounds(
     return;
   }
   if (!session.created) return;
-  if (!wasVisible) {
-    void xmuxWebviewSetVisible(session.label, true).catch((err) => {
-      logNativeBridgeError(session, '[BrowserRegistry] show failed', err);
-    });
+  if (shouldShow) {
+    void xmuxWebviewSetVisible(session.label, true)
+      .then(() => {
+        session.nativeVisible = true;
+      })
+      .catch((err) => {
+        logNativeBridgeError(session, '[BrowserRegistry] show failed', err);
+      });
   }
   void xmuxWebviewSetBounds(session.label, x, y, width, height).catch((err) => {
     if (!logNativeBridgeError(session, '[BrowserRegistry] set_bounds failed', err)) {

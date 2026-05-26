@@ -16,10 +16,11 @@ interface ScanReportPanelProps {
   report: ScanReport | null;
   /** When true, the global "Scan All" is still running — show a busy bar. */
   running: boolean;
+  runningKind?: 'scan' | 'test';
   onClose: () => void;
 }
 
-export function ScanReportPanel({ report, running, onClose }: ScanReportPanelProps) {
+export function ScanReportPanel({ report, running, runningKind = 'scan', onClose }: ScanReportPanelProps) {
   const summary = useMemo(() => {
     if (!report) return null;
     let added = 0;
@@ -50,7 +51,13 @@ export function ScanReportPanel({ report, running, onClose }: ScanReportPanelPro
             className={`text-emerald-300 ${running ? 'animate-spin' : ''}`}
           />
           <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-100">
-            {running ? 'Scanning…' : 'Scan report'}
+            {running
+              ? runningKind === 'test'
+                ? 'Testing...'
+                : 'Scanning...'
+              : report?.kind === 'test'
+                ? 'Test report'
+                : 'Scan report'}
           </h3>
           {report && (
             <span className="font-mono text-[10px] text-stone-500">

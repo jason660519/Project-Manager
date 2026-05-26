@@ -30,7 +30,7 @@ $ARGUMENTS
    - 新 `#[tauri::command]` → 確認 `capabilities/default.json` + `lib/bridge/index.ts` 都加了
    - ADR 衝突（004 key / 003 prompt / `app/api/` 被靜態 build 引用）→ 確認 ADR 修訂 OR 退回變更
    - `app/ui/**` 大幅變動 → DESIGN.md 還對得上嗎
-   - navigation / dashboard sheets / workspace 變動 → `guard:legacy-surfaces` 必須通過，避免舊版 Coding Editor、舊 `/xmux` 入口或非拖拽 sheets 回歸
+   - navigation / dashboard sheets / workspace 變動 → `guard:legacy-surfaces` 必須通過，避免舊版 Coding Editor、舊 `/cmux` 入口或非拖拽 sheets 回歸
    - bugfix / regression 類 feature → 是否已更新 `debug-retro.md` 與 `test-scenarios.md`，並在 `config.json` 的 `paths.debugRetro` / `paths.testScenarios` 登記
    - 大 diff（>3 檔）且本 session 沒跑 `/pre-landing-review` → 建議先跑
    - Override 要記在 commit footer：`Override: <reason>`
@@ -50,6 +50,6 @@ $ARGUMENTS
 - ✅ verification 紅 → 停下叫 `/investigate`，修完再回來 ship
 - ✅ Schema 動到 → bump `schemaVersion`（ADR-002）
 - ✅ 高成本 debug / regression → 補 `.project-manager/features/<ID>/debug-retro.md` + `test-scenarios.md`，讓 TDD/E2E 能重用真實使用情境
-- ✅ Navigation / dashboard sheet / cmux work → 跑 `npm run guard:legacy-surfaces`；branch hygiene 相關疑慮 → 跑 `npm run branch:check`
+- ✅ Navigation / dashboard sheet / xmux work → 跑 `npm run guard:legacy-surfaces`；branch hygiene 相關疑慮 → 跑 `npm run branch:check`
 - ✅ 新 Tauri command → 同時更新 `capabilities/default.json` + `lib/bridge/index.ts` wrapper
 - ✅ skip 任何驗證步驟 → 在輸出明說（例：`Skipped: cargo test (doc-only change)`）

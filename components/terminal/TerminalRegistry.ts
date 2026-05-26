@@ -18,6 +18,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import { isTauriRuntime } from '../../lib/runtime/tauri-ready';
+import { EDITOR_BG, XTERM_THEME } from '../../lib/tokens/editor-colors';
 
 const SHELL = '/bin/zsh';
 const MIN_DIM = 20; // hostDiv must be at least this large in both axes before we trust fit()
@@ -86,7 +87,7 @@ function createSession(itemId: string, cwd: string): Session {
   const hostDiv = document.createElement('div');
   hostDiv.setAttribute('data-terminal-host', itemId);
   hostDiv.style.cssText =
-    'position:relative;width:100%;height:100%;background:#1e1e1e;padding:4px;box-sizing:border-box;overflow:hidden;';
+    `position:relative;width:100%;height:100%;background:${EDITOR_BG};padding:4px;box-sizing:border-box;overflow:hidden;`;
 
   const term = new Terminal({
     cursorBlink: true,
@@ -94,12 +95,7 @@ function createSession(itemId: string, cwd: string): Session {
     fontFamily: 'Menlo, Monaco, "Courier New", monospace',
     allowProposedApi: true,
     scrollback: 5000,
-    theme: {
-      background: '#1e1e1e',
-      foreground: '#d4d4d4',
-      cursor: '#d4d4d4',
-      selectionBackground: '#264f78',
-    },
+    theme: XTERM_THEME,
   });
 
   const fitAddon = new FitAddon();

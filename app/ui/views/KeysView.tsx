@@ -26,6 +26,8 @@ const KEY_TABS: ReadonlyArray<SheetTabItem<KeysTab>> = [
   { key: 'vlm_arena', label: 'VLM Arena' },
 ];
 
+const KEYS_SHEET_ORDER_STORAGE_KEY = 'projectManager.keys.sheetOrder';
+
 function KeysViewContent({
   projectRoot,
   initialSheet,
@@ -65,7 +67,13 @@ function KeysViewContent({
       panelClassName="border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72"
       scrollChildren={false}
       bottomTabs={
-        <BottomSheetTabs tabs={KEY_TABS} activeKey={activeTab} onSelect={handleTabSelect} />
+        <BottomSheetTabs
+          tabs={KEY_TABS}
+          activeKey={activeTab}
+          onSelect={handleTabSelect}
+          reorderable
+          orderStorageKey={KEYS_SHEET_ORDER_STORAGE_KEY}
+        />
       }
     >
       {/* Mounted in parallel + display toggled so per-tab state is preserved */}

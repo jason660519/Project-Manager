@@ -43,7 +43,7 @@ export function PaneShell({
 }) {
   return (
     <div className="flex h-full min-h-0 min-w-0 w-full flex-col overflow-hidden">
-      <div className="relative z-20 flex h-8 min-w-0 items-center overflow-hidden border-b border-stone-800/90 bg-[#202020]">
+      <div className="relative z-20 flex h-8 min-w-0 items-center overflow-hidden border-b border-stone-800/90 bg-editor-bar">
         {tabs.map((tab) => {
           const Icon =
             tab.type === 'browser'
@@ -56,7 +56,7 @@ export function PaneShell({
               key={tab.id}
               className={[
                 'flex h-8 min-w-0 max-w-[220px] items-center border-r border-stone-800 text-[11px]',
-                tab.active ? 'bg-[#232323] text-stone-100' : 'text-stone-400',
+                tab.active ? 'bg-editor-tab text-stone-100' : 'text-stone-400',
               ].join(' ')}
             >
               <button

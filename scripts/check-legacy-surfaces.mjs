@@ -79,24 +79,32 @@ for (const dir of activeSourceDirs) {
 const sidebar = path.join(root, 'app/ui/Sidebar.tsx');
 if (existsSync(sidebar)) {
   const content = read(sidebar);
-  if (!content.includes("href: '/cmux'") || !content.includes("id: 'cmux'")) {
-    fail('Sidebar must route the current workspace entry to /cmux with ViewId cmux.');
+  if (!content.includes("href: '/xmux'") || !content.includes("id: 'xmux'")) {
+    fail('Sidebar must route the current workspace entry to /xmux with ViewId xmux.');
   }
   if (content.includes("href: '/coding-editor'") || content.includes('Coding Editor')) {
     fail('Sidebar still exposes the retired Coding Editor entry.');
   }
+  if (content.includes("href: '/cmux'") || content.includes("id: 'cmux'")) {
+    fail('Sidebar must not expose /cmux as the primary workspace entry.');
+  }
 }
 
-const cmuxRoute = path.join(root, 'app/cmux/page.tsx');
-if (!existsSync(cmuxRoute)) {
-  fail('Current cmux route missing: app/cmux/page.tsx');
+const xmuxRoute = path.join(root, 'app/xmux/page.tsx');
+if (!existsSync(xmuxRoute)) {
+  fail('Current xmux route missing: app/xmux/page.tsx');
+} else {
+  const content = read(xmuxRoute);
+  if (!content.includes('MainClient') || !content.includes('currentView="xmux"')) {
+    fail('Current /xmux route must render MainClient with ViewId xmux.');
+  }
 }
 
-const legacyXmuxRoute = path.join(root, 'app/xmux/page.tsx');
-if (existsSync(legacyXmuxRoute)) {
-  const content = read(legacyXmuxRoute);
-  if (!content.includes("redirect('/cmux')")) {
-    fail('Legacy /xmux route must redirect to /cmux, not render a separate surface.');
+const legacyCmuxRoute = path.join(root, 'app/cmux/page.tsx');
+if (existsSync(legacyCmuxRoute)) {
+  const content = read(legacyCmuxRoute);
+  if (!content.includes("redirect('/xmux')")) {
+    fail('Legacy /cmux route must redirect to /xmux, not render a separate surface.');
   }
 }
 

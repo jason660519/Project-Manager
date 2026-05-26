@@ -1226,7 +1226,7 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
           initialSheet={integrationsSheet}
         />
       )}
-      {(currentView === 'cmux' || currentView === 'xmux') && (
+      {currentView === 'xmux' && (
         <XmuxView
           projects={projects}
           selectedDashboardProjectIds={selectedDashboardProjectIds}

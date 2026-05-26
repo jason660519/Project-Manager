@@ -17,7 +17,6 @@ export const VIEW_DOCS_SLUG: Record<ViewId, string | null> = {
   dashboard: 'features/dashboard',
   features: 'features/feature-management',
   'integrations-hub': 'features/integrations-hub',
-  cmux: 'features/xmux',
   xmux: 'features/xmux',
   settings: 'features/settings',
   engineers: 'features/engineers',

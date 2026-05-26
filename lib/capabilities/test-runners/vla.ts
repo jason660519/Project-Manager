@@ -11,6 +11,7 @@
 import type { CandidateTestResult, CapabilityCandidate } from '../../types';
 import { callAnthropic } from '../../bridge';
 import { loadProviderKey } from '../../keys/loadProviderKey';
+import { CANVAS_WHITE, CANVAS_BLACK } from '../../tokens/editor-colors';
 
 const PROMPT = 'Read the text in this image and reply with only the word that appears. No explanation.';
 
@@ -23,9 +24,9 @@ function makeTestImageBase64(): string {
   canvas.height = 80;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Failed to obtain 2D canvas context.');
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = CANVAS_WHITE;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#000000';
+  ctx.fillStyle = CANVAS_BLACK;
   ctx.font = 'bold 48px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';

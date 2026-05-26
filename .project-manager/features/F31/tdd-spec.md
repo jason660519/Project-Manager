@@ -11,6 +11,11 @@
 - A5: Clearing the field without submitting keeps the draft visible and does not navigate.
 - A6: Focusing the URL input does not hide or park the active native browser content.
 - A7: Common drafts (`google.com`, `https://google.com/search?q=xmux`, `about:blank`, localhost URLs) normalize and navigate correctly.
+- A8: If a user submits a new URL while native webview creation is still pending, the latest submitted URL is replayed after create completes.
+- A9: If native navigation reports that the child webview is missing, the browser session is recreated with the latest submitted URL.
+- A10: Multiple browser panes can independently open the same local Project Manager URL; no PID or singleton browser constraint is allowed.
+- A11: Switching back to an older browser tab in the same pane must call native show/restore even if frontend state already believes the tab is visible.
+- A12: A late native hide from a previous inactive state must not leave the tab black after the user switches back.
 
 ### B. Add Browser Scenarios
 
@@ -43,6 +48,8 @@
 - E5: Close browser tab and pane, verify no native webview remains on screen.
 - E6: While a browser page is visibly loaded, click the URL input and verify the browser content does not turn black.
 - E7: Enter `google.com`, `https://google.com/search?q=xmux`, `about:blank`, and `localhost:43187/xmux`, then verify each submitted URL is normalized and rendered or delegated through the expected browser backend.
+- E8: Open at least two browser panes/tabs and submit `localhost:43187/project-progress-dashboard` in both; both panes must load or stay queued for the same local URL independently.
+- E9: In one pane, open three browser tabs, navigate them to internal and external URLs, then click back through all older tabs; every tab must redraw content instead of blacking out.
 
 ## Required Automated Tests
 

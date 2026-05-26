@@ -11,7 +11,7 @@ This guard prevents retired UI surfaces from re-entering Project Manager through
 Current protected regressions:
 
 - The retired **Coding Editor** sidebar/page must not reappear.
-- The current workspace entry is **cmux** at `/cmux`; `/xmux` is only a compatibility redirect.
+- The current workspace entry is **xmux** at `/xmux`; `/cmux` is only a compatibility redirect.
 - Project dashboard sheet tabs must keep drag-reorder support.
 
 ## Required Commands
@@ -48,7 +48,7 @@ ps -axo pid,ppid,lstart,comm,args | rg "project-manager|Project Manager|target/d
 
 The Tauri dev app must be restarted after navigation or route-level changes. Hot reload can update React components, but an already-running desktop shell may still show a stale bundle or route state until restarted.
 
-When the source code says `cmux` but the app shows `Coding Editor`, stop the old desktop process and relaunch through the repo launcher:
+When the source code says `xmux` but the app shows `Coding Editor` or a stale `cmux` route, stop the old desktop process and relaunch through the repo launcher:
 
 ```bash
 ./start_project_manager.sh

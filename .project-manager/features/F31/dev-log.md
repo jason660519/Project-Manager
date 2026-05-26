@@ -217,3 +217,90 @@ A second related case existed when Rust had already destroyed a stale child webv
 | `npm run docs:check` | Pass |
 | `npm run standards:check` | Pass with existing P2 hard-coded color warning. |
 | `npm run build` | Pass. Existing Turbopack dynamic file-tracing warnings remain in `app/api/chat/tools/file/route.ts`. |
+
+## 2026-05-26 AEST - Local Project URL Navigation Replay Fixed
+
+User reported a new xmux browser defect: external sites such as GitHub and Google could render, but submitting a local Project Manager URL such as `http://localhost:43187/project-progress-dashboard` left the visible pane on the old external page. The URL input showed the local URL while native browser content did not change.
+
+### Reproduction And Logs
+
+- Dev log showed successful local route requests (`GET /project-progress-dashboard 200`) and `/xmux` hydration warnings around `BrowserContent`, so the local Next route itself was reachable.
+- The failing symptom matched a frontend/native lifecycle split: React state and the URL input changed, but the native child webview did not receive or complete the corresponding navigation.
+- PID investigation found no PID participation in `BrowserContent`, `BrowserSlot`, `BrowserRegistry`, `lib/bridge` browser commands, or `src-tauri/src/xmux_webview.rs`. PID values in the repo belong to agent/process execution, not browser URL assembly. The issue was not a one-browser-per-project or PID collision problem.
+
+### cmux Reference Notes
+
+- cmux keeps browser navigation as a durable panel command: `navigateSmart()` resolves localhost before generic URL parsing, `navigateWithoutInsecureHTTPPrompt()` records the attempted URL, and pending remote navigation is stored until the webview can render it.
+- cmux also records the last attempted URL for failed/provisional navigation so localhost failures do not silently revert the omnibar to stale page state.
+- The mechanism copied into xmux is the important invariant, not the Swift implementation detail: keep "latest desired URL" separate from "last URL confirmed by native webview", and replay it after native create/recreate boundaries.
+
+### Root Cause
+
+`BrowserRegistry.navigate()` updated `session.url` and then returned if the Tauri child webview had not been created yet. If the user submitted a local URL while `xmuxWebviewCreate()` was still queued, the native view could be created with the old remote URL or never receive the new URL. A second variant occurred when Rust returned `xmux webview ... not found`: the registry marked the session as not created, but did not recreate the child with the latest requested URL.
+
+This explains the screenshot: the URL input reflected `http://localhost:43187/project-progress-dashboard`, but the visible native surface still showed Google.
+
+### Fixes Implemented
+
+- Added `pendingNavigateUrl` and `lastNativeUrl` to Tauri browser sessions.
+- `navigate()` now records the latest desired URL and flushes it through native `xmuxWebviewNavigate()` when the native child exists.
+- If navigation is requested while create is pending, the latest URL is replayed after create completes.
+- If native navigate reports that the child webview is missing, the registry recreates it using the latest requested URL and the last known bounds.
+- Multiple browser panes can navigate to the same localhost Project Manager route independently; no PID or singleton browser constraint is introduced.
+
+### Tests Added
+
+- `replays the latest local URL when navigation changes while native create is pending`
+- `recreates a stale native webview and preserves the requested local URL`
+- `allows multiple native browser panes to load the same local project URL`
+
+### Verification
+
+| Command / Check | Result |
+| --- | --- |
+| `npm run test -- --run __tests__/BrowserRegistry.native-lifecycle.test.ts` | Pass: 1 file / 10 tests. |
+| `npm run test -- --run __tests__/BrowserRegistry.native-lifecycle.test.ts __tests__/BrowserSlot.native-bounds.test.tsx __tests__/xmux.browser-url-chrome.test.tsx __tests__/xmux.registry.test.tsx __tests__/blockLayout.destroy.test.ts __tests__/browser.embed.test.ts` | Pass: 6 files / 31 tests. Existing jsdom canvas warning only. |
+
+## 2026-05-26 AEST - Same-Pane Multi Browser Tab Black Screen Fixed
+
+User reported that one pane could only keep the newest browser tab usable. When multiple browser tabs existed in the same pane, the newest browser could load internal and external URLs, but clicking back to older browser tabs turned them black.
+
+### PID Investigation
+
+- Rechecked browser code paths for PID usage: `BrowserContent`, `BrowserSlot`, `BrowserRegistry`, `lib/bridge` xmux webview commands, and `src-tauri/src/xmux_webview.rs` do not use PID for browser URL assembly, native labels, or navigation.
+- PID fields in the repo are for agent/process execution (`spawnAgent`, stdout/stderr, kill), not browser tab identity.
+- The bug is not caused by PID collision, missing PID URL params, or a one-browser-per-project limit.
+
+### cmux Reference Notes
+
+- cmux treats browser panel visibility/rendering as native lifecycle state, not just SwiftUI/React state. Its portal refresh code reattaches rendering state after hide/detach churn and coalesces follow-up refresh passes.
+- The xmux equivalent fix is to track native child visibility separately and force a native restore when a hidden tab becomes active again.
+
+### Root Cause
+
+`setSlotHidden()` parks inactive native browser tabs by calling native `set_bounds(offscreen)` and `set_visible(false)` asynchronously. When the user switches back, `notifySlotVisible()` set frontend `session.visible = true`, then `forceNativeBoundsSync()` saw the session as already visible and skipped native `setVisible(true)`.
+
+That allowed frontend state and OS child-view state to diverge: React believed the browser tab was visible, while the native WKWebView/WebView2 child had actually been hidden by an earlier async hide. The result was a black pane when switching back to older browser tabs in the same pane.
+
+### Fixes Implemented
+
+- Added `nativeVisible` to Tauri browser sessions to distinguish desired frontend visibility from confirmed native child visibility.
+- `notifySlotVisible()` now restores a created native webview by pushing latest bounds and `setVisible(true)`.
+- `forceNativeBoundsSync()` and `setBounds()` now show the native webview when `nativeVisible` is false, even if `session.visible` is already true.
+- Late async hide completion detects when the tab became desired-visible again and schedules another restore, preventing stale hide calls from leaving an active tab black.
+
+### Tests Added
+
+- `shows a previously hidden native browser when its pane tab becomes active again`
+- `repairs a late native hide that resolves after the user switches back to a browser tab`
+
+### Verification
+
+| Command / Check | Result |
+| --- | --- |
+| `npm run test -- --run __tests__/BrowserRegistry.native-lifecycle.test.ts` | Pass: 1 file / 12 tests. |
+| `npm run test -- --run __tests__/BrowserRegistry.native-lifecycle.test.ts __tests__/BrowserSlot.native-bounds.test.tsx __tests__/xmux.browser-url-chrome.test.tsx __tests__/xmux.registry.test.tsx __tests__/blockLayout.destroy.test.ts __tests__/browser.embed.test.ts` | Pass: 6 files / 33 tests. Existing jsdom canvas warning only. |
+| `npm run typecheck` | Pass |
+| `cargo check --manifest-path src-tauri/Cargo.toml` | Pass |
+| `npm run docs:check` | Pass |
+| `npm run guard:legacy-surfaces` | Pass |

@@ -28,7 +28,7 @@ Use narrower checks for small documentation-only changes, but `docs:check` and `
 
 | Command | Covers | Notes |
 | --- | --- | --- |
-| `npm run guard:legacy-surfaces` | Retired Coding Editor entry, current `/cmux` route, draggable dashboard sheets | Also runs automatically before `npm run build`. |
+| `npm run guard:legacy-surfaces` | Retired Coding Editor entry, current `/xmux` route, draggable dashboard sheets | Also runs automatically before `npm run build`. |
 | `npm run docs:check` | Filename safety, repo-local docs layout, bilingual heading order | Required after docs edits. |
 | `npm run standards:check` | Company baseline standards | May report P2 advisory findings. |
 | `npm run typecheck` | Next typegen and TypeScript correctness | Required after TS or UI edits. |
@@ -88,7 +88,7 @@ npm run build
 
 | Command | Covers | 說明 |
 | --- | --- | --- |
-| `npm run guard:legacy-surfaces` | Retired Coding Editor entry、current `/cmux` route、draggable dashboard sheets | `npm run build` 前會自動執行。 |
+| `npm run guard:legacy-surfaces` | Retired Coding Editor entry、current `/xmux` route、draggable dashboard sheets | `npm run build` 前會自動執行。 |
 | `npm run docs:check` | Filename safety、repo-local docs layout、bilingual heading order | Docs edits 後必跑。 |
 | `npm run standards:check` | Company baseline standards | 可能回報 P2 advisory findings。 |
 | `npm run typecheck` | Next typegen 與 TypeScript correctness | TS 或 UI edits 後必跑。 |

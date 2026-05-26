@@ -71,7 +71,7 @@ export function QuickActions({ onAction }: QuickActionsProps) {
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute bottom-8 left-0 z-40 w-44 rounded-lg border border-stone-200/20 bg-[#1e1e1e] py-1 shadow-xl">
+          <div className="absolute bottom-8 left-0 z-40 w-44 rounded-lg border border-stone-200/20 bg-editor-bg py-1 shadow-xl">
             <div className="px-3 py-1.5 text-[9px] uppercase tracking-[0.1em] text-stone-500">
               Add agents, context, tools…
             </div>

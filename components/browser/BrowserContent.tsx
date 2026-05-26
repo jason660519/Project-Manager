@@ -97,11 +97,11 @@ export function BrowserContent({
   return (
     <div
       data-browser-pane
-      className="flex h-full min-h-0 flex-col bg-[#1e1e1e]"
+      className="flex h-full min-h-0 flex-col bg-editor-bg"
     >
       <div
         data-browser-chrome
-        className="relative z-[100] flex h-8 shrink-0 items-center gap-2 border-b border-stone-800 bg-[#1e1e1e] px-2 text-[11px] text-stone-400"
+        className="relative z-[100] flex h-8 shrink-0 items-center gap-2 border-b border-stone-800 bg-editor-bg px-2 text-[11px] text-stone-400"
       >
         <Chrome size={13} className="shrink-0 text-stone-300" />
         <input
@@ -111,7 +111,7 @@ export function BrowserContent({
             if (event.key === 'Enter') navigate();
           }}
           placeholder={homepageUrl}
-          className="min-w-0 flex-1 bg-[#151515] px-2 py-1 text-stone-200 outline-none ring-1 ring-stone-800 focus:ring-sky-400/50"
+          className="min-w-0 flex-1 bg-editor-addr px-2 py-1 text-stone-200 outline-none ring-1 ring-stone-800 focus:ring-sky-400/50"
           aria-label="Browser URL"
         />
         <button

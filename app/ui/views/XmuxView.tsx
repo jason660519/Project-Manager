@@ -156,7 +156,7 @@ function WorkspaceSidebar({
   onToggleNotifications: () => void;
 }) {
   return (
-    <aside className="flex min-h-0 w-full shrink-0 flex-col border-r border-stone-700/80 bg-[#1f2326] text-stone-200">
+    <aside className="flex min-h-0 w-full shrink-0 flex-col border-r border-stone-700/80 bg-editor-sidebar text-stone-200">
       <div className="flex h-9 items-center justify-between border-b border-stone-700/70 px-2">
         <span className="text-[11px] font-semibold tracking-[0.08em] text-stone-400 uppercase">Workspaces</span>
         <button
@@ -227,7 +227,7 @@ function WorkspaceSidebar({
 
 function NotificationPanel({ onClose, workspaceName }: { onClose: () => void; workspaceName: string }) {
   return (
-    <aside className="flex min-h-0 w-full flex-col border-l border-stone-700/80 bg-[#202326] text-stone-300 lg:w-[320px]">
+    <aside className="flex min-h-0 w-full flex-col border-l border-stone-700/80 bg-editor-sidebar-r text-stone-300 lg:w-[320px]">
       <div className="flex h-9 items-center justify-between border-b border-stone-700/70 px-3">
         <div className="flex items-center gap-2 text-[12px] font-semibold text-stone-100">
           <Bell size={14} className="text-blue-300" />
@@ -250,7 +250,7 @@ function NotificationPanel({ onClose, workspaceName }: { onClose: () => void; wo
 
 function WorkspaceHeader({ workspaceName }: { workspaceName: string }) {
   return (
-    <header className="flex h-9 min-w-0 items-center border-b border-stone-800 bg-[#202020] px-3">
+    <header className="flex h-9 min-w-0 items-center border-b border-stone-800 bg-editor-bar px-3">
       <div className="flex min-w-0 items-center gap-2">
         <Folder size={13} className="shrink-0 text-sky-300" />
         <h1 className="truncate text-[13px] font-semibold text-stone-100">{workspaceName} Workspace</h1>
@@ -458,7 +458,7 @@ function InteropConsole({
   return (
     <section
       ref={rootRef}
-      className="flex h-full min-h-0 w-full flex-col overflow-hidden border border-stone-700/80 bg-[#1b1b1b] shadow-2xl lg:flex-row"
+      className="flex h-full min-h-0 w-full flex-col overflow-hidden border border-stone-700/80 bg-editor-panel shadow-2xl lg:flex-row"
     >
       <div className="shrink-0" style={{ width: `min(100%, ${sidebarWidth}px)` }}>
         <WorkspaceSidebar
@@ -553,7 +553,7 @@ export function XmuxView({
   return (
     <section className="flex h-full w-full flex-col gap-3">
       {workspaces.length === 0 ? (
-        <div className="flex h-full min-h-[280px] items-center justify-center rounded border border-stone-700/80 bg-[#1b1b1b] text-stone-400">
+        <div className="flex h-full min-h-[280px] items-center justify-center rounded border border-stone-700/80 bg-editor-panel text-stone-400">
           目前沒有可顯示的 workspace，請先在 Project Dashboard 勾選專案。
         </div>
       ) : (

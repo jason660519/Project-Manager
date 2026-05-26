@@ -108,7 +108,7 @@ export function ChatSettings({ current, onChange }: ChatSettingsProps) {
         <>
           {/* Backdrop to close on click outside */}
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-8 z-40 w-72 rounded-lg border border-stone-200/20 bg-[#1e1e1e] p-3 shadow-xl">
+          <div className="absolute right-0 top-8 z-40 w-72 rounded-lg border border-stone-200/20 bg-editor-bg p-3 shadow-xl">
             <div className="mb-2 flex items-center justify-between">
               <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-400">
                 Chat Settings
