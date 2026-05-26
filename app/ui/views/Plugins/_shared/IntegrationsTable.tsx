@@ -106,7 +106,11 @@ interface IntegrationsTableProps {
 }
 
 function isTestableRow(row: IntegrationRow): boolean {
-  return row.sourceKind === 'plugin-installed' || row.sourceKind === 'plugin-marketplace';
+  return (
+    row.sourceKind === 'plugin-installed' ||
+    row.sourceKind === 'plugin-marketplace' ||
+    row.sourceKind === 'connected-instance'
+  );
 }
 
 export function IntegrationsTable({
@@ -136,24 +140,29 @@ export function IntegrationsTable({
             columnHelper.display({
               id: 'col-check',
               enableSorting: false,
-              size: 36,
+              size: 88,
               header: ({ table }) => {
                 const visibleKeys = table.getRowModel().rows.map((r) => r.original.rowKey);
                 const allChecked = visibleKeys.length > 0 && visibleKeys.every((k) => checkedKeys?.has(k));
                 const someChecked = !allChecked && visibleKeys.some((k) => checkedKeys?.has(k));
                 return (
-                  <input
-                    type="checkbox"
-                    checked={allChecked}
-                    ref={(el) => { if (el) el.indeterminate = someChecked; }}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      onToggleCheckAll?.(e.target.checked, visibleKeys);
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    className="h-3.5 w-3.5 accent-emerald-400"
-                    title={allChecked ? 'Deselect all' : 'Select all'}
-                  />
+                  <div className="inline-flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={allChecked}
+                      ref={(el) => { if (el) el.indeterminate = someChecked; }}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        onToggleCheckAll?.(e.target.checked, visibleKeys);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-3.5 w-3.5 shrink-0 accent-emerald-400"
+                      title={allChecked ? t.integrations.deselectAll : t.integrations.selectAll}
+                    />
+                    <span className="whitespace-nowrap normal-case tracking-normal text-stone-400">
+                      {t.integrations.colEnabled}
+                    </span>
+                  </div>
                 );
               },
               cell: ({ row }) => (
@@ -175,7 +184,7 @@ export function IntegrationsTable({
         ? [
             columnHelper.display({
               id: 'col-enable',
-              header: 'On',
+              header: () => null,
               cell: ({ row }) => (
                 <input
                   type="checkbox"
@@ -186,9 +195,11 @@ export function IntegrationsTable({
                   }}
                   onClick={(e) => e.stopPropagation()}
                   className="h-3.5 w-3.5 accent-emerald-400"
+                  title={t.integrations.colEnabled}
                 />
               ),
               size: 40,
+              enableSorting: false,
             }),
           ]
         : []),
@@ -302,26 +313,11 @@ export function IntegrationsTable({
             }),
           ]
         : []),
-      columnHelper.accessor('lastUpdated', {
-        id: 'col-updated',
-        header: 'Updated',
-        cell: (info) => <span className="font-mono text-[10px] text-stone-400">{info.getValue() || '—'}</span>,
-        size: 88,
-      }),
-      ...(columnVisibility.notes
-        ? [
-            columnHelper.accessor('notes', {
-              id: 'col-notes',
-              header: 'Notes',
-              cell: (info) => truncateCell(info.getValue(), 24),
-            }),
-          ]
-        : []),
       ...(onTestRow
         ? [
             columnHelper.display({
               id: 'col-test',
-              header: 'Test',
+              header: t.integrations.colTest,
               enableSorting: false,
               size: 92,
               cell: ({ row }) => {
@@ -344,7 +340,7 @@ export function IntegrationsTable({
                           ? `${result.ok ? 'Available' : 'Unavailable'}${
                               result.detail ? ` — ${result.detail}` : ''
                             } · ${new Date(result.testedAt).toLocaleTimeString()}`
-                          : 'Re-check availability'
+                          : t.integrations.colTestAvailabilityHint
                     }
                     className={`inline-flex h-6 items-center gap-1 border px-2 text-[10px] font-medium uppercase tracking-[0.08em] transition-colors ${
                       testing
@@ -370,7 +366,7 @@ export function IntegrationsTable({
             }),
             columnHelper.display({
               id: 'col-test-result',
-              header: 'Result',
+              header: t.integrations.colTestResult,
               enableSorting: false,
               size: 200,
               cell: ({ row }) => {
@@ -398,6 +394,21 @@ export function IntegrationsTable({
                   </span>
                 );
               },
+            }),
+          ]
+        : []),
+      columnHelper.accessor('lastUpdated', {
+        id: 'col-updated',
+        header: t.integrations.colUpdated,
+        cell: (info) => <span className="font-mono text-[10px] text-stone-400">{info.getValue() || '—'}</span>,
+        size: 88,
+      }),
+      ...(columnVisibility.notes
+        ? [
+            columnHelper.accessor('notes', {
+              id: 'col-notes',
+              header: t.integrations.colNotes,
+              cell: (info) => truncateCell(info.getValue(), 24),
             }),
           ]
         : []),

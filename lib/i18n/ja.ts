@@ -281,6 +281,7 @@ export const ja: Translations = {
   integrations: {
     title: 'インテグレーション Hub',
     subtitle: 'プラグイン・スキル・チャネル・Memory・Commands を一覧管理。行をクリックして詳細。',
+    hubGuide: 'Integration hub Guide',
     sheetPlugins: 'System Installed Apps',
     sheetMcp: 'MCP',
     sheetSkills: 'スキル',
@@ -288,6 +289,8 @@ export const ja: Translations = {
     sheetMemory: 'Memory',
     sheetCommands: 'Commands',
     searchPlaceholder: '名前・会社・パス・メモを検索…',
+    filterAllCategories: 'すべての分類',
+    filterAllPlugins: 'インストール済み + マーケット',
     selectProjectHint: 'サイドバーでプロジェクトを選択すると、そのリポジトリの Memory と slash コマンドをスキャンします。',
     openCommandsFolder: '.claude/commands を開く',
     openCommandFile: 'コマンドファイルを開く',
@@ -300,8 +303,6 @@ export const ja: Translations = {
     systemCliDetectedHint:
       'このコマンドはシステム PATH で検出されました。Commands テーブルで切り替えて、AI assistants への公開を制御できます。',
     systemCliRevealBinary: 'バイナリの場所を表示',
-    filterAllCategories: 'すべての分類',
-    filterAllPlugins: 'インストール済み + マーケット',
     manualFields: '手動フィールド',
     saveManual: 'メモを保存',
     channelEditHint: 'チャネル認証情報の詳細編集はサイドバーの Channels ビューも利用できます。',
@@ -316,6 +317,12 @@ export const ja: Translations = {
     colUrl: 'URL',
     colUpdated: '更新日',
     colNotes: '備考',
+    colEnabled: '採用',
+    colTest: 'Test',
+    colTestResult: '結果',
+    colTestAvailabilityHint: 'インスタンスが利用可能か確認',
+    selectAll: 'すべて選択',
+    deselectAll: '選択解除',
   },
   features: {
     filterAll: 'すべて',

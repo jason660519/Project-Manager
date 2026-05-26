@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildConnectedInstanceRows,
+  buildScannedConnectedInstanceRows,
   connectedInstanceSearchText,
+  type ConnectedInstanceScanSnapshot,
 } from '../lib/integrations/mappers/connected-instances';
 import { INTEGRATION_SHEETS, isCapabilitySheet } from '../lib/integrations/types';
 
@@ -68,5 +70,60 @@ describe('connected instances integration sheet (F24)', () => {
     for (const r of buildConnectedInstanceRows()) {
       expect(payloadKeys(r.payload).filter((key) => forbidden.test(key))).toEqual([]);
     }
+  });
+
+  it('maps passive discovery results without duplicating seeded intranet hosts', () => {
+    const snapshot: ConnectedInstanceScanSnapshot = {
+      scannedAt: '2026-05-26T00:00:00Z',
+      warnings: [],
+      devices: [
+        {
+          id: 'known-living-room',
+          ipAddress: '192.168.1.6',
+          macAddress: 'aa:bb:cc:dd:ee:ff',
+          source: 'arp',
+          confidence: 'medium',
+          lastSeenAt: '2026-05-26T00:00:00Z',
+        },
+        {
+          id: 'new-device',
+          ipAddress: '192.168.1.99',
+          macAddress: '11:22:33:44:55:66',
+          hostname: 'lab-mini',
+          source: 'arp',
+          confidence: 'medium',
+          lastSeenAt: '2026-05-26T00:00:00Z',
+        },
+      ],
+      containers: [
+        {
+          id: 'abc123',
+          name: 'open-webui',
+          image: 'ghcr.io/open-webui/open-webui:latest',
+          state: 'running',
+          status: 'Up 2 hours',
+          ports: ['0.0.0.0:38457->8080/tcp'],
+          source: 'docker',
+          lastSeenAt: '2026-05-26T00:00:00Z',
+        },
+      ],
+      services: [],
+    };
+
+    const seeded = buildConnectedInstanceRows();
+    const rows = buildScannedConnectedInstanceRows(snapshot, seeded);
+
+    expect(rows.map((r) => r.installPath)).not.toContain('192.168.1.6');
+    expect(rows.find((r) => r.sourceId === 'scan-device-new-device')).toMatchObject({
+      category1: 'Network Discovery',
+      statusLabel: 'Observed',
+      enabled: false,
+    });
+    expect(rows.find((r) => r.sourceId === 'scan-container-abc123')).toMatchObject({
+      category2: 'Docker Container',
+      status: 'running',
+      port: '0.0.0.0:38457->8080/tcp',
+      enabled: false,
+    });
   });
 });

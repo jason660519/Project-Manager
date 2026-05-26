@@ -284,6 +284,7 @@ export interface Translations {
   integrations: {
     title: string;
     subtitle: string;
+    hubGuide: string;
     sheetPlugins: string;
     sheetMcp: string;
     sheetSkills: string;
@@ -291,6 +292,8 @@ export interface Translations {
     sheetMemory: string;
     sheetCommands: string;
     searchPlaceholder: string;
+    filterAllCategories: string;
+    filterAllPlugins: string;
     selectProjectHint: string;
     openCommandsFolder: string;
     openCommandFile: string;
@@ -302,8 +305,6 @@ export interface Translations {
     channelCommandMappingHint: string;
     systemCliDetectedHint: string;
     systemCliRevealBinary: string;
-    filterAllCategories: string;
-    filterAllPlugins: string;
     manualFields: string;
     saveManual: string;
     channelEditHint: string;
@@ -318,6 +319,12 @@ export interface Translations {
     colUrl: string;
     colUpdated: string;
     colNotes: string;
+    colEnabled: string;
+    colTest: string;
+    colTestResult: string;
+    colTestAvailabilityHint: string;
+    selectAll: string;
+    deselectAll: string;
   };
   features: {
     filterAll: string;

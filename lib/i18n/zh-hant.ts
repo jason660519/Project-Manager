@@ -280,6 +280,7 @@ export const zhHant: Translations = {
   integrations: {
     title: '整合中心',
     subtitle: '插件、技能、頻道、Memory、Commands 統一清單；點選列開啟詳細設定。',
+    hubGuide: '整合中心指南',
     sheetPlugins: 'System Installed Apps',
     sheetMcp: 'MCP',
     sheetSkills: '技能',
@@ -287,6 +288,8 @@ export const zhHant: Translations = {
     sheetMemory: 'Memory',
     sheetCommands: 'Commands',
     searchPlaceholder: '搜尋名稱、公司、路徑、備註…',
+    filterAllCategories: '全部分類',
+    filterAllPlugins: '已安裝 + 市集',
     selectProjectHint: '請先在側欄選擇專案，才能掃描該 repo 的 Memory 檔案與 slash commands。',
     openCommandsFolder: '開啟 .claude/commands',
     openCommandFile: '開啟指令檔',
@@ -299,8 +302,6 @@ export const zhHant: Translations = {
     systemCliDetectedHint:
       '此指令已在系統 PATH 中偵測到。可在 Commands 表格中切換，決定是否暴露給 AI assistants。',
     systemCliRevealBinary: '顯示執行檔位置',
-    filterAllCategories: '全部分類',
-    filterAllPlugins: '已安裝 + 市集',
     manualFields: '手動欄位',
     saveManual: '儲存備註',
     channelEditHint: '完整頻道憑證：請使用列操作或側欄的 Channels 檢視。',
@@ -315,6 +316,12 @@ export const zhHant: Translations = {
     colUrl: 'Github/URL',
     colUpdated: '最後更新',
     colNotes: '備註',
+    colEnabled: '是否採用',
+    colTest: 'Test',
+    colTestResult: '結果',
+    colTestAvailabilityHint: '檢查此 instance 是否仍可用',
+    selectAll: '全選',
+    deselectAll: '取消全選',
   },
   features: {
     filterAll: '全部',

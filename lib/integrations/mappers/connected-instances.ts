@@ -29,6 +29,47 @@ export interface ConnectedInstanceDefinition {
   notes: string;
 }
 
+export interface ConnectedInstanceScannedDevice {
+  id: string;
+  ipAddress: string;
+  macAddress?: string;
+  hostname?: string;
+  vendor?: string;
+  interfaceName?: string;
+  source: 'arp' | 'nmap' | 'mdns';
+  confidence: 'low' | 'medium' | 'high';
+  lastSeenAt: string;
+}
+
+export interface ConnectedInstanceScannedContainer {
+  id: string;
+  name: string;
+  image: string;
+  state: string;
+  status: string;
+  ports: string[];
+  source: 'docker';
+  lastSeenAt: string;
+}
+
+export interface ConnectedInstanceScannedService {
+  id: string;
+  name: string;
+  serviceType: string;
+  domain?: string;
+  source: 'bonjour' | 'mdns';
+  confidence: 'low' | 'medium' | 'high';
+  lastSeenAt: string;
+}
+
+export interface ConnectedInstanceScanSnapshot {
+  scannedAt: string;
+  devices: ConnectedInstanceScannedDevice[];
+  containers: ConnectedInstanceScannedContainer[];
+  services: ConnectedInstanceScannedService[];
+  warnings: string[];
+}
+
 export const CONNECTED_INSTANCE_DEFINITIONS: readonly ConnectedInstanceDefinition[] = [
   {
     id: 'project-manager-local',
@@ -200,8 +241,169 @@ export function mapConnectedInstanceRow(def: ConnectedInstanceDefinition): Integ
   };
 }
 
-export function buildConnectedInstanceRows(): IntegrationRow[] {
-  return CONNECTED_INSTANCE_DEFINITIONS.map(mapConnectedInstanceRow);
+export function mapScannedDeviceRow(device: ConnectedInstanceScannedDevice): IntegrationRow {
+  const address = device.hostname ? `${device.hostname} (${device.ipAddress})` : device.ipAddress;
+  return {
+    rowKey: `connected-instances:scan:device:${device.id}`,
+    sheet: 'connected-instances',
+    sourceKind: 'connected-instance',
+    sourceId: `scan-device-${device.id}`,
+    enabled: false,
+    category1: 'Network Discovery',
+    category2: 'Observed Host',
+    githubUrl: '',
+    company: device.vendor || 'Unknown Vendor',
+    name: device.hostname || `LAN Device ${device.ipAddress}`,
+    version: '',
+    license: '',
+    scope: 'intranet',
+    port: '',
+    installPath: address,
+    installMethod: 'remote_url',
+    status: 'warning',
+    statusLabel: 'Observed',
+    lastUpdated: device.lastSeenAt.slice(0, 10),
+    notes: 'Auto-discovered LAN device. Review before promoting to a trusted connected instance.',
+    lv: null,
+    badges: [device.source, device.confidence, device.macAddress ? 'mac' : 'ip-only'].filter(Boolean),
+    payload: {
+      instanceKind: 'intranet-host',
+      owner: 'unverified',
+      accessType: 'api',
+      capabilities: [],
+      services: [],
+      risk: 'auto-discovered private LAN device',
+      discoverySource: device.source,
+      approvalState: 'pending',
+      confidence: device.confidence,
+      ipAddress: device.ipAddress,
+      macAddress: device.macAddress ?? '',
+      hostname: device.hostname ?? '',
+      vendor: device.vendor ?? '',
+      interfaceName: device.interfaceName ?? '',
+      lastSeenAt: device.lastSeenAt,
+      credentialBoundary: 'Credentials are not stored in connected instance rows.',
+    },
+  };
+}
+
+export function mapScannedContainerRow(container: ConnectedInstanceScannedContainer): IntegrationRow {
+  const primaryPort = container.ports[0] ?? '';
+  const isRunning = container.state.toLowerCase() === 'running';
+  return {
+    rowKey: `connected-instances:scan:container:${container.id}`,
+    sheet: 'connected-instances',
+    sourceKind: 'connected-instance',
+    sourceId: `scan-container-${container.id}`,
+    enabled: false,
+    category1: 'Local Runtime',
+    category2: 'Docker Container',
+    githubUrl: '',
+    company: 'Docker',
+    name: container.name,
+    version: container.image,
+    license: '',
+    scope: 'project',
+    port: primaryPort,
+    installPath: `docker://${container.id}`,
+    installMethod: 'system_path',
+    status: isRunning ? 'running' : 'stopped',
+    statusLabel: container.status || container.state,
+    lastUpdated: container.lastSeenAt.slice(0, 10),
+    notes: 'Auto-discovered local Docker container. Published ports are observed from Docker metadata.',
+    lv: null,
+    badges: ['docker', container.state, ...container.ports].slice(0, 5),
+    payload: {
+      instanceKind: 'local-sidecar',
+      owner: 'user',
+      accessType: 'api',
+      capabilities: [],
+      services: [container.name],
+      risk: 'local Docker runtime metadata',
+      discoverySource: container.source,
+      approvalState: 'observed',
+      containerId: container.id,
+      image: container.image,
+      state: container.state,
+      status: container.status,
+      ports: container.ports,
+      lastSeenAt: container.lastSeenAt,
+      credentialBoundary: 'Docker credentials and socket paths are not stored in connected instance rows.',
+    },
+  };
+}
+
+export function mapScannedServiceRow(service: ConnectedInstanceScannedService): IntegrationRow {
+  return {
+    rowKey: `connected-instances:scan:service:${service.id}`,
+    sheet: 'connected-instances',
+    sourceKind: 'connected-instance',
+    sourceId: `scan-service-${service.id}`,
+    enabled: false,
+    category1: 'Network Discovery',
+    category2: 'Bonjour Service',
+    githubUrl: '',
+    company: 'Bonjour',
+    name: service.name,
+    version: '',
+    license: '',
+    scope: 'intranet',
+    port: '',
+    installPath: service.domain ? `${service.serviceType}.${service.domain}` : service.serviceType,
+    installMethod: 'remote_url',
+    status: 'warning',
+    statusLabel: 'Observed',
+    lastUpdated: service.lastSeenAt.slice(0, 10),
+    notes: 'Auto-discovered Bonjour/mDNS service. Resolve and review before promotion.',
+    lv: null,
+    badges: [service.source, service.confidence, service.serviceType].slice(0, 5),
+    payload: {
+      instanceKind: 'intranet-service',
+      owner: 'unverified',
+      accessType: 'api',
+      capabilities: [],
+      services: [service.serviceType],
+      risk: 'auto-discovered local network service',
+      discoverySource: service.source,
+      approvalState: 'pending',
+      confidence: service.confidence,
+      serviceType: service.serviceType,
+      domain: service.domain ?? '',
+      lastSeenAt: service.lastSeenAt,
+      credentialBoundary: 'Credentials are not stored in connected instance rows.',
+    },
+  };
+}
+
+export function buildScannedConnectedInstanceRows(
+  snapshot?: ConnectedInstanceScanSnapshot | null,
+  existingRows: IntegrationRow[] = [],
+): IntegrationRow[] {
+  if (!snapshot) return [];
+  const knownAddresses = new Set(
+    existingRows.flatMap((row) => {
+      const values = [row.installPath];
+      const ip = stringPayload(row.payload.ipAddress);
+      if (ip) values.push(ip);
+      return values;
+    }),
+  );
+
+  const rows: IntegrationRow[] = [];
+  for (const device of snapshot.devices) {
+    if (knownAddresses.has(device.ipAddress) || [...knownAddresses].some((addr) => addr.includes(device.ipAddress))) {
+      continue;
+    }
+    rows.push(mapScannedDeviceRow(device));
+  }
+  rows.push(...snapshot.containers.map(mapScannedContainerRow));
+  rows.push(...snapshot.services.map(mapScannedServiceRow));
+  return rows;
+}
+
+export function buildConnectedInstanceRows(snapshot?: ConnectedInstanceScanSnapshot | null): IntegrationRow[] {
+  const seeded = CONNECTED_INSTANCE_DEFINITIONS.map(mapConnectedInstanceRow);
+  return [...seeded, ...buildScannedConnectedInstanceRows(snapshot, seeded)];
 }
 
 export function connectedInstanceSearchText(row: IntegrationRow): string {

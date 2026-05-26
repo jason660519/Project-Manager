@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
 use tokio::sync::{oneshot, Mutex};
 
 // ── Event payloads emitted to frontend ────────────────────────────────────────
@@ -3327,6 +3327,401 @@ async fn list_global_cli_inventory() -> Result<Vec<GlobalCliEntry>, String> {
     Ok(rows)
 }
 
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct ConnectedInstanceScanOptions {
+    nmap_targets: Option<Vec<String>>,
+    include_nmap: Option<bool>,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ConnectedInstanceScannedDevice {
+    id: String,
+    ip_address: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mac_address: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hostname: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    vendor: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    interface_name: Option<String>,
+    source: String,
+    confidence: String,
+    last_seen_at: String,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ConnectedInstanceScannedContainer {
+    id: String,
+    name: String,
+    image: String,
+    state: String,
+    status: String,
+    ports: Vec<String>,
+    source: String,
+    last_seen_at: String,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ConnectedInstanceScannedService {
+    id: String,
+    name: String,
+    service_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    domain: Option<String>,
+    source: String,
+    confidence: String,
+    last_seen_at: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ConnectedInstanceScanSnapshot {
+    scanned_at: String,
+    devices: Vec<ConnectedInstanceScannedDevice>,
+    containers: Vec<ConnectedInstanceScannedContainer>,
+    services: Vec<ConnectedInstanceScannedService>,
+    warnings: Vec<String>,
+}
+
+fn stable_scan_id(raw: &str) -> String {
+    let mut out = String::new();
+    for c in raw.trim().to_ascii_lowercase().chars() {
+        if c.is_ascii_alphanumeric() {
+            out.push(c);
+        } else if matches!(c, '.' | ':' | '-' | '_' | ' ') {
+            out.push('-');
+        }
+    }
+    let collapsed = out
+        .split('-')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+    if collapsed.is_empty() {
+        "unknown".to_string()
+    } else {
+        collapsed
+    }
+}
+
+fn is_private_scan_target(target: &str) -> bool {
+    let host = target.trim().split('/').next().unwrap_or("").trim();
+    let parts: Vec<u8> = host
+        .split('.')
+        .filter_map(|part| part.parse::<u8>().ok())
+        .collect();
+    if parts.len() != 4 {
+        return false;
+    }
+    parts[0] == 10
+        || parts[0] == 127
+        || (parts[0] == 192 && parts[1] == 168)
+        || (parts[0] == 172 && (16..=31).contains(&parts[1]))
+}
+
+async fn run_scan_command(command: &str, args: &[&str], timeout_secs: u64) -> Result<String, String> {
+    let output = tokio::time::timeout(
+        std::time::Duration::from_secs(timeout_secs),
+        tokio::process::Command::new(command)
+            .args(args)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output(),
+    )
+    .await
+    .map_err(|_| format!("`{command}` timed out"))?
+    .map_err(|e| format!("failed to run `{command}`: {e}"))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    if output.status.success() || !stdout.trim().is_empty() {
+        Ok(stdout)
+    } else {
+        Err(stderr.trim().to_string())
+    }
+}
+
+async fn browse_bonjour_service(service_type: &str, timeout_secs: u64) -> Result<String, String> {
+    let mut child = tokio::process::Command::new("dns-sd")
+        .args(["-B", service_type, "local."])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("failed to run `dns-sd`: {e}"))?;
+
+    tokio::time::sleep(std::time::Duration::from_secs(timeout_secs)).await;
+    let _ = child.kill().await;
+
+    let mut stdout = String::new();
+    if let Some(mut pipe) = child.stdout.take() {
+        let _ = pipe.read_to_string(&mut stdout).await;
+    }
+    let mut stderr = String::new();
+    if let Some(mut pipe) = child.stderr.take() {
+        let _ = pipe.read_to_string(&mut stderr).await;
+    }
+    let _ = child.wait().await;
+    if stdout.trim().is_empty() && !stderr.trim().is_empty() {
+        Err(stderr.trim().to_string())
+    } else {
+        Ok(stdout)
+    }
+}
+
+fn parse_arp_devices(output: &str, scanned_at: &str) -> Vec<ConnectedInstanceScannedDevice> {
+    let mut devices = Vec::new();
+    for line in output.lines() {
+        let Some(ip_start) = line.find('(') else { continue; };
+        let Some(ip_end_rel) = line[ip_start + 1..].find(')') else { continue; };
+        let ip = line[ip_start + 1..ip_start + 1 + ip_end_rel].trim();
+        if ip.is_empty() || !is_private_scan_target(ip) {
+            continue;
+        }
+        let mac = line
+            .split(" at ")
+            .nth(1)
+            .and_then(|rest| rest.split_whitespace().next())
+            .filter(|v| *v != "(incomplete)")
+            .map(|v| v.to_ascii_lowercase());
+        let interface_name = line
+            .split(" on ")
+            .nth(1)
+            .and_then(|rest| rest.split_whitespace().next())
+            .map(|v| v.to_string());
+        let id_source = mac.as_deref().unwrap_or(ip);
+        devices.push(ConnectedInstanceScannedDevice {
+            id: stable_scan_id(id_source),
+            ip_address: ip.to_string(),
+            mac_address: mac,
+            hostname: None,
+            vendor: None,
+            interface_name,
+            source: "arp".to_string(),
+            confidence: "medium".to_string(),
+            last_seen_at: scanned_at.to_string(),
+        });
+    }
+    devices
+}
+
+fn parse_nmap_devices(output: &str, scanned_at: &str) -> Vec<ConnectedInstanceScannedDevice> {
+    let mut devices = Vec::new();
+    let mut current_ip: Option<String> = None;
+    let mut current_host: Option<String> = None;
+    for line in output.lines() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("Nmap scan report for ") {
+            let label = rest.trim();
+            if let Some(start) = label.rfind('(') {
+                if label.ends_with(')') {
+                    current_host = Some(label[..start].trim().to_string()).filter(|v| !v.is_empty());
+                    current_ip = Some(label[start + 1..label.len() - 1].trim().to_string());
+                } else {
+                    current_host = None;
+                    current_ip = Some(label.to_string());
+                }
+            } else {
+                current_host = None;
+                current_ip = Some(label.to_string());
+            }
+        } else if trimmed.starts_with("Host is up") {
+            if let Some(ip) = current_ip.take() {
+                if is_private_scan_target(&ip) {
+                    devices.push(ConnectedInstanceScannedDevice {
+                        id: stable_scan_id(&ip),
+                        ip_address: ip,
+                        mac_address: None,
+                        hostname: current_host.take(),
+                        vendor: None,
+                        interface_name: None,
+                        source: "nmap".to_string(),
+                        confidence: "high".to_string(),
+                        last_seen_at: scanned_at.to_string(),
+                    });
+                }
+            }
+        }
+    }
+    devices
+}
+
+fn parse_bonjour_services(
+    service_type: &str,
+    output: &str,
+    scanned_at: &str,
+) -> Vec<ConnectedInstanceScannedService> {
+    let mut services = Vec::new();
+    for line in output.lines() {
+        let trimmed = line.trim();
+        if !trimmed.contains(" Add ") || !trimmed.contains(service_type) {
+            continue;
+        }
+        let parts: Vec<&str> = trimmed.split_whitespace().collect();
+        let Some(idx) = parts.iter().position(|part| part.contains(service_type)) else {
+            continue;
+        };
+        let domain = idx.checked_sub(1).and_then(|i| parts.get(i)).map(|v| v.trim_end_matches('.').to_string());
+        let name = parts.get(idx + 1..).map(|tail| tail.join(" ")).unwrap_or_default();
+        if name.trim().is_empty() {
+            continue;
+        }
+        services.push(ConnectedInstanceScannedService {
+            id: stable_scan_id(&format!("{service_type}-{name}")),
+            name,
+            service_type: service_type.to_string(),
+            domain,
+            source: "bonjour".to_string(),
+            confidence: "medium".to_string(),
+            last_seen_at: scanned_at.to_string(),
+        });
+    }
+    services
+}
+
+fn parse_docker_containers(output: &str, scanned_at: &str) -> Vec<ConnectedInstanceScannedContainer> {
+    let mut containers = Vec::new();
+    for line in output.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(trimmed) else {
+            continue;
+        };
+        let id = value
+            .get("ID")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        if id.is_empty() {
+            continue;
+        }
+        let name = value
+            .get("Names")
+            .or_else(|| value.get("Name"))
+            .and_then(|v| v.as_str())
+            .unwrap_or(&id)
+            .trim_start_matches('/')
+            .to_string();
+        let image = value
+            .get("Image")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let state = value
+            .get("State")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let status = value
+            .get("Status")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let ports_raw = value
+            .get("Ports")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let ports = ports_raw
+            .split(',')
+            .map(|part| part.trim().to_string())
+            .filter(|part| !part.is_empty())
+            .collect::<Vec<_>>();
+        containers.push(ConnectedInstanceScannedContainer {
+            id: stable_scan_id(&id),
+            name,
+            image,
+            state,
+            status,
+            ports,
+            source: "docker".to_string(),
+            last_seen_at: scanned_at.to_string(),
+        });
+    }
+    containers
+}
+
+fn dedupe_devices(devices: Vec<ConnectedInstanceScannedDevice>) -> Vec<ConnectedInstanceScannedDevice> {
+    let mut by_key: HashMap<String, ConnectedInstanceScannedDevice> = HashMap::new();
+    for device in devices {
+        let key = device
+            .mac_address
+            .clone()
+            .filter(|v| !v.is_empty())
+            .unwrap_or_else(|| device.ip_address.clone());
+        let replace = match by_key.get(&key) {
+            None => true,
+            Some(existing) => existing.source == "arp" && device.source == "nmap",
+        };
+        if replace {
+            by_key.insert(key, device);
+        }
+    }
+    let mut rows: Vec<ConnectedInstanceScannedDevice> = by_key.into_values().collect();
+    rows.sort_by(|a, b| a.ip_address.cmp(&b.ip_address));
+    rows
+}
+
+#[tauri::command]
+async fn scan_connected_instances(
+    options: Option<ConnectedInstanceScanOptions>,
+) -> Result<ConnectedInstanceScanSnapshot, String> {
+    let scanned_at = now_iso8601();
+    let options = options.unwrap_or_default();
+    let mut warnings = Vec::new();
+    let mut devices = Vec::new();
+    let mut containers = Vec::new();
+    let mut services = Vec::new();
+
+    match run_scan_command("arp", &["-an"], 4).await {
+        Ok(output) => devices.extend(parse_arp_devices(&output, &scanned_at)),
+        Err(e) => warnings.push(format!("ARP scan skipped: {e}")),
+    }
+
+    match run_scan_command("docker", &["ps", "-a", "--format", "{{json .}}"], 5).await {
+        Ok(output) => containers.extend(parse_docker_containers(&output, &scanned_at)),
+        Err(e) => warnings.push(format!("Docker scan skipped: {e}")),
+    }
+
+    for service_type in ["_http._tcp", "_ssh._tcp", "_workstation._tcp", "_ipp._tcp"] {
+        match browse_bonjour_service(service_type, 2).await {
+            Ok(output) => services.extend(parse_bonjour_services(service_type, &output, &scanned_at)),
+            Err(e) => warnings.push(format!("Bonjour scan for {service_type} skipped: {e}")),
+        }
+    }
+
+    if options.include_nmap.unwrap_or(false) {
+        let targets = options.nmap_targets.unwrap_or_default();
+        if targets.is_empty() {
+            warnings.push("nmap scan skipped: no private allowlisted targets configured".to_string());
+        }
+        for target in targets.iter().take(4) {
+            if !is_private_scan_target(target) {
+                warnings.push(format!("nmap target rejected because it is not a private IPv4 target: {target}"));
+                continue;
+            }
+            match run_scan_command("nmap", &["-sn", "-T2", "--max-retries", "1", target], 20).await {
+                Ok(output) => devices.extend(parse_nmap_devices(&output, &scanned_at)),
+                Err(e) => warnings.push(format!("nmap scan skipped for {target}: {e}")),
+            }
+        }
+    }
+
+    Ok(ConnectedInstanceScanSnapshot {
+        scanned_at,
+        devices: dedupe_devices(devices),
+        containers,
+        services,
+        warnings,
+    })
+}
+
 /// Capture a screenshot of the current display as a PNG and return it as
 /// base64 bytes (no `data:` prefix). macOS only in Phase 1 (F23) — other
 /// platforms return a clear error so the test runner UI can surface it.
@@ -4493,6 +4888,7 @@ pub fn run() {
             probe_command_version,
             resolve_install_path,
             list_global_cli_inventory,
+            scan_connected_instances,
             skill_default_dir,
             skill_list,
             skill_save,

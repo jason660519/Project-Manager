@@ -577,6 +577,80 @@ export async function listGlobalCliInventory(): Promise<GlobalCliInventoryEntry[
   return invoke<GlobalCliInventoryEntry[]>('list_global_cli_inventory');
 }
 
+export interface ConnectedInstanceScanOptions {
+  /** Private CIDR/IP targets explicitly allowed for active nmap host discovery. */
+  nmapTargets?: string[];
+  /** Active nmap is opt-in; passive ARP, Bonjour, and Docker probes still run when false. */
+  includeNmap?: boolean;
+}
+
+export interface ConnectedInstanceScannedDevice {
+  id: string;
+  ipAddress: string;
+  macAddress?: string;
+  hostname?: string;
+  vendor?: string;
+  interfaceName?: string;
+  source: 'arp' | 'nmap' | 'mdns';
+  confidence: 'low' | 'medium' | 'high';
+  lastSeenAt: string;
+}
+
+export interface ConnectedInstanceScannedContainer {
+  id: string;
+  name: string;
+  image: string;
+  state: string;
+  status: string;
+  ports: string[];
+  source: 'docker';
+  lastSeenAt: string;
+}
+
+export interface ConnectedInstanceScannedService {
+  id: string;
+  name: string;
+  serviceType: string;
+  domain?: string;
+  source: 'bonjour' | 'mdns';
+  confidence: 'low' | 'medium' | 'high';
+  lastSeenAt: string;
+}
+
+export interface ConnectedInstanceScanSnapshot {
+  scannedAt: string;
+  devices: ConnectedInstanceScannedDevice[];
+  containers: ConnectedInstanceScannedContainer[];
+  services: ConnectedInstanceScannedService[];
+  warnings: string[];
+}
+
+/**
+ * Best-effort connected-instance discovery.
+ * Browser mode returns an empty snapshot; Tauri mode runs fixed, low-risk probes:
+ * ARP cache, Bonjour browse, Docker container list, and opt-in nmap host discovery.
+ */
+export async function scanConnectedInstances(
+  options: ConnectedInstanceScanOptions = {},
+): Promise<ConnectedInstanceScanSnapshot> {
+  if (!isTauri()) {
+    const scannedAt = new Date().toISOString();
+    return {
+      scannedAt,
+      devices: [],
+      containers: [],
+      services: [],
+      warnings: ['Connected instance discovery requires the Tauri desktop runtime.'],
+    };
+  }
+  return invoke<ConnectedInstanceScanSnapshot>('scan_connected_instances', {
+    options: {
+      nmapTargets: options.nmapTargets ?? [],
+      includeNmap: options.includeNmap ?? false,
+    },
+  });
+}
+
 /**
  * Discriminated result of {@link pickProjectFolders}. Callers MUST switch on
  * `status` so "user cancelled" and "non-Tauri environment" never collapse

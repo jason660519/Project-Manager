@@ -30,6 +30,7 @@ import { mapSkillRow } from '../../../../lib/integrations/mappers/skills';
 import { mapChannelRow, mapCommandMappingRow } from '../../../../lib/integrations/mappers/channels';
 import { mapSystemCliRow } from '../../../../lib/integrations/mappers/system-cli';
 import { buildConnectedInstanceRows } from '../../../../lib/integrations/mappers/connected-instances';
+import { probeConnectedInstanceAvailability } from '../../../../lib/integrations/probe-connected-instance';
 import { loadMemoryRows, loadSlashCommandRows } from '../../../../lib/integrations/load-project-inventory';
 import { MARKETPLACE, buildFromMarketplace } from '../../../../lib/integrations/marketplace-catalog';
 import type { PluginCatalog, McpPlugin } from '../../../../lib/types/plugins';
@@ -83,6 +84,7 @@ import {
   onTelegramMessage,
   openPath,
   readFile,
+  scanConnectedInstances,
   listGlobalCliInventory,
   resolveInstallPath,
   probeCommandVersion,
@@ -117,10 +119,10 @@ import { McpLogsViewer } from './_shared/McpLogsViewer';
 import { ConnectSheet } from './ConnectSheet';
 import { CapabilitySheetView } from './CapabilitySheetView';
 import { ScanReportPanel } from './_shared/ScanReportPanel';
-
 const EMPTY_CATALOG: PluginCatalog = { schemaVersion: 2, plugins: [] };
 const PROJECT_MANAGER_ROOT = '/Volumes/KLEVV-4T-1/Project-Manager';
 const INTEGRATIONS_HUB_SHEET_ORDER_STORAGE_KEY = 'projectManager.integrationsHub.sheetOrder';
+const CONNECTED_INSTANCE_SCAN_STORAGE_KEY = 'projectManager.integrationsHub.connectedInstanceScan';
 
 function newChannelId(): string {
   return typeof crypto !== 'undefined' ? crypto.randomUUID() : Math.random().toString(36).slice(2);
@@ -189,10 +191,11 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [frozenDataColCount, setFrozenDataColCount] = useState(0);
   const [rowDensity, setRowDensity] = useState<PluginsRowDensity>('comfortable');
+  const [connectedInstanceScan, setConnectedInstanceScan] = useState<Awaited<ReturnType<typeof scanConnectedInstances>> | null>(null);
+  const [connectedInstanceScanRunning, setConnectedInstanceScanRunning] = useState(false);
   const [scanReport, setScanReport] = useState<ScanReport | null>(null);
   const [scanRunning, setScanRunning] = useState(false);
   const [scanActionKind, setScanActionKind] = useState<'scan' | 'test'>('scan');
-
   const refreshManual = () => setManualVersion((v) => v + 1);
 
   // Reset per-sheet state when the URL sheet changes — dynamic-segment
@@ -220,6 +223,20 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
       loadAllChannelActivity(chCatalog.channels.map((c) => c.id)).slice(0, ACTIVITY_CAP_PER_CHANNEL),
     );
     setSystemCliExposure(loadSystemCliExposureMap());
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem(CONNECTED_INSTANCE_SCAN_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Awaited<ReturnType<typeof scanConnectedInstances>>;
+      if (parsed && typeof parsed.scannedAt === 'string') {
+        setConnectedInstanceScan(parsed);
+      }
+    } catch {
+      window.localStorage.removeItem(CONNECTED_INSTANCE_SCAN_STORAGE_KEY);
+    }
   }, []);
 
   // Pure fetch — reads skill files under `skillsDir` and returns parsed
@@ -523,7 +540,10 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
   const skillsRowsMerged = useMemo(() => mergeAllManual(skillRows), [skillRows, manualVersion]);
   const memoryRowsMerged = useMemo(() => mergeAllManual(memoryRows), [memoryRows, manualVersion]);
   const commandRowsMerged = useMemo(() => mergeAllManual(commandRows), [commandRows, manualVersion]);
-  const connectedInstanceRows = useMemo(() => mergeAllManual(buildConnectedInstanceRows()), [manualVersion]);
+  const connectedInstanceRows = useMemo(
+    () => mergeAllManual(buildConnectedInstanceRows(connectedInstanceScan)),
+    [connectedInstanceScan, manualVersion],
+  );
   const systemCliRows = useMemo(
     () => commandRowsMerged.filter((row) => row.sourceKind === 'system-cli'),
     [commandRowsMerged],
@@ -553,23 +573,8 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     [loadCommands, systemCliRows],
   );
 
-  // ---------------------------------------------------------------------------
-  // Scanner functions — one per sheet. Each rescan function:
-  //   1. Snapshots the current rows for that sheet (closure).
-  //   2. Fetches fresh data from disk / Tauri / catalog.
-  //   3. Updates the relevant React state so the table re-renders.
-  //   4. Builds a new row snapshot from the *fresh* data and diffs against (1).
-  //   5. Returns a ScanOutcome describing added/removed/updated.
-  // Errors are caught and surfaced via outcome.error rather than thrown.
-  // ---------------------------------------------------------------------------
-
   type SharedPluginCtx = { status: Record<string, boolean>; paths: Record<string, ResolvedPluginPath> };
 
-  /**
-   * Build plugin-system rows from a freshly scanned (status, paths) context.
-   * Mirrors the `allPluginRows` useMemo so we can compute the "after" snapshot
-   * synchronously without waiting for React to re-render.
-   */
   const buildPluginRowsFromCtx = useCallback(
     (ctx: SharedPluginCtx, mcpStatusMap: Map<string, McpRunStatus>): IntegrationRow[] => {
       const mapperCtx = {
@@ -873,11 +878,12 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     const startedAt = Date.now();
     const prev = connectedInstanceRows;
     try {
-      // Connected instances are derived from localStorage / catalog state, so
-      // we don't need an async fetch — but we still re-derive and refresh the
-      // manual-merge counter so the table picks up edits made elsewhere.
-      const next = mergeAllManual(buildConnectedInstanceRows());
-      refreshManual();
+      const snapshot = await scanConnectedInstances({ includeNmap: false, nmapTargets: [] });
+      setConnectedInstanceScan(snapshot);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(CONNECTED_INSTANCE_SCAN_STORAGE_KEY, JSON.stringify(snapshot));
+      }
+      const next = mergeAllManual(buildConnectedInstanceRows(snapshot));
       return {
         sheetId: 'connected-instances',
         label: 'Connected Instances',
@@ -1029,6 +1035,78 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     [catalog],
   );
 
+  const handleTestConnectedInstanceRow = useCallback(async (row: IntegrationRow) => {
+    if (row.sourceKind !== 'connected-instance') return;
+
+    setPluginTestingKeys((prev) => {
+      const next = new Set(prev);
+      next.add(row.rowKey);
+      return next;
+    });
+
+    try {
+      const { ok, detail } = await probeConnectedInstanceAvailability(row);
+      setPluginTestResults((prev) => ({
+        ...prev,
+        [row.rowKey]: { ok, testedAt: Date.now(), detail },
+      }));
+    } catch (e) {
+      setPluginTestResults((prev) => ({
+        ...prev,
+        [row.rowKey]: {
+          ok: false,
+          testedAt: Date.now(),
+          detail: e instanceof Error ? e.message : String(e),
+        },
+      }));
+    } finally {
+      setPluginTestingKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(row.rowKey);
+        return next;
+      });
+    }
+  }, []);
+
+  const handleIntegrationTestRow = useCallback(
+    async (row: IntegrationRow) => {
+      if (row.sourceKind === 'connected-instance') {
+        await handleTestConnectedInstanceRow(row);
+        return;
+      }
+      await handleTestPluginRow(row);
+    },
+    [handleTestConnectedInstanceRow, handleTestPluginRow],
+  );
+
+  const handleScanConnectedInstances = useCallback(async (includeNmap = false, nmapTargets: string[] = []) => {
+    setConnectedInstanceScanRunning(true);
+    try {
+      const snapshot = await scanConnectedInstances({ includeNmap, nmapTargets });
+      setConnectedInstanceScan(snapshot);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(CONNECTED_INSTANCE_SCAN_STORAGE_KEY, JSON.stringify(snapshot));
+      }
+    } catch (error) {
+      const scannedAt = new Date().toISOString();
+      const snapshot = {
+        scannedAt,
+        devices: [],
+        containers: [],
+        services: [],
+        warnings: [error instanceof Error ? error.message : String(error)],
+      };
+      setConnectedInstanceScan(snapshot);
+    } finally {
+      setConnectedInstanceScanRunning(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeSheet !== 'connected-instances' || connectedInstanceScan || connectedInstanceScanRunning) return;
+    void handleScanConnectedInstances(false);
+  }, [activeSheet, connectedInstanceScan, connectedInstanceScanRunning, handleScanConnectedInstances]);
+
   const handleApiKeyChange = async (id: string, key: string) => {
     await setProviderApiKey(id, key);
     setApiKeys((prev) => ({ ...prev, [id]: key }));
@@ -1040,7 +1118,6 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     const plugin = buildFromMarketplace(mp);
     if (!plugin) return;
     updateCatalog(addPlugin(catalog, plugin));
-    setPluginsFilter('installed');
   };
 
   const handleRunRuntimeCommand = useCallback(async (command: IntegrationRuntimeCommand) => {
@@ -1247,7 +1324,6 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
 
   const handleSheetSelect = (key: IntegrationSheet) => {
     setSelectedRow(null);
-    setCategoryFilter('all');
     setCheckedRowKeys(new Set());
     router.push(`/integrations-hub/${key}`);
   };
@@ -1272,6 +1348,9 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
   const isPluginSystemSheet =
     activeSheet === SYSTEM_INSTALLED_APPS_SHEET || activeSheet === 'coding-tools' || activeSheet === 'mcp';
 
+  const showIntegrationRowTest =
+    isPluginSystemSheet || activeSheet === 'connected-instances';
+
   const testPluginRowsForSheet = useCallback(
     async (sheetId: IntegrationInventorySheet, rows: IntegrationRow[]): Promise<ScanOutcome> => {
       const startedAt = Date.now();
@@ -1290,11 +1369,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
         for (const row of testableRows) {
           await handleTestPluginRow(row);
         }
-        return createSheetTestOutcome({
-          sheetId,
-          count: testableRows.length,
-          durationMs: Date.now() - startedAt,
-        });
+        return createSheetTestOutcome({ sheetId, count: testableRows.length, durationMs: Date.now() - startedAt });
       } catch (e) {
         return createSheetTestOutcome({
           sheetId,
@@ -1333,24 +1408,21 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     [fetchSkillRows, skillsDir],
   );
 
-  const testChannelsSheet = useCallback(
-    async (rows: IntegrationRow[]): Promise<ScanOutcome> => {
-      const startedAt = Date.now();
-      try {
-        const arr = await telegramStatusAll();
-        setPollStatuses(new Map(arr.map((s) => [s.channelId, s])));
-        return createSheetTestOutcome({ sheetId: 'channels', count: rows.length, durationMs: Date.now() - startedAt });
-      } catch (e) {
-        return createSheetTestOutcome({
-          sheetId: 'channels',
-          count: rows.length,
-          error: e instanceof Error ? e.message : String(e),
-          durationMs: Date.now() - startedAt,
-        });
-      }
-    },
-    [],
-  );
+  const testChannelsSheet = useCallback(async (rows: IntegrationRow[]): Promise<ScanOutcome> => {
+    const startedAt = Date.now();
+    try {
+      const arr = await telegramStatusAll();
+      setPollStatuses(new Map(arr.map((s) => [s.channelId, s])));
+      return createSheetTestOutcome({ sheetId: 'channels', count: rows.length, durationMs: Date.now() - startedAt });
+    } catch (e) {
+      return createSheetTestOutcome({
+        sheetId: 'channels',
+        count: rows.length,
+        error: e instanceof Error ? e.message : String(e),
+        durationMs: Date.now() - startedAt,
+      });
+    }
+  }, []);
 
   const testMemorySheet = useCallback(
     async (rows: IntegrationRow[]): Promise<ScanOutcome> => {
@@ -1397,28 +1469,29 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     [projectRoot],
   );
 
-  const testConnectedInstancesSheet = useCallback((rows: IntegrationRow[]): Promise<ScanOutcome> => {
-    const startedAt = Date.now();
-    try {
-      buildConnectedInstanceRows();
-      return Promise.resolve(
-        createSheetTestOutcome({
+  const testConnectedInstancesSheet = useCallback(
+    async (rows: IntegrationRow[]): Promise<ScanOutcome> => {
+      const startedAt = Date.now();
+      try {
+        for (const row of rows.filter((r) => r.sourceKind === 'connected-instance')) {
+          await handleTestConnectedInstanceRow(row);
+        }
+        return createSheetTestOutcome({
           sheetId: 'connected-instances',
           count: rows.length,
           durationMs: Date.now() - startedAt,
-        }),
-      );
-    } catch (e) {
-      return Promise.resolve(
-        createSheetTestOutcome({
+        });
+      } catch (e) {
+        return createSheetTestOutcome({
           sheetId: 'connected-instances',
           count: rows.length,
           error: e instanceof Error ? e.message : String(e),
           durationMs: Date.now() - startedAt,
-        }),
-      );
-    }
-  }, []);
+        });
+      }
+    },
+    [handleTestConnectedInstanceRow],
+  );
 
   const sheetActions = useMemo(
     () =>
@@ -1438,26 +1511,11 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
           test: (rows) => testPluginRowsForSheet('mcp', rows),
           testMode: 'selected-rows',
         },
-        skills: {
-          scan: rescanSkills,
-          test: testSkillsSheet,
-        },
-        channels: {
-          scan: rescanChannels,
-          test: testChannelsSheet,
-        },
-        memory: {
-          scan: rescanMemory,
-          test: testMemorySheet,
-        },
-        commands: {
-          scan: rescanCommands,
-          test: testCommandsSheet,
-        },
-        'connected-instances': {
-          scan: rescanConnectedInstances,
-          test: testConnectedInstancesSheet,
-        },
+        skills: { scan: rescanSkills, test: testSkillsSheet },
+        channels: { scan: rescanChannels, test: testChannelsSheet },
+        memory: { scan: rescanMemory, test: testMemorySheet },
+        commands: { scan: rescanCommands, test: testCommandsSheet },
+        'connected-instances': { scan: rescanConnectedInstances, test: testConnectedInstancesSheet },
       }),
     [
       rescanSystemInstalledApps,
@@ -1486,10 +1544,6 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     return activeRows;
   }, [activeRows, activeSheetAction, checkedRowKeys]);
 
-  /**
-   * Scan All runs every inventory sheet through the sheet action registry. The
-   * expensive plugin-system probe is shared only with the plugin-family scans.
-   */
   const runAllScans = useCallback(async () => {
     setScanActionKind('scan');
     setScanRunning(true);
@@ -1538,12 +1592,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
           durationMs: Date.now() - startedAt,
         });
       }
-      setScanReport({
-        kind: 'scan',
-        startedAt,
-        durationMs: Date.now() - startedAt,
-        outcomes: [outcome],
-      });
+      setScanReport({ kind: 'scan', startedAt, durationMs: Date.now() - startedAt, outcomes: [outcome] });
       setScanRunning(false);
     },
     [sheetActions],
@@ -1566,12 +1615,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
         durationMs: Date.now() - startedAt,
       });
     }
-    setScanReport({
-      kind: 'test',
-      startedAt,
-      durationMs: Date.now() - startedAt,
-      outcomes: [outcome],
-    });
+    setScanReport({ kind: 'test', startedAt, durationMs: Date.now() - startedAt, outcomes: [outcome] });
     setScanRunning(false);
   }, [activeSheetAction, activeSheetTestRows]);
 
@@ -1610,11 +1654,11 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
         <button
           type="button"
           onClick={() => void runSheetRescan(activeSheet)}
-          disabled={scanRunning}
+          disabled={scanRunning || connectedInstanceScanRunning}
           title="Rescan this sheet"
           className="flex items-center gap-1 border border-stone-200/20 px-2 py-2 text-xs text-stone-300 hover:border-emerald-300/30 disabled:opacity-50"
         >
-          <RotateCw size={12} className={scanRunning ? 'animate-spin' : ''} />
+          <RotateCw size={12} className={scanRunning || connectedInstanceScanRunning ? 'animate-spin' : ''} />
           Rescan
         </button>
       )}
@@ -1676,6 +1720,39 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
             className="border border-cyan-400/30 bg-cyan-950/20 px-2 py-2 text-xs text-cyan-200"
           >
             {t.integrations.commandsAiDefaultsPreset}
+          </button>
+        </>
+      )}
+      {activeSheet === 'connected-instances' && (
+        <>
+          <button
+            type="button"
+            onClick={() => void handleScanConnectedInstances(false)}
+            disabled={connectedInstanceScanRunning}
+            className="border border-emerald-400/30 bg-emerald-950/20 px-2 py-2 text-xs text-emerald-300 disabled:opacity-50"
+            title="Run passive ARP, Bonjour, and Docker discovery"
+          >
+            {connectedInstanceScanRunning ? 'Discovering...' : 'Discover'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const raw =
+                typeof window !== 'undefined'
+                  ? window.prompt('Private nmap targets, comma-separated (example: 192.168.1.0/24)')
+                  : '';
+              const targets = (raw ?? '')
+                .split(',')
+                .map((part) => part.trim())
+                .filter(Boolean);
+              if (targets.length === 0) return;
+              void handleScanConnectedInstances(true, targets);
+            }}
+            disabled={connectedInstanceScanRunning}
+            className="border border-amber-400/30 bg-amber-950/20 px-2 py-2 text-xs text-amber-200 disabled:opacity-50"
+            title="Run passive discovery plus nmap only for private targets you enter"
+          >
+            nmap opt-in
           </button>
         </>
       )}
@@ -1761,60 +1838,60 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
       <WorkstationFrame
         className="w-full"
         header={
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
+          <div>
+            <div className="flex items-center justify-between gap-3">
               <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">
                 {t.integrations.title}
               </h1>
-              <p className="mt-1 text-xs text-stone-400">{t.integrations.subtitle}</p>
-            </div>
-            <div className="flex items-center gap-2 self-start sm:self-center">
-              {activeSheetAction && (
+              <div className="flex items-center gap-2">
+                {activeSheetAction && (
+                  <button
+                    type="button"
+                    onClick={() => void runSheetTest()}
+                    disabled={!activeSheetCanTest || scanRunning || pluginTestingKeys.size > 0}
+                    title={
+                      activeSheetRequiresSelection && activeSheetTestRows.length === 0
+                        ? 'Select rows to test'
+                        : activeSheetRequiresSelection
+                          ? `Test ${activeSheetTestRows.length} selected item${activeSheetTestRows.length > 1 ? 's' : ''}`
+                          : `Test ${activeSheetAction.label}`
+                    }
+                    className="flex shrink-0 items-center gap-2 border border-emerald-400/30 bg-emerald-950/25 px-3 py-1.5 text-xs text-emerald-200 hover:bg-emerald-950/45 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <CheckCircle2 size={13} />
+                    {pluginTestingKeys.size > 0 || (scanRunning && scanActionKind === 'test')
+                      ? 'Testing...'
+                      : activeSheetRequiresSelection
+                        ? `Test Selected${activeSheetTestRows.length > 0 ? ` (${activeSheetTestRows.length})` : ''}`
+                        : 'Test Sheet'}
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => void runSheetTest()}
-                  disabled={!activeSheetCanTest || scanRunning || pluginTestingKeys.size > 0}
-                  title={
-                    activeSheetRequiresSelection && activeSheetTestRows.length === 0
-                      ? 'Select rows to test'
-                      : activeSheetRequiresSelection
-                        ? `Test ${activeSheetTestRows.length} selected item${activeSheetTestRows.length > 1 ? 's' : ''}`
-                        : `Test ${activeSheetAction.label}`
-                  }
-                  className="flex items-center gap-2 border border-emerald-400/30 bg-emerald-950/25 px-3 py-1.5 text-xs text-emerald-200 hover:bg-emerald-950/45 disabled:opacity-40 disabled:cursor-not-allowed"
+                  onClick={() => void runAllScans()}
+                  disabled={scanRunning || connectedInstanceScanRunning}
+                  title="Re-scan every sheet and report what changed"
+                  className="flex shrink-0 items-center gap-2 border border-cyan-400/30 bg-cyan-950/25 px-3 py-1.5 text-xs text-cyan-200 hover:bg-cyan-950/45 disabled:opacity-50"
                 >
-                  <CheckCircle2 size={13} />
-                  {pluginTestingKeys.size > 0 || (scanRunning && scanActionKind === 'test')
-                    ? 'Testing...'
-                    : activeSheetRequiresSelection
-                      ? `Test Selected${activeSheetTestRows.length > 0 ? ` (${activeSheetTestRows.length})` : ''}`
-                      : 'Test Sheet'}
+                  <RefreshCw size={13} className={scanRunning ? 'animate-spin' : ''} />
+                  {scanRunning && scanActionKind === 'scan' ? 'Scanning...' : 'Scan All'}
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={() => void runAllScans()}
-                disabled={scanRunning}
-                title="Re-scan every sheet and report what changed"
-                className="flex items-center gap-2 border border-cyan-400/30 bg-cyan-950/25 px-3 py-1.5 text-xs text-cyan-200 hover:bg-cyan-950/45 disabled:opacity-50"
-              >
-                <RefreshCw size={13} className={scanRunning ? 'animate-spin' : ''} />
-                {scanRunning && scanActionKind === 'scan' ? 'Scanning…' : 'Scan All'}
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  void openPath('/Volumes/KLEVV-4T-1/Project-Manager/docs/engineering/plugin-guide.md').catch(
-                    () => {},
-                  )
-                }
-                className="flex items-center gap-2 border border-emerald-500/20 bg-emerald-950/25 px-3 py-1.5 text-xs text-emerald-400"
-              >
-                <FileText size={13} />
-                Plugin Guide
-                <ExternalLink size={11} />
-              </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void openPath('/Volumes/KLEVV-4T-1/Project-Manager/docs/engineering/plugin-guide.md').catch(
+                      () => {},
+                    )
+                  }
+                  className="flex shrink-0 items-center gap-2 border border-emerald-500/20 bg-emerald-950/25 px-3 py-1.5 text-xs text-emerald-400"
+                >
+                  <FileText size={13} />
+                  {t.integrations.hubGuide}
+                  <ExternalLink size={11} />
+                </button>
+              </div>
             </div>
+            <p className="mt-1 text-xs text-stone-400">{t.integrations.subtitle}</p>
           </div>
         }
         panelClassName="border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72"
@@ -1851,6 +1928,15 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
                   .replace('{whitelisted}', String(exposedSystemCliConfigured))}
               </div>
             )}
+            {activeSheet === 'connected-instances' && (
+              <div className="shrink-0 border border-emerald-400/20 bg-emerald-950/20 px-3 py-2 text-xs text-emerald-100/90">
+                {connectedInstanceScan
+                  ? `Last discovery ${new Date(connectedInstanceScan.scannedAt).toLocaleString()} · ${connectedInstanceScan.devices.length} devices · ${connectedInstanceScan.containers.length} containers · ${connectedInstanceScan.services.length} services${
+                      connectedInstanceScan.warnings.length > 0 ? ` · ${connectedInstanceScan.warnings.length} warning(s)` : ''
+                    }`
+                  : 'Discovery has not run yet. Passive discovery starts when this sheet opens.'}
+              </div>
+            )}
 
             <div className="min-h-0 flex-1">
               <IntegrationsTable
@@ -1867,19 +1953,13 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
                 frozenDataColCount={frozenDataColCount}
                 rowDensity={rowDensity}
                 onTestRow={
-                  isPluginSystemSheet
-                    ? handleTestPluginRow
-                    : undefined
+                  showIntegrationRowTest ? handleIntegrationTestRow : undefined
                 }
                 testResults={
-                  isPluginSystemSheet
-                    ? pluginTestResults
-                    : undefined
+                  showIntegrationRowTest ? pluginTestResults : undefined
                 }
                 testingKeys={
-                  isPluginSystemSheet
-                    ? pluginTestingKeys
-                    : undefined
+                  showIntegrationRowTest ? pluginTestingKeys : undefined
                 }
                 onToggleEnabled={
                   isPluginSystemSheet

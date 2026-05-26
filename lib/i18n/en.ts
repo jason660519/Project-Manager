@@ -279,6 +279,7 @@ export const en: Translations = {
   integrations: {
     title: 'Integrations Hub',
     subtitle: 'Plugins, skills, channels, memory, and commands in one inventory table. Click a row for details.',
+    hubGuide: 'Integration hub Guide',
     sheetPlugins: 'System Installed Apps',
     sheetMcp: 'MCP',
     sheetSkills: 'Skills',
@@ -286,6 +287,8 @@ export const en: Translations = {
     sheetMemory: 'Memory',
     sheetCommands: 'Commands',
     searchPlaceholder: 'Search name, company, path, notes…',
+    filterAllCategories: 'All categories',
+    filterAllPlugins: 'Installed + Marketplace',
     selectProjectHint: 'Select a project in the sidebar to scan memory files and slash commands for that repo.',
     openCommandsFolder: 'Open .claude/commands',
     openCommandFile: 'Open command file',
@@ -298,8 +301,6 @@ export const en: Translations = {
     systemCliDetectedHint:
       'This command was detected on your system PATH. Toggle it in the Commands table to expose or hide it from AI assistants.',
     systemCliRevealBinary: 'Reveal binary',
-    filterAllCategories: 'All categories',
-    filterAllPlugins: 'Installed + marketplace',
     manualFields: 'Manual fields',
     saveManual: 'Save notes',
     channelEditHint: 'Full channel credentials: use row actions or the legacy Channels view in the sidebar.',
@@ -314,6 +315,12 @@ export const en: Translations = {
     colUrl: 'URL',
     colUpdated: 'Updated',
     colNotes: 'Notes',
+    colEnabled: 'Enabled',
+    colTest: 'Test',
+    colTestResult: 'Result',
+    colTestAvailabilityHint: 'Check if this instance is still reachable',
+    selectAll: 'Select all',
+    deselectAll: 'Deselect all',
   },
   features: {
     filterAll: 'All',
