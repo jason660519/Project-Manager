@@ -96,7 +96,7 @@ export default defineConfig({
     },
 
     footer: {
-      message: 'MIT Licensed',
+      message: 'Business Source License 1.1 (BSL 1.1) Licensed',
       copyright: '© Project Manager contributors',
     },
 

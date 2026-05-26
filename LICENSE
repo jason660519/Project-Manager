@@ -1,0 +1,27 @@
+Business Source License 1.1
+
+Parameters
+
+Licensor:             jason660519
+Licensed Work:        Project Manager (including Tauri shell, desktop applications, web router code, and associated tooling in this repository)
+Value Added Use Limit: Commercial production use is permitted only for individuals or teams of 3 or fewer developers. Production use by teams of more than 3 developers for commercial purposes, or providing the software as a hosted service to third parties, is not permitted.
+Change Date:          2029-05-26
+Change License:       Apache License, Version 2.0
+
+Licensor hereby grants you the right to copy, modify, create derivative works, redistribute, and make non-production use of the Licensed Work. The Licensor also grants you the right to make Production Use of the Licensed Work under the License only to the extent that your use does not exceed the Value Added Use Limit.
+
+You may not make Production Use of the Licensed Work in excess of the Value Added Use Limit. Any such Use is a breach of this License and your right to use the Licensed Work under this License is automatically terminated.
+
+If you exceed the Value Added Use Limit, you must obtain a commercial license from Licensor or its authorized reseller. You may contact Licensor at the repository: https://github.com/jason660519/Project-Manager
+
+Change of License. On the Change Date, or in connection with a Change Date Event, this License shall transition to the Change License. All rights and restrictions under this License shall terminate and you shall be granted the right to use the Licensed Work under the terms of the Change License.
+
+For purposes of this License:
+
+"Production Use" means any use of the Licensed Work in production or commercial environments.
+"Non-Production Use" means any use of the Licensed Work for testing, evaluation, development, or education.
+"Change Date Event" means any event specified as such in this License, if any.
+
+All copies of original and modified Licensed Work, and derivative works of the Licensed Work, are subject to this License.
+
+Copyright © 2026 jason660519 and Project Manager contributors. All rights reserved.
