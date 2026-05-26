@@ -154,6 +154,9 @@ export const INTEGRATION_REGISTRY: Record<string, IntegrationRegistryEntry> = {
   'mcp-filesystem': { company: 'MCP', category1: 'MCP Server', category2: 'Filesystem', scope: 'project' },
   'mcp-chrome': { company: 'MCP', category1: 'MCP Server', category2: 'Browser', scope: 'project' },
   'mcp-slack': { company: 'Slack', category1: 'MCP Server', category2: 'Notify', scope: 'project' },
+  'mcp-exa': { company: 'Exa Labs', category1: 'MCP Server', category2: 'Web Search', scope: 'network', githubUrl: 'https://github.com/exa-labs/exa-mcp-server' },
+  'mcp-context7': { company: 'Upstash', category1: 'MCP Server', category2: 'Documentation', scope: 'network', githubUrl: 'https://github.com/upstash/context7-mcp' },
+  'mcp-grep-app': { company: 'Grep.app', category1: 'MCP Server', category2: 'Code Search', scope: 'network', githubUrl: 'https://github.com/vicoplus/grep-mcp' },
 
   github: { company: 'GitHub', category1: 'Version Control', githubUrl: 'https://git-scm.com/docs/gitcli' },
   linear: { company: 'Linear', category1: 'Project Mgmt' },

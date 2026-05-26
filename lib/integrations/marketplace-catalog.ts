@@ -113,6 +113,21 @@ export const MARKETPLACE: MarketplacePlugin[] = [
     defaultMcp: { transport: 'stdio', command: 'npx', args: ['-y', '@modelcontextprotocol/server-slack'], env: { SLACK_BOT_TOKEN: '' } },
   },
   {
+    id: 'mcp-exa', name: 'Exa Search MCP Server', description: 'MCP server that connects to Exa\'s AI search and web crawling engine.',
+    category: 'dev', kind: 'mcp', accentColor: 'bg-emerald-700', initials: 'EX',
+    defaultMcp: { transport: 'stdio', command: 'npx', args: ['-y', 'exa-mcp-server'], env: { EXA_API_KEY: '' } },
+  },
+  {
+    id: 'mcp-context7', name: 'Context7 Docs MCP Server', description: 'Upstash Context7 MCP server providing real-time, version-specific developer documentation and code examples.',
+    category: 'dev', kind: 'mcp', accentColor: 'bg-cyan-700', initials: 'C7',
+    defaultMcp: { transport: 'stdio', command: 'npx', args: ['-y', '@upstash/context7-mcp'] },
+  },
+  {
+    id: 'mcp-grep-app', name: 'Grep.app Search MCP Server', description: 'MCP server that searches millions of public GitHub repositories via grep.app.',
+    category: 'dev', kind: 'mcp', accentColor: 'bg-blue-800', initials: 'GA',
+    defaultMcp: { transport: 'stdio', command: 'npx', args: ['-y', 'grep-mcp'] },
+  },
+  {
     id: 'github', name: 'GitHub CLI', description: 'GitHub CLI (`gh`) — sync pull requests and issues to your projects. (Not GitHub Desktop.)',
     category: 'vcs', kind: 'cli', accentColor: 'bg-stone-700', initials: 'GH',
     defaultCli: { command: 'gh', argsTemplate: [] },

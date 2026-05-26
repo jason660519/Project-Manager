@@ -20,4 +20,22 @@ describe('integration registry runtime metadata', () => {
     );
   });
 
+  it('describes new built-in MCP servers', () => {
+    const exa = registryFor('mcp-exa');
+    const context7 = registryFor('mcp-context7');
+    const grepApp = registryFor('mcp-grep-app');
+
+    expect(exa.company).toBe('Exa Labs');
+    expect(exa.category2).toBe('Web Search');
+    expect(exa.scope).toBe('network');
+
+    expect(context7.company).toBe('Upstash');
+    expect(context7.category2).toBe('Documentation');
+    expect(context7.scope).toBe('network');
+
+    expect(grepApp.company).toBe('Grep.app');
+    expect(grepApp.category2).toBe('Code Search');
+    expect(grepApp.scope).toBe('network');
+  });
+
 });

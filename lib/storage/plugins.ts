@@ -104,13 +104,47 @@ const DEFAULT_EDITORS: EditorPlugin[] = [
   { id: 'antigravity', kind: 'editor', name: 'Antigravity IDE App', enabled: true, installedAt: BUILT_IN_INSTALL_DATE, command: 'antigravity' },
 ];
 
+const DEFAULT_MCPS: McpPlugin[] = [
+  {
+    id: 'mcp-exa',
+    kind: 'mcp',
+    name: 'Exa Search MCP Server',
+    enabled: false,
+    installedAt: BUILT_IN_INSTALL_DATE,
+    transport: 'stdio',
+    command: 'npx',
+    args: ['-y', 'exa-mcp-server'],
+    env: { EXA_API_KEY: '' },
+  },
+  {
+    id: 'mcp-context7',
+    kind: 'mcp',
+    name: 'Context7 Docs MCP Server',
+    enabled: true,
+    installedAt: BUILT_IN_INSTALL_DATE,
+    transport: 'stdio',
+    command: 'npx',
+    args: ['-y', '@upstash/context7-mcp'],
+  },
+  {
+    id: 'mcp-grep-app',
+    kind: 'mcp',
+    name: 'Grep.app Search MCP Server',
+    enabled: true,
+    installedAt: BUILT_IN_INSTALL_DATE,
+    transport: 'stdio',
+    command: 'npx',
+    args: ['-y', 'grep-mcp'],
+  },
+];
+
 const DEFAULT_FRONTEND: FrontendPlugin[] = [];
 
 const DEFAULT_CATALOG: PluginCatalog = {
   schemaVersion: 2,
-  plugins: [...DEFAULT_PROVIDERS, ...DEFAULT_CLIS, ...DEFAULT_EDITORS, ...DEFAULT_FRONTEND],
+  plugins: [...DEFAULT_PROVIDERS, ...DEFAULT_CLIS, ...DEFAULT_EDITORS, ...DEFAULT_MCPS, ...DEFAULT_FRONTEND],
 };
-const REQUIRED_BUILTIN_PLUGINS: AnyPlugin[] = [...DEFAULT_FRONTEND];
+const REQUIRED_BUILTIN_PLUGINS: AnyPlugin[] = [...DEFAULT_MCPS, ...DEFAULT_FRONTEND];
 
 // One-shot migration from the v1 three-array layout to the v2 union.
 function migrateV1toV2(v1: PluginCatalogV1): PluginCatalog {
