@@ -21,6 +21,7 @@ export function mapSystemCliRow(
     scope: entry.scope,
     port: '',
     installPath: entry.path,
+    installMethod: 'system_path',
     status: 'installed',
     statusLabel: exposedToAi ? 'Exposed to AI' : 'Hidden from AI',
     lastUpdated: '',

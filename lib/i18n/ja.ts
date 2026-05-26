@@ -309,6 +309,7 @@ export const ja: Translations = {
     colCategory2: '分類2',
     colCompany: '会社',
     colScope: 'Scope',
+    colMethod: '実行方式',
     colPath: 'パス/アドレス',
     colPort: 'Port',
     colLicense: 'License',

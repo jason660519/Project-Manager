@@ -973,6 +973,24 @@
       "createdAt": "2026-05-25T20:51:52Z",
       "updatedAt": "2026-05-25T22:10:47Z",
       "updatedBy": "Codex"
+    },
+    {
+      "id": "F32",
+      "name": "Built-in MCP Servers & Execution Method Column",
+      "category": "Core/Integration",
+      "status": "done",
+      "progress": 100,
+      "phase": "development",
+      "points": 5,
+      "locatedSection": "/plugins",
+      "paths": {
+        "implementation": "app/ui/views/Plugins/_shared/IntegrationsTable.tsx",
+        "test": "__tests__/integrations.registry.test.ts"
+      },
+      "notes": "Added out-of-the-box MCP server templates for Exa Search, Context7 Docs, and Grep.app. Added an 'Execution Method' column in the Integrations Hub table with custom styled badges, multi-language support (English, Traditional Chinese, Simplified Chinese, Japanese), and full type safety.",
+      "createdAt": "2026-05-26T03:26:00.000Z",
+      "updatedAt": "2026-05-26T03:26:00.000Z",
+      "updatedBy": "Antigravity"
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",
@@ -983,6 +1001,6 @@
     "root": "/Volumes/KLEVV-4T-1/Project-Manager"
   },
   "schemaVersion": 8,
-  "updatedAt": "2026-05-26T00:36:38.000Z",
-  "updatedBy": "Codex"
+  "updatedAt": "2026-05-26T03:26:00.000Z",
+  "updatedBy": "Antigravity"
 }

@@ -30,6 +30,7 @@ export function mapSlashCommandRow(file: SlashCommandFile, commandsDir: string):
     scope: 'project',
     port: '',
     installPath: file.absPath,
+    installMethod: 'local_file',
     status,
     statusLabel: 'Installed',
     lastUpdated: file.modified?.slice(0, 10) ?? '',

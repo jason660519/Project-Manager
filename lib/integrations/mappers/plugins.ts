@@ -181,6 +181,7 @@ function mapPlugin(plugin: AnyPlugin, ctx: PluginMapperContext): IntegrationRow 
     port: portFor(plugin, reg),
     installPath:
       reg.installPathHint ?? installPathFor(plugin, ctx.resolvedInstallPaths?.[plugin.id]),
+    installMethod: reg.installMethod ?? '',
     status,
     statusLabel,
     lastUpdated: plugin.installedAt?.slice(0, 10) ?? '',
@@ -234,6 +235,7 @@ export function mapMarketplaceRow(
     scope: (reg.scope ?? '') as IntegrationScope,
     port: reg.port ?? '',
     installPath: reg.installPathHint ?? detectedPath,
+    installMethod: reg.installMethod ?? '',
     status: entry.installed ? 'installed' : 'not_installed',
     statusLabel: entry.installed ? 'Installed' : 'Available',
     lastUpdated: '',

@@ -307,6 +307,7 @@ export const en: Translations = {
     colCategory2: 'Category 2',
     colCompany: 'Company',
     colScope: 'Scope',
+    colMethod: 'Method',
     colPath: 'Path / address',
     colPort: 'Port',
     colLicense: 'License',

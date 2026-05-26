@@ -308,6 +308,7 @@ export const zh: Translations = {
     colCategory2: '分类2',
     colCompany: '公司',
     colScope: 'Scope',
+    colMethod: '执行方式',
     colPath: '安装路径/地址',
     colPort: 'Port',
     colLicense: 'License',

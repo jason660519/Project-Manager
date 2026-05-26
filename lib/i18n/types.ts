@@ -311,6 +311,7 @@ export interface Translations {
     colCategory2: string;
     colCompany: string;
     colScope: string;
+    colMethod: string;
     colPath: string;
     colPort: string;
     colLicense: string;

@@ -34,6 +34,7 @@ export function mapMemoryRow(
     scope: 'project',
     port: '',
     installPath: absPath,
+    installMethod: 'local_file',
     status,
     statusLabel: exists ? 'Present' : 'Not found',
     lastUpdated: scan?.modified?.slice(0, 10) ?? '',

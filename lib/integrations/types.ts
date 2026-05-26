@@ -89,6 +89,7 @@ export interface IntegrationRow {
   scope: IntegrationScope;
   port: string;
   installPath: string;
+  installMethod?: string;
   status: IntegrationStatus;
   statusLabel: string;
   lastUpdated: string;

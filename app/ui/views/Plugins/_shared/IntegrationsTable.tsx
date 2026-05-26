@@ -12,6 +12,7 @@ import {
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import type { IntegrationRow } from '../../../../../lib/integrations/types';
 import { connectedInstanceSearchText } from '../../../../../lib/integrations/mappers/connected-instances';
+import { useI18n } from '../../../../../lib/i18n';
 import { StatusBadge } from './status-badge';
 
 export interface IntegrationRowTestResult {
@@ -49,6 +50,30 @@ function truncateCell(value: string, max = 28) {
   return (
     <span className="block max-w-[200px] truncate font-mono text-xs text-stone-300" title={value}>
       {value.length > max ? `${value.slice(0, max)}…` : value}
+    </span>
+  );
+}
+
+const METHOD_STYLES: Record<string, { label: string; className: string }> = {
+  local_venv: { label: 'Venv', className: 'border-blue-400/25 bg-blue-500/10 text-blue-200' },
+  system_path: { label: 'PATH', className: 'border-purple-400/25 bg-purple-500/10 text-purple-200' },
+  desktop_app: { label: 'App', className: 'border-pink-400/25 bg-pink-500/10 text-pink-200' },
+  ondemand_npx: { label: 'NPX', className: 'border-orange-400/25 bg-orange-500/10 text-orange-200' },
+  remote_url: { label: 'URL', className: 'border-teal-400/25 bg-teal-500/10 text-teal-200' },
+  git_clone: { label: 'Git', className: 'border-sky-400/25 bg-sky-500/10 text-sky-200' },
+  local_file: { label: 'File', className: 'border-indigo-400/25 bg-indigo-500/10 text-indigo-200' },
+  webhook: { label: 'Webhook', className: 'border-lime-400/25 bg-lime-500/10 text-lime-200' },
+  poll: { label: 'Poll', className: 'border-amber-400/25 bg-amber-500/10 text-amber-200' },
+};
+
+function MethodBadge({ method }: { method?: string }) {
+  if (!method) return emptyCell();
+  const style = METHOD_STYLES[method] || { label: method, className: 'border-stone-400/25 bg-stone-500/10 text-stone-200' };
+  return (
+    <span
+      className={`inline-flex border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] ${style.className}`}
+    >
+      {style.label}
     </span>
   );
 }
@@ -102,6 +127,7 @@ export function IntegrationsTable({
   frozenDataColCount = 0,
   rowDensity = 'comfortable',
 }: IntegrationsTableProps) {
+  const { t } = useI18n();
   const [columnSizing, setColumnSizing] = useState<Record<string, number>>({});
   const columns = useMemo(
     () => [
@@ -210,6 +236,12 @@ export function IntegrationsTable({
         cell: (info) => (
           <span className="font-medium text-stone-100">{info.getValue()}</span>
         ),
+      }),
+      columnHelper.display({
+        id: 'col-method',
+        header: t.integrations.colMethod,
+        cell: ({ row }) => <MethodBadge method={row.original.installMethod} />,
+        size: 80,
       }),
       columnHelper.display({
         id: 'col-status',
@@ -370,7 +402,7 @@ export function IntegrationsTable({
           ]
         : []),
     ],
-    [columnVisibility, onToggleCheck, onToggleCheckAll, checkedKeys, onToggleEnabled, onTestRow, testResults, testingKeys],
+    [columnVisibility, onToggleCheck, onToggleCheckAll, checkedKeys, onToggleEnabled, onTestRow, testResults, testingKeys, t],
   );
 
   const table = useReactTable({

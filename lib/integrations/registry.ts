@@ -9,6 +9,7 @@ export interface IntegrationRegistryEntry {
   category2?: string;
   license?: string;
   scope?: 'user' | 'project' | 'network' | 'intranet';
+  installMethod?: 'local_venv' | 'system_path' | 'desktop_app' | 'ondemand_npx' | 'remote_url' | '';
   port?: string;
   installPathHint?: string;
   githubUrl?: string;
@@ -36,8 +37,8 @@ export const INTEGRATION_REGISTRY: Record<string, IntegrationRegistryEntry> = {
   // AI provider rows (anthropic, openai, google, ollama) intentionally omitted —
   // those are surfaced from the Keys view, not the Plugins hub.
 
-  'claude-code': { company: 'Anthropic', category1: 'Coding Editor/Orchestrator', category2: 'CLI', scope: 'user' },
-  codex: { company: 'OpenAI', category1: 'Coding Editor/Orchestrator', category2: 'CLI', scope: 'user' },
+  'claude-code': { company: 'Anthropic', category1: 'Coding Editor/Orchestrator', category2: 'CLI', scope: 'user', installMethod: 'system_path' },
+  codex: { company: 'OpenAI', category1: 'Coding Editor/Orchestrator', category2: 'CLI', scope: 'user', installMethod: 'system_path' },
   'hermes-agent': {
     company: 'Nous Research',
     category1: 'Coding Editor/Orchestrator',
@@ -46,6 +47,7 @@ export const INTEGRATION_REGISTRY: Record<string, IntegrationRegistryEntry> = {
     scope: 'project',
     port: '9119',
     installPathHint: '.project-manager/bin/hermes',
+    installMethod: 'local_venv',
     runtime: {
       dashboardUrl: 'http://127.0.0.1:9119',
       sourcePath: '.project-manager/vendor/hermes-agent',
@@ -99,6 +101,7 @@ export const INTEGRATION_REGISTRY: Record<string, IntegrationRegistryEntry> = {
     scope: 'project',
     port: '18790',
     installPathHint: '.project-manager/bin/openclaw',
+    installMethod: 'local_venv',
     runtime: {
       dashboardUrl: 'http://127.0.0.1:18790/',
       sourcePath: '.project-manager/vendor/openclaw',
@@ -144,24 +147,24 @@ export const INTEGRATION_REGISTRY: Record<string, IntegrationRegistryEntry> = {
       ],
     },
   },
-  aider: { company: 'Aider', category1: 'Coding Editor/Orchestrator', category2: 'CLI', scope: 'user' },
-  cursor: { company: 'Cursor', category1: 'Coding Editor/Orchestrator', category2: 'Desktop App', scope: 'user' },
-  vscode: { company: 'Microsoft', category1: 'Coding Editor/Orchestrator', category2: 'Desktop App', scope: 'user' },
-  zed: { company: 'Zed', category1: 'Coding Editor/Orchestrator', category2: 'Desktop App', scope: 'user' },
-  trae: { company: 'ByteDance', category1: 'Coding Editor/Orchestrator', category2: 'Desktop App', scope: 'user' },
-  antigravity: { company: 'Google', category1: 'Coding Editor/Orchestrator', category2: 'Desktop App', scope: 'user' },
+  aider: { company: 'Aider', category1: 'Coding Editor/Orchestrator', category2: 'CLI', scope: 'user', installMethod: 'system_path' },
+  cursor: { company: 'Cursor', category1: 'Coding Editor/Orchestrator', category2: 'Desktop App', scope: 'user', installMethod: 'desktop_app' },
+  vscode: { company: 'Microsoft', category1: 'Coding Editor/Orchestrator', category2: 'Desktop App', scope: 'user', installMethod: 'desktop_app' },
+  zed: { company: 'Zed', category1: 'Coding Editor/Orchestrator', category2: 'Desktop App', scope: 'user', installMethod: 'desktop_app' },
+  trae: { company: 'ByteDance', category1: 'Coding Editor/Orchestrator', category2: 'Desktop App', scope: 'user', installMethod: 'desktop_app' },
+  antigravity: { company: 'Google', category1: 'Coding Editor/Orchestrator', category2: 'Desktop App', scope: 'user', installMethod: 'desktop_app' },
 
-  'mcp-filesystem': { company: 'MCP', category1: 'MCP Server', category2: 'Filesystem', scope: 'project' },
-  'mcp-chrome': { company: 'MCP', category1: 'MCP Server', category2: 'Browser', scope: 'project' },
-  'mcp-slack': { company: 'Slack', category1: 'MCP Server', category2: 'Notify', scope: 'project' },
-  'mcp-exa': { company: 'Exa Labs', category1: 'MCP Server', category2: 'Web Search', scope: 'network', githubUrl: 'https://github.com/exa-labs/exa-mcp-server' },
-  'mcp-context7': { company: 'Upstash', category1: 'MCP Server', category2: 'Documentation', scope: 'network', githubUrl: 'https://github.com/upstash/context7-mcp' },
-  'mcp-grep-app': { company: 'Grep.app', category1: 'MCP Server', category2: 'Code Search', scope: 'network', githubUrl: 'https://github.com/vicoplus/grep-mcp' },
+  'mcp-filesystem': { company: 'MCP', category1: 'MCP Server', category2: 'Filesystem', scope: 'project', installMethod: 'ondemand_npx' },
+  'mcp-chrome': { company: 'MCP', category1: 'MCP Server', category2: 'Browser', scope: 'project', installMethod: 'ondemand_npx' },
+  'mcp-slack': { company: 'Slack', category1: 'MCP Server', category2: 'Notify', scope: 'project', installMethod: 'ondemand_npx' },
+  'mcp-exa': { company: 'Exa Labs', category1: 'MCP Server', category2: 'Web Search', scope: 'network', githubUrl: 'https://github.com/exa-labs/exa-mcp-server', installMethod: 'ondemand_npx' },
+  'mcp-context7': { company: 'Upstash', category1: 'MCP Server', category2: 'Documentation', scope: 'network', githubUrl: 'https://github.com/upstash/context7-mcp', installMethod: 'ondemand_npx' },
+  'mcp-grep-app': { company: 'Grep.app', category1: 'MCP Server', category2: 'Code Search', scope: 'network', githubUrl: 'https://github.com/vicoplus/grep-mcp', installMethod: 'ondemand_npx' },
 
-  github: { company: 'GitHub', category1: 'Version Control', githubUrl: 'https://git-scm.com/docs/gitcli' },
-  linear: { company: 'Linear', category1: 'Project Mgmt' },
-  slack: { company: 'Slack', category1: 'Notifications' },
-  sentry: { company: 'Sentry', category1: 'Monitoring' },
+  github: { company: 'GitHub', category1: 'Version Control', githubUrl: 'https://git-scm.com/docs/gitcli', installMethod: 'system_path' },
+  linear: { company: 'Linear', category1: 'Project Mgmt', installMethod: 'system_path' },
+  slack: { company: 'Slack', category1: 'Notifications', installMethod: 'system_path' },
+  sentry: { company: 'Sentry', category1: 'Monitoring', installMethod: 'system_path' },
 };
 
 export function registryFor(id: string): IntegrationRegistryEntry {

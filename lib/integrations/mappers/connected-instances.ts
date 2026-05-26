@@ -180,6 +180,7 @@ export function mapConnectedInstanceRow(def: ConnectedInstanceDefinition): Integ
     scope: def.scope,
     port: def.port ?? '',
     installPath: def.address,
+    installMethod: 'remote_url',
     status: 'idle',
     statusLabel: def.statusLabel,
     lastUpdated: '2026-05-24',
