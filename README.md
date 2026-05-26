@@ -1,6 +1,9 @@
 # Project Manager: The Context-Aware Engineering Dashboard
 
+[**📖 專案公開文件網站 (GitHub Pages)**](https://jason660519.github.io/Project-Manager/)
+
 Project Manager 是一個跨專案的開發進度管理與任務派遣工具，旨在解耦傳統笨重的專案管理系統，並與工程師的本地開發環境（IDE & Agents）深度互動。
+
 
 ## 專案路徑
 
@@ -110,6 +113,7 @@ npm run tauri:build           # 打包成 .app / .exe；會拒絕 PM_DEV_PLAINTE
 
 ## 技術文件入口
 
+- [公開文件網站 (GitHub Pages)](https://jason660519.github.io/Project-Manager/): 基於 VitePress 架設的專案公開使用手冊與功能指南。
 - [Architecture Overview](./docs/architecture/architecture-overview.md): 系統資料流、雙模式執行與文件格式策略。
 - [File Naming Standards](./docs/file-naming-standards.md): Project Manager/SayDo 對齊後的檔案命名與歸檔規則。
 - [User Guides](./docs/guides/getting-started.md): 對外使用說明與功能導覽（public，發布至 `/documentation`）。
