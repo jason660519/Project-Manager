@@ -185,3 +185,24 @@ Project Manager 的介面已完整國際化，翻譯檔位於 [`lib/i18n/`](./li
 ### 術語表
 
 [`lib/i18n/GLOSSARY.md`](./lib/i18n/GLOSSARY.md) 是所有關鍵技術詞彙的權威對照表。翻譯檔中用 `// GLOSSARY: <key>` 行內標注來指向對應的術語表條目。
+
+---
+
+## License / 授權條款
+
+This project is licensed under the **Business Source License 1.1 (BSL 1.1)**. 
+- **Non-commercial / Personal use**: Free and unrestricted.
+- **Commercial use**: Allowed for individuals or teams of 3 or fewer developers. Production use by teams of more than 3 developers for commercial purposes, or hosting the software as a service (SaaS), requires a commercial license.
+- **Future Open Source**: On **2029-05-26**, the license for this version of the code will automatically convert to the **Apache License, Version 2.0**.
+
+For more details, please see the [LICENSE](./LICENSE) file.
+
+---
+
+本專案採用 **Business Source License 1.1 (BSL 1.1)** 授權條款：
+- **非商業 / 個人使用**：完全免費且無限制。
+- **商業使用**：僅允許個人或 3 人（含）以下的團隊使用。超過 3 人的商業團隊或將本軟體作為託管服務（SaaS）銷售，需購買商業授權。
+- **未來開源承諾**：於 **2029-05-26**，本版本的程式碼授權條款將自動轉化為 **Apache License, Version 2.0** 開源授權。
+
+詳細資訊請參閱 [LICENSE](./LICENSE) 檔案。
+
