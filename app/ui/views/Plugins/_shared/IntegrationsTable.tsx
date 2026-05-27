@@ -64,6 +64,12 @@ const METHOD_STYLES: Record<string, { label: string; className: string }> = {
   local_file: { label: 'File', className: 'border-indigo-400/25 bg-indigo-500/10 text-indigo-200' },
   webhook: { label: 'Webhook', className: 'border-lime-400/25 bg-lime-500/10 text-lime-200' },
   poll: { label: 'Poll', className: 'border-amber-400/25 bg-amber-500/10 text-amber-200' },
+  arp: { label: 'ARP', className: 'border-cyan-400/25 bg-cyan-500/10 text-cyan-200' },
+  bonjour: { label: 'Bonjour', className: 'border-teal-400/25 bg-teal-500/10 text-teal-200' },
+  docker: { label: 'Docker', className: 'border-blue-400/25 bg-blue-500/10 text-blue-200' },
+  nmap: { label: 'nmap', className: 'border-amber-400/25 bg-amber-500/10 text-amber-200' },
+  manual: { label: 'Manual', className: 'border-stone-400/25 bg-stone-500/10 text-stone-200' },
+  mdns: { label: 'mDNS', className: 'border-teal-400/25 bg-teal-500/10 text-teal-200' },
 };
 
 function MethodBadge({ method }: { method?: string }) {
@@ -103,6 +109,10 @@ interface IntegrationsTableProps {
   errorMessage?: string | null;
   frozenDataColCount?: number;
   rowDensity?: 'compact' | 'comfortable';
+  /** Override Method column header (e.g. Scan method on Connected Instances). */
+  methodColumnHeader?: string;
+  /** When true, status badges omit extra row.badges in the status cell. */
+  compactStatusCell?: boolean;
 }
 
 function isTestableRow(row: IntegrationRow): boolean {
@@ -130,6 +140,8 @@ export function IntegrationsTable({
   errorMessage = null,
   frozenDataColCount = 0,
   rowDensity = 'comfortable',
+  methodColumnHeader,
+  compactStatusCell = false,
 }: IntegrationsTableProps) {
   const { t } = useI18n();
   const [columnSizing, setColumnSizing] = useState<Record<string, number>>({});
@@ -250,7 +262,7 @@ export function IntegrationsTable({
       }),
       columnHelper.display({
         id: 'col-method',
-        header: t.integrations.colMethod,
+        header: methodColumnHeader ?? t.integrations.colMethod,
         cell: ({ row }) => <MethodBadge method={row.original.installMethod} />,
         size: 80,
       }),
@@ -260,14 +272,15 @@ export function IntegrationsTable({
         cell: ({ row }) => (
           <div className="flex flex-wrap items-center gap-1">
             <StatusBadge status={row.original.status} label={row.original.statusLabel} />
-            {row.original.badges.slice(0, 2).map((b) => (
-              <span
-                key={b}
-                className="border border-stone-300/20 bg-stone-200/5 px-1 py-0.5 text-[9px] text-stone-300"
-              >
-                {b}
-              </span>
-            ))}
+            {!compactStatusCell &&
+              row.original.badges.slice(0, 2).map((b) => (
+                <span
+                  key={b}
+                  className="border border-stone-300/20 bg-stone-200/5 px-1 py-0.5 text-[9px] text-stone-300"
+                >
+                  {b}
+                </span>
+              ))}
           </div>
         ),
       }),
@@ -413,7 +426,19 @@ export function IntegrationsTable({
           ]
         : []),
     ],
-    [columnVisibility, onToggleCheck, onToggleCheckAll, checkedKeys, onToggleEnabled, onTestRow, testResults, testingKeys, t],
+    [
+      columnVisibility,
+      onToggleCheck,
+      onToggleCheckAll,
+      checkedKeys,
+      onToggleEnabled,
+      onTestRow,
+      testResults,
+      testingKeys,
+      t,
+      methodColumnHeader,
+      compactStatusCell,
+    ],
   );
 
   const table = useReactTable({

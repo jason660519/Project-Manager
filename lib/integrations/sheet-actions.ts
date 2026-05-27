@@ -24,7 +24,7 @@ export const INTEGRATION_SHEET_ACTION_LABELS: Record<IntegrationInventorySheet, 
   channels: 'Channels',
   memory: 'Memory',
   commands: 'Commands',
-  'connected-instances': 'Connected Instances',
+  'connected-instances': 'Network Instances',
 };
 
 export interface IntegrationSheetAction<SharedScanContext = unknown> {

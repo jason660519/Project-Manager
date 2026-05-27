@@ -940,14 +940,16 @@
         "featureFolder": ".project-manager/features/F30/",
         "spec": ".project-manager/features/F30/feature-spec.md",
         "tdd": ".project-manager/features/F30/tdd-spec.md",
+        "debugRetro": ".project-manager/features/F30/debug-retro.md",
+        "testScenarios": ".project-manager/features/F30/test-scenarios.md",
         "developmentLogSummaryFolder": ".project-manager/features/F30/",
         "implementation": "app/api/chat",
         "test": "__tests__/chat.agent.test.ts"
       },
-      "notes": "Upgrade AI Assistant to match/exceed OpenClaw capabilities. Enhanced system prompt, tool execution, slash commands v2, cross-session memory, streaming UX polish.",
+      "notes": "Upgrade AI Assistant to match/exceed OpenClaw capabilities. Enhanced system prompt, tool execution, slash commands v2, cross-session memory, streaming UX polish. Fixed chat API key bridging: server routes now accept client-loaded keys from providerKeyStore.",
       "createdAt": "2026-05-25T12:30:00Z",
-      "updatedAt": "2026-05-25T13:15:00Z",
-      "updatedBy": "小龍蝦"
+      "updatedAt": "2026-05-26T00:00:00Z",
+      "updatedBy": "Claude"
     },
     {
       "id": "F31",
@@ -991,6 +993,31 @@
       "createdAt": "2026-05-26T03:26:00.000Z",
       "updatedAt": "2026-05-26T03:26:00.000Z",
       "updatedBy": "Antigravity"
+    },
+    {
+      "id": "F33",
+      "name": "Network Discovery Plan",
+      "category": "Core/Integration",
+      "status": "in_progress",
+      "progress": 92,
+      "phase": "development",
+      "points": 8,
+      "locatedSection": "/integrations-hub/connected-instances",
+      "readmePath": ".project-manager/features/F33/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F33/",
+        "spec": ".project-manager/features/F33/feature-spec.md",
+        "tdd": ".project-manager/features/F33/tdd-spec.md",
+        "debugRetro": ".project-manager/features/F33/debug-retro.md",
+        "testScenarios": ".project-manager/features/F33/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F33/",
+        "implementation": "lib/integrations/discovery",
+        "test": "__tests__/discovery.plan.test.ts"
+      },
+      "notes": "P0 + nmap install scripts. Fixed US-05: checking nmap on Passive LAN auto-switches Active + CIDR hint (no Run dead-end). Manual Tauri: F33-M02/M03 pending.",
+      "createdAt": "2026-05-27T00:00:00Z",
+      "updatedAt": "2026-05-27T14:30:00Z",
+      "updatedBy": "Cursor"
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",
@@ -1001,6 +1028,6 @@
     "root": "/Volumes/KLEVV-4T-1/Project-Manager"
   },
   "schemaVersion": 8,
-  "updatedAt": "2026-05-26T03:26:00.000Z",
-  "updatedBy": "Antigravity"
+  "updatedAt": "2026-05-27T00:00:00Z",
+  "updatedBy": "Cursor"
 }

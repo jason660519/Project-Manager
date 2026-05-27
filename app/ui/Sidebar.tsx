@@ -16,7 +16,6 @@ import {
   ShieldCheck,
   SquareTerminal,
   Timer,
-  Users2,
   Wifi,
   WifiOff,
 } from 'lucide-react';
@@ -54,15 +53,19 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'integrations-hub', itemKey: 'integrationsHub', href: '/integrations-hub/system_installed_apps', icon: Plug },
       { id: 'xmux',             itemKey: 'xmux',            href: '/xmux',                     icon: SquareTerminal },
       { id: 'cron-jobs',        itemKey: 'cronJobs',        href: '/cron-jobs',                icon: Timer },
-      { id: 'engineers',        itemKey: 'engineers',       href: '/engineers',                icon: Users2 },
     ],
   },
   {
     groupKey: 'observe',
     items: [
-      { id: 'sessions', itemKey: 'sessions', href: '/sessions', icon: ScrollText },
       { id: 'logs',     itemKey: 'logs',     href: '/logs',     icon: FileText },
-      { id: 'chat',     itemKey: 'chat',     href: '/ai_assistants',     icon: MessageSquareText },
+    ],
+  },
+  {
+    groupKey: 'assist',
+    items: [
+      { id: 'chat',     itemKey: 'chat',     href: '/ai_assistants', icon: MessageSquareText },
+      { id: 'sessions', itemKey: 'sessions', href: '/sessions',      icon: ScrollText },
     ],
   },
   {

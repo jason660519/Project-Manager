@@ -36,6 +36,8 @@
     "openclaw:update": "bash scripts/update-openclaw.sh",
     "openclaw:rollback": "bash scripts/rollback-openclaw.sh",
     "openclaw:sync-env": "bash scripts/sync-openclaw-env.sh",
+    "discovery:install-nmap": "bash scripts/install-nmap.sh",
+    "discovery:doctor": "bash scripts/discovery-doctor.sh",
     "test": "vitest run",
     "test:watch": "vitest",
     "eval:run:wrapper": "node eval/runners/run-wrapper-batch.mjs --help",

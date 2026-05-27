@@ -12,12 +12,12 @@ import {
   History,
   KeyRound,
   LockKeyhole,
-  PlugZap,
   RefreshCw,
   ShieldCheck,
   SlidersHorizontal,
   Terminal,
   TriangleAlert,
+  Users2,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useEffect, useMemo, useState } from 'react';
@@ -55,13 +55,14 @@ import { ChatPageClient } from '../chat/ChatPageClient';
 
 interface AIAssistantsConsoleClientProps {
   initialChatContext?: ChatContext;
-  activeSheet?: AIAssistantSheetId;
+  activeSheet?: AIAssistantSheetId | 'instances';
+  engineersPanel?: React.ReactNode;
 }
 
 const SHEET_TABS: ReadonlyArray<SheetTabItem<AIAssistantSheetId>> = [
   { key: 'chat', label: 'Chat', icon: <Bot size={14} /> },
+  { key: 'engineers', label: 'Engineers', icon: <Users2 size={14} /> },
   { key: 'overview', label: 'Overview', icon: <Activity size={14} /> },
-  { key: 'instances', label: 'Instance', icon: <PlugZap size={14} /> },
   { key: 'profile', label: 'Profile', icon: <FileText size={14} /> },
   { key: 'skills', label: 'Skills', icon: <SlidersHorizontal size={14} /> },
   { key: 'daily-logs', label: 'Daily Logs', icon: <FileClock size={14} /> },
@@ -152,7 +153,13 @@ const inputClass =
 const selectClass =
   'w-full rounded border border-stone-200/15 bg-stone-950/70 px-3 py-2 text-[12px] text-stone-100 outline-none focus:border-amber-200/40';
 
-function OverviewSheet({ assistant }: { assistant: AIAssistantConfig }) {
+function OverviewSheet({
+  assistant,
+  onSaveInstance,
+}: {
+  assistant: AIAssistantConfig;
+  onSaveInstance: (instance: AssistantInstanceConfig) => void;
+}) {
   const enabledSkills = assistant.skills.filter((skill) => skill.enabled).length;
   const warnings = assistant.dailyLogs.filter((log) => log.severity !== 'info').length;
   const blockedPermissions = assistant.permissions.filter((permission) => permission.state === 'blocked').length;
@@ -192,6 +199,10 @@ function OverviewSheet({ assistant }: { assistant: AIAssistantConfig }) {
             <p>Let Dreaming jobs produce reviewable proposals instead of mutating profile or memory directly.</p>
           </div>
         </section>
+      </div>
+
+      <div className="rounded border border-stone-200/15 bg-white/[0.02]">
+        <InstanceSheet assistant={assistant} onSave={onSaveInstance} />
       </div>
     </div>
   );
@@ -237,7 +248,7 @@ function InstanceSheet({
   };
 
   return (
-    <div className="grid min-h-full gap-4 p-4 xl:grid-cols-[1fr_340px]">
+    <div className="grid gap-4 p-4 xl:grid-cols-[1fr_340px]">
       <section className="rounded border border-stone-200/15 bg-white/[0.03]">
         <div className="flex items-center justify-between gap-3 border-b border-stone-200/10 px-4 py-3">
           <div>
@@ -757,6 +768,7 @@ function Toolbar({
 export function AIAssistantsConsoleClient({
   initialChatContext,
   activeSheet = 'chat',
+  engineersPanel,
 }: AIAssistantsConsoleClientProps) {
   const router = useRouter();
   const [state, setState] = useState<AIAssistantsConsoleState>(() => loadAIAssistantsConsoleState());
@@ -791,20 +803,31 @@ export function AIAssistantsConsoleClient({
     return tab;
   });
 
+  const effectiveSheet: AIAssistantSheetId = activeSheet === 'instances' ? 'overview' : activeSheet;
+
   let content: React.ReactNode;
   if (activeSheet === 'chat') {
     content = <ChatPageClient initialChatContext={initialChatContext} embedded />;
-  } else if (activeSheet === 'overview') {
-    content = <OverviewSheet assistant={selectedAssistant} />;
-  } else if (activeSheet === 'instances') {
-    content = <InstanceSheet assistant={selectedAssistant} onSave={(instance) => updateSelected((assistant) => updateAssistantInstance(assistant, instance))} />;
-  } else if (activeSheet === 'profile') {
+  } else if (effectiveSheet === 'engineers') {
+    content = engineersPanel ?? (
+      <div className="flex h-full items-center justify-center p-6 text-[12px] text-stone-400">
+        Select a project to manage AI engineer roles.
+      </div>
+    );
+  } else if (effectiveSheet === 'overview') {
+    content = (
+      <OverviewSheet
+        assistant={selectedAssistant}
+        onSaveInstance={(instance) => updateSelected((assistant) => updateAssistantInstance(assistant, instance))}
+      />
+    );
+  } else if (effectiveSheet === 'profile') {
     content = <ProfileSheet assistant={selectedAssistant} onSave={(source) => updateSelected((assistant) => updateProfileSource(assistant, source))} />;
-  } else if (activeSheet === 'skills') {
+  } else if (effectiveSheet === 'skills') {
     content = <SkillsSheet assistant={selectedAssistant} onToggle={(skill) => updateSelected((assistant) => updateSkill(assistant, skill))} />;
-  } else if (activeSheet === 'daily-logs') {
+  } else if (effectiveSheet === 'daily-logs') {
     content = <DailyLogsSheet assistant={selectedAssistant} />;
-  } else if (activeSheet === 'dreaming') {
+  } else if (effectiveSheet === 'dreaming') {
     content = (
       <DreamingSheet
         assistant={selectedAssistant}
@@ -828,28 +851,32 @@ export function AIAssistantsConsoleClient({
         }
       />
     );
-  } else if (activeSheet === 'permissions') {
+  } else if (effectiveSheet === 'permissions') {
     content = <PermissionsSheet assistant={selectedAssistant} onSave={(permission) => updateSelected((assistant) => updatePermission(assistant, permission))} />;
   } else {
     content = <AuditSheet assistant={selectedAssistant} />;
   }
 
+  const showAssistantChrome = effectiveSheet !== 'engineers';
+
   return (
     <WorkstationFrame
       reservedRem={7.5}
-      header={<Header assistant={selectedAssistant} />}
+      header={showAssistantChrome ? <Header assistant={selectedAssistant} /> : undefined}
       toolbar={
-        <Toolbar
-          state={state}
-          assistant={selectedAssistant}
-          onSelectAssistant={(id) => setState((prev) => ({ ...prev, selectedAssistantId: id }))}
-          onReset={onReset}
-        />
+        showAssistantChrome ? (
+          <Toolbar
+            state={state}
+            assistant={selectedAssistant}
+            onSelectAssistant={(id) => setState((prev) => ({ ...prev, selectedAssistantId: id }))}
+            onReset={onReset}
+          />
+        ) : undefined
       }
       bottomTabs={
         <BottomSheetTabs
           tabs={tabs}
-          activeKey={activeSheet}
+          activeKey={effectiveSheet}
           onSelect={onSelectSheet}
           reorderable
           orderStorageKey={AI_ASSISTANTS_SHEET_ORDER_STORAGE_KEY}

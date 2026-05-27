@@ -1,5 +1,5 @@
-import { MainClient } from '../ui/MainClient';
+import { redirect } from 'next/navigation';
 
 export default function EngineersPage() {
-  return <MainClient currentView="engineers" />;
+  redirect('/ai_assistants/engineers');
 }

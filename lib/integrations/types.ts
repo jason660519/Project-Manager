@@ -45,7 +45,11 @@ export type IntegrationStatus =
   | 'warning'
   | 'unavailable'
   | 'not_installed'
-  | 'idle';
+  | 'idle'
+  /** Connected Instances sheet: endpoint reachable or seen in latest discovery. */
+  | 'live'
+  /** Connected Instances sheet: not reachable or absent from latest discovery. */
+  | 'disconnected';
 
 export type IntegrationScope = 'user' | 'system' | 'project' | 'network' | 'intranet' | '';
 

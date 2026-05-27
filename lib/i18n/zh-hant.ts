@@ -5,6 +5,7 @@ export const zhHant: Translations = {
     workspace: '工作區',
     execution: '執行',
     observe: '觀測',
+    assist: '助手',
     system: '系統',
   },
   navItems: {
@@ -310,6 +311,7 @@ export const zhHant: Translations = {
     colCompany: '公司',
     colScope: 'Scope',
     colMethod: '執行方式',
+    colScanMethod: '掃描方式',
     colPath: '安裝路徑/位址',
     colPort: 'Port',
     colLicense: 'License',

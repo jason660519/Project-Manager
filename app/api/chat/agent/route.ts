@@ -32,6 +32,8 @@ interface RequestBody {
   tools?: boolean;
   /** Project context for tool execution */
   context?: ToolContext;
+  /** API key passed from the client (loaded from Keychain/localStorage). */
+  apiKey?: string;
 }
 
 // ── Config ──────────────────────────────────────────────────────────────────
@@ -579,10 +581,11 @@ async function streamWithProvider(
   provider: string, model: string, sys: string, messages: ChatApiMessage[],
   tools: boolean, context: ToolContext | undefined,
   send: (data: Record<string, unknown>) => void,
+  clientApiKey?: string,
 ): Promise<void> {
-  const envKey = `${provider.toUpperCase()}_API_KEY`;
-  const apiKey = process.env[envKey];
-  if (!apiKey) throw new Error(`${envKey} not configured`);
+  const envKey = process.env[`${provider.toUpperCase()}_API_KEY`];
+  const apiKey = clientApiKey || envKey;
+  if (!apiKey) throw new Error(`${provider.toUpperCase()}_API_KEY not configured`);
 
   switch (provider) {
     case 'anthropic':
@@ -644,7 +647,9 @@ export async function POST(request: NextRequest) {
           send({ type: 'thinking_start' });
 
           const userProvider = body.provider && body.provider !== 'auto' ? body.provider : undefined;
-          const providersToTry = buildProviderChain(body.model, userProvider);
+          const providersToTry = body.apiKey
+            ? (userProvider ? [userProvider] : (body.model ? [detectProviderFromModel(body.model) ?? FALLBACK_PROVIDERS[0]] : []))
+            : buildProviderChain(body.model, userProvider);
           const errors: string[] = [];
 
           for (const provider of providersToTry) {
@@ -652,7 +657,7 @@ export async function POST(request: NextRequest) {
               const model = body.model || DEFAULT_MODELS[provider];
               await streamWithProvider(provider, model, sys, body.messages,
                 useTools,  // All providers now support tools via streamOpenAICompat
-                context, send);
+                context, send, body.apiKey);
               break;
             } catch (e) {
               errors.push(`${provider}: ${(e as Error).message}`);

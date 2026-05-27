@@ -27,6 +27,14 @@ describe('connected instances integration sheet (F24)', () => {
     expect(isCapabilitySheet('connected-instances')).toBe(false);
   });
 
+  it('seeds manual rows with live status and scan method manual', () => {
+    expect(row('project-manager-local')).toMatchObject({
+      installMethod: 'manual',
+      status: 'live',
+      statusLabel: 'Live',
+    });
+  });
+
   it('seeds local Project Manager, Hermes, and OpenClaw runtime rows', () => {
     expect(row('project-manager-local').installPath).toBe('/Volumes/KLEVV-4T-1/Project-Manager');
     expect(row('hermes-local-dashboard').port).toBe('9119');
@@ -116,12 +124,16 @@ describe('connected instances integration sheet (F24)', () => {
     expect(rows.map((r) => r.installPath)).not.toContain('192.168.1.6');
     expect(rows.find((r) => r.sourceId === 'scan-device-new-device')).toMatchObject({
       category1: 'Network Discovery',
-      statusLabel: 'Observed',
+      installMethod: 'arp',
+      status: 'live',
+      statusLabel: 'Live',
       enabled: false,
     });
     expect(rows.find((r) => r.sourceId === 'scan-container-abc123')).toMatchObject({
       category2: 'Docker Container',
-      status: 'running',
+      installMethod: 'docker',
+      status: 'live',
+      statusLabel: 'Live',
       port: '0.0.0.0:38457->8080/tcp',
       enabled: false,
     });

@@ -5,6 +5,7 @@ export const en: Translations = {
     workspace: 'WORKSPACE',
     execution: 'EXECUTION',
     observe: 'OBSERVE',
+    assist: 'ASSIST',
     system: 'SYSTEM',
   },
   navItems: {
@@ -309,6 +310,7 @@ export const en: Translations = {
     colCompany: 'Company',
     colScope: 'Scope',
     colMethod: 'Method',
+    colScanMethod: 'Scan method',
     colPath: 'Path / address',
     colPort: 'Port',
     colLicense: 'License',

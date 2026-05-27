@@ -11,6 +11,8 @@ const STATUS_STYLES: Record<IntegrationStatus, string> = {
   unavailable: 'border-red-400/30 bg-red-500/15 text-red-200',
   not_installed: 'border-stone-300/25 bg-stone-200/10 text-stone-200',
   idle: 'border-stone-300/25 bg-stone-200/10 text-stone-200',
+  live: 'border-emerald-200/25 bg-emerald-100/12 text-emerald-100',
+  disconnected: 'border-stone-300/25 bg-stone-200/10 text-stone-400',
 };
 
 export function StatusBadge({

@@ -6,6 +6,8 @@
  * /api/bridge/execute HTTP route so the Next.js dev server still works.
  */
 
+import { defaultDiscoveryPlan } from '../integrations/discovery/presets';
+import type { DiscoveryPlan } from '../integrations/discovery/types';
 import { migrateConfig } from '../storage';
 import type { ProjectManagerConfig } from '../types';
 import { KEY_PERSONAL_SYSTEM_CLI_EXPOSURE } from '../storage/keys';
@@ -577,13 +579,6 @@ export async function listGlobalCliInventory(): Promise<GlobalCliInventoryEntry[
   return invoke<GlobalCliInventoryEntry[]>('list_global_cli_inventory');
 }
 
-export interface ConnectedInstanceScanOptions {
-  /** Private CIDR/IP targets explicitly allowed for active nmap host discovery. */
-  nmapTargets?: string[];
-  /** Active nmap is opt-in; passive ARP, Bonjour, and Docker probes still run when false. */
-  includeNmap?: boolean;
-}
-
 export interface ConnectedInstanceScannedDevice {
   id: string;
   ipAddress: string;
@@ -626,13 +621,17 @@ export interface ConnectedInstanceScanSnapshot {
 }
 
 /**
- * Best-effort connected-instance discovery.
- * Browser mode returns an empty snapshot; Tauri mode runs fixed, low-risk probes:
- * ARP cache, Bonjour browse, Docker container list, and opt-in nmap host discovery.
+ * Run a composed discovery plan (scope × probes). Browser mode returns an empty snapshot.
  */
-export async function scanConnectedInstances(
-  options: ConnectedInstanceScanOptions = {},
-): Promise<ConnectedInstanceScanSnapshot> {
+/** Install or verify nmap on PATH (macOS: Homebrew). No-op in browser dev mode. */
+export async function ensureNmapInstalled(): Promise<string> {
+  if (!isTauri()) {
+    throw new Error('nmap install requires the Tauri desktop runtime. Run: npm run discovery:install-nmap');
+  }
+  return invoke<string>('ensure_nmap_installed_command');
+}
+
+export async function runDiscoveryPlan(plan: DiscoveryPlan): Promise<ConnectedInstanceScanSnapshot> {
   if (!isTauri()) {
     const scannedAt = new Date().toISOString();
     return {
@@ -640,15 +639,15 @@ export async function scanConnectedInstances(
       devices: [],
       containers: [],
       services: [],
-      warnings: ['Connected instance discovery requires the Tauri desktop runtime.'],
+      warnings: ['Network discovery requires the Tauri desktop runtime.'],
     };
   }
-  return invoke<ConnectedInstanceScanSnapshot>('scan_connected_instances', {
-    options: {
-      nmapTargets: options.nmapTargets ?? [],
-      includeNmap: options.includeNmap ?? false,
-    },
-  });
+  return invoke<ConnectedInstanceScanSnapshot>('run_discovery_plan', { plan });
+}
+
+/** @deprecated Prefer {@link runDiscoveryPlan} with an explicit plan. */
+export async function scanConnectedInstances(): Promise<ConnectedInstanceScanSnapshot> {
+  return runDiscoveryPlan(defaultDiscoveryPlan());
 }
 
 /**

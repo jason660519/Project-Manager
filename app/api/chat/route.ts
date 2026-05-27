@@ -13,6 +13,8 @@ interface RequestBody {
   model?: string;
   /** Custom system prompt override. Omit to use the default. */
   systemPrompt?: string;
+  /** API key passed from the client (loaded from Keychain/localStorage). */
+  apiKey?: string;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -24,8 +26,10 @@ async function callProvider(
   model: string,
   messages: ChatApiMessage[],
   systemPrompt?: string,
+  clientApiKey?: string,
 ): Promise<string> {
-  const apiKey = process.env[`${provider.toUpperCase()}_API_KEY`];
+  const envKey = process.env[`${provider.toUpperCase()}_API_KEY`];
+  const apiKey = clientApiKey || envKey;
   if (!apiKey) throw new Error(`${provider.toUpperCase()}_API_KEY not configured`);
 
   const sys = systemPrompt || getSystemPrompt();
@@ -189,21 +193,23 @@ export async function POST(request: NextRequest) {
 
   const systemPrompt = body.systemPrompt;
 
-  // Try user-specified provider first, then fall back to chain on failure.
-  // Also detect provider from model name patterns when no provider specified.
+  // When the client provides a specific API key (loaded from Keychain),
+  // only try the user-requested provider — the key is provider-specific.
   const errors: string[] = [];
   const startProvider = body.provider;
   const modelProvider = body.model ? detectProviderFromModel(body.model) : undefined;
-  const providersToTry = startProvider
-    ? [startProvider, ...FALLBACK_CHAIN.filter(p => p !== startProvider)]
-    : modelProvider
-      ? [modelProvider, ...FALLBACK_CHAIN.filter(p => p !== modelProvider)]
-      : [...FALLBACK_CHAIN];
+  const providersToTry = body.apiKey
+    ? (startProvider ? [startProvider] : (modelProvider ? [modelProvider] : []))
+    : (startProvider
+        ? [startProvider, ...FALLBACK_CHAIN.filter(p => p !== startProvider)]
+        : modelProvider
+          ? [modelProvider, ...FALLBACK_CHAIN.filter(p => p !== modelProvider)]
+          : [...FALLBACK_CHAIN]);
 
   for (const provider of providersToTry) {
     try {
       const model = body.model || DEFAULT_MODELS[provider];
-      const content = await callProvider(provider, model, body.messages, systemPrompt);
+      const content = await callProvider(provider, model, body.messages, systemPrompt, body.apiKey);
       return NextResponse.json({ content, provider, model });
     } catch (e) {
       errors.push(`${provider}: ${(e as Error).message}`);

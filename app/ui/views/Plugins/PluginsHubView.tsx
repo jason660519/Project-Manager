@@ -3,7 +3,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, ExternalLink, FileText, MessageCircle, RefreshCw, RotateCw, Snowflake, X } from 'lucide-react';
+import {
+  CheckCircle2,
+  ChevronDown,
+  ExternalLink,
+  FileText,
+  MessageCircle,
+  RefreshCw,
+  RotateCw,
+  Snowflake,
+  X,
+} from 'lucide-react';
 import type { IntegrationRow, IntegrationSheet } from '../../../../lib/integrations/types';
 import {
   LEGACY_PLUGINS_SHEET,
@@ -29,7 +39,16 @@ import {
 import { mapSkillRow } from '../../../../lib/integrations/mappers/skills';
 import { mapChannelRow, mapCommandMappingRow } from '../../../../lib/integrations/mappers/channels';
 import { mapSystemCliRow } from '../../../../lib/integrations/mappers/system-cli';
-import { buildConnectedInstanceRows } from '../../../../lib/integrations/mappers/connected-instances';
+import {
+  buildConnectedInstanceRows,
+} from '../../../../lib/integrations/mappers/connected-instances';
+import { summarizeDiscoverySnapshot } from '../../../../lib/integrations/discovery/summarize';
+import type { DiscoveryRunSummary } from '../../../../lib/integrations/discovery/summarize';
+import {
+  loadLastDiscoveryPlan,
+  saveLastDiscoveryPlan,
+  type DiscoveryPlan,
+} from '../../../../lib/integrations/discovery';
 import { probeConnectedInstanceAvailability } from '../../../../lib/integrations/probe-connected-instance';
 import { loadMemoryRows, loadSlashCommandRows } from '../../../../lib/integrations/load-project-inventory';
 import { MARKETPLACE, buildFromMarketplace } from '../../../../lib/integrations/marketplace-catalog';
@@ -84,7 +103,8 @@ import {
   onTelegramMessage,
   openPath,
   readFile,
-  scanConnectedInstances,
+  runDiscoveryPlan,
+  type ConnectedInstanceScanSnapshot,
   listGlobalCliInventory,
   resolveInstallPath,
   probeCommandVersion,
@@ -119,6 +139,8 @@ import { McpLogsViewer } from './_shared/McpLogsViewer';
 import { ConnectSheet } from './ConnectSheet';
 import { CapabilitySheetView } from './CapabilitySheetView';
 import { ScanReportPanel } from './_shared/ScanReportPanel';
+import { DiscoverPlanDialog } from './_shared/DiscoverPlanDialog';
+import { DiscoveryResultPanel } from './_shared/DiscoveryResultPanel';
 const EMPTY_CATALOG: PluginCatalog = { schemaVersion: 2, plugins: [] };
 const PROJECT_MANAGER_ROOT = '/Volumes/KLEVV-4T-1/Project-Manager';
 const INTEGRATIONS_HUB_SHEET_ORDER_STORAGE_KEY = 'projectManager.integrationsHub.sheetOrder';
@@ -191,8 +213,17 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [frozenDataColCount, setFrozenDataColCount] = useState(0);
   const [rowDensity, setRowDensity] = useState<PluginsRowDensity>('comfortable');
-  const [connectedInstanceScan, setConnectedInstanceScan] = useState<Awaited<ReturnType<typeof scanConnectedInstances>> | null>(null);
+  const [connectedInstanceScan, setConnectedInstanceScan] = useState<ConnectedInstanceScanSnapshot | null>(null);
   const [connectedInstanceScanRunning, setConnectedInstanceScanRunning] = useState(false);
+  const [discoverDialogOpen, setDiscoverDialogOpen] = useState(false);
+  const [discoveryResult, setDiscoveryResult] = useState<{
+    summary: DiscoveryRunSummary;
+    warnings: string[];
+  } | null>(null);
+  const [discoveryPlanDraft, setDiscoveryPlanDraft] = useState<DiscoveryPlan>(() => loadLastDiscoveryPlan());
+  const [connectedReachability, setConnectedReachability] = useState<
+    Record<string, { status: 'live' | 'disconnected'; label: string }>
+  >({});
   const [scanReport, setScanReport] = useState<ScanReport | null>(null);
   const [scanRunning, setScanRunning] = useState(false);
   const [scanActionKind, setScanActionKind] = useState<'scan' | 'test'>('scan');
@@ -230,7 +261,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     try {
       const raw = window.localStorage.getItem(CONNECTED_INSTANCE_SCAN_STORAGE_KEY);
       if (!raw) return;
-      const parsed = JSON.parse(raw) as Awaited<ReturnType<typeof scanConnectedInstances>>;
+      const parsed = JSON.parse(raw) as ConnectedInstanceScanSnapshot;
       if (parsed && typeof parsed.scannedAt === 'string') {
         setConnectedInstanceScan(parsed);
       }
@@ -540,10 +571,14 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
   const skillsRowsMerged = useMemo(() => mergeAllManual(skillRows), [skillRows, manualVersion]);
   const memoryRowsMerged = useMemo(() => mergeAllManual(memoryRows), [memoryRows, manualVersion]);
   const commandRowsMerged = useMemo(() => mergeAllManual(commandRows), [commandRows, manualVersion]);
-  const connectedInstanceRows = useMemo(
-    () => mergeAllManual(buildConnectedInstanceRows(connectedInstanceScan)),
-    [connectedInstanceScan, manualVersion],
-  );
+  const connectedInstanceRows = useMemo(() => {
+    const rows = mergeAllManual(buildConnectedInstanceRows(connectedInstanceScan));
+    return rows.map((row) => {
+      const reach = connectedReachability[row.rowKey];
+      if (!reach) return row;
+      return { ...row, status: reach.status, statusLabel: reach.label };
+    });
+  }, [connectedInstanceScan, manualVersion, connectedReachability]);
   const systemCliRows = useMemo(
     () => commandRowsMerged.filter((row) => row.sourceKind === 'system-cli'),
     [commandRowsMerged],
@@ -878,7 +913,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     const startedAt = Date.now();
     const prev = connectedInstanceRows;
     try {
-      const snapshot = await scanConnectedInstances({ includeNmap: false, nmapTargets: [] });
+      const snapshot = await runDiscoveryPlan(loadLastDiscoveryPlan());
       setConnectedInstanceScan(snapshot);
       if (typeof window !== 'undefined') {
         window.localStorage.setItem(CONNECTED_INSTANCE_SCAN_STORAGE_KEY, JSON.stringify(snapshot));
@@ -886,7 +921,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
       const next = mergeAllManual(buildConnectedInstanceRows(snapshot));
       return {
         sheetId: 'connected-instances',
-        label: 'Connected Instances',
+        label: 'Network Instances',
         count: next.length,
         ...diffRows(prev, next),
         durationMs: Date.now() - startedAt,
@@ -894,7 +929,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     } catch (e) {
       return {
         sheetId: 'connected-instances',
-        label: 'Connected Instances',
+        label: 'Network Instances',
         count: prev.length,
         added: [],
         removed: [],
@@ -1046,6 +1081,10 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
 
     try {
       const { ok, detail } = await probeConnectedInstanceAvailability(row);
+      setConnectedReachability((prev) => ({
+        ...prev,
+        [row.rowKey]: { status: ok ? 'live' : 'disconnected', label: ok ? 'Live' : 'Disconnected' },
+      }));
       setPluginTestResults((prev) => ({
         ...prev,
         [row.rowKey]: { ok, testedAt: Date.now(), detail },
@@ -1079,24 +1118,37 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     [handleTestConnectedInstanceRow, handleTestPluginRow],
   );
 
-  const handleScanConnectedInstances = useCallback(async (includeNmap = false, nmapTargets: string[] = []) => {
+  const executeDiscoveryPlan = useCallback(async (plan: DiscoveryPlan) => {
+    const startedAt = Date.now();
     setConnectedInstanceScanRunning(true);
+    const seededRows = buildConnectedInstanceRows(null);
     try {
-      const snapshot = await scanConnectedInstances({ includeNmap, nmapTargets });
+      const snapshot = await runDiscoveryPlan(plan);
       setConnectedInstanceScan(snapshot);
+      saveLastDiscoveryPlan(plan);
+      setDiscoveryPlanDraft(plan);
       if (typeof window !== 'undefined') {
         window.localStorage.setItem(CONNECTED_INSTANCE_SCAN_STORAGE_KEY, JSON.stringify(snapshot));
       }
+      const summary = summarizeDiscoverySnapshot(snapshot, Date.now() - startedAt, seededRows);
+      const payload = { snapshot, summary };
+      setDiscoveryResult({ summary, warnings: snapshot.warnings });
+      return payload;
     } catch (error) {
       const scannedAt = new Date().toISOString();
-      const snapshot = {
+      const message = error instanceof Error ? error.message : String(error);
+      const snapshot: ConnectedInstanceScanSnapshot = {
         scannedAt,
         devices: [],
         containers: [],
         services: [],
-        warnings: [error instanceof Error ? error.message : String(error)],
+        warnings: [message],
       };
       setConnectedInstanceScan(snapshot);
+      const summary = summarizeDiscoverySnapshot(snapshot, Date.now() - startedAt, seededRows);
+      const payload = { snapshot, summary };
+      setDiscoveryResult({ summary, warnings: snapshot.warnings });
+      return payload;
     } finally {
       setConnectedInstanceScanRunning(false);
     }
@@ -1104,8 +1156,8 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
 
   useEffect(() => {
     if (activeSheet !== 'connected-instances' || connectedInstanceScan || connectedInstanceScanRunning) return;
-    void handleScanConnectedInstances(false);
-  }, [activeSheet, connectedInstanceScan, connectedInstanceScanRunning, handleScanConnectedInstances]);
+    void executeDiscoveryPlan(loadLastDiscoveryPlan());
+  }, [activeSheet, connectedInstanceScan, connectedInstanceScanRunning, executeDiscoveryPlan]);
 
   const handleApiKeyChange = async (id: string, key: string) => {
     await setProviderApiKey(id, key);
@@ -1318,7 +1370,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     { key: 'channels', label: t.integrations.sheetChannels, badge: channelRows.length },
     { key: 'memory', label: t.integrations.sheetMemory, badge: memoryRowsMerged.length },
     { key: 'commands', label: t.integrations.sheetCommands, badge: commandRowsMerged.length },
-    { key: 'connected-instances', label: 'Connected Instances', badge: connectedInstanceRows.length },
+    { key: 'connected-instances', label: 'Network Instances', badge: connectedInstanceRows.length },
     { key: 'connect', label: 'Connect' },
   ];
 
@@ -1724,37 +1776,30 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
         </>
       )}
       {activeSheet === 'connected-instances' && (
-        <>
+        <div className="flex items-stretch">
           <button
             type="button"
-            onClick={() => void handleScanConnectedInstances(false)}
+            onClick={() => void executeDiscoveryPlan(loadLastDiscoveryPlan())}
             disabled={connectedInstanceScanRunning}
-            className="border border-emerald-400/30 bg-emerald-950/20 px-2 py-2 text-xs text-emerald-300 disabled:opacity-50"
-            title="Run passive ARP, Bonjour, and Docker discovery"
+            className="border border-r-0 border-emerald-400/30 bg-emerald-950/20 px-2 py-2 text-xs text-emerald-300 disabled:opacity-50"
+            title="Run last discovery plan"
           >
             {connectedInstanceScanRunning ? 'Discovering...' : 'Discover'}
           </button>
           <button
             type="button"
             onClick={() => {
-              const raw =
-                typeof window !== 'undefined'
-                  ? window.prompt('Private nmap targets, comma-separated (example: 192.168.1.0/24)')
-                  : '';
-              const targets = (raw ?? '')
-                .split(',')
-                .map((part) => part.trim())
-                .filter(Boolean);
-              if (targets.length === 0) return;
-              void handleScanConnectedInstances(true, targets);
+              setDiscoveryPlanDraft(loadLastDiscoveryPlan());
+              setDiscoverDialogOpen(true);
             }}
             disabled={connectedInstanceScanRunning}
-            className="border border-amber-400/30 bg-amber-950/20 px-2 py-2 text-xs text-amber-200 disabled:opacity-50"
-            title="Run passive discovery plus nmap only for private targets you enter"
+            className="border border-emerald-400/30 bg-emerald-950/20 px-1.5 py-2 text-emerald-300 disabled:opacity-50"
+            title="Configure discovery scope and probes"
+            aria-label="Open discovery plan"
           >
-            nmap opt-in
+            <ChevronDown size={14} />
           </button>
-        </>
+        </div>
       )}
       {activeSheet === 'channels' && (
         <div className="flex flex-wrap gap-1">
@@ -1930,11 +1975,15 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
             )}
             {activeSheet === 'connected-instances' && (
               <div className="shrink-0 border border-emerald-400/20 bg-emerald-950/20 px-3 py-2 text-xs text-emerald-100/90">
-                {connectedInstanceScan
-                  ? `Last discovery ${new Date(connectedInstanceScan.scannedAt).toLocaleString()} · ${connectedInstanceScan.devices.length} devices · ${connectedInstanceScan.containers.length} containers · ${connectedInstanceScan.services.length} services${
-                      connectedInstanceScan.warnings.length > 0 ? ` · ${connectedInstanceScan.warnings.length} warning(s)` : ''
-                    }`
-                  : 'Discovery has not run yet. Passive discovery starts when this sheet opens.'}
+                {connectedInstanceScanRunning
+                  ? 'Discovery running… see progress in the dialog or panel at bottom-right.'
+                  : connectedInstanceScan
+                    ? `Last discovery ${new Date(connectedInstanceScan.scannedAt).toLocaleString()} · ${connectedInstanceScan.devices.length} hosts · ${connectedInstanceScan.containers.length} containers · ${connectedInstanceScan.services.length} services · ${discoveryResult?.summary.newInstanceCount ?? '—'} new instance row(s)${
+                        connectedInstanceScan.warnings.length > 0
+                          ? ` · ${connectedInstanceScan.warnings.length} warning(s)`
+                          : ''
+                      }`
+                    : 'Discovery has not run yet. Opening this sheet runs your last plan (default: Passive LAN).'}
               </div>
             )}
 
@@ -1952,6 +2001,10 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
                 errorMessage={activeSheetError}
                 frozenDataColCount={frozenDataColCount}
                 rowDensity={rowDensity}
+                methodColumnHeader={
+                  activeSheet === 'connected-instances' ? t.integrations.colScanMethod : undefined
+                }
+                compactStatusCell={activeSheet === 'connected-instances'}
                 onTestRow={
                   showIntegrationRowTest ? handleIntegrationTestRow : undefined
                 }
@@ -2073,6 +2126,33 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
           existingTriggers={channelCatalog.commandMappings.map((m) => m.trigger)}
           onAdd={handleCommandMappingAdd}
           onClose={() => setAddCommandOpen(false)}
+        />
+      )}
+
+      <DiscoverPlanDialog
+        open={discoverDialogOpen}
+        initialPlan={discoveryPlanDraft}
+        onClose={() => setDiscoverDialogOpen(false)}
+        onDone={() => {
+          setDiscoverDialogOpen(false);
+          setDiscoveryResult(null);
+        }}
+        onRun={executeDiscoveryPlan}
+      />
+
+      {!discoverDialogOpen && (discoveryResult || connectedInstanceScanRunning) && (
+        <DiscoveryResultPanel
+          summary={discoveryResult?.summary ?? null}
+          warnings={discoveryResult?.warnings ?? []}
+          running={connectedInstanceScanRunning}
+          onClose={() => {
+            if (connectedInstanceScanRunning) return;
+            setDiscoveryResult(null);
+          }}
+          onRunAgain={() => {
+            setDiscoveryResult(null);
+            setDiscoverDialogOpen(true);
+          }}
         />
       )}
 

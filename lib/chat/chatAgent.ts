@@ -9,6 +9,8 @@ import {
   type AgentExitPayload,
   type AgentStdioPayload,
 } from '../bridge';
+import { loadProviderKey } from '../keys/loadProviderKey';
+import type { LlmProviderId } from '../keys/llmProviders';
 import type { Feature } from '../types';
 import type { ChatContext, ChatMessage, SendChatMessageRequest, SendChatMessageResult } from './types';
 
@@ -17,7 +19,7 @@ const ROUTES: Record<string, string> = {
   project: '/project-progress-dashboard#projects',
   dashboard: '/project-progress-dashboard',
   features: '/features',
-  engineers: '/engineers',
+  engineers: '/ai_assistants/engineers',
   plugins: '/integrations-hub/system_installed_apps',
   skills: '/skills',
   channels: '/integrations-hub/channels',
@@ -679,6 +681,17 @@ async function callChatApi(
   // Always pass system prompt via the dedicated field
   chatPayload.systemPrompt = systemPrompt;
 
+  // Load the API key client-side (Keychain/localStorage) and forward to the server
+  const effectiveProvider = providerConfig.provider;
+  if (effectiveProvider) {
+    try {
+      const key = await loadProviderKey(effectiveProvider as LlmProviderId);
+      if (key?.trim()) {
+        chatPayload.apiKey = key;
+      }
+    } catch { /* key not available, server will try env or fail */ }
+  }
+
   // Streaming
   if (onStream) {
     const res = await fetch('/api/chat/stream', {
@@ -876,6 +889,15 @@ async function callAgentApi(
   };
   if (providerConfig.provider) payload.provider = providerConfig.provider;
   if (providerConfig.model) payload.model = providerConfig.model;
+
+  // Load the API key client-side (Keychain/localStorage) and forward to the server
+  const effectiveProvider = providerConfig.provider;
+  if (effectiveProvider) {
+    try {
+      const key = await loadProviderKey(effectiveProvider as LlmProviderId);
+      if (key?.trim()) payload.apiKey = key;
+    } catch { /* key not available, server will try env or fail */ }
+  }
 
   const res = await fetch('/api/chat/agent', {
     method: 'POST',

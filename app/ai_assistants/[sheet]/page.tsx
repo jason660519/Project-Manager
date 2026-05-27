@@ -3,8 +3,8 @@ import { MainClient } from '../../ui/MainClient';
 import type { AIAssistantSheetId } from '../../../lib/ai-assistants/types';
 
 const VALID_SHEETS: AIAssistantSheetId[] = [
+  'engineers',
   'overview',
-  'instances',
   'profile',
   'skills',
   'daily-logs',
@@ -27,6 +27,9 @@ export default async function AIAssistantsSheetPage({
   const { sheet } = await params;
   if (sheet === 'chat') {
     redirect('/ai_assistants');
+  }
+  if (sheet === 'instances') {
+    redirect('/ai_assistants/overview');
   }
   if (!VALID_SHEETS.includes(sheet as AIAssistantSheetId)) {
     notFound();

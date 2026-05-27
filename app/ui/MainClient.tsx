@@ -1265,6 +1265,16 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
         assistantSheet ? (
           <AIAssistantsConsoleClient
             activeSheet={assistantSheet}
+            engineersPanel={
+              selectedProject ? (
+                <EngineersView
+                  embedded
+                  roles={selectedProject.config.engineerRoles ?? []}
+                  agents={adapters}
+                  onRolesChange={handleRolesUpdate}
+                />
+              ) : undefined
+            }
             initialChatContext={{
               currentView,
               selectedProject,
@@ -1300,13 +1310,6 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
             }}
           />
         )
-      )}
-      {currentView === 'engineers' && selectedProject && (
-        <EngineersView
-          roles={selectedProject.config.engineerRoles ?? []}
-          agents={adapters}
-          onRolesChange={handleRolesUpdate}
-        />
       )}
       {currentView === 'documentation' && (
         <DocumentationView

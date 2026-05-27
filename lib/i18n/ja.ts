@@ -5,6 +5,7 @@ export const ja: Translations = {
     workspace: 'ワークスペース',
     execution: '実行',
     observe: '観測',
+    assist: 'アシスト',
     system: 'システム',
   },
   navItems: {
@@ -311,6 +312,7 @@ export const ja: Translations = {
     colCompany: '会社',
     colScope: 'Scope',
     colMethod: '実行方式',
+    colScanMethod: 'スキャン方式',
     colPath: 'パス/アドレス',
     colPort: 'Port',
     colLicense: 'License',

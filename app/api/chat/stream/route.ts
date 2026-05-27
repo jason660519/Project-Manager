@@ -13,6 +13,8 @@ interface RequestBody {
   model?: string;
   /** Custom system prompt override. Omit to use the default. */
   systemPrompt?: string;
+  /** API key passed from the client (loaded from Keychain/localStorage). */
+  apiKey?: string;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -103,10 +105,11 @@ async function* streamProvider(
   model: string,
   messages: ChatApiMessage[],
   systemPrompt?: string,
+  clientApiKey?: string,
 ): AsyncGenerator<string> {
-  const envKey = `${provider.toUpperCase()}_API_KEY`;
-  const apiKey = process.env[envKey];
-  if (!apiKey) throw new Error(`${envKey} not configured`);
+  const envKey = process.env[`${provider.toUpperCase()}_API_KEY`];
+  const apiKey = clientApiKey || envKey;
+  if (!apiKey) throw new Error(`${provider.toUpperCase()}_API_KEY not configured`);
 
   const sys = systemPrompt || getSystemPrompt();
 
@@ -272,21 +275,23 @@ export async function POST(request: NextRequest) {
 
   const systemPrompt = body.systemPrompt;
 
-  // If the client specified a provider, try it first, then fall back to chain on failure.
-  // Smart routing: if model name matches a provider pattern, try that provider first.
+  // When the client provides a specific API key (loaded from Keychain),
+  // only try the user-requested provider — the key is provider-specific.
   const errors: string[] = [];
   const startProvider = body.provider;
   const modelProvider = body.model ? detectProviderFromModel(body.model) : undefined;
-  const providersToTry = startProvider
-    ? [startProvider, ...FALLBACK_PROVIDERS.filter(p => p !== startProvider)]
-    : modelProvider
-      ? [modelProvider, ...FALLBACK_PROVIDERS.filter(p => p !== modelProvider)]
-      : FALLBACK_PROVIDERS;
+  const providersToTry = body.apiKey
+    ? (startProvider ? [startProvider] : (modelProvider ? [modelProvider] : []))
+    : (startProvider
+        ? [startProvider, ...FALLBACK_PROVIDERS.filter(p => p !== startProvider)]
+        : modelProvider
+          ? [modelProvider, ...FALLBACK_PROVIDERS.filter(p => p !== modelProvider)]
+          : FALLBACK_PROVIDERS);
 
   for (const provider of providersToTry) {
     const model = body.model || DEFAULT_MODELS[provider] || 'default';
     try {
-      const gen = streamProvider(provider, model, body.messages, systemPrompt);
+      const gen = streamProvider(provider, model, body.messages, systemPrompt, body.apiKey);
       const iterator = gen[Symbol.asyncIterator]();
       const first = await iterator.next();
       async function* withFirst(): AsyncGenerator<string> {

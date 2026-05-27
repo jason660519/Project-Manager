@@ -3327,13 +3327,6 @@ async fn list_global_cli_inventory() -> Result<Vec<GlobalCliEntry>, String> {
     Ok(rows)
 }
 
-#[derive(Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-struct ConnectedInstanceScanOptions {
-    nmap_targets: Option<Vec<String>>,
-    include_nmap: Option<bool>,
-}
-
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct ConnectedInstanceScannedDevice {
@@ -3422,6 +3415,58 @@ fn is_private_scan_target(target: &str) -> bool {
         || parts[0] == 127
         || (parts[0] == 192 && parts[1] == 168)
         || (parts[0] == 172 && (16..=31).contains(&parts[1]))
+}
+
+async fn nmap_available() -> bool {
+    tokio::process::Command::new("nmap")
+        .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .await
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+/// Best-effort nmap install (macOS Homebrew). Other platforms return an actionable error.
+async fn ensure_nmap_installed() -> Result<(), String> {
+    if nmap_available().await {
+        return Ok(());
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let brew = tokio::process::Command::new("brew")
+            .args(["install", "nmap"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .await
+            .map_err(|e| format!("failed to run `brew install nmap`: {e}"))?;
+        if !brew.status.success() {
+            let stderr = String::from_utf8_lossy(&brew.stderr);
+            return Err(format!(
+                "brew install nmap failed. Install Homebrew from https://brew.sh or run `npm run discovery:install-nmap`. {}",
+                stderr.trim()
+            ));
+        }
+        if nmap_available().await {
+            return Ok(());
+        }
+        return Err(
+            "nmap install reported success but `nmap` is still not on PATH. Restart the app or run `npm run discovery:install-nmap`."
+                .to_string(),
+        );
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = ();
+        Err(
+            "nmap is not installed. Run `npm run discovery:install-nmap` (Linux) or install nmap from your OS package manager."
+                .to_string(),
+        )
+    }
 }
 
 async fn run_scan_command(command: &str, args: &[&str], timeout_secs: u64) -> Result<String, String> {
@@ -3668,42 +3713,115 @@ fn dedupe_devices(devices: Vec<ConnectedInstanceScannedDevice>) -> Vec<Connected
     rows
 }
 
-#[tauri::command]
-async fn scan_connected_instances(
-    options: Option<ConnectedInstanceScanOptions>,
-) -> Result<ConnectedInstanceScanSnapshot, String> {
+#[derive(Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+enum DiscoveryScopeInput {
+    Local,
+    Lan {
+        #[allow(dead_code)]
+        mode: String,
+        #[serde(default)]
+        cidrs: Vec<String>,
+    },
+    Host {
+        address: String,
+    },
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DiscoveryPlanInput {
+    #[serde(default)]
+    #[allow(dead_code)]
+    preset_id: Option<String>,
+    scope: DiscoveryScopeInput,
+    probes: Vec<String>,
+}
+
+fn discovery_probe_enabled(probes: &[String], id: &str) -> bool {
+    probes.iter().any(|probe| probe == id)
+}
+
+fn default_passive_discovery_plan() -> DiscoveryPlanInput {
+    DiscoveryPlanInput {
+        preset_id: Some("passive-lan".to_string()),
+        scope: DiscoveryScopeInput::Lan {
+            mode: "passive".to_string(),
+            cidrs: Vec::new(),
+        },
+        probes: vec![
+            "arp".to_string(),
+            "bonjour".to_string(),
+            "docker-local".to_string(),
+        ],
+    }
+}
+
+async fn execute_discovery_plan(plan: DiscoveryPlanInput) -> Result<ConnectedInstanceScanSnapshot, String> {
     let scanned_at = now_iso8601();
-    let options = options.unwrap_or_default();
     let mut warnings = Vec::new();
     let mut devices = Vec::new();
     let mut containers = Vec::new();
     let mut services = Vec::new();
+    let probes = &plan.probes;
 
-    match run_scan_command("arp", &["-an"], 4).await {
-        Ok(output) => devices.extend(parse_arp_devices(&output, &scanned_at)),
-        Err(e) => warnings.push(format!("ARP scan skipped: {e}")),
-    }
+    let run_arp = discovery_probe_enabled(probes, "arp")
+        && matches!(plan.scope, DiscoveryScopeInput::Lan { .. });
+    let run_bonjour = discovery_probe_enabled(probes, "bonjour");
+    let run_docker = discovery_probe_enabled(probes, "docker-local");
+    let run_nmap = discovery_probe_enabled(probes, "nmap");
 
-    match run_scan_command("docker", &["ps", "-a", "--format", "{{json .}}"], 5).await {
-        Ok(output) => containers.extend(parse_docker_containers(&output, &scanned_at)),
-        Err(e) => warnings.push(format!("Docker scan skipped: {e}")),
-    }
-
-    for service_type in ["_http._tcp", "_ssh._tcp", "_workstation._tcp", "_ipp._tcp"] {
-        match browse_bonjour_service(service_type, 2).await {
-            Ok(output) => services.extend(parse_bonjour_services(service_type, &output, &scanned_at)),
-            Err(e) => warnings.push(format!("Bonjour scan for {service_type} skipped: {e}")),
+    if run_arp {
+        match run_scan_command("arp", &["-an"], 4).await {
+            Ok(output) => devices.extend(parse_arp_devices(&output, &scanned_at)),
+            Err(e) => warnings.push(format!("ARP scan skipped: {e}")),
         }
     }
 
-    if options.include_nmap.unwrap_or(false) {
-        let targets = options.nmap_targets.unwrap_or_default();
+    if run_docker {
+        match run_scan_command("docker", &["ps", "-a", "--format", "{{json .}}"], 5).await {
+            Ok(output) => containers.extend(parse_docker_containers(&output, &scanned_at)),
+            Err(e) => warnings.push(format!("Docker scan skipped: {e}")),
+        }
+    }
+
+    if run_bonjour {
+        for service_type in ["_http._tcp", "_ssh._tcp", "_workstation._tcp", "_ipp._tcp"] {
+            match browse_bonjour_service(service_type, 2).await {
+                Ok(output) => services.extend(parse_bonjour_services(service_type, &output, &scanned_at)),
+                Err(e) => warnings.push(format!("Bonjour scan for {service_type} skipped: {e}")),
+            }
+        }
+    }
+
+    if run_nmap {
+        if let Err(e) = ensure_nmap_installed().await {
+            warnings.push(format!("nmap unavailable: {e}"));
+        }
+    }
+
+    if run_nmap && nmap_available().await {
+        let mut targets: Vec<String> = Vec::new();
+        match &plan.scope {
+            DiscoveryScopeInput::Lan { mode: _, cidrs } => {
+                targets.extend(cidrs.iter().map(|t| t.trim().to_string()).filter(|t| !t.is_empty()));
+            }
+            DiscoveryScopeInput::Host { address } => {
+                let trimmed = address.trim().to_string();
+                if !trimmed.is_empty() {
+                    targets.push(trimmed);
+                }
+            }
+            DiscoveryScopeInput::Local => {}
+        }
         if targets.is_empty() {
-            warnings.push("nmap scan skipped: no private allowlisted targets configured".to_string());
+            warnings.push("nmap scan skipped: no targets configured for this scope".to_string());
         }
         for target in targets.iter().take(4) {
             if !is_private_scan_target(target) {
-                warnings.push(format!("nmap target rejected because it is not a private IPv4 target: {target}"));
+                warnings.push(format!(
+                    "nmap target rejected because it is not a private IPv4 target: {target}"
+                ));
                 continue;
             }
             match run_scan_command("nmap", &["-sn", "-T2", "--max-retries", "1", target], 20).await {
@@ -3720,6 +3838,22 @@ async fn scan_connected_instances(
         services,
         warnings,
     })
+}
+
+#[tauri::command]
+async fn ensure_nmap_installed_command() -> Result<String, String> {
+    ensure_nmap_installed().await?;
+    Ok("nmap is installed and available on PATH.".to_string())
+}
+
+#[tauri::command]
+async fn run_discovery_plan(plan: DiscoveryPlanInput) -> Result<ConnectedInstanceScanSnapshot, String> {
+    execute_discovery_plan(plan).await
+}
+
+#[tauri::command]
+async fn scan_connected_instances() -> Result<ConnectedInstanceScanSnapshot, String> {
+    execute_discovery_plan(default_passive_discovery_plan()).await
 }
 
 /// Capture a screenshot of the current display as a PNG and return it as
@@ -4889,6 +5023,8 @@ pub fn run() {
             resolve_install_path,
             list_global_cli_inventory,
             scan_connected_instances,
+            run_discovery_plan,
+            ensure_nmap_installed_command,
             skill_default_dir,
             skill_list,
             skill_save,

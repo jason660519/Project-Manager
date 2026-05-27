@@ -7,6 +7,7 @@ export interface Translations {
     workspace: string;
     execution: string;
     observe: string;
+    assist: string;
     system: string;
   };
   navItems: {
@@ -313,6 +314,7 @@ export interface Translations {
     colCompany: string;
     colScope: string;
     colMethod: string;
+    colScanMethod: string;
     colPath: string;
     colPort: string;
     colLicense: string;

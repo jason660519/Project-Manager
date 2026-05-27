@@ -1,7 +1,7 @@
 export type AIAssistantSheetId =
   | 'chat'
+  | 'engineers'
   | 'overview'
-  | 'instances'
   | 'profile'
   | 'skills'
   | 'daily-logs'

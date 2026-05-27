@@ -40,9 +40,11 @@ interface EngineersViewProps {
   roles: EngineerRole[];
   agents: AnyAdapterConfig[];
   onRolesChange: (roles: EngineerRole[]) => void;
+  /** When true, omits the outer WorkstationFrame (for AI Assistants console embedding). */
+  embedded?: boolean;
 }
 
-export function EngineersView({ roles, agents, onRolesChange }: EngineersViewProps) {
+export function EngineersView({ roles, agents, onRolesChange, embedded = false }: EngineersViewProps) {
   const [activeTab, setActiveTab] = useState<EngineersTab>(DEFAULT_ENGINEERS_TAB);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [capabilityCatalog, setCapabilityCatalog] = useState<CapabilityCatalog>({
@@ -142,41 +144,58 @@ export function EngineersView({ roles, agents, onRolesChange }: EngineersViewPro
     </div>
   );
 
+  const bottomTabs = (
+    <BottomSheetTabs
+      tabs={TABS}
+      activeKey={activeTab}
+      onSelect={setActiveTab}
+      reorderable
+      orderStorageKey={ENGINEERS_SHEET_ORDER_STORAGE_KEY}
+    />
+  );
+
+  const tables = (
+    <>
+      <div className={activeTab === 'ai_engineers' ? 'h-full' : 'hidden'}>
+        <AiEngineersTable
+          roles={roles}
+          agents={agents}
+          providers={providers}
+          selectedRoleId={selectedId}
+          onRowClick={handleRowClick}
+        />
+      </div>
+      <div className={activeTab === 'ability_tools' ? 'h-full' : 'hidden'}>
+        <AbilityToolsTable
+          roles={roles}
+          capabilityCatalog={capabilityCatalog}
+          selectedRoleId={selectedId}
+          onRowClick={handleRowClick}
+        />
+      </div>
+    </>
+  );
+
   return (
     <>
-      <WorkstationFrame
-        header={header}
-        panelClassName="border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72"
-        scrollChildren={false}
-        bottomTabs={
-          <BottomSheetTabs
-            tabs={TABS}
-            activeKey={activeTab}
-            onSelect={setActiveTab}
-            reorderable
-            orderStorageKey={ENGINEERS_SHEET_ORDER_STORAGE_KEY}
-          />
-        }
-      >
-        {/* Both sheets mounted in parallel so TanStack column state survives tab swaps */}
-        <div className={activeTab === 'ai_engineers' ? 'h-full' : 'hidden'}>
-          <AiEngineersTable
-            roles={roles}
-            agents={agents}
-            providers={providers}
-            selectedRoleId={selectedId}
-            onRowClick={handleRowClick}
-          />
+      {embedded ? (
+        <div className="flex h-full min-h-0 flex-col overflow-hidden">
+          <div className="flex-none pb-4">{header}</div>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72">
+            <div className="min-h-0 flex-1 overflow-hidden">{tables}</div>
+            <div className="flex-none">{bottomTabs}</div>
+          </div>
         </div>
-        <div className={activeTab === 'ability_tools' ? 'h-full' : 'hidden'}>
-          <AbilityToolsTable
-            roles={roles}
-            capabilityCatalog={capabilityCatalog}
-            selectedRoleId={selectedId}
-            onRowClick={handleRowClick}
-          />
-        </div>
-      </WorkstationFrame>
+      ) : (
+        <WorkstationFrame
+          header={header}
+          panelClassName="border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72"
+          scrollChildren={false}
+          bottomTabs={bottomTabs}
+        >
+          {tables}
+        </WorkstationFrame>
+      )}
 
       <EngineerDetailSheet
         role={selectedRole}

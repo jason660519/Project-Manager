@@ -5,6 +5,7 @@ export const zh: Translations = {
     workspace: '工作区',
     execution: '执行',
     observe: '观测',
+    assist: '助手',
     system: '系统',
   },
   navItems: {
@@ -310,6 +311,7 @@ export const zh: Translations = {
     colCompany: '公司',
     colScope: 'Scope',
     colMethod: '执行方式',
+    colScanMethod: '扫描方式',
     colPath: '安装路径/地址',
     colPort: 'Port',
     colLicense: 'License',
