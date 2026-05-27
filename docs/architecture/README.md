@@ -2,9 +2,9 @@
 
 > **Created Date**: 2026-05-12
 > **Created By**: GitHub Copilot
-> **Last Modified**: 2026-05-24
+> **Last Modified**: 2026-05-28
 > **Modified By**: Codex
-> **Version**: 1.3
+> **Version**: 1.4
 > **Document Type**: Architecture / ADR Index
 
 ---
@@ -36,6 +36,8 @@ ADR 記錄重要的技術決策、背景和決策理由，作為專案架構演�
 | [009](./ADR-009-schema-v5-feature-readme-path.md) | Schema v5 Feature README Path | Accepted | 2026-05-19 | Split README file pointers from human-authored notes |
 | [010](./ADR-010-documentation-site-static-sync.md) | Documentation Site Static Sync | Accepted | 2026-05-23 | Generate `/documentation` routes from the repo `docs/` tree before static export |
 | [011](./ADR-011-schema-v6-located-section.md) | Schema v6 Located Section Rename | Accepted | 2026-05-24 | Rename `locatedPage` to `locatedSection` with backward-compatible migration |
+| [012](./ADR-012-schema-v8-engineer-cron.md) | Schema v8 Engineer Cron Dispatch | Accepted | 2026-05-24 | Add scheduled engineer dispatch action type and cron observability fields |
+| [013](./ADR-013-agent-workflow-dag-control-plane.md) | Agent Workflow DAG Control Plane | Accepted | 2026-05-28 | Define multi-agent workflow DAG templates, runtime adapter boundary, and per-agent session isolation |
 
 ## Architecture Sources
 
@@ -113,6 +115,7 @@ Related documents, links, and resources.
 | 2026-05-15 | 1.1     | Codex          | Added ADR-006 to index |
 | 2026-05-19 | 1.2     | Codex          | Added ADR-007 through ADR-009 to index |
 | 2026-05-24 | 1.3     | Codex          | Added ADR-011 to index |
+| 2026-05-28 | 1.4     | Codex          | Added ADR-012 and ADR-013 to index |
 
 ---
 

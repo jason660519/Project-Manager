@@ -4,19 +4,19 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-05-27T02:01:12.000Z",
+    "generatedAt": "2026-05-27T21:42:55.000Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
     "manifestAudience": "internal",
-    "totalDocuments": 70,
+    "totalDocuments": 71,
     "totalFolders": 12,
     "publicDocuments": 22,
-    "internalDocuments": 47,
+    "internalDocuments": 48,
     "restrictedDocuments": 1,
     "publishableDocuments": 7,
-    "reviewRequiredDocuments": 43,
-    "warningCount": 98
+    "reviewRequiredDocuments": 44,
+    "warningCount": 99
   },
   "folders": [
     {
@@ -26,7 +26,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "sourcePath": "docs",
       "label": "All Docs",
       "title": "Documentation",
-      "summary": "70 documentation files indexed from docs.",
+      "summary": "71 documentation files indexed from docs.",
       "parentSlug": null,
       "folderSlugs": [
         "architecture",
@@ -44,14 +44,14 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       ],
       "classificationCounts": {
         "public": 22,
-        "internal": 47,
+        "internal": 48,
         "restricted": 1
       },
       "publishableCount": 7,
-      "reviewRequiredCount": 43,
+      "reviewRequiredCount": 44,
       "visibilityCounts": {
         "public": 22,
-        "internal": 47,
+        "internal": 48,
         "restricted": 1
       },
       "warnings": [
@@ -90,20 +90,21 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "architecture/adr-010-documentation-site-static-sync",
         "architecture/adr-011-schema-v6-located-section",
         "architecture/adr-012-schema-v8-engineer-cron",
+        "architecture/adr-013-agent-workflow-dag-control-plane",
         "architecture/adr-013-xmux-libghostty-terminal",
         "architecture/architecture-overview",
         "architecture/readme"
       ],
       "classificationCounts": {
         "public": 0,
-        "internal": 14,
+        "internal": 15,
         "restricted": 1
       },
       "publishableCount": 0,
-      "reviewRequiredCount": 6,
+      "reviewRequiredCount": 7,
       "visibilityCounts": {
         "public": 0,
-        "internal": 14,
+        "internal": 15,
         "restricted": 1
       },
       "warnings": [
@@ -891,6 +892,41 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "updatedAt": "2026-05-24T03:03:36.000Z"
     },
     {
+      "id": "architecture/adr-013-agent-workflow-dag-control-plane",
+      "slug": "architecture/adr-013-agent-workflow-dag-control-plane",
+      "route": "/documentation/architecture/adr-013-agent-workflow-dag-control-plane",
+      "sourcePath": "docs/architecture/ADR-013-agent-workflow-dag-control-plane.md",
+      "folderSlug": "architecture",
+      "folderPath": "docs/architecture",
+      "title": "ADR-013: Agent Workflow DAG Control Plane",
+      "summary": "Project Manager is moving from single-role dispatches toward multi-agent workflows. The target workflow shape includes Software Development DAGs and Deep Research DAGs with fan-out, revie...",
+      "content": "# ADR-013: Agent Workflow DAG Control Plane\n\n> **Created Date**: 2026-05-28\n> **Created By**: Codex\n> **Last Modified**: 2026-05-28\n> **Modified By**: Codex\n> **Status**: Accepted\n> **Decision Maker**: Jason\n> **Related**: [ADR-003 - Prompt Assembly](./ADR-003-prompt-assembly.md), [ADR-004 - API Call Security](./ADR-004-api-call-security.md), [ADR-012 - Schema v8 Engineer Cron Dispatch](./ADR-012-schema-v8-engineer-cron.md)\n\n## Background\n\nProject Manager is moving from single-role dispatches toward multi-agent workflows. The target workflow shape includes Software Development DAGs and Deep Research DAGs with fan-out, review/test gates, summarization, runtime isolation, and explicit tool eligibility.\n\nCubeSandbox is a strong candidate for isolated worker execution because it provides E2B-compatible sandbox APIs, fast VM-backed startup, and session pause/resume behavior. It does not replace Project Manager's product-level orchestration responsibilities: workflow definition, run state, retry policy, artifact routing, tool permission resolution, and memory isolation.\n\n## Decision\n\nProject Manager will own a workflow DAG control plane with these boundaries:\n\n1. Workflow definitions are product-level DAG templates, not runtime scripts.\n2. Worker runtimes are selected through a declarative runtime profile and later executed through a `WorkerRuntimeAdapter` boundary.\n3. Built-in templates start with:\n   - `software-dev-parallel`\n   - `deep-research-parallel`\n4. Every worker node gets an isolated session scope containing `projectId`, `workflowId`, `workflowRunId`, `nodeId`, and `agentId`.\n5. Tool access is represented as references to Integrations Hub candidates, skills, memory files, MCP servers, commands, plugins, or adapters. Workflow definitions must not store raw secrets.\n6. CubeSandbox is treated as one future runtime provider, beside `local-process`, `xmux`, `e2b`, `hermes`, and `openclaw`.\n\n## Rationale\n\n- A Project Manager-owned DAG model keeps business workflows stable even if the execution substrate changes.\n- Per-agent session scope directly addresses memory pollution risk and avoids reusing global chat history.\n- Tool references preserve Integrations Hub as the qualification and enablement source of truth.\n- Starting with pure TypeScript definitions and validation lets the dashboard, tests, and docs converge before any sandbox process lifecycle is introduced.\n- Keeping prompt assembly in TypeScript remains aligned with ADR-003. Runtime adapters execute prepared work; they do not become hidden prompt assemblers.\n\n## Evaluated Alternatives\n\n| Alternative | Outcome | Reason |\n| --- | --- | --- |\n| Make CubeSandbox the workflow orchestrator | Rejected | It is an execution substrate; PM still needs product workflows, UI state, artifacts, retry policy, and session isolation. |\n| Extend P/W/E dispatch only | Rejected | Planner/Worker/Evaluator is too narrow for Software Dev and Deep Research DAGs with parallel branches and joins. |\n| Persist workflows in schema v9 immediately | Deferred | Built-in TS templates are enough for the first slice; schema persistence should land after UI and migration design are clear. |\n| Reuse global chat sessions | Rejected | This is the memory pollution failure mode the feature is meant to prevent. |\n\n## Risks & Mitigation\n\n| Risk | Mitigation |\n| --- | --- |\n| Workflow model grows too abstract | Keep only fields needed by Software Dev and Deep Research templates in F35. |\n| Runtime-specific fields leak into definitions | Use declarative runtime provider/profile fields and keep provider behavior behind adapters. |\n| Session store fragmentation makes browsing harder | Include workflow/run/node/agent metadata so Sessions UI can group records later. |\n| Tool refs point to unavailable candidates | Add resolver and blocked-state UI in a follow-up before execution. |\n\n## Consequences\n\n**Positive**\n\n- Multi-agent workflow planning has a stable control-plane contract.\n- Worker memory isolation is enforceable from the first implementation slice.\n- CubeSandbox can be integrated later without redesigning Dispatch templates.\n\n**Negative**\n\n- The first slice adds architecture and type surface before user-visible workflow execution.\n- A later schema decision is still required for user-authored workflow persistence.\n\n## References\n\n- `.project-manager/features/F35/feature-spec.md`\n- `lib/agent-workflows/dagDefinitions.ts`\n- `lib/agent-workflows/sessionScope.ts`\n- `__tests__/agentWorkflowDag.test.ts`\n",
+      "contentHash": "68eb9bcb8b92debc",
+      "readingMinutes": 3,
+      "classification": "internal",
+      "classificationSource": "policy",
+      "classificationConfidence": 0.92,
+      "classificationReason": "Architecture decisions usually contain internal tradeoffs and implementation constraints.",
+      "matchedPolicyRule": "CLS-INTERNAL-ARCHITECTURE",
+      "publish": false,
+      "reviewStatus": "ai-classified",
+      "needsReview": true,
+      "visibility": "internal",
+      "audience": [
+        "engineers",
+        "technical-reviewers"
+      ],
+      "tags": [
+        "architecture",
+        "adr",
+        "table"
+      ],
+      "warnings": [
+        "Mentions execution or command policy"
+      ],
+      "updatedAt": "2026-05-27T21:37:34.000Z"
+    },
+    {
       "id": "architecture/adr-013-xmux-libghostty-terminal",
       "slug": "architecture/adr-013-xmux-libghostty-terminal",
       "route": "/documentation/architecture/adr-013-xmux-libghostty-terminal",
@@ -969,8 +1005,8 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "folderPath": "docs/architecture",
       "title": "Architecture Decision Records (ADR)",
       "summary": "This directory contains all Architecture Decision Records (ADRs) for the Project Manager project. ADRs document important technical decisions, the context that led to them, and the reason...",
-      "content": "# Architecture Decision Records (ADR)\n\n> **Created Date**: 2026-05-12\n> **Created By**: GitHub Copilot\n> **Last Modified**: 2026-05-24\n> **Modified By**: Codex\n> **Version**: 1.3\n> **Document Type**: Architecture / ADR Index\n\n---\n\n## Overview\n\nThis directory contains all Architecture Decision Records (ADRs) for the Project Manager project.\n\nADRs document important technical decisions, the context that led to them, and the reasoning behind the choice. They serve as a historical record of how the project's architecture has evolved.\n\n**此目錄包含 Project Manager 專案的所有架構決策記錄（ADR）。**\n\nADR 記錄重要的技術決策、背景和決策理由，作為專案架構演進的歷史紀錄。\n\n---\n\n## ADRs Index\n\n| # | Title | Status | Date | Summary |\n|---|-------|--------|------|---------|\n| [001](./ADR-001-tauri-selection.md) | Tauri Selection | Accepted | 2026-05-12 | Choose Tauri v2 + Next.js over Electron for desktop shell |\n| [002](./ADR-002-schema-versioning.md) | Schema Versioning | Accepted | 2026-05-12 | Implement versioning strategy for `.project-manager.json` |\n| [003](./ADR-003-prompt-assembly.md) | Prompt Assembly | Accepted | 2026-05-12 | Keep prompt template logic in TypeScript frontend |\n| [004](./ADR-004-api-call-security.md) | API Call Security | Accepted | 2026-05-12 | Route all API calls through Rust bridge for security |\n| [005](./ADR-005-beta-testing.md) | Beta Testing Strategy | Accepted | 2026-05-12 | Use AI personas for MVP testing instead of real users |\n| [006](./ADR-006-schema-v2-sync-fields.md) | Schema v2 Sync Fields | Accepted | 2026-05-12 | Add stable identity and audit fields for future sync |\n| [007](./ADR-007-schema-v3-project-progress-fields.md) | Schema v3 Project-Progress Phase Fields | Accepted | 2026-05-17 | Add lifecycle phase fields for the project-progress dashboard |\n| [008](./ADR-008-dashboard-folder-consolidation.md) | Dashboard Folder Consolidation | Accepted | 2026-05-19 | Use `.project-manager/` as the canonical dashboard artifact folder |\n| [009](./ADR-009-schema-v5-feature-readme-path.md) | Schema v5 Feature README Path | Accepted | 2026-05-19 | Split README file pointers from human-authored notes |\n| [010](./ADR-010-documentation-site-static-sync.md) | Documentation Site Static Sync | Accepted | 2026-05-23 | Generate `/documentation` routes from the repo `docs/` tree before static export |\n| [011](./ADR-011-schema-v6-located-section.md) | Schema v6 Located Section Rename | Accepted | 2026-05-24 | Rename `locatedPage` to `locatedSection` with backward-compatible migration |\n\n## Architecture Sources\n\n| Document | Purpose |\n|---|---|\n| [architecture-overview.md](./architecture-overview.md) | System data flow, runtime modes, and current implementation map |\n\n---\n\n## How to Add a New ADR\n\n1. Create a new file: `ADR-###-kebab-case-title.md`\n2. Copy the template below\n3. Fill in the sections\n4. Add entry to the table above\n5. Commit with message: `[Author] docs(architecture): add ADR-###`\n\n### ADR Template\n\n```markdown\n# ADR-###: Title of Decision\n\n> **Created Date**: YYYY-MM-DD\n> **Created By**: Author Name\n> **Last Modified**: YYYY-MM-DD\n> **Modified By**: Author Name\n> **Status**: Proposed | Accepted | Superseded\n> **Decision Maker**: Name\n\n## Background\n\nContext and problem statement.\n\n## Decision\n\nWhat decision was made and why.\n\n## Rationale\n\nWhy this decision was chosen over alternatives.\n\n## Evaluated Alternatives\n\nOther options that were considered.\n\n## Risks & Mitigation\n\nPotential risks and how to address them.\n\n## Consequences\n\nImpact on the project and team.\n\n## References\n\nRelated documents, links, and resources.\n```\n\n---\n\n## Status Legend\n\n- **Proposed**: Under discussion, not yet approved\n- **Accepted**: Approved and being implemented\n- **Superseded**: Replaced by a newer ADR\n- **Deprecated**: No longer valid or relevant\n\n---\n\n## 修改歷史\n\n| Date       | Version | Modified By    | Changes                    |\n| ---------- | ------- | -------------- | -------------------------- |\n| 2026-05-12 | 1.0     | GitHub Copilot | Initial ADR index creation |\n| 2026-05-15 | 1.1     | Codex          | Added ADR-006 to index |\n| 2026-05-19 | 1.2     | Codex          | Added ADR-007 through ADR-009 to index |\n| 2026-05-24 | 1.3     | Codex          | Added ADR-011 to index |\n\n---\n\n> See also: [File Naming Standards](../file-naming-standards.md)\n",
-      "contentHash": "48a023c07749d1c8",
+      "content": "# Architecture Decision Records (ADR)\n\n> **Created Date**: 2026-05-12\n> **Created By**: GitHub Copilot\n> **Last Modified**: 2026-05-28\n> **Modified By**: Codex\n> **Version**: 1.4\n> **Document Type**: Architecture / ADR Index\n\n---\n\n## Overview\n\nThis directory contains all Architecture Decision Records (ADRs) for the Project Manager project.\n\nADRs document important technical decisions, the context that led to them, and the reasoning behind the choice. They serve as a historical record of how the project's architecture has evolved.\n\n**此目錄包含 Project Manager 專案的所有架構決策記錄（ADR）。**\n\nADR 記錄重要的技術決策、背景和決策理由，作為專案架構演進的歷史紀錄。\n\n---\n\n## ADRs Index\n\n| # | Title | Status | Date | Summary |\n|---|-------|--------|------|---------|\n| [001](./ADR-001-tauri-selection.md) | Tauri Selection | Accepted | 2026-05-12 | Choose Tauri v2 + Next.js over Electron for desktop shell |\n| [002](./ADR-002-schema-versioning.md) | Schema Versioning | Accepted | 2026-05-12 | Implement versioning strategy for `.project-manager.json` |\n| [003](./ADR-003-prompt-assembly.md) | Prompt Assembly | Accepted | 2026-05-12 | Keep prompt template logic in TypeScript frontend |\n| [004](./ADR-004-api-call-security.md) | API Call Security | Accepted | 2026-05-12 | Route all API calls through Rust bridge for security |\n| [005](./ADR-005-beta-testing.md) | Beta Testing Strategy | Accepted | 2026-05-12 | Use AI personas for MVP testing instead of real users |\n| [006](./ADR-006-schema-v2-sync-fields.md) | Schema v2 Sync Fields | Accepted | 2026-05-12 | Add stable identity and audit fields for future sync |\n| [007](./ADR-007-schema-v3-project-progress-fields.md) | Schema v3 Project-Progress Phase Fields | Accepted | 2026-05-17 | Add lifecycle phase fields for the project-progress dashboard |\n| [008](./ADR-008-dashboard-folder-consolidation.md) | Dashboard Folder Consolidation | Accepted | 2026-05-19 | Use `.project-manager/` as the canonical dashboard artifact folder |\n| [009](./ADR-009-schema-v5-feature-readme-path.md) | Schema v5 Feature README Path | Accepted | 2026-05-19 | Split README file pointers from human-authored notes |\n| [010](./ADR-010-documentation-site-static-sync.md) | Documentation Site Static Sync | Accepted | 2026-05-23 | Generate `/documentation` routes from the repo `docs/` tree before static export |\n| [011](./ADR-011-schema-v6-located-section.md) | Schema v6 Located Section Rename | Accepted | 2026-05-24 | Rename `locatedPage` to `locatedSection` with backward-compatible migration |\n| [012](./ADR-012-schema-v8-engineer-cron.md) | Schema v8 Engineer Cron Dispatch | Accepted | 2026-05-24 | Add scheduled engineer dispatch action type and cron observability fields |\n| [013](./ADR-013-agent-workflow-dag-control-plane.md) | Agent Workflow DAG Control Plane | Accepted | 2026-05-28 | Define multi-agent workflow DAG templates, runtime adapter boundary, and per-agent session isolation |\n\n## Architecture Sources\n\n| Document | Purpose |\n|---|---|\n| [architecture-overview.md](./architecture-overview.md) | System data flow, runtime modes, and current implementation map |\n\n---\n\n## How to Add a New ADR\n\n1. Create a new file: `ADR-###-kebab-case-title.md`\n2. Copy the template below\n3. Fill in the sections\n4. Add entry to the table above\n5. Commit with message: `[Author] docs(architecture): add ADR-###`\n\n### ADR Template\n\n```markdown\n# ADR-###: Title of Decision\n\n> **Created Date**: YYYY-MM-DD\n> **Created By**: Author Name\n> **Last Modified**: YYYY-MM-DD\n> **Modified By**: Author Name\n> **Status**: Proposed | Accepted | Superseded\n> **Decision Maker**: Name\n\n## Background\n\nContext and problem statement.\n\n## Decision\n\nWhat decision was made and why.\n\n## Rationale\n\nWhy this decision was chosen over alternatives.\n\n## Evaluated Alternatives\n\nOther options that were considered.\n\n## Risks & Mitigation\n\nPotential risks and how to address them.\n\n## Consequences\n\nImpact on the project and team.\n\n## References\n\nRelated documents, links, and resources.\n```\n\n---\n\n## Status Legend\n\n- **Proposed**: Under discussion, not yet approved\n- **Accepted**: Approved and being implemented\n- **Superseded**: Replaced by a newer ADR\n- **Deprecated**: No longer valid or relevant\n\n---\n\n## 修改歷史\n\n| Date       | Version | Modified By    | Changes                    |\n| ---------- | ------- | -------------- | -------------------------- |\n| 2026-05-12 | 1.0     | GitHub Copilot | Initial ADR index creation |\n| 2026-05-15 | 1.1     | Codex          | Added ADR-006 to index |\n| 2026-05-19 | 1.2     | Codex          | Added ADR-007 through ADR-009 to index |\n| 2026-05-24 | 1.3     | Codex          | Added ADR-011 to index |\n| 2026-05-28 | 1.4     | Codex          | Added ADR-012 and ADR-013 to index |\n\n---\n\n> See also: [File Naming Standards](../file-naming-standards.md)\n",
+      "contentHash": "8763d91e30299986",
       "readingMinutes": 3,
       "classification": "internal",
       "classificationSource": "policy",
@@ -990,7 +1026,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "table"
       ],
       "warnings": [],
-      "updatedAt": "2026-05-27T02:01:12.000Z"
+      "updatedAt": "2026-05-27T21:42:55.000Z"
     },
     {
       "id": "archive/archived-20260512-05-adr-tauri",
@@ -2879,6 +2915,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
     "architecture/adr-010-documentation-site-static-sync",
     "architecture/adr-011-schema-v6-located-section",
     "architecture/adr-012-schema-v8-engineer-cron",
+    "architecture/adr-013-agent-workflow-dag-control-plane",
     "architecture/adr-013-xmux-libghostty-terminal",
     "architecture/architecture-overview",
     "architecture/readme",

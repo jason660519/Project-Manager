@@ -117,6 +117,43 @@ describe('ChatPageClient', () => {
     expect(screen.getByText(/I am the assistant/i)).toBeInTheDocument();
   });
 
+  it('lets the console chat pick a validated provider model before sending', async () => {
+    const user = userEvent.setup();
+    localStorageMock.setItem(
+      'pm:keys-metadata',
+      JSON.stringify({
+        openai: {
+          lastValidatedAt: '2026-05-28T00:00:00.000Z',
+          status: 'ok',
+          dynamicModels: ['gpt-live-a', 'gpt-live-b'],
+        },
+      }),
+    );
+    renderWithI18n(<ChatPageClient />);
+
+    await user.click(screen.getAllByRole('button', { name: /chat settings/i })[0]);
+    await user.selectOptions(screen.getByLabelText(/provider/i), 'openai');
+
+    const modelInput = screen.getByLabelText(/model id/i);
+    expect(modelInput).toHaveValue('gpt-live-a');
+    await user.clear(modelInput);
+    await user.type(modelInput, 'gpt-custom-2026');
+    await user.click(screen.getByRole('button', { name: /apply/i }));
+
+    const textarea = screen.getByPlaceholderText('Ask me anything...');
+    await user.type(textarea, 'Hello with model');
+    await user.keyboard('{Enter}');
+
+    await new Promise((r) => setTimeout(r, 100));
+    expect(mockSendChatMessage).toHaveBeenCalledWith(expect.objectContaining({
+      content: 'Hello with model',
+      chatSettings: expect.objectContaining({
+        provider: 'openai',
+        model: 'gpt-custom-2026',
+      }),
+    }));
+  });
+
   it('deletes a session from history', async () => {
     // Seed a session
     const sessionId = 'test-session-abc';

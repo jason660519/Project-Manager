@@ -1053,6 +1053,39 @@
         ],
         "kickoffAt": "2026-05-27T07:06:00.000Z"
       }
+    },
+    {
+      "id": "F35",
+      "name": "Agent Workflow DAG Control Plane",
+      "category": "AI Workflows",
+      "status": "in_progress",
+      "progress": 40,
+      "phase": "development",
+      "points": 8,
+      "locatedSection": "lib/agent-workflows",
+      "readmePath": ".project-manager/features/F35/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F35/",
+        "spec": ".project-manager/features/F35/feature-spec.md",
+        "tdd": ".project-manager/features/F35/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F35/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F35/",
+        "implementation": "lib/agent-workflows",
+        "test": "__tests__/agentWorkflowDag.test.ts"
+      },
+      "notes": "Define Project Manager's multi-agent DAG control plane before runtime integration: Software Dev and Deep Research templates, per-agent session isolation, tool bundle refs, and a future WorkerRuntimeAdapter boundary for local/xmux/CubeSandbox/E2B.",
+      "createdAt": "2026-05-28T00:00:00.000Z",
+      "updatedAt": "2026-05-28T01:00:00.000Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "docs/architecture/ADR-013-agent-workflow-dag-control-plane.md",
+          "lib/agent-workflows/dagDefinitions.ts",
+          "lib/agent-workflows/sessionScope.ts",
+          "__tests__/agentWorkflowDag.test.ts"
+        ],
+        "kickoffAt": "2026-05-28T00:00:00.000Z"
+      }
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",
@@ -1063,6 +1096,6 @@
     "root": "/Volumes/KLEVV-4T-1/Project-Manager"
   },
   "schemaVersion": 8,
-  "updatedAt": "2026-05-27T00:00:00Z",
-  "updatedBy": "Cursor"
+  "updatedAt": "2026-05-28T00:00:00.000Z",
+  "updatedBy": "Codex"
 }

@@ -10,6 +10,13 @@ import { executeToolCall, toAnthropicTools } from '../../../../lib/chat/toolExec
 import { AVAILABLE_TOOLS } from '../../../../lib/chat/tools';
 import type { ToolCall, ToolResult } from '../../../../lib/chat/tools';
 import type { ToolContext } from '../../../../lib/chat/toolExecutor';
+import {
+  buildChatProviderChain,
+  getChatProviderSpec,
+  getDefaultChatModel,
+  openAiCompatibleBaseUrl,
+  resolveChatProviderApiKey,
+} from '../../../../lib/chat/providerRouting';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -34,58 +41,6 @@ interface RequestBody {
   context?: ToolContext;
   /** API key passed from the client (loaded from Keychain/localStorage). */
   apiKey?: string;
-}
-
-// ── Config ──────────────────────────────────────────────────────────────────
-
-const DEFAULT_MODELS: Record<string, string> = {
-  anthropic: 'claude-sonnet-4-6',
-  openai: 'gpt-4o',
-  gemini: 'gemini-1.5-pro-latest',
-  deepseek: 'deepseek-v4-pro',
-  grok: 'grok-2-latest',
-  kimi: 'kimi-k2.6',
-  openrouter: 'anthropic/claude-3.5-sonnet',
-  perplexity: 'sonar',
-  together: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
-  zhipu: 'glm-4-plus',
-  qwen: 'qwen-plus',
-};
-
-const FALLBACK_PROVIDERS = ['deepseek', 'anthropic', 'openai', 'gemini', 'grok'];
-
-/** Detect which provider a model name belongs to, for smarter fallback routing. */
-const MODEL_PATTERNS: Array<{ pattern: RegExp; provider: string }> = [
-  { pattern: /^deepseek/i, provider: 'deepseek' },
-  { pattern: /^claude/i, provider: 'anthropic' },
-  { pattern: /^gpt/i, provider: 'openai' },
-  { pattern: /^o1/i, provider: 'openai' },
-  { pattern: /^o3/i, provider: 'openai' },
-  { pattern: /^gemini/i, provider: 'gemini' },
-  { pattern: /^grok/i, provider: 'grok' },
-  { pattern: /^kimi|^moonshot/i, provider: 'kimi' },
-  { pattern: /^qwen/i, provider: 'qwen' },
-  { pattern: /^glm/i, provider: 'zhipu' },
-];
-
-function detectProviderFromModel(model: string): string | undefined {
-  for (const { pattern, provider } of MODEL_PATTERNS) {
-    if (pattern.test(model)) return provider;
-  }
-  return undefined;
-}
-
-function buildProviderChain(model?: string, userProvider?: string): string[] {
-  const detected = model ? detectProviderFromModel(model) : undefined;
-  if (userProvider && userProvider !== 'auto') {
-    // User specified a provider: try it first, then fallback chain
-    return [userProvider, ...FALLBACK_PROVIDERS.filter(p => p !== userProvider)];
-  }
-  if (detected) {
-    // Model name matches a known provider: try that provider first
-    return [detected, ...FALLBACK_PROVIDERS.filter(p => p !== detected)];
-  }
-  return FALLBACK_PROVIDERS;
 }
 
 // ── SSE Helpers ─────────────────────────────────────────────────────────────
@@ -575,6 +530,67 @@ async function streamOpenAICompat(
   }
 }
 
+async function streamGemini(
+  apiKey: string,
+  model: string,
+  sys: string,
+  messages: ChatApiMessage[],
+  send: (data: Record<string, unknown>) => void,
+): Promise<void> {
+  const contents: { role: string; parts: { text: string }[] }[] = [];
+  for (const msg of messages) {
+    if (msg.role === 'system') continue;
+    contents.push({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: msg.content }],
+    });
+  }
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: sys }] },
+        contents,
+        generationConfig: { maxOutputTokens: 8192 },
+      }),
+    },
+  );
+
+  if (!res.ok) throw new Error(`gemini ${res.status}: ${(await res.text()).slice(0, 200)}`);
+
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error('No response body');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data: ')) continue;
+      try {
+        const json = JSON.parse(trimmed.slice(6)) as Record<string, unknown>;
+        const candidates = json.candidates as Array<Record<string, unknown>> | undefined;
+        const content = candidates?.[0]?.content as Record<string, unknown> | undefined;
+        const parts = content?.parts as Array<Record<string, unknown>> | undefined;
+        const text = parts?.[0]?.text;
+        if (typeof text === 'string' && text) send({ type: 'text', text });
+      } catch {
+        // Skip malformed provider stream chunks.
+      }
+    }
+  }
+}
+
 // ── Main Provider Router ────────────────────────────────────────────────────
 
 async function streamWithProvider(
@@ -583,39 +599,21 @@ async function streamWithProvider(
   send: (data: Record<string, unknown>) => void,
   clientApiKey?: string,
 ): Promise<void> {
-  const envKey = process.env[`${provider.toUpperCase()}_API_KEY`];
-  const apiKey = clientApiKey || envKey;
-  if (!apiKey) throw new Error(`${provider.toUpperCase()}_API_KEY not configured`);
+  const apiKey = resolveChatProviderApiKey(provider, clientApiKey);
+  const providerSpec = getChatProviderSpec(provider);
 
-  switch (provider) {
+  switch (providerSpec.apiKind) {
     case 'anthropic':
       return streamAnthropic(apiKey, model, sys, messages, send, tools, context);
 
-    case 'openai':
-      return streamOpenAI(apiKey, model, sys, messages, send, tools, context);
-
-    case 'deepseek':
-      return streamOpenAICompat('deepseek', apiKey, 'https://api.deepseek.com', model, sys, messages, send, tools, context);
-    case 'grok':
-      return streamOpenAICompat('grok', apiKey, 'https://api.x.ai', model, sys, messages, send, tools, context);
-    case 'kimi':
-      return streamOpenAICompat('kimi', apiKey, 'https://api.moonshot.ai/v1', model, sys, messages, send, tools, context);
-    case 'openrouter':
-      return streamOpenAICompat('openrouter', apiKey, 'https://openrouter.ai/api', model, sys, messages, send, tools, context);
-    case 'perplexity':
-      return streamOpenAICompat('perplexity', apiKey, 'https://api.perplexity.ai', model, sys, messages, send, tools, context);
-    case 'together':
-      return streamOpenAICompat('together', apiKey, 'https://api.together.xyz', model, sys, messages, send, tools, context);
-    case 'zhipu':
-      return streamOpenAICompat('zhipu', apiKey, 'https://open.bigmodel.cn/api/paas/v4', model, sys, messages, send, tools, context);
-    case 'qwen':
-      return streamOpenAICompat('qwen', apiKey, 'https://dashscope.aliyuncs.com/compatible-mode/v1', model, sys, messages, send, tools, context);
-
     case 'gemini':
-      // Gemini needs special handling but for now use simple text
-      return streamOpenAICompat('gemini', apiKey,
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
-        model, sys, messages, send);
+      return streamGemini(apiKey, model, sys, messages, send);
+
+    case 'openai-compatible':
+      if (provider === 'openai') {
+        return streamOpenAI(apiKey, model, sys, messages, send, tools, context);
+      }
+      return streamOpenAICompat(provider, apiKey, openAiCompatibleBaseUrl(provider), model, sys, messages, send, tools, context);
 
     default:
       throw new Error(`Unsupported provider: ${provider}`);
@@ -647,14 +645,16 @@ export async function POST(request: NextRequest) {
           send({ type: 'thinking_start' });
 
           const userProvider = body.provider && body.provider !== 'auto' ? body.provider : undefined;
-          const providersToTry = body.apiKey
-            ? (userProvider ? [userProvider] : (body.model ? [detectProviderFromModel(body.model) ?? FALLBACK_PROVIDERS[0]] : []))
-            : buildProviderChain(body.model, userProvider);
+          const providersToTry = buildChatProviderChain({
+            model: body.model,
+            userProvider,
+            hasClientApiKey: Boolean(body.apiKey),
+          });
           const errors: string[] = [];
 
           for (const provider of providersToTry) {
             try {
-              const model = body.model || DEFAULT_MODELS[provider];
+              const model = body.model || getDefaultChatModel(provider);
               await streamWithProvider(provider, model, sys, body.messages,
                 useTools,  // All providers now support tools via streamOpenAICompat
                 context, send, body.apiKey);

@@ -86,6 +86,45 @@ describe('ChatPanel', () => {
     expect(await screen.findByText('Here is the status.')).toBeInTheDocument();
   });
 
+  it('lets the docked assistant pick a validated provider model or enter a custom model id', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem(
+      'pm:keys-metadata',
+      JSON.stringify({
+        anthropic: {
+          lastValidatedAt: '2026-05-28T00:00:00.000Z',
+          status: 'ok',
+          dynamicModels: ['claude-live-a', 'claude-live-b'],
+        },
+      }),
+    );
+    sendChatMessageMock.mockResolvedValueOnce({ content: 'Using selected model.' });
+    renderPanel(true, true);
+
+    await user.click(screen.getByRole('button', { name: /chat settings/i }));
+    await user.selectOptions(screen.getByLabelText(/provider/i), 'anthropic');
+
+    const modelInput = screen.getByLabelText(/model id/i);
+    expect(modelInput).toHaveValue('claude-live-a');
+    expect(screen.getByText(/2 models from the latest api key validation/i)).toBeInTheDocument();
+
+    await user.clear(modelInput);
+    await user.type(modelInput, 'claude-custom-999');
+    await user.click(screen.getByRole('button', { name: /apply/i }));
+
+    const input = screen.getByPlaceholderText(/ask me anything/i);
+    await user.type(input, 'use this provider');
+    await user.keyboard('{Enter}');
+
+    expect(sendChatMessageMock).toHaveBeenCalledWith(expect.objectContaining({
+      content: 'use this provider',
+      chatSettings: expect.objectContaining({
+        provider: 'anthropic',
+        model: 'claude-custom-999',
+      }),
+    }));
+  });
+
   it('empty input does not send', async () => {
     renderPanel(true);
     const input = screen.getByPlaceholderText(/ask me anything/i);

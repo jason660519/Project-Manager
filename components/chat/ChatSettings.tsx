@@ -1,8 +1,13 @@
 'use client';
 
 import { Settings2, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { listLlmProviders } from '../../lib/keys/llmProviders';
+import {
+  loadProviderMetadata,
+  resolveModelList,
+  subscribeProviderMetadataChanges,
+} from '../../lib/keys/providerMetadata';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -29,7 +34,14 @@ export function loadChatSettings(): ChatSettingsData {
   if (typeof window === 'undefined') return { provider: 'auto', model: '', systemPrompt: '' };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<ChatSettingsData>;
+      return {
+        provider: typeof parsed.provider === 'string' && parsed.provider ? parsed.provider : 'auto',
+        model: typeof parsed.model === 'string' ? parsed.model : '',
+        systemPrompt: typeof parsed.systemPrompt === 'string' ? parsed.systemPrompt : '',
+      };
+    }
   } catch { /* ignore */ }
   return { provider: 'auto', model: '', systemPrompt: '' };
 }
@@ -47,11 +59,12 @@ export function saveChatSettings(settings: ChatSettingsData) {
 const ALL_PROVIDERS = listLlmProviders();
 
 export function ChatSettings({ current, onChange }: ChatSettingsProps) {
+  const modelListId = useId();
   const [open, setOpen] = useState(false);
   const [provider, setProvider] = useState(current.provider);
   const [model, setModel] = useState(current.model);
   const [systemPrompt, setSystemPrompt] = useState(current.systemPrompt);
-  const [hasChanged, setHasChanged] = useState(false);
+  const [metadataVersion, setMetadataVersion] = useState(0);
 
   // Sync local state when current changes externally
   useEffect(() => {
@@ -60,12 +73,43 @@ export function ChatSettings({ current, onChange }: ChatSettingsProps) {
     setSystemPrompt(current.systemPrompt);
   }, [current]);
 
-  const currentSpec = ALL_PROVIDERS.find((p) => p.id === provider);
-  const models = currentSpec?.availableModels ?? [];
+  useEffect(() => {
+    return subscribeProviderMetadataChanges(() => {
+      setMetadataVersion((version) => version + 1);
+    });
+  }, []);
+
+  const providerOptions = useMemo(() => {
+    return ALL_PROVIDERS.map((providerSpec) => {
+      const resolved = resolveModelList(providerSpec.id, providerSpec.availableModels);
+      return {
+        ...providerSpec,
+        models: resolved.models,
+        modelSource: resolved.isDynamic ? 'validated' : 'static',
+        metadata: loadProviderMetadata(providerSpec.id),
+      };
+    });
+  }, [metadataVersion]);
+
+  const currentSpec = providerOptions.find((p) => p.id === provider);
+  const models = currentSpec?.models ?? [];
   const providerChanged = provider !== current.provider;
   const modelChanged = model !== current.model;
   const promptChanged = systemPrompt !== current.systemPrompt;
   const dirty = providerChanged || modelChanged || promptChanged;
+  const activeProviderLabel =
+    provider === 'auto'
+      ? 'Auto'
+      : currentSpec
+        ? currentSpec.label
+        : provider;
+  const modelHelper = currentSpec
+    ? currentSpec.modelSource === 'validated'
+      ? `${models.length} models from the latest API key validation. You can still type another model ID.`
+      : currentSpec.metadata?.status === 'fail'
+        ? `Validation failed: ${currentSpec.metadata.errorReason ?? 'unknown error'}. Static suggestions are shown; manual model IDs are allowed.`
+        : 'Static model suggestions are shown until this provider is validated. You can type any model ID.'
+    : '';
 
   // Reset model when provider changes (and the current model isn't valid for the new provider)
   const handleProviderChange = (newProvider: string) => {
@@ -74,14 +118,17 @@ export function ChatSettings({ current, onChange }: ChatSettingsProps) {
       setModel('');
       return;
     }
-    const spec = ALL_PROVIDERS.find((p) => p.id === newProvider);
-    if (spec && !spec.availableModels.includes(model)) {
-      setModel(spec.availableModels[0] || spec.defaultModel || '');
+    const spec = providerOptions.find((p) => p.id === newProvider);
+    if (spec && !spec.models.includes(model)) {
+      setModel(spec.models[0] || spec.defaultModel || '');
     }
   };
 
   const handleApply = () => {
-    const settings: ChatSettingsData = { provider, model, systemPrompt };
+    const settings: ChatSettingsData =
+      provider === 'auto'
+        ? { provider: 'auto', model: '', systemPrompt }
+        : { provider, model: model.trim(), systemPrompt };
     saveChatSettings(settings);
     onChange(settings);
     setOpen(false);
@@ -93,6 +140,7 @@ export function ChatSettings({ current, onChange }: ChatSettingsProps) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        aria-label="Chat settings"
         className={`flex items-center gap-1 rounded px-1.5 py-1 text-[10px] transition-colors ${
           provider !== 'auto'
             ? 'text-amber-300/80 hover:text-amber-200'
@@ -101,6 +149,11 @@ export function ChatSettings({ current, onChange }: ChatSettingsProps) {
         title="Chat settings"
       >
         <Settings2 size={12} />
+        {provider !== 'auto' && (
+          <span className="hidden max-w-[120px] truncate sm:inline">
+            {activeProviderLabel}{model ? ` · ${model}` : ''}
+          </span>
+        )}
       </button>
 
       {/* Settings panel */}
@@ -119,14 +172,15 @@ export function ChatSettings({ current, onChange }: ChatSettingsProps) {
             </div>
 
             {/* Provider */}
-            <label className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-stone-500">Provider</label>
+            <label htmlFor={`${modelListId}-provider`} className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-stone-500">Provider</label>
             <select
+              id={`${modelListId}-provider`}
               value={provider}
               onChange={(e) => handleProviderChange(e.target.value)}
               className="mb-2 w-full rounded border border-stone-200/15 bg-stone-900 px-2 py-1 text-[11px] text-stone-200 outline-none focus:border-amber-200/40"
             >
               <option value="auto">Auto (fallback chain)</option>
-              {ALL_PROVIDERS.map((p) => (
+              {providerOptions.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.label}
                 </option>
@@ -136,18 +190,25 @@ export function ChatSettings({ current, onChange }: ChatSettingsProps) {
             {/* Model */}
             {provider !== 'auto' && (
               <>
-                <label className="mb-1 mt-2 block text-[9px] uppercase tracking-[0.1em] text-stone-500">Model</label>
-                <select
+                <label htmlFor={`${modelListId}-model`} className="mb-1 mt-2 block text-[9px] uppercase tracking-[0.1em] text-stone-500">Model ID</label>
+                <input
+                  id={`${modelListId}-model`}
+                  list={modelListId}
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
-                  className="mb-2 w-full rounded border border-stone-200/15 bg-stone-900 px-2 py-1 text-[11px] text-stone-200 outline-none focus:border-amber-200/40"
-                >
+                  placeholder={currentSpec?.defaultModel ?? 'Enter model ID'}
+                  className="mb-1 w-full rounded border border-stone-200/15 bg-stone-900 px-2 py-1 text-[11px] text-stone-200 outline-none placeholder:text-stone-600 focus:border-amber-200/40"
+                />
+                <datalist id={modelListId}>
                   {models.map((m) => (
                     <option key={m} value={m}>
                       {m}
                     </option>
                   ))}
-                </select>
+                </datalist>
+                <p className="mb-2 text-[10px] leading-relaxed text-stone-500">
+                  {modelHelper}
+                </p>
               </>
             )}
 

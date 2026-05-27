@@ -197,7 +197,7 @@ export interface ExecutionResult {
 export type AnyAdapterConfig = IDEAdapterConfig | AgentAdapterConfig | AgentAppAdapterConfig;
 
 export interface ProjectManagerConfig {
-  /** Increment when making breaking changes to the config structure. Current: 7 */
+  /** Increment when making breaking changes to the config structure. Current: 8 */
   schemaVersion: number;
   engineerRoles?: EngineerRole[];
   // ── Sync identity + audit fields (schema v2, ADR-006) ──────────────────

@@ -1,4 +1,11 @@
 import { NextRequest } from 'next/server';
+import {
+  buildChatProviderChain,
+  getChatProviderSpec,
+  getDefaultChatModel,
+  openAiCompatibleChatCompletionsUrl,
+  resolveChatProviderApiKey,
+} from '../../../../lib/chat/providerRouting';
 
 interface ChatApiMessage {
   role: 'user' | 'assistant' | 'system';
@@ -21,43 +28,6 @@ interface RequestBody {
 // Streaming chat API using SSE (Server-Sent Events).
 // Accepts `provider` + `model` or falls back to default chain.
 // ────────────────────────────────────────────────────────────────────────────
-
-/** Default model for each provider when none is specified. */
-const DEFAULT_MODELS: Record<string, string> = {
-  anthropic: 'claude-sonnet-4-6',
-  openai: 'gpt-4o',
-  gemini: 'gemini-1.5-pro-latest',
-  deepseek: 'deepseek-v4-pro',
-  grok: 'grok-2-latest',
-  kimi: 'kimi-k2.6',
-  openrouter: 'anthropic/claude-3.5-sonnet',
-  perplexity: 'sonar',
-  together: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
-  zhipu: 'glm-4-plus',
-  qwen: 'qwen-plus',
-};
-
-/** Fallback chain when no provider is specified by the client. */
-const FALLBACK_PROVIDERS = ['deepseek', 'anthropic', 'openai', 'gemini', 'grok'];
-
-/** Detect provider from model name patterns. */
-function detectProviderFromModel(model: string): string | undefined {
-  const patterns: Array<{ pattern: RegExp; provider: string }> = [
-    { pattern: /^deepseek/i, provider: 'deepseek' },
-    { pattern: /^claude/i, provider: 'anthropic' },
-    { pattern: /^gpt/i, provider: 'openai' },
-    { pattern: /^o1|^o3/i, provider: 'openai' },
-    { pattern: /^gemini/i, provider: 'gemini' },
-    { pattern: /^grok/i, provider: 'grok' },
-    { pattern: /^kimi|^moonshot/i, provider: 'kimi' },
-    { pattern: /^qwen/i, provider: 'qwen' },
-    { pattern: /^glm/i, provider: 'zhipu' },
-  ];
-  for (const { pattern, provider } of patterns) {
-    if (pattern.test(model)) return provider;
-  }
-  return undefined;
-}
 
 function getSystemPrompt(): string {
   return [
@@ -107,13 +77,11 @@ async function* streamProvider(
   systemPrompt?: string,
   clientApiKey?: string,
 ): AsyncGenerator<string> {
-  const envKey = process.env[`${provider.toUpperCase()}_API_KEY`];
-  const apiKey = clientApiKey || envKey;
-  if (!apiKey) throw new Error(`${provider.toUpperCase()}_API_KEY not configured`);
-
+  const apiKey = resolveChatProviderApiKey(provider, clientApiKey);
+  const providerSpec = getChatProviderSpec(provider);
   const sys = systemPrompt || getSystemPrompt();
 
-  switch (provider) {
+  switch (providerSpec.apiKind) {
     case 'anthropic': {
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -134,24 +102,6 @@ async function* streamProvider(
       const reader = res.body?.getReader();
       if (!reader) throw new Error('No response body');
       yield* parseSSE<{ delta?: { text?: string }; type?: string }>(reader, (json) => json.delta?.text ?? '');
-      return;
-    }
-
-    case 'openai': {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-        body: JSON.stringify({
-          model,
-          max_tokens: 4096,
-          stream: true,
-          messages: [{ role: 'system', content: sys }, ...messages],
-        }),
-      });
-      if (!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0, 200)}`);
-      const reader = res.body?.getReader();
-      if (!reader) throw new Error('No response body');
-      yield* parseSSE<{ choices?: { delta?: { content?: string } }[] }>(reader, (json) => json.choices?.[0]?.delta?.content ?? '');
       return;
     }
 
@@ -186,28 +136,8 @@ async function* streamProvider(
       return;
     }
 
-    // OpenAI-compatible providers
-    case 'deepseek':
-    case 'grok':
-    case 'kimi':
-    case 'openrouter':
-    case 'perplexity':
-    case 'together':
-    case 'zhipu':
-    case 'qwen': {
-      const baseUrls: Record<string, string> = {
-        deepseek: 'https://api.deepseek.com',
-        grok: 'https://api.x.ai',
-        kimi: 'https://api.moonshot.ai/v1',
-        openrouter: 'https://openrouter.ai/api',
-        perplexity: 'https://api.perplexity.ai',
-        together: 'https://api.together.xyz',
-        zhipu: 'https://open.bigmodel.cn/api/paas/v4',
-        qwen: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-      };
-      const base = baseUrls[provider];
-      if (!base) throw new Error(`Unknown provider: ${provider}`);
-      const res = await fetch(`${base}/chat/completions`, {
+    case 'openai-compatible': {
+      const res = await fetch(openAiCompatibleChatCompletionsUrl(provider), {
         method: 'POST',
         headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -278,18 +208,15 @@ export async function POST(request: NextRequest) {
   // When the client provides a specific API key (loaded from Keychain),
   // only try the user-requested provider — the key is provider-specific.
   const errors: string[] = [];
-  const startProvider = body.provider;
-  const modelProvider = body.model ? detectProviderFromModel(body.model) : undefined;
-  const providersToTry = body.apiKey
-    ? (startProvider ? [startProvider] : (modelProvider ? [modelProvider] : []))
-    : (startProvider
-        ? [startProvider, ...FALLBACK_PROVIDERS.filter(p => p !== startProvider)]
-        : modelProvider
-          ? [modelProvider, ...FALLBACK_PROVIDERS.filter(p => p !== modelProvider)]
-          : FALLBACK_PROVIDERS);
+  const userProvider = body.provider && body.provider !== 'auto' ? body.provider : undefined;
+  const providersToTry = buildChatProviderChain({
+    model: body.model,
+    userProvider,
+    hasClientApiKey: Boolean(body.apiKey),
+  });
 
   for (const provider of providersToTry) {
-    const model = body.model || DEFAULT_MODELS[provider] || 'default';
+    const model = body.model || getDefaultChatModel(provider);
     try {
       const gen = streamProvider(provider, model, body.messages, systemPrompt, body.apiKey);
       const iterator = gen[Symbol.asyncIterator]();
