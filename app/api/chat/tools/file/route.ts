@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFileSync, existsSync, statSync } from 'fs';
-import { join, resolve } from 'path';
+import { extname, isAbsolute, relative, resolve } from 'path';
 
 const MAX_FILE_SIZE = 100 * 1024; // 100 KB
 const ALLOWED_EXTENSIONS = [
@@ -15,21 +15,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'path is required' }, { status: 400 });
     }
 
-    const root = body.root || process.cwd();
+    const root = resolve(/* turbopackIgnore: true */ body.root || process.cwd());
 
     // Resolve and validate path
-    const targetPath = resolve(root, body.path);
+    const targetPath = resolve(/* turbopackIgnore: true */ root, body.path);
 
     // Security: ensure path is within root
-    if (!targetPath.startsWith(resolve(root))) {
+    const relativePath = relative(root, targetPath);
+    if (
+      relativePath === '' ||
+      relativePath === '..' ||
+      relativePath.startsWith('../') ||
+      relativePath.startsWith('..\\') ||
+      isAbsolute(relativePath)
+    ) {
       return NextResponse.json({ error: 'Path traversal denied' }, { status: 403 });
     }
 
-    if (!existsSync(targetPath)) {
+    if (!existsSync(/* turbopackIgnore: true */ targetPath)) {
       return NextResponse.json({ error: `File not found: ${body.path}` }, { status: 404 });
     }
 
-    const stat = statSync(targetPath);
+    const stat = statSync(/* turbopackIgnore: true */ targetPath);
     if (stat.isDirectory()) {
       return NextResponse.json({ error: 'Path is a directory, not a file' }, { status: 400 });
     }
@@ -41,7 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check extension for text files
-    const ext = '.' + body.path.split('.').pop()?.toLowerCase();
+    const ext = extname(body.path).toLowerCase();
     const isText = ALLOWED_EXTENSIONS.includes(ext) || !ext;
 
     if (!isText) {
@@ -50,7 +57,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const content = readFileSync(targetPath, 'utf-8');
+    const content = readFileSync(/* turbopackIgnore: true */ targetPath, 'utf-8');
     const lines = content.split('\n');
 
     // Syntax highlight hint based on extension

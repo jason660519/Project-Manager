@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useKeysContext } from './KeysContext';
 import { useArenaChat } from './useArenaChat';
+import { hasProviderKey } from '../../../../lib/keys/loadProviderKey';
 import { useI18n } from '../../../../lib/i18n';
 import { LlmArenaMethodPanel } from './LlmArenaMethodPanel';
 import { LlmArenaMatrixTable } from './LlmArenaMatrixTable';
@@ -220,6 +221,8 @@ export function LlmArenaSheet() {
     for (const providerId of rank) {
       const provider = providersById.get(providerId as any);
       if (!provider) continue;
+      const hasKey = await hasProviderKey(provider.id);
+      if (!hasKey) continue;
       const preferred = topModelByProvider[provider.id];
       const model =
         (preferred && provider.availableModels.includes(preferred) && preferred) ||
