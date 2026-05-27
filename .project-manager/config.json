@@ -931,7 +931,7 @@
       "name": "AI Assistant Capability Upgrade",
       "category": "Core/AI",
       "status": "done",
-      "progress": 98,
+      "progress": 99,
       "phase": "development",
       "points": 13,
       "locatedSection": "/ai_assistants",
@@ -1018,6 +1018,41 @@
       "createdAt": "2026-05-27T00:00:00Z",
       "updatedAt": "2026-05-27T14:30:00Z",
       "updatedBy": "Cursor"
+    },
+    {
+      "id": "F34",
+      "name": "Xmux AI Assistant Block and Browser Tools",
+      "category": "Frontend/UI",
+      "status": "in_progress",
+      "progress": 98,
+      "phase": "development",
+      "points": 3,
+      "locatedSection": "/xmux",
+      "notes": "Removed pane-toolbar AI Assistant tab; Select Element sends DOM payload to docked Assistant; Console mirrors native webview logs; CSS Inspector now renders selected DOM tree, Design tab, CSS tab, box model, class list, and computed styles.",
+      "createdAt": "2026-05-27T07:06:00.000Z",
+      "updatedAt": "2026-05-27T10:25:00.000Z",
+      "readmePath": ".project-manager/features/F34/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F34/",
+        "spec": ".project-manager/features/F34/feature-spec.md",
+        "tdd": ".project-manager/features/F34/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F34/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F34/",
+        "implementation": "app/ui/views/XmuxView.tsx",
+        "test": "__tests__/xmux.registry.test.tsx; __tests__/xmux.browser-url-chrome.test.tsx"
+      },
+      "metadata": {
+        "evidencePaths": [
+          "components/terminal/blockLayout.ts",
+          "components/terminal/Block.tsx",
+          "components/terminal/PaneShell.tsx",
+          "components/browser/BrowserContent.tsx",
+          "components/browser/BrowserRegistry.ts",
+          "lib/bridge/index.ts",
+          "src-tauri/src/xmux_webview.rs"
+        ],
+        "kickoffAt": "2026-05-27T07:06:00.000Z"
+      }
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",

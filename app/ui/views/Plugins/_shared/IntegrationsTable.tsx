@@ -147,16 +147,22 @@ export function IntegrationsTable({
   const [columnSizing, setColumnSizing] = useState<Record<string, number>>({});
   const columns = useMemo(
     () => [
-      ...(onToggleCheck
+      ...(onToggleCheck || onToggleEnabled
         ? [
             columnHelper.display({
               id: 'col-check',
               enableSorting: false,
               size: 88,
               header: ({ table }) => {
-                const visibleKeys = table.getRowModel().rows.map((r) => r.original.rowKey);
-                const allChecked = visibleKeys.length > 0 && visibleKeys.every((k) => checkedKeys?.has(k));
-                const someChecked = !allChecked && visibleKeys.some((k) => checkedKeys?.has(k));
+                const visibleRows = table.getRowModel().rows.map((r) => r.original);
+                const visibleKeys = visibleRows.map((r) => r.rowKey);
+                const selectionOnly = Boolean(onToggleCheck && !onToggleEnabled);
+                const allChecked = selectionOnly
+                  ? visibleKeys.length > 0 && visibleKeys.every((k) => checkedKeys?.has(k))
+                  : visibleRows.length > 0 && visibleRows.every((r) => r.enabled);
+                const someChecked = selectionOnly
+                  ? !allChecked && visibleKeys.some((k) => checkedKeys?.has(k))
+                  : !allChecked && visibleRows.some((r) => r.enabled);
                 return (
                   <div className="inline-flex items-center gap-1.5">
                     <input
@@ -165,7 +171,15 @@ export function IntegrationsTable({
                       ref={(el) => { if (el) el.indeterminate = someChecked; }}
                       onChange={(e) => {
                         e.stopPropagation();
-                        onToggleCheckAll?.(e.target.checked, visibleKeys);
+                        const next = e.target.checked;
+                        if (selectionOnly) {
+                          onToggleCheckAll?.(next, visibleKeys);
+                          return;
+                        }
+                        visibleRows.forEach((row) => {
+                          onToggleEnabled?.(row, next);
+                          onToggleCheck?.(row.rowKey, next);
+                        });
                       }}
                       onClick={(e) => e.stopPropagation()}
                       className="h-3.5 w-3.5 shrink-0 accent-emerald-400"
@@ -177,41 +191,31 @@ export function IntegrationsTable({
                   </div>
                 );
               },
-              cell: ({ row }) => (
-                <input
-                  type="checkbox"
-                  checked={checkedKeys?.has(row.original.rowKey) ?? false}
-                  onChange={(e) => {
-                    e.stopPropagation();
-                    onToggleCheck(row.original.rowKey, e.target.checked);
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="h-3.5 w-3.5 accent-emerald-400"
-                />
-              ),
-            }),
-          ]
-        : []),
-      ...(onToggleEnabled
-        ? [
-            columnHelper.display({
-              id: 'col-enable',
-              header: () => null,
-              cell: ({ row }) => (
-                <input
-                  type="checkbox"
-                  checked={row.original.enabled}
-                  onChange={(e) => {
-                    e.stopPropagation();
-                    onToggleEnabled(row.original, e.target.checked);
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="h-3.5 w-3.5 accent-emerald-400"
-                  title={t.integrations.colEnabled}
-                />
-              ),
-              size: 40,
-              enableSorting: false,
+              cell: ({ row }) => {
+                const selectionOnly = Boolean(onToggleCheck && !onToggleEnabled);
+                const checked = selectionOnly
+                  ? (checkedKeys?.has(row.original.rowKey) ?? false)
+                  : row.original.enabled;
+                return (
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      const next = e.target.checked;
+                      if (selectionOnly) {
+                        onToggleCheck?.(row.original.rowKey, next);
+                        return;
+                      }
+                      onToggleEnabled?.(row.original, next);
+                      onToggleCheck?.(row.original.rowKey, next);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-3.5 w-3.5 accent-emerald-400"
+                    title={t.integrations.colEnabled}
+                  />
+                );
+              },
             }),
           ]
         : []),

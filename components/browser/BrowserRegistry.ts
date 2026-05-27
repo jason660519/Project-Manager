@@ -7,9 +7,18 @@
 
 import {
   xmuxWebviewCreate,
+  xmuxWebviewClearBrowsingData,
+  xmuxWebviewClearConsole,
+  xmuxWebviewClearCookies,
+  xmuxWebviewConsoleEntries,
+  xmuxWebviewCurrentUrl,
   xmuxWebviewDestroy,
   xmuxWebviewNavigate,
+  xmuxWebviewEval,
+  xmuxWebviewReload,
+  xmuxWebviewSelectElement,
   xmuxWebviewSetBounds,
+  xmuxWebviewSetZoom,
   xmuxWebviewSetVisible,
   xmuxWebviewDestroyAll,
 } from '../../lib/bridge';
@@ -706,6 +715,68 @@ export function resumeNativeBrowserPainting(): void {
 
 export function getCurrentUrl(itemId: string): string | null {
   return sessions.get(itemId)?.url ?? null;
+}
+
+function requireNativeSession(itemId: string): TauriSession {
+  const session = sessions.get(itemId);
+  if (!session) {
+    throw new Error('Browser session is not ready yet.');
+  }
+  if (session.kind !== 'tauri') {
+    throw new Error('This browser action requires the Tauri native webview.');
+  }
+  if (!session.created) {
+    throw new Error('Native browser is still loading. Try again after the page appears.');
+  }
+  return session;
+}
+
+export async function getNativeCurrentUrl(itemId: string): Promise<string> {
+  const session = requireNativeSession(itemId);
+  const nativeUrl = await xmuxWebviewCurrentUrl(session.label);
+  session.url = nativeUrl;
+  session.lastNativeUrl = nativeUrl;
+  return nativeUrl;
+}
+
+export async function reloadNativeBrowser(itemId: string): Promise<void> {
+  const session = requireNativeSession(itemId);
+  await xmuxWebviewReload(session.label);
+}
+
+export async function setNativeBrowserZoom(itemId: string, scaleFactor: number): Promise<void> {
+  const session = requireNativeSession(itemId);
+  await xmuxWebviewSetZoom(session.label, scaleFactor);
+}
+
+export async function clearNativeBrowsingData(itemId: string): Promise<void> {
+  const session = requireNativeSession(itemId);
+  await xmuxWebviewClearBrowsingData(session.label);
+}
+
+export async function clearNativeCookies(itemId: string): Promise<void> {
+  const session = requireNativeSession(itemId);
+  await xmuxWebviewClearCookies(session.label);
+}
+
+export async function evalNativeBrowserScript(itemId: string, script: string): Promise<void> {
+  const session = requireNativeSession(itemId);
+  await xmuxWebviewEval(session.label, script);
+}
+
+export async function getNativeConsoleEntries(itemId: string): Promise<string> {
+  const session = requireNativeSession(itemId);
+  return xmuxWebviewConsoleEntries(session.label);
+}
+
+export async function clearNativeConsoleEntries(itemId: string): Promise<void> {
+  const session = requireNativeSession(itemId);
+  await xmuxWebviewClearConsole(session.label);
+}
+
+export async function selectNativeBrowserElement(itemId: string): Promise<string> {
+  const session = requireNativeSession(itemId);
+  return xmuxWebviewSelectElement(session.label);
 }
 
 export function backendKind(): 'tauri' | 'iframe' {

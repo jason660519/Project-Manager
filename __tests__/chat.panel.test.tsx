@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '../lib/i18n';
@@ -29,10 +29,10 @@ const mockContext: ChatContext = {
   activeRunCount: 0,
 };
 
-function renderPanel(defaultExpanded = false) {
+function renderPanel(defaultExpanded = false, docked = false) {
   return render(
     <I18nProvider>
-      <ChatPanel context={mockContext} defaultExpanded={defaultExpanded} />
+      <ChatPanel context={mockContext} defaultExpanded={defaultExpanded} docked={docked} />
     </I18nProvider>,
   );
 }
@@ -58,6 +58,16 @@ describe('ChatPanel', () => {
   it('shows empty state with welcome message', () => {
     renderPanel(true);
     expect(screen.getByText(/project manager assistant/i)).toBeInTheDocument();
+  });
+
+  it('keeps docked conversations inside a scroll container', () => {
+    const { container } = renderPanel(true, true);
+    const panel = container.firstElementChild;
+    const scrollRegion = screen.getByTestId('chat-message-scroll');
+
+    expect(panel).toHaveClass('min-h-0', 'overflow-hidden');
+    expect(scrollRegion).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto');
+    expect(screen.getByPlaceholderText(/ask me anything/i).closest('.shrink-0')).toBeTruthy();
   });
 
   it('typing in input and pressing Enter sends a message', async () => {
@@ -129,5 +139,111 @@ describe('ChatPanel', () => {
     await waitFor(() => {
       expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();
     });
+  });
+
+  it('does not render Xmux selected element payloads as conversation cards', async () => {
+    renderPanel(true, true);
+    const input = screen.getByPlaceholderText(/ask me anything/i) as HTMLTextAreaElement;
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('pm:xmux-selected-element', {
+          detail: {
+            positionTag: 'bottom',
+            elementTag: 'button',
+            selector: 'body > button',
+            url: 'https://example.com',
+            domTree: {
+              tag: 'button',
+              attributes: { type: 'button' },
+              children: [{ tag: 'span', text: 'Sign in', children: [] }],
+            },
+            outerHTML: '<button type="button"><span>Sign in</span></button>',
+          },
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(input.value).toContain('[xmux element: bottom · button]');
+    });
+    expect(screen.getByTestId('chat-message-scroll').textContent).not.toContain('bottom');
+    expect(screen.getByTestId('chat-message-scroll').textContent).not.toContain('"tag": "span"');
+    expect(screen.getByTestId('chat-message-scroll').textContent).not.toContain('outerHTML');
+  });
+
+  it('appends Xmux selected element context to the end of the chat input', async () => {
+    renderPanel(true, true);
+    const input = screen.getByPlaceholderText(/ask me anything/i) as HTMLTextAreaElement;
+
+    fireEvent.change(input, { target: { value: 'Please review this layout' } });
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('pm:xmux-selected-element', {
+          detail: {
+            positionTag: 'bottom',
+            elementTag: 'button',
+            selector: 'body > button',
+            url: 'https://example.com',
+            domTree: { tag: 'button' },
+            outerHTML: '<button>Go</button>',
+          },
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(input.value.startsWith('Please review this layout')).toBe(true);
+      expect(input.value).toContain('[xmux element: bottom · button]');
+      expect(input.value).toContain('selector: body > button');
+      expect(input.value).toContain('<button>Go</button>');
+      expect(input.value.indexOf('Please review this layout')).toBeLessThan(
+        input.value.indexOf('[xmux element: bottom · button]'),
+      );
+      expect(input.selectionStart).toBe(input.value.length);
+      expect(input.selectionEnd).toBe(input.value.length);
+    });
+  });
+
+  it('fills the chat input with selected element context when empty', async () => {
+    renderPanel(true, true);
+    const input = screen.getByPlaceholderText(/ask me anything/i) as HTMLTextAreaElement;
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('pm:xmux-selected-element', {
+          detail: {
+            positionTag: 'top',
+            elementTag: 'header',
+            selector: 'body > header',
+          },
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(input.value).toContain('[xmux element: top · header]');
+      expect(input.value).toContain('selector: body > header');
+    });
+  });
+
+  it('ignores empty Xmux selected element payloads', async () => {
+    renderPanel(true, true);
+    const input = screen.getByPlaceholderText(/ask me anything/i) as HTMLTextAreaElement;
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('pm:xmux-selected-element', {
+          detail: {},
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(input.value).toBe('');
+    });
+    expect(screen.getByTestId('chat-message-scroll').textContent).not.toContain('selected');
+    expect(screen.getByTestId('chat-message-scroll').textContent).not.toContain('element');
   });
 });

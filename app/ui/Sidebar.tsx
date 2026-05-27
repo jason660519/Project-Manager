@@ -11,7 +11,6 @@ import {
   MessageSquareText,
   Plug,
   RefreshCw,
-  ScrollText,
   Settings,
   ShieldCheck,
   SquareTerminal,
@@ -65,7 +64,6 @@ const NAV_GROUPS: NavGroup[] = [
     groupKey: 'assist',
     items: [
       { id: 'chat',     itemKey: 'chat',     href: '/ai_assistants', icon: MessageSquareText },
-      { id: 'sessions', itemKey: 'sessions', href: '/sessions',      icon: ScrollText },
     ],
   },
   {

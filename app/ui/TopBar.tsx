@@ -1,7 +1,13 @@
 'use client';
 
 import { Bot, ChevronDown, HelpCircle, Search, Zap } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from 'react';
 import { useTheme, THEMES } from '../../lib/hooks/useTheme';
 import { useI18n } from '../../lib/i18n';
 import { ViewId } from '../../lib/types';
@@ -39,6 +45,14 @@ interface TopBarProps {
 // ── Draggable panel position (persisted) ───────────────────────────────────
 
 const POSITION_KEY = 'pm-chat-position';
+const SIZE_KEY = 'pm-chat-size';
+const DEFAULT_CHAT_SIZE = { width: 340, height: 420 };
+const MIN_CHAT_SIZE = { width: 300, height: 280 };
+const VIEWPORT_MARGIN = 12;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
 
 function loadPosition(): { x: number; y: number } {
   if (typeof window === 'undefined') return { x: 100, y: 80 };
@@ -53,6 +67,27 @@ function savePosition(pos: { x: number; y: number }) {
   try { window.localStorage.setItem(POSITION_KEY, JSON.stringify(pos)); } catch { /* ignore */ }
 }
 
+function loadSize(): { width: number; height: number } {
+  if (typeof window === 'undefined') return DEFAULT_CHAT_SIZE;
+  try {
+    const raw = window.localStorage.getItem(SIZE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<typeof DEFAULT_CHAT_SIZE>;
+      if (Number.isFinite(parsed.width) && Number.isFinite(parsed.height)) {
+        return {
+          width: Math.max(MIN_CHAT_SIZE.width, Number(parsed.width)),
+          height: Math.max(MIN_CHAT_SIZE.height, Number(parsed.height)),
+        };
+      }
+    }
+  } catch { /* ignore */ }
+  return DEFAULT_CHAT_SIZE;
+}
+
+function saveSize(size: { width: number; height: number }) {
+  try { window.localStorage.setItem(SIZE_KEY, JSON.stringify(size)); } catch { /* ignore */ }
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 
 export function TopBar({ currentView, activeRunCount, searchValue = '', onSearchChange, chatContext }: TopBarProps) {
@@ -63,15 +98,26 @@ export function TopBar({ currentView, activeRunCount, searchValue = '', onSearch
   const [langOpen, setLangOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatPos, setChatPos] = useState(loadPosition);
+  const [chatSize, setChatSize] = useState(loadSize);
   const themeRef = useRef<HTMLDivElement>(null);
   const langRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+  const resizeRef = useRef<{
+    startX: number;
+    startY: number;
+    origWidth: number;
+    origHeight: number;
+    originLeft: number;
+    originTop: number;
+  } | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const posRef = useRef(chatPos);
+  const sizeRef = useRef(chatSize);
   posRef.current = chatPos;
+  sizeRef.current = chatSize;
 
   // ── Drag logic ──────────────────────────────────────────────────────────
-  const handleDragStart = useCallback((e: React.MouseEvent) => {
+  const handleDragStart = useCallback((e: ReactMouseEvent) => {
     const target = e.target as HTMLElement;
     if (!target.closest('[data-drag-handle]')) return;
     e.preventDefault();
@@ -88,9 +134,18 @@ export function TopBar({ currentView, activeRunCount, searchValue = '', onSearch
       if (!dragRef.current) return;
       const dx = ev.clientX - dragRef.current.startX;
       const dy = ev.clientY - dragRef.current.startY;
+      const size = sizeRef.current;
       setChatPos({
-        x: Math.max(0, dragRef.current.origX + dx),
-        y: Math.max(0, dragRef.current.origY + dy),
+        x: clamp(
+          dragRef.current.origX + dx,
+          0,
+          Math.max(0, window.innerWidth - size.width - VIEWPORT_MARGIN),
+        ),
+        y: clamp(
+          dragRef.current.origY + dy,
+          0,
+          Math.max(0, window.innerHeight - size.height - VIEWPORT_MARGIN),
+        ),
       });
     };
 
@@ -106,6 +161,55 @@ export function TopBar({ currentView, activeRunCount, searchValue = '', onSearch
     document.addEventListener('mouseup', onUp);
   }, []);
 
+  const handleResizeStart = useCallback((e: ReactMouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (!target.closest('[data-resize-handle]')) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const current = sizeRef.current;
+    const position = posRef.current;
+    resizeRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      origWidth: current.width,
+      origHeight: current.height,
+      originLeft: position.x,
+      originTop: position.y,
+    };
+
+    const onMove = (ev: MouseEvent) => {
+      if (!resizeRef.current) return;
+      const dx = ev.clientX - resizeRef.current.startX;
+      const dy = ev.clientY - resizeRef.current.startY;
+      const maxWidth = Math.max(
+        MIN_CHAT_SIZE.width,
+        window.innerWidth - resizeRef.current.originLeft - VIEWPORT_MARGIN,
+      );
+      const maxHeight = Math.max(
+        MIN_CHAT_SIZE.height,
+        window.innerHeight - resizeRef.current.originTop - VIEWPORT_MARGIN,
+      );
+      setChatSize({
+        width: clamp(resizeRef.current.origWidth + dx, MIN_CHAT_SIZE.width, maxWidth),
+        height: clamp(resizeRef.current.origHeight + dy, MIN_CHAT_SIZE.height, maxHeight),
+      });
+    };
+
+    const onUp = () => {
+      if (!resizeRef.current) return;
+      saveSize(sizeRef.current);
+      resizeRef.current = null;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, []);
+
   // ── Click-outside close ─────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -117,6 +221,7 @@ export function TopBar({ currentView, activeRunCount, searchValue = '', onSearch
       // treated as outside.
       const toggle = document.getElementById('chat-toggle-btn');
       if (chatOpen && toggle && !toggle.contains(e.target as Node)) {
+        if (resizeRef.current) return;
         // Only close if also outside the panel (if panel exists)
         if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
           setChatOpen(false);
@@ -167,12 +272,28 @@ export function TopBar({ currentView, activeRunCount, searchValue = '', onSearch
           <div
             ref={panelRef}
             onMouseDown={handleDragStart}
-            style={{ left: chatPos.x, top: chatPos.y, position: 'fixed', zIndex: 9999 }}
+            style={{
+              left: chatPos.x,
+              top: chatPos.y,
+              width: chatSize.width,
+              height: chatSize.height,
+              position: 'fixed',
+              zIndex: 9999,
+            }}
+            className="min-h-[280px] min-w-[300px]"
           >
             <ChatPanel
               context={chatContext}
               defaultExpanded={true}
               toggleOpen={setChatOpen}
+            />
+            <div
+              role="separator"
+              aria-label="Resize AI Assistant panel"
+              data-resize-handle
+              onMouseDown={handleResizeStart}
+              className="absolute bottom-0 right-0 h-4 w-4 cursor-nwse-resize border-b border-r border-amber-200/40 bg-stone-900/80"
+              title="Resize AI Assistant panel"
             />
           </div>
         )}

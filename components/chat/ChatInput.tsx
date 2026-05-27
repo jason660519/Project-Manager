@@ -18,6 +18,12 @@ export interface AttachedFile {
   previewUrl?: string;
 }
 
+export interface ChatInputApi {
+  setValue: (value: string) => void;
+  appendValue: (suffix: string) => void;
+  getValue: () => string;
+}
+
 interface ChatInputProps {
   placeholder: string;
   sendLabel: string;
@@ -32,6 +38,8 @@ interface ChatInputProps {
   afterArea?: React.ReactNode;
   /** Expose a setValue callback so parent components can set input content */
   onSetValueRef?: React.MutableRefObject<((value: string) => void) | undefined>;
+  /** Read/write helpers for parents that append content (e.g. xmux Select Element). */
+  onInputApiRef?: React.MutableRefObject<ChatInputApi | undefined>;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -85,6 +93,7 @@ export function ChatInput({
   beforeArea,
   afterArea,
   onSetValueRef,
+  onInputApiRef,
 }: ChatInputProps) {
   const [value, setValue] = useState('');
   const [files, setFiles] = useState<AttachedFile[]>([]);
@@ -92,20 +101,56 @@ export function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sentRef = useRef(false);
+  const valueRef = useRef(value);
   const canSend = (value.trim().length > 0 || files.length > 0) && !loading;
 
-  // Expose setValue to parent via ref
+  valueRef.current = value;
+
+  const focusInput = (cursorToEnd = false, valueLength?: number) => {
+    const textarea = textareaRef.current;
+    textarea?.focus();
+    if (!cursorToEnd || !textarea) return;
+    const nextLength = valueLength ?? textarea.value.length;
+    const schedule =
+      typeof requestAnimationFrame === 'function'
+        ? requestAnimationFrame
+        : (callback: FrameRequestCallback) => window.setTimeout(callback, 0);
+    schedule(() => {
+      textarea.setSelectionRange(nextLength, nextLength);
+      textarea.scrollTop = textarea.scrollHeight;
+    });
+  };
+
+  // Expose setValue / append / getValue to parent via refs
   useEffect(() => {
+    const setInputValue = (newValue: string) => {
+      valueRef.current = newValue;
+      setValue(newValue);
+      focusInput(true, newValue.length);
+    };
+    const api: ChatInputApi = {
+      setValue: setInputValue,
+      appendValue: (suffix: string) => {
+        const current = valueRef.current;
+        const separator = current.length === 0 ? '' : current.endsWith('\n') ? '\n' : '\n\n';
+        const next = `${current}${separator}${suffix}`;
+        valueRef.current = next;
+        setValue(next);
+        focusInput(true, next.length);
+      },
+      getValue: () => valueRef.current,
+    };
     if (onSetValueRef) {
-      onSetValueRef.current = (newValue: string) => {
-        setValue(newValue);
-        textareaRef.current?.focus();
-      };
+      onSetValueRef.current = setInputValue;
+    }
+    if (onInputApiRef) {
+      onInputApiRef.current = api;
     }
     return () => {
       if (onSetValueRef) onSetValueRef.current = undefined;
+      if (onInputApiRef) onInputApiRef.current = undefined;
     };
-  }, [onSetValueRef]);
+  }, [onInputApiRef, onSetValueRef]);
 
   // Sync external ref
   useEffect(() => {
@@ -133,6 +178,7 @@ export function ChatInput({
     if (loading) return;
     sentRef.current = true;
     onSend(message, files.length > 0 ? [...files] : undefined);
+    valueRef.current = '';
     setValue('');
     setFiles([]);
     setFileError(null);
@@ -184,6 +230,7 @@ export function ChatInput({
   };
 
   const insertTemplate = (template: string) => {
+    valueRef.current = template;
     setValue(template);
     textareaRef.current?.focus();
   };
@@ -238,6 +285,7 @@ export function ChatInput({
           value={value}
           onChange={(event) => {
             sentRef.current = false;
+            valueRef.current = event.target.value;
             setValue(event.target.value);
           }}
           onKeyDown={handleKeyDown}

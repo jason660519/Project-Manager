@@ -4,7 +4,7 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-05-25T23:47:13.000Z",
+    "generatedAt": "2026-05-27T02:01:12.000Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
@@ -990,7 +990,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "table"
       ],
       "warnings": [],
-      "updatedAt": "2026-05-25T18:35:35.000Z"
+      "updatedAt": "2026-05-27T02:01:12.000Z"
     },
     {
       "id": "archive/archived-20260512-05-adr-tauri",
@@ -1529,7 +1529,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "table"
       ],
       "warnings": [],
-      "updatedAt": "2026-05-25T18:35:35.000Z"
+      "updatedAt": "2026-05-27T02:01:12.000Z"
     },
     {
       "id": "engineering/table-standards",
@@ -2788,7 +2788,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "Mentions secrets, tokens, or credentials",
         "Mentions roadmap, pricing, investor, or strategy material"
       ],
-      "updatedAt": "2026-05-25T23:47:13.000Z"
+      "updatedAt": "2026-05-27T02:01:12.000Z"
     },
     {
       "id": "project-process/commands/debug-retro",

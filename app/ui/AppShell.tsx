@@ -22,25 +22,38 @@ export function AppShell({
   activeRunCount,
   chatContext,
 }: AppShellProps) {
+  const isXmux = currentView === 'xmux';
+
   return (
     <I18nProvider>
-    <main className="min-h-screen text-stone-100" style={{ background: 'var(--pm-bg)' }}>
+    <main
+      className={`${isXmux ? 'h-screen overflow-hidden' : 'min-h-screen'} text-stone-100`}
+      style={{ background: 'var(--pm-bg)' }}
+    >
       {/* Grid noise layer */}
       <div className="fixed inset-0 pm-bg-noise" />
       {/* Radial glow layer — theme-aware via CSS vars */}
       <div className="fixed inset-0 pm-bg-glow" />
-      <div className="relative grid min-h-screen grid-cols-1 lg:grid-cols-[180px_minmax(0,1fr)]">
+      <div
+        className={`relative grid grid-cols-1 lg:grid-cols-[180px_minmax(0,1fr)] ${
+          isXmux ? 'h-full min-h-0 overflow-hidden' : 'min-h-screen'
+        }`}
+      >
         <Sidebar
           currentView={currentView}
           bridgeStatus={bridgeStatus}
           activeRunCount={activeRunCount}
           chatContext={chatContext}
         />
-        <div className="flex min-w-0 flex-col border-l border-stone-200/15">
+        <div
+          className={`flex min-w-0 flex-col border-l border-stone-200/15 ${
+            isXmux ? 'min-h-0 overflow-hidden' : ''
+          }`}
+        >
           <TopBar currentView={currentView} activeRunCount={activeRunCount} chatContext={chatContext} />
           <div
             className={
-              currentView === 'xmux'
+              isXmux
                 ? 'flex-1 min-h-0 overflow-hidden'
                 : 'flex-1 overflow-y-auto px-5 py-5'
             }

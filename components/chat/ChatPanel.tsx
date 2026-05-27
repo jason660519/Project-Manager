@@ -6,7 +6,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { sendChatMessage } from '../../lib/chat/chatAgent';
 import type { ChatContext, ChatMessage } from '../../lib/chat/types';
 import { useI18n } from '../../lib/i18n';
-import { ChatInput, type AttachedFile } from './ChatInput';
+import { ChatInput, type AttachedFile, type ChatInputApi } from './ChatInput';
+import {
+  formatXmuxSelectedElementSnippet,
+  isXmuxSelectedElementPayload,
+  type XmuxSelectedElementSnippetPayload,
+} from '../../lib/xmux/selectedElementSnippet';
 import { ChatMessage as ChatMessageView } from './ChatMessage';
 import { ChatSettings } from './ChatSettings';
 import { QuickActions } from './QuickActions';
@@ -21,7 +26,10 @@ interface ChatPanelProps {
   defaultExpanded?: boolean;
   /** When provided, the panel renders as a floating window (no self-collapse). */
   toggleOpen?: (open: boolean) => void;
+  docked?: boolean;
 }
+
+type XmuxSelectedElementPayload = XmuxSelectedElementSnippetPayload;
 
 function makeMessage(role: ChatMessage['role'], content: string, status?: ChatMessage['status']): ChatMessage {
   return {
@@ -35,7 +43,7 @@ function makeMessage(role: ChatMessage['role'], content: string, status?: ChatMe
 
 // ────────────────────────────────────────────────────────────────────────────
 
-export function ChatPanel({ context, defaultExpanded = false, toggleOpen }: ChatPanelProps) {
+export function ChatPanel({ context, defaultExpanded = false, toggleOpen, docked = false }: ChatPanelProps) {
   const { t } = useI18n();
   const router = useRouter();
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -57,6 +65,7 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen }: Chat
   });
   const scrollRef = useRef<HTMLDivElement>(null);
   const setInputValueRef = useRef<((v: string) => void) | undefined>(undefined);
+  const inputApiRef = useRef<ChatInputApi | undefined>(undefined);
 
   // Load saved settings
   useEffect(() => {
@@ -75,6 +84,21 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen }: Chat
       scrollRef.current.scrollIntoView({ block: 'end' });
     }
   }, [messages, loading, expanded]);
+
+  useEffect(() => {
+    if (!docked || typeof window === 'undefined') return;
+    const handleSelectedElement = (event: Event) => {
+      const detail = (event as CustomEvent<XmuxSelectedElementPayload>).detail;
+      if (!isXmuxSelectedElementPayload(detail)) return;
+      const api = inputApiRef.current;
+      if (api) {
+        const snippet = formatXmuxSelectedElementSnippet(detail);
+        api.appendValue(snippet);
+      }
+    };
+    window.addEventListener('pm:xmux-selected-element', handleSelectedElement);
+    return () => window.removeEventListener('pm:xmux-selected-element', handleSelectedElement);
+  }, [docked]);
 
   const handleStreamSend = useCallback(async (content: string, files?: AttachedFile[]) => {
     if (loading) return;
@@ -185,9 +209,22 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen }: Chat
   }
 
   return (
-    <div className="w-[340px] max-w-[calc(100vw-24px)] rounded border border-stone-200/15 bg-stone-950/95 shadow-2xl shadow-black/40 backdrop-blur animate-in fade-in slide-in-from-bottom-2 duration-200">
+    <div
+      className={[
+        docked
+          ? 'flex h-full min-h-0 w-full flex-col overflow-hidden'
+          : 'flex h-full min-h-0 w-full flex-col overflow-hidden rounded shadow-2xl shadow-black/40 backdrop-blur',
+        'border border-stone-200/15 bg-stone-950/95 animate-in fade-in slide-in-from-bottom-2 duration-200',
+      ].join(' ')}
+    >
       {/* ── Header (drag handle) ────────────────────────────────────────── */}
-      <div data-drag-handle className="flex h-10 items-center gap-2 border-b border-stone-200/15 px-3 cursor-grab active:cursor-grabbing select-none">
+      <div
+        data-drag-handle={!docked ? true : undefined}
+        className={[
+          'flex h-10 shrink-0 items-center gap-2 border-b border-stone-200/15 px-3 select-none',
+          docked ? '' : 'cursor-grab active:cursor-grabbing',
+        ].join(' ')}
+      >
         <Bot size={14} className="text-amber-200/80" />
         <h2 className="min-w-0 flex-1 truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-100">
           {t.chat.title}
@@ -220,7 +257,11 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen }: Chat
       </div>
 
       {/* ── Messages ────────────────────────────────────────────────────── */}
-      <div className="max-h-80 min-h-48 overflow-y-auto p-2">
+      <div
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2"
+        aria-label="AI Assistant conversation"
+        data-testid="chat-message-scroll"
+      >
         {messages.length === 0 ? (
           <div className="rounded border border-dashed border-stone-200/15 bg-white/[0.02] p-3 text-[11px] leading-relaxed text-stone-400">
             {t.chat.welcome}
@@ -252,7 +293,7 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen }: Chat
       </div>
 
       {/* ── Input ───────────────────────────────────────────────────────── */}
-      <div className="border-t border-stone-200/15 p-2">
+      <div className="shrink-0 border-t border-stone-200/15 p-2">
         <ChatInput
           placeholder={t.chat.placeholder}
           sendLabel={t.chat.send}
@@ -260,6 +301,7 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen }: Chat
           loading={loading}
           onSend={handleStreamSend}
           onSetValueRef={setInputValueRef}
+          onInputApiRef={inputApiRef}
           beforeArea={
             <QuickActions
               onAction={(template) => {

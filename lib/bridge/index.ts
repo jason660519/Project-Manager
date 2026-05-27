@@ -192,6 +192,51 @@ export async function xmuxWebviewNavigate(label: string, url: string): Promise<v
   return invoke<void>('xmux_webview_navigate', { label, url });
 }
 
+export async function xmuxWebviewCurrentUrl(label: string): Promise<string> {
+  if (!isTauri()) throw new Error('xmuxWebviewCurrentUrl requires Tauri runtime');
+  return invoke<string>('xmux_webview_current_url', { label });
+}
+
+export async function xmuxWebviewReload(label: string): Promise<void> {
+  if (!isTauri()) throw new Error('xmuxWebviewReload requires Tauri runtime');
+  return invoke<void>('xmux_webview_reload', { label });
+}
+
+export async function xmuxWebviewEval(label: string, script: string): Promise<void> {
+  if (!isTauri()) throw new Error('xmuxWebviewEval requires Tauri runtime');
+  return invoke<void>('xmux_webview_eval', { label, script });
+}
+
+export async function xmuxWebviewConsoleEntries(label: string): Promise<string> {
+  if (!isTauri()) throw new Error('xmuxWebviewConsoleEntries requires Tauri runtime');
+  return invoke<string>('xmux_webview_console_entries', { label });
+}
+
+export async function xmuxWebviewClearConsole(label: string): Promise<void> {
+  if (!isTauri()) throw new Error('xmuxWebviewClearConsole requires Tauri runtime');
+  return invoke<void>('xmux_webview_clear_console', { label });
+}
+
+export async function xmuxWebviewSelectElement(label: string): Promise<string> {
+  if (!isTauri()) throw new Error('xmuxWebviewSelectElement requires Tauri runtime');
+  return invoke<string>('xmux_webview_select_element', { label });
+}
+
+export async function xmuxWebviewSetZoom(label: string, scaleFactor: number): Promise<void> {
+  if (!isTauri()) throw new Error('xmuxWebviewSetZoom requires Tauri runtime');
+  return invoke<void>('xmux_webview_set_zoom', { label, scaleFactor });
+}
+
+export async function xmuxWebviewClearBrowsingData(label: string): Promise<void> {
+  if (!isTauri()) throw new Error('xmuxWebviewClearBrowsingData requires Tauri runtime');
+  return invoke<void>('xmux_webview_clear_browsing_data', { label });
+}
+
+export async function xmuxWebviewClearCookies(label: string): Promise<void> {
+  if (!isTauri()) throw new Error('xmuxWebviewClearCookies requires Tauri runtime');
+  return invoke<void>('xmux_webview_clear_cookies', { label });
+}
+
 export async function xmuxWebviewDestroy(label: string): Promise<void> {
   if (!isTauri()) throw new Error('xmuxWebviewDestroy requires Tauri runtime');
   return invoke<void>('xmux_webview_destroy', { label });

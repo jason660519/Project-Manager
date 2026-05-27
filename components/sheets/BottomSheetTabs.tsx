@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { clsx } from 'clsx';
-import { GripVertical } from 'lucide-react';
+import { GripVertical, X } from 'lucide-react';
 import {
   moveSheetTab,
   normalizeSheetOrder,
@@ -31,6 +31,7 @@ export interface SheetTabItem<Key extends string> {
   iconClassName?: string;
   ariaLabel?: string;
   title?: string;
+  closeAriaLabel?: string;
 }
 
 export interface BottomSheetTabsProps<Key extends string> {
@@ -46,6 +47,8 @@ export interface BottomSheetTabsProps<Key extends string> {
   /** localStorage key used when reorderable tabs should persist per page. */
   orderStorageKey?: string;
   onOrderChange?: (order: Key[]) => void;
+  /** Optional close action for sheet tabs that represent dismissible workspaces. */
+  onClose?: (key: Key) => void;
 }
 
 export function BottomSheetTabs<Key extends string>({
@@ -56,6 +59,7 @@ export function BottomSheetTabs<Key extends string>({
   reorderable = false,
   orderStorageKey,
   onOrderChange,
+  onClose,
 }: BottomSheetTabsProps<Key>) {
   const defaultOrderKey = tabs.map((tab) => tab.key).join('\u0000');
   const defaultOrder = React.useMemo(() => tabs.map((tab) => tab.key), [defaultOrderKey]);
@@ -165,6 +169,97 @@ export function BottomSheetTabs<Key extends string>({
           const active = tab.key === activeKey;
           const isDragging = draggingKey === tab.key;
           const isDropTarget = dropTargetKey === tab.key && draggingKey !== tab.key;
+          const tabClassName = clsx(
+            'relative flex transform-gpu select-none items-center gap-2 whitespace-nowrap border-r border-stone-200/15 px-4 py-2.5 text-sm font-medium transition-[background-color,border-color,box-shadow,color,opacity,transform] duration-150 ease-out last:border-r-0 motion-reduce:transform-none motion-reduce:transition-none',
+            reorderable && 'cursor-grab active:cursor-grabbing',
+            active
+              ? tab.activeClassName ?? 'bg-emerald-600/85 text-white shadow-sm'
+              : 'text-stone-300/85 hover:bg-white/5 hover:text-stone-100',
+            isDragging && 'opacity-40',
+            isDropTarget && '-translate-y-0.5 ring-1 ring-inset ring-white/70',
+          );
+          const tabContents = (
+            <>
+              {reorderable && (
+                <GripVertical className="h-3.5 w-3.5 text-stone-400/80" aria-hidden="true" />
+              )}
+              {tab.icon && (
+                <span className={active ? 'text-current' : tab.iconClassName ?? 'text-amber-100'}>
+                  {tab.icon}
+                </span>
+              )}
+              <span>{tab.label}</span>
+              {tab.badge !== undefined && (
+                <span
+                  className={clsx(
+                    'ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none',
+                    active ? 'bg-white/25 text-white' : 'bg-stone-200/15 text-stone-100',
+                  )}
+                >
+                  {tab.badge}
+                </span>
+              )}
+              {active && <span className="absolute left-0 right-0 top-0 h-0.5 bg-white/60" />}
+            </>
+          );
+
+          if (onClose) {
+            return (
+              <div
+                key={tab.key}
+                aria-grabbed={reorderable ? isDragging : undefined}
+                title={tab.title ?? (reorderable ? `${tab.label} sheet. Drag to reorder.` : undefined)}
+                onPointerDown={(event) => {
+                  startDrag(tab.key, event.button, event.clientX, event.clientY);
+                }}
+                onPointerEnter={() => {
+                  enterDragTarget(tab.key);
+                }}
+                onMouseDown={(event) => {
+                  startDrag(tab.key, event.button, event.clientX, event.clientY);
+                }}
+                onMouseEnter={() => {
+                  enterDragTarget(tab.key);
+                }}
+                className={clsx(tabClassName, 'px-0')}
+              >
+                <button
+                  type="button"
+                  aria-label={tab.ariaLabel ?? `${tab.label} sheet`}
+                  onClick={(event) => {
+                    if (suppressClickRef.current) {
+                      event.preventDefault();
+                      suppressClickRef.current = false;
+                      return;
+                    }
+                    onSelect(tab.key);
+                  }}
+                  className="flex min-w-0 items-center gap-2 px-4 py-2.5 text-left"
+                >
+                  {tabContents}
+                </button>
+                <button
+                  type="button"
+                  aria-label={tab.closeAriaLabel ?? `Close ${tab.label} sheet`}
+                  title={tab.closeAriaLabel ?? `Close ${tab.label} sheet`}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onClose(tab.key);
+                  }}
+                  className={clsx(
+                    'mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm transition-colors',
+                    active
+                      ? 'text-white/70 hover:bg-white/15 hover:text-white'
+                      : 'text-stone-500 hover:bg-white/10 hover:text-stone-100',
+                  )}
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            );
+          }
+
           return (
             <button
               key={tab.key}
@@ -192,36 +287,9 @@ export function BottomSheetTabs<Key extends string>({
               onMouseEnter={() => {
                 enterDragTarget(tab.key);
               }}
-              className={clsx(
-                'relative flex transform-gpu select-none items-center gap-2 whitespace-nowrap border-r border-stone-200/15 px-4 py-2.5 text-sm font-medium transition-[background-color,border-color,box-shadow,color,opacity,transform] duration-150 ease-out last:border-r-0 motion-reduce:transform-none motion-reduce:transition-none',
-                reorderable && 'cursor-grab active:cursor-grabbing',
-                active
-                  ? tab.activeClassName ?? 'bg-emerald-600/85 text-white shadow-sm'
-                  : 'text-stone-300/85 hover:bg-white/5 hover:text-stone-100',
-                isDragging && 'opacity-40',
-                isDropTarget && '-translate-y-0.5 ring-1 ring-inset ring-white/70',
-              )}
+              className={tabClassName}
             >
-              {reorderable && (
-                <GripVertical className="h-3.5 w-3.5 text-stone-400/80" aria-hidden="true" />
-              )}
-              {tab.icon && (
-                <span className={active ? 'text-current' : tab.iconClassName ?? 'text-amber-100'}>
-                  {tab.icon}
-                </span>
-              )}
-              <span>{tab.label}</span>
-              {tab.badge !== undefined && (
-                <span
-                  className={clsx(
-                    'ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none',
-                    active ? 'bg-white/25 text-white' : 'bg-stone-200/15 text-stone-100',
-                  )}
-                >
-                  {tab.badge}
-                </span>
-              )}
-              {active && <span className="absolute left-0 right-0 top-0 h-0.5 bg-white/60" />}
+              {tabContents}
             </button>
           );
         })}

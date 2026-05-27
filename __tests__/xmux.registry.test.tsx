@@ -1,9 +1,13 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../components/terminal/TerminalSlot', () => ({
   TerminalSlot: () => <div data-testid="terminal-slot-mock" className="h-full min-h-0" />,
+}));
+
+vi.mock('../components/chat/ChatPanel', () => ({
+  ChatPanel: () => <div data-testid="xmux-sidebar-assistant-mock">AI Assistant docked chat</div>,
 }));
 
 import { createRuntimeAdapter, listAdapters } from '../lib/adapters/registry';
@@ -12,6 +16,7 @@ import { CURRENT_SCHEMA_VERSION } from '../lib/storage/migrate';
 import type { Feature, ProjectEntry, ProjectManagerConfig } from '../lib/types';
 import { XmuxView } from '../app/ui/views/XmuxView';
 import { __resetForTests as resetBrowserRegistry } from '../components/browser/BrowserRegistry';
+import { XMUX_LAYOUT_STORAGE_KEY } from '../lib/xmux/layoutPersistence';
 
 const feature: Feature = {
   id: 'F27',
@@ -131,12 +136,15 @@ describe('xmux registry integration', () => {
     expect(screen.getByText('Project Management')).toBeInTheDocument();
     // F29: TerminalSlot is stubbed in setup.ts; assert the mock placeholder.
     expect(screen.getAllByTestId('terminal-slot-mock').length).toBeGreaterThan(0);
-    // Initial split layout shows terminal and browser surfaces side-by-side.
+    // Initial split layout shows folder, browser, and terminal surfaces.
+    expect(screen.getAllByLabelText('Refresh folder tree').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByTitle('xmux browser pane')).toBeInTheDocument();
     expect(screen.getByLabelText('Notification panel')).toBeInTheDocument();
     expect(screen.getAllByLabelText('Close pane').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByLabelText('New terminal in this pane').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByLabelText('New browser tab').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByLabelText('New AI Assistant tab')).not.toBeInTheDocument();
+    expect(screen.getByTestId('xmux-sidebar-assistant-mock')).toBeInTheDocument();
   });
 
   it('makes the xmux pane controls interactive', async () => {
@@ -196,5 +204,92 @@ describe('xmux registry integration', () => {
     expect(screen.queryByText('Project A')).not.toBeInTheDocument();
     expect(screen.queryByText('Project C')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /顯示全部專案/i })).not.toBeInTheDocument();
+  });
+
+  it('switches and closes project workspace sheet tabs', async () => {
+    const user = userEvent.setup();
+    const projects = [
+      createProjectEntry('project-a', 'Project A'),
+      createProjectEntry('project-b', 'Project B'),
+    ];
+
+    render(
+      <XmuxView
+        projects={projects}
+        selectedDashboardProjectIds={['project-a', 'project-b']}
+        selectedProjectId="project-a"
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Project B workspace sheet' }));
+    expect(screen.getByText('Project B Workspace')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Close Project B workspace sheet' }));
+
+    expect(screen.queryByRole('button', { name: 'Project B workspace sheet' })).not.toBeInTheDocument();
+    expect(screen.getByText('Project A Workspace')).toBeInTheDocument();
+  });
+
+  it('resizes, closes, and reopens the AI Assistants dock', async () => {
+    const user = userEvent.setup();
+    render(<XmuxView />);
+
+    const resizeHandle = screen.getByRole('separator', { name: 'Resize AI Assistants panel' });
+    const dock = resizeHandle.closest('aside') as HTMLElement;
+    expect(dock.style.width).toBe('340px');
+
+    fireEvent.keyDown(window, { key: '+' });
+    expect(dock.style.width).toBe('372px');
+
+    fireEvent.keyDown(window, { key: '-' });
+    expect(dock.style.width).toBe('340px');
+
+    await user.click(screen.getByRole('button', { name: 'Close AI Assistants panel' }));
+    expect(screen.queryByTestId('xmux-sidebar-assistant-mock')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Open AI Assistants panel' }));
+    expect(screen.getByTestId('xmux-sidebar-assistant-mock')).toBeInTheDocument();
+  });
+
+  it('persists resized block layout and restores it after remounting xmux', async () => {
+    const project = createProjectEntry('project-layout', 'Project Layout');
+    const props = {
+      projects: [project],
+      selectedDashboardProjectIds: ['project-layout'],
+      selectedProjectId: 'project-layout',
+    };
+
+    const { unmount } = render(<XmuxView {...props} />);
+    const rootSeparator = screen.getAllByRole('separator', { name: 'Resize split' })[0];
+    const rootSplit = rootSeparator.parentElement as HTMLElement;
+    rootSplit.getBoundingClientRect = () =>
+      ({
+        x: 0,
+        y: 0,
+        left: 0,
+        top: 0,
+        right: 1000,
+        bottom: 600,
+        width: 1000,
+        height: 600,
+        toJSON: () => {},
+      }) as DOMRect;
+
+    fireEvent.mouseDown(rootSeparator, { clientX: 280, clientY: 10 });
+    fireEvent.mouseMove(document, { clientX: 620, clientY: 10 });
+    fireEvent.mouseUp(document);
+
+    await waitFor(() => {
+      const raw = window.localStorage.getItem(XMUX_LAYOUT_STORAGE_KEY);
+      expect(raw).toBeTruthy();
+      const saved = JSON.parse(raw ?? '{}');
+      expect(saved.workspaces['project-layout'].layout.ratio).toBe(0.62);
+    });
+
+    unmount();
+    render(<XmuxView {...props} />);
+
+    const restoredSeparator = screen.getAllByRole('separator', { name: 'Resize split' })[0];
+    expect((restoredSeparator.previousElementSibling as HTMLElement).style.width).toBe('62%');
   });
 });

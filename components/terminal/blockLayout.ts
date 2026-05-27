@@ -105,16 +105,33 @@ export function createBlock(seed?: BlockItem): Block {
   return { id: uniqueId('block'), items: [item], activeItemId: item.id };
 }
 
-// First-time layout for a workspace: terminal (left) + browser (right) so both
-// surfaces are visible without hunting through tabs.
-export function createInitialLayout(homepageUrl: string): LayoutNode {
+// First-time layout for a workspace: project folder, browser, and terminal are
+// all visible without hunting through tabs.
+export function createInitialLayout(
+  homepageUrl: string,
+  projectRootPath: string = '',
+  projectRootPathError?: string,
+): LayoutNode {
+  const folderBlock = createBlock(
+    createFolderItem(projectRootPath, undefined, projectRootPathError),
+  );
+  const browserBlock = createBlock(createBrowserItem(homepageUrl));
+  const terminalBlock = createBlock(createTerminalItem());
+
   return {
     type: 'split',
     id: uniqueId('split'),
     direction: 'vertical',
-    ratio: 0.5,
-    first: { type: 'leaf', block: createBlock(createTerminalItem()) },
-    second: { type: 'leaf', block: createBlock(createBrowserItem(homepageUrl)) },
+    ratio: 0.28,
+    first: { type: 'leaf', block: folderBlock },
+    second: {
+      type: 'split',
+      id: uniqueId('split'),
+      direction: 'vertical',
+      ratio: 0.58,
+      first: { type: 'leaf', block: browserBlock },
+      second: { type: 'leaf', block: terminalBlock },
+    },
   };
 }
 
