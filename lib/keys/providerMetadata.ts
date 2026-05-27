@@ -14,6 +14,8 @@
  */
 
 const STORAGE_KEY = 'pm:keys-metadata';
+const MODEL_SUPPORT_STORAGE_KEY = 'pm:keys-validated-model-support';
+const METADATA_CHANGED_EVENT = 'pm:keys-metadata-changed';
 
 export interface ProviderMetadata {
   /** ISO 8601 timestamp of the last validation attempt. */
@@ -26,6 +28,14 @@ export interface ProviderMetadata {
 }
 
 export type ProviderMetadataMap = Record<string, ProviderMetadata>;
+
+export interface ValidatedModelSupportSummary {
+  generatedAt: string;
+  providers: Array<{ providerId: string; models: string[] }>;
+  totalModelCount: number;
+  uniqueModels: string[];
+  uniqueModelCount: number;
+}
 
 export interface ValidationFailureSummary {
   category:
@@ -62,6 +72,9 @@ function writeMap(map: ProviderMetadataMap): void {
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+    const summary = computeValidatedModelSupportSummary(map);
+    window.localStorage.setItem(MODEL_SUPPORT_STORAGE_KEY, JSON.stringify(summary));
+    window.dispatchEvent(new CustomEvent(METADATA_CHANGED_EVENT));
   } catch {
     // Quota exceeded or storage disabled — silent no-op is fine, the next
     // validation just won't be cached.
@@ -74,6 +87,19 @@ export function loadAllProviderMetadata(): ProviderMetadataMap {
 
 export function loadProviderMetadata(providerId: string): ProviderMetadata | null {
   return readMap()[providerId] ?? null;
+}
+
+export function loadValidatedModelSupportSummary(): ValidatedModelSupportSummary | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(MODEL_SUPPORT_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    return parsed as ValidatedModelSupportSummary;
+  } catch {
+    return null;
+  }
 }
 
 export function saveProviderMetadata(
@@ -91,6 +117,54 @@ export function clearProviderMetadata(providerId: string): void {
     delete map[providerId];
     writeMap(map);
   }
+}
+
+export function computeValidatedModelSupportSummary(
+  map: ProviderMetadataMap,
+): ValidatedModelSupportSummary {
+  const providers: Array<{ providerId: string; models: string[] }> = [];
+  const unique = new Set<string>();
+  let totalModelCount = 0;
+
+  Object.entries(map).forEach(([providerId, meta]) => {
+    if (meta?.status !== 'ok') return;
+    const models = meta.dynamicModels?.filter(Boolean) ?? [];
+    if (models.length === 0) return;
+    const deduped = Array.from(new Set(models));
+    providers.push({ providerId, models: deduped });
+    totalModelCount += deduped.length;
+    deduped.forEach((m) => unique.add(m));
+  });
+
+  providers.sort((a, b) => a.providerId.localeCompare(b.providerId));
+  const uniqueModels = Array.from(unique).sort((a, b) => a.localeCompare(b));
+
+  return {
+    generatedAt: new Date().toISOString(),
+    providers,
+    totalModelCount,
+    uniqueModels,
+    uniqueModelCount: uniqueModels.length,
+  };
+}
+
+export function subscribeProviderMetadataChanges(listener: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+
+  const handleStorage = (event: StorageEvent) => {
+    if (!event.key) return;
+    if (event.key === STORAGE_KEY || event.key === MODEL_SUPPORT_STORAGE_KEY) {
+      listener();
+    }
+  };
+
+  window.addEventListener(METADATA_CHANGED_EVENT, listener);
+  window.addEventListener('storage', handleStorage);
+
+  return () => {
+    window.removeEventListener(METADATA_CHANGED_EVENT, listener);
+    window.removeEventListener('storage', handleStorage);
+  };
 }
 
 /**

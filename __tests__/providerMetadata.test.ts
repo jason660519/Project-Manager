@@ -8,9 +8,11 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   clearProviderMetadata,
   classifyValidationFailure,
+  computeValidatedModelSupportSummary,
   formatRelativeTime,
   formatValidationFailure,
   loadAllProviderMetadata,
+  loadValidatedModelSupportSummary,
   loadProviderMetadata,
   maskKey,
   resolveModelList,
@@ -47,6 +49,13 @@ describe('providerMetadata storage', () => {
     expect(meta?.status).toBe('ok');
     expect(meta?.dynamicModels).toEqual(['claude-sonnet-4-6', 'claude-haiku-4-5']);
     expect(meta?.lastValidatedAt).toBe(now);
+
+    const support = loadValidatedModelSupportSummary();
+    expect(support?.providers).toEqual([
+      { providerId: 'anthropic', models: ['claude-sonnet-4-6', 'claude-haiku-4-5'] },
+    ]);
+    expect(support?.totalModelCount).toBe(2);
+    expect(support?.uniqueModelCount).toBe(2);
   });
 
   it('round-trips a failure entry with reason', () => {
@@ -67,12 +76,30 @@ describe('providerMetadata storage', () => {
     clearProviderMetadata('anthropic');
     expect(loadProviderMetadata('anthropic')).toBeNull();
     expect(loadProviderMetadata('openai')).not.toBeNull();
+
+    const support = loadValidatedModelSupportSummary();
+    expect(support?.providers).toEqual([]);
+    expect(support?.totalModelCount).toBe(0);
   });
 
   it('survives corrupted JSON by returning an empty map', () => {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem('pm:keys-metadata', '{not json');
     expect(loadAllProviderMetadata()).toEqual({});
+  });
+});
+
+describe('computeValidatedModelSupportSummary', () => {
+  it('counts ok providers with non-empty model lists only', () => {
+    const summary = computeValidatedModelSupportSummary({
+      anthropic: { lastValidatedAt: 't', status: 'ok', dynamicModels: ['a', 'a', 'b'] },
+      openai: { lastValidatedAt: 't', status: 'fail', errorReason: '401' },
+      gemini: { lastValidatedAt: 't', status: 'ok', dynamicModels: [] },
+    });
+    expect(summary.totalModelCount).toBe(2);
+    expect(summary.uniqueModelCount).toBe(2);
+    expect(summary.providers).toEqual([{ providerId: 'anthropic', models: ['a', 'b'] }]);
+    expect(summary.uniqueModels).toEqual(['a', 'b']);
   });
 });
 

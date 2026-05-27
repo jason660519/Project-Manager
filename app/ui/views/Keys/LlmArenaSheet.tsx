@@ -3,8 +3,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useKeysContext } from './KeysContext';
 import { useArenaChat } from './useArenaChat';
-import { listLlmProviders } from '../../../../lib/keys/llmProviders';
-import { hasProviderKey } from '../../../../lib/keys/loadProviderKey';
 import { useI18n } from '../../../../lib/i18n';
 import { LlmArenaMethodPanel } from './LlmArenaMethodPanel';
 import { LlmArenaMatrixTable } from './LlmArenaMatrixTable';
@@ -14,9 +12,9 @@ import { formatResultSummary, type EvaluationLevel, type RunHistoryEntry } from 
 export function LlmArenaSheet() {
   const { t } = useI18n();
   const copy = t.keysArena.llm;
-  const { llmState, setLlmState } = useKeysContext();
+  const { llmState, setLlmState, validatedLlmProviders } = useKeysContext();
   const { runComparison, results, clearResults, isRunning } = useArenaChat();
-  const allProviders = listLlmProviders();
+  const allProviders = validatedLlmProviders;
   const seenResultTimestampRef = useRef<Record<string, number>>({});
   const [enabledByIndex, setEnabledByIndex] = useState<Record<number, boolean>>({});
   const [evaluationByIndex, setEvaluationByIndex] = useState<Record<number, EvaluationLevel>>({});
@@ -24,7 +22,37 @@ export function LlmArenaSheet() {
   const [historyByResultKey, setHistoryByResultKey] = useState<Record<string, RunHistoryEntry[]>>({});
   const [selectedDetailIndex, setSelectedDetailIndex] = useState<number | null>(null);
   const [autoAddHint, setAutoAddHint] = useState<string>('');
-  const bootstrappedRef = useRef(false);
+  const autoAddSignatureRef = useRef<string>('');
+  const providersSignature = allProviders
+    .map((provider) => `${provider.id}:${provider.availableModels.join(',')}`)
+    .join('|');
+
+  useEffect(() => {
+    setLlmState((prev) => {
+      if (prev.selectedModels.length === 0) return prev;
+      if (allProviders.length === 0) {
+        return { ...prev, selectedModels: [] };
+      }
+
+      const allowedByProvider = new Map(allProviders.map((p) => [p.id, p.availableModels]));
+      const fallbackProvider = allProviders[0]?.id;
+      const fallbackModel = allProviders[0]?.availableModels[0] ?? '';
+
+      let changed = false;
+      const nextSelected = prev.selectedModels.map((spec) => {
+        const allowedModels = allowedByProvider.get(spec.provider);
+        if (allowedModels && allowedModels.includes(spec.model)) return spec;
+        changed = true;
+        if (allowedModels && allowedModels.length > 0) {
+          return { provider: spec.provider, model: allowedModels[0] };
+        }
+        return { provider: fallbackProvider, model: fallbackModel };
+      });
+
+      if (!changed) return prev;
+      return { ...prev, selectedModels: nextSelected.filter((spec) => Boolean(spec.model)) };
+    });
+  }, [providersSignature, allProviders.length, setLlmState]);
 
   useEffect(() => {
     setEnabledByIndex((prev) => {
@@ -103,6 +131,7 @@ export function LlmArenaSheet() {
 
   const addModel = () => {
     const defaultProvider = allProviders[0];
+    if (!defaultProvider) return;
     setLlmState((prev) => ({
       ...prev,
       selectedModels: [
@@ -191,8 +220,6 @@ export function LlmArenaSheet() {
     for (const providerId of rank) {
       const provider = providersById.get(providerId as any);
       if (!provider) continue;
-      const hasKey = await hasProviderKey(provider.id);
-      if (!hasKey) continue;
       const preferred = topModelByProvider[provider.id];
       const model =
         (preferred && provider.availableModels.includes(preferred) && preferred) ||
@@ -220,11 +247,12 @@ export function LlmArenaSheet() {
   };
 
   useEffect(() => {
-    if (bootstrappedRef.current) return;
     if (llmState.selectedModels.length > 0) return;
-    bootstrappedRef.current = true;
+    if (allProviders.length === 0) return;
+    if (autoAddSignatureRef.current === providersSignature) return;
+    autoAddSignatureRef.current = providersSignature;
     void handleAutoAddTopModels();
-  }, [llmState.selectedModels.length]);
+  }, [llmState.selectedModels.length, allProviders.length, providersSignature]);
 
   const selectedSpec = selectedDetailIndex !== null ? llmState.selectedModels[selectedDetailIndex] : undefined;
   const selectedResultKey =

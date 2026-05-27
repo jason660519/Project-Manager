@@ -1,8 +1,23 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import type { LlmProviderId } from '../../../../lib/keys/llmProviders';
 import type { KeysTab } from '../../../../lib/keys/sheetSlugs';
+import {
+  loadAllProviderMetadata,
+  loadValidatedModelSupportSummary,
+  subscribeProviderMetadataChanges,
+  type ProviderMetadataMap,
+  type ValidatedModelSupportSummary,
+} from '../../../../lib/keys/providerMetadata';
+import { listLlmProviders } from '../../../../lib/keys/llmProviders';
 
 // Re-export slug helpers + KeysTab so existing imports from this module keep
 // working. The constants themselves live in a server-safe module so
@@ -37,6 +52,15 @@ interface KeysContextType {
 
   vlmState: VlmArenaState;
   setVlmState: React.Dispatch<React.SetStateAction<VlmArenaState>>;
+
+  providerMetadata: ProviderMetadataMap;
+  validatedModelSupport: ValidatedModelSupportSummary | null;
+  validatedLlmProviders: ReadonlyArray<{
+    id: LlmProviderId;
+    label: string;
+    availableModels: string[];
+    defaultModel?: string;
+  }>;
 }
 
 const defaultLlmState: ArenaState = {
@@ -67,6 +91,38 @@ export function KeysProvider({
   const [activeTab, setActiveTab] = useState<KeysTab>(initialTab);
   const [llmState, setLlmState] = useState<ArenaState>(defaultLlmState);
   const [vlmState, setVlmState] = useState<VlmArenaState>(defaultVlmState);
+  const [providerMetadata, setProviderMetadata] = useState<ProviderMetadataMap>(() =>
+    loadAllProviderMetadata(),
+  );
+  const [validatedModelSupport, setValidatedModelSupport] = useState<ValidatedModelSupportSummary | null>(
+    () => loadValidatedModelSupportSummary(),
+  );
+
+  useEffect(() => {
+    return subscribeProviderMetadataChanges(() => {
+      setProviderMetadata(loadAllProviderMetadata());
+      setValidatedModelSupport(loadValidatedModelSupportSummary());
+    });
+  }, []);
+
+  const validatedLlmProviders = useMemo(() => {
+    const all = listLlmProviders();
+    return all
+      .map((provider) => {
+        const meta = providerMetadata[provider.id];
+        if (meta?.status !== 'ok') return null;
+        const models = meta.dynamicModels?.filter(Boolean) ?? [];
+        const deduped = Array.from(new Set(models));
+        if (deduped.length === 0) return null;
+        return {
+          id: provider.id,
+          label: provider.label,
+          availableModels: deduped,
+          defaultModel: provider.defaultModel,
+        };
+      })
+      .filter((p) => p !== null);
+  }, [providerMetadata]);
 
   return (
     <KeysContext.Provider
@@ -77,6 +133,9 @@ export function KeysProvider({
         setLlmState,
         vlmState,
         setVlmState,
+        providerMetadata,
+        validatedModelSupport,
+        validatedLlmProviders,
       }}
     >
       {children}
