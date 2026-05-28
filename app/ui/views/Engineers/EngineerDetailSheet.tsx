@@ -47,6 +47,7 @@ import type {
   RoleCapability,
   WorkingScope,
 } from '../../../../lib/types';
+import { AgentArchitecturePanel } from './AgentArchitecturePanel';
 import { slugColor, slugify } from './shared';
 
 // ── Form state ────────────────────────────────────────────────────────────────
@@ -55,6 +56,7 @@ interface FormState {
   name: string;
   slug: string;
   skills: string;
+  skillRefs: string;
   systemPrompt: string;
   defaultAgentId: string;
   notes: string;
@@ -76,6 +78,7 @@ function roleToForm(role: EngineerRole): FormState {
     name: role.name,
     slug: role.slug,
     skills: role.skills.join('\n'),
+    skillRefs: (role.skillRefs ?? []).join('\n'),
     systemPrompt: role.systemPrompt,
     defaultAgentId: role.defaultAgentId ?? '',
     notes: role.notes ?? '',
@@ -103,6 +106,10 @@ function formToRole(id: string, form: FormState, existing: EngineerRole): Engine
     name: form.name || 'Unnamed Role',
     slug: form.slug || slugify(form.name) || 'role',
     skills: form.skills.split('\n').map((s) => s.trim()).filter(Boolean),
+    skillRefs: (() => {
+      const refs = form.skillRefs.split('\n').map((s) => s.trim()).filter(Boolean);
+      return refs.length > 0 ? refs : undefined;
+    })(),
     commands: existing.commands,
     systemPrompt: form.systemPrompt,
     referenceFiles: existing.referenceFiles,
@@ -388,8 +395,23 @@ function EngineerDetailBody({ role, agents, onSave, onDelete }: EngineerDetailBo
         )}
       </div>
 
+      <AgentArchitecturePanel
+        form={{
+          defaultAgentId: form.defaultAgentId,
+          systemPrompt: form.systemPrompt,
+          skills: form.skills,
+          scopePaths: form.scopePaths,
+          scopeMode: form.scopeMode,
+          capabilities: form.capabilities,
+          testPrompt: form.testPrompt,
+          primaryProviderId: form.primaryProviderId,
+          fallbacksCount: form.fallbacks.length,
+        }}
+        agents={agents}
+      />
+
       {/* Basic */}
-      <div className="grid grid-cols-2 gap-3">
+      <div id="engineer-section-loop" className="scroll-mt-3 grid grid-cols-2 gap-3">
         <FormField label="Role Name">
           <input
             value={form.name}
@@ -422,7 +444,10 @@ function EngineerDetailBody({ role, agents, onSave, onDelete }: EngineerDetailBo
       )}
 
       {/* AI Model Configuration */}
-      <div className="space-y-3 border border-stone-200/15 bg-[rgb(var(--pm-card-3))]/40 p-3">
+      <div
+        id="engineer-section-model"
+        className="scroll-mt-3 space-y-3 border border-stone-200/15 bg-[rgb(var(--pm-card-3))]/40 p-3"
+      >
         <div className="flex items-center gap-2">
           <Bot size={13} className="text-stone-400" />
           <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">
@@ -576,13 +601,27 @@ function EngineerDetailBody({ role, agents, onSave, onDelete }: EngineerDetailBo
         </p>
       </div>
 
-      {/* Skills */}
+      {/* Skills + System Prompt — CONTEXT injection */}
+      <div id="engineer-section-context" className="scroll-mt-3 space-y-4">
       <FormField label="Skills" hint="(one per line)">
         <textarea
           rows={4}
           value={form.skills}
           onChange={set('skills')}
           placeholder={'React\nTypeScript\nTailwind CSS'}
+          className={`${inputCls} font-mono text-xs`}
+        />
+      </FormField>
+
+      <FormField
+        label="Skill refs"
+        hint="(SKILL.md paths, one per line — merged at dispatch)"
+      >
+        <textarea
+          rows={3}
+          value={form.skillRefs}
+          onChange={set('skillRefs')}
+          placeholder={'.agents/skills/workflow/ship/SKILL.md\n.claude/skills/investigate/SKILL.md'}
           className={`${inputCls} font-mono text-xs`}
         />
       </FormField>
@@ -597,9 +636,13 @@ function EngineerDetailBody({ role, agents, onSave, onDelete }: EngineerDetailBo
           className={`${inputCls} text-xs leading-5`}
         />
       </FormField>
+      </div>
 
       {/* Capabilities */}
-      <div className="space-y-3 border border-violet-300/15 bg-[rgb(var(--pm-card-3))]/45 p-3">
+      <div
+        id="engineer-section-capabilities"
+        className="scroll-mt-3 space-y-3 border border-violet-300/15 bg-[rgb(var(--pm-card-3))]/45 p-3"
+      >
         <div className="flex items-center gap-2">
           <Eye size={13} className="text-violet-300/80" />
           <span className="text-[11px] uppercase tracking-[0.14em] text-violet-200/85">
@@ -669,7 +712,10 @@ function EngineerDetailBody({ role, agents, onSave, onDelete }: EngineerDetailBo
       </div>
 
       {/* AI Provider Test */}
-      <div className="space-y-3 border border-cyan-300/15 bg-[rgb(var(--pm-card-3))]/55 p-3">
+      <div
+        id="engineer-section-test"
+        className="scroll-mt-3 space-y-3 border border-cyan-300/15 bg-[rgb(var(--pm-card-3))]/55 p-3"
+      >
         <div className="flex items-center gap-2">
           <Sparkles size={13} className="text-cyan-300/80" />
           <span className="text-[11px] uppercase tracking-[0.14em] text-cyan-200/85">
@@ -829,7 +875,10 @@ function EngineerDetailBody({ role, agents, onSave, onDelete }: EngineerDetailBo
       </div>
 
       {/* Working Scope */}
-      <div className="space-y-3 border border-stone-200/15 bg-[rgb(var(--pm-card-3))]/40 p-3">
+      <div
+        id="engineer-section-scope"
+        className="scroll-mt-3 space-y-3 border border-stone-200/15 bg-[rgb(var(--pm-card-3))]/40 p-3"
+      >
         <div className="flex items-center gap-2">
           <FolderLock size={13} className="text-stone-400" />
           <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">

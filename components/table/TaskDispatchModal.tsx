@@ -18,6 +18,7 @@ import {
   getAdapterExecutionKind,
 } from '../../lib/adapters/registry';
 import { listLlmProviders } from '../../lib/keys/llmProviders';
+import { prependAgentTeamContext } from '../../lib/dispatch/assembleAgentTeamPrompt';
 import { collectEnabledMcpServers } from '../../lib/storage/plugins';
 import { useI18n } from '../../lib/i18n';
 import { BottomSheetTabs, type SheetTabItem } from '../sheets/BottomSheetTabs';
@@ -247,7 +248,7 @@ export function TaskDispatchModal({
     return patch;
   }, [adapters, engineerRoles, feature, selectedPhase]);
 
-  const buildExecutionPrompt = useCallback((role: HarnessTaskRole, config: RoleConfigState): string => {
+  const buildExecutionPrompt = useCallback(async (role: HarnessTaskRole, config: RoleConfigState): Promise<string> => {
     let effectivePrompt = config.prompt;
     const engineerRole = engineerRoles.find((r) => r.id === config.selectedRoleId);
     const adapter = adapters.find((a) => a.id === config.selectedAdapterId);
@@ -258,29 +259,27 @@ export function TaskDispatchModal({
       effectivePrompt =
         `[Agent Model]\nModel Company: ${providerLabel}\nModel Model: ${engineerRole.primaryModel.modelId}\n\n---\n\n${effectivePrompt}`;
     }
+
+    const workingScopeBlock =
+      engineerRole?.workingScope && engineerRole.workingScope.allowedPaths.length > 0
+        ? `[Working Scope]\nOnly modify files within these paths:\n${engineerRole.workingScope.allowedPaths.map((p) => `- ${p}`).join('\n')}\nDo not create or edit files outside these directories.`
+        : undefined;
+
     if (engineerRole) {
-      const parts: string[] = [];
-      if (engineerRole.systemPrompt) {
-        parts.push(`[${d.engineerLabel}: ${engineerRole.name}]\n${engineerRole.systemPrompt}`);
-      }
-      if (engineerRole.referenceFiles.length > 0) {
-        parts.push(`${d.refsPrefix}\n${engineerRole.referenceFiles.map((f) => `- ${f}`).join('\n')}`);
-      }
-      if (engineerRole.workingScope && engineerRole.workingScope.allowedPaths.length > 0) {
-        parts.push(
-          `[Working Scope]\nOnly modify files within these paths:\n${engineerRole.workingScope.allowedPaths.map((p) => `- ${p}`).join('\n')}\nDo not create or edit files outside these directories.`,
-        );
-      }
-      if (parts.length > 0) {
-        effectivePrompt = `${parts.join('\n\n')}\n\n---\n\n${effectivePrompt}`;
-      }
+      effectivePrompt = await prependAgentTeamContext(projectRoot, engineerRole, effectivePrompt, {
+        engineerLabel: d.engineerLabel,
+        refsPrefix: d.refsPrefix,
+        harnessRole: role,
+        workingScopeBlock,
+      });
     }
+
     const selectedWorkflow = config.selectedWorkflowId ? getAgentWorkflowById(config.selectedWorkflowId) ?? null : null;
     if (selectedWorkflow) {
       effectivePrompt = buildAgentWorkflowPrompt(selectedWorkflow, feature, effectivePrompt);
     }
     return effectivePrompt;
-  }, [adapters, d, engineerRoles, feature, llmProviders]);
+  }, [adapters, d, engineerRoles, feature, llmProviders, projectRoot]);
 
   const dispatchRole = useCallback(async (role: HarnessTaskRole) => {
     const config = configByRole[role];
@@ -304,7 +303,7 @@ export function TaskDispatchModal({
         const runtimeAdapter = createRuntimeAdapterFromConfig(adapter);
         const result = await runtimeAdapter.execute({
           feature,
-          prompt: buildExecutionPrompt(role, config),
+          prompt: await buildExecutionPrompt(role, config),
           projectRoot,
         });
         if (!result.success || !result.command || !result.args) {
@@ -326,7 +325,7 @@ export function TaskDispatchModal({
       const runtimeAdapter = createRuntimeAdapterFromConfig(adapter);
       const result = await runtimeAdapter.execute({
         feature,
-        prompt: buildExecutionPrompt(role, config),
+        prompt: await buildExecutionPrompt(role, config),
         projectRoot,
       });
       if (!result.success || !result.command || !result.args) {
@@ -421,7 +420,7 @@ export function TaskDispatchModal({
       const runtimeAdapter = createRuntimeAdapterFromConfig(adapter);
       const result = await runtimeAdapter.execute({
         feature,
-        prompt: buildExecutionPrompt(activeRole, config),
+        prompt: await buildExecutionPrompt(activeRole, config),
         projectRoot,
       });
       if (!result.success || !result.command || !result.args) throw new Error(result.message ?? 'Unable to build command');

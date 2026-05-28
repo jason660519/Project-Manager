@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import sampleConfig1 from '../../config/samples/project-manager.sample.json';
 import sampleConfig2 from '../../config/samples/project-manager-self.sample.json';
 import { listAdapters } from '../../lib/adapters/registry';
@@ -32,23 +33,74 @@ import {
 } from '../../lib/types';
 import { AppShell } from './AppShell';
 import { ProjectProgressClient } from '../project-progress-dashboard/ProjectProgressClient';
-import { FeaturesView } from './views/FeaturesView';
-import { EngineersView } from './views/EngineersView';
-import { PluginsView } from './views/PluginsView';
-import { XmuxView } from './views/XmuxView';
 import { ProjectsView } from './views/ProjectsView';
-import { ChannelsView } from './views/ChannelsView';
-import { CronJobsView } from './views/CronJobsView';
-import { LogsView } from './views/LogsView';
-import { SessionsView } from './views/SessionsView';
-import { KeysView } from './views/KeysView';
-import { SettingsView } from './views/SettingsView';
-import { DocumentationView } from './views/DocumentationView';
-import { CompanyStandardsView } from './views/CompanyStandardsView';
 import { DOCUMENTATION_SITE_PUBLIC_MANIFEST } from '../../lib/generated/documentation-site-public';
-import { ChatPageClient } from '../chat/ChatPageClient';
-import { AIAssistantsConsoleClient } from '../ai_assistants/AIAssistantsConsoleClient';
 import type { AIAssistantSheetId } from '../../lib/ai-assistants/types';
+
+function RouteViewLoading() {
+  return (
+    <div className="flex h-full min-h-[240px] items-center justify-center rounded border border-stone-700/80 bg-editor-panel p-6 text-[13px] text-stone-400">
+      Loading view...
+    </div>
+  );
+}
+
+const FeaturesView = dynamic(
+  () => import('./views/FeaturesView').then((mod) => mod.FeaturesView),
+  { loading: RouteViewLoading },
+);
+const EngineersView = dynamic(
+  () => import('./views/EngineersView').then((mod) => mod.EngineersView),
+  { loading: RouteViewLoading },
+);
+const PluginsView = dynamic(
+  () => import('./views/PluginsView').then((mod) => mod.PluginsView),
+  { loading: RouteViewLoading },
+);
+const XmuxView = dynamic(
+  () => import('./views/XmuxView').then((mod) => mod.XmuxView),
+  { loading: RouteViewLoading },
+);
+const ChannelsView = dynamic(
+  () => import('./views/ChannelsView').then((mod) => mod.ChannelsView),
+  { loading: RouteViewLoading },
+);
+const CronJobsView = dynamic(
+  () => import('./views/CronJobsView').then((mod) => mod.CronJobsView),
+  { loading: RouteViewLoading },
+);
+const LogsView = dynamic(
+  () => import('./views/LogsView').then((mod) => mod.LogsView),
+  { loading: RouteViewLoading },
+);
+const SessionsView = dynamic(
+  () => import('./views/SessionsView').then((mod) => mod.SessionsView),
+  { loading: RouteViewLoading },
+);
+const KeysView = dynamic(
+  () => import('./views/KeysView').then((mod) => mod.KeysView),
+  { loading: RouteViewLoading },
+);
+const SettingsView = dynamic(
+  () => import('./views/SettingsView').then((mod) => mod.SettingsView),
+  { loading: RouteViewLoading },
+);
+const DocumentationView = dynamic(
+  () => import('./views/DocumentationView').then((mod) => mod.DocumentationView),
+  { loading: RouteViewLoading },
+);
+const CompanyStandardsView = dynamic(
+  () => import('./views/CompanyStandardsView').then((mod) => mod.CompanyStandardsView),
+  { loading: RouteViewLoading },
+);
+const ChatPageClient = dynamic(
+  () => import('../chat/ChatPageClient').then((mod) => mod.ChatPageClient),
+  { loading: RouteViewLoading },
+);
+const AIAssistantsConsoleClient = dynamic(
+  () => import('../ai_assistants/AIAssistantsConsoleClient').then((mod) => mod.AIAssistantsConsoleClient),
+  { loading: RouteViewLoading },
+);
 
 type BridgeFileNode = {
   name: string;

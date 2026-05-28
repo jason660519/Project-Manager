@@ -1,3 +1,4 @@
+import { AGENT_TEAM_DIR } from '../defaults/agentTeamProtocol';
 import { DEFAULT_ENGINEER_ROLES } from '../defaults/engineerRoles';
 import type { Feature, FeatureStatus, IDEId, ProjectManagerConfig } from '../types';
 import { CURRENT_SCHEMA_VERSION, migrateConfig } from './migrate';
@@ -7,6 +8,7 @@ import { mergeEngineerRolesById } from './mergeEngineerRoles';
 export const SCAFFOLD_DOC_DIRS = [
   '.project-manager/features',
   '.project-manager/dev-logs',
+  AGENT_TEAM_DIR,
 ] as const;
 
 export const DEFAULT_DEV_LOG_FOLDER = '.project-manager/dev-logs/';

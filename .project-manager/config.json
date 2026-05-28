@@ -1086,6 +1086,38 @@
         ],
         "kickoffAt": "2026-05-28T00:00:00.000Z"
       }
+    },
+    {
+      "id": "F36",
+      "name": "Performance Baseline, Route Splitting & xmux Smoothness",
+      "category": "Frontend/UI",
+      "status": "in_progress",
+      "progress": 60,
+      "phase": "development",
+      "points": 5,
+      "locatedSection": "app/ui/MainClient.tsx",
+      "readmePath": ".project-manager/features/F36/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F36/",
+        "spec": ".project-manager/features/F36/feature-spec.md",
+        "tdd": ".project-manager/features/F36/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F36/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F36/",
+        "implementation": "app/ui/MainClient.tsx",
+        "test": "__tests__/MainClient.lazy-routes.test.tsx"
+      },
+      "notes": "Measured performance checkpoint focused on reducing inactive route code loaded through MainClient, preserving deep-link route props, and preparing targeted xmux smoothness follow-ups before broad dead-code cleanup.",
+      "createdAt": "2026-05-28T01:29:41.000Z",
+      "updatedAt": "2026-05-28T01:35:00.000Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "app/ui/MainClient.tsx",
+          "__tests__/MainClient.lazy-routes.test.tsx",
+          ".project-manager/features/F36/dev-log.md"
+        ],
+        "kickoffAt": "2026-05-28T01:29:41.000Z"
+      }
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",

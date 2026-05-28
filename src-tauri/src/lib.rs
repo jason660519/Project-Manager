@@ -212,6 +212,7 @@ async fn initialize_project(
         dashboard_dir.clone(),
         dashboard_dir.join("features"),
         dashboard_dir.join("dev-logs"),
+        dashboard_dir.join("agent-team"),
     ];
     let mut created_dirs: Vec<String> = Vec::new();
     for dir in &scaffold_dirs {

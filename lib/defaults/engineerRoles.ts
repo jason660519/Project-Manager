@@ -1,5 +1,7 @@
 import type { EngineerRole, ModelFallbackEntry } from '../types';
 
+import { engineerSystemPrompt } from './agentArchitecturePrompt';
+
 const DEFAULT_PRIMARY_MODEL = { providerId: 'openai', modelId: 'gpt-5.5' };
 const DEFAULT_FALLBACKS: ModelFallbackEntry[] = [
   { providerId: 'gemini',    modelId: 'gemini-2.5-flash' },
@@ -14,9 +16,11 @@ export const DEFAULT_ENGINEER_ROLES: EngineerRole[] = [
     name: 'Frontend Engineer',
     slug: 'frontend',
     skills: ['React', 'TypeScript', 'Tailwind CSS', 'Next.js'],
+    skillRefs: ['.claude/skills/table-and-sheet-layout/SKILL.md'],
     commands: ['npm run dev', 'npm run typecheck', 'npm run build'],
-    systemPrompt:
+    systemPrompt: engineerSystemPrompt(
       "You are a senior frontend engineer specializing in React and TypeScript. Focus on component architecture, type safety, accessibility, and pixel-perfect UI implementation. Follow the project's existing patterns and conventions. Prefer composition over inheritance, keep components small and focused.",
+    ),
     referenceFiles: ['CLAUDE.md'],
     notes: '',
     primaryModel: DEFAULT_PRIMARY_MODEL,
@@ -28,8 +32,9 @@ export const DEFAULT_ENGINEER_ROLES: EngineerRole[] = [
     slug: 'backend',
     skills: ['Node.js', 'TypeScript', 'REST API', 'PostgreSQL'],
     commands: ['npm run dev', 'npm run test'],
-    systemPrompt:
+    systemPrompt: engineerSystemPrompt(
       'You are a senior backend engineer. Focus on API design, data modeling, security, and performance. Write well-tested, maintainable server-side code. Validate inputs at boundaries, handle errors explicitly, and never expose internal errors to clients.',
+    ),
     referenceFiles: ['CLAUDE.md'],
     notes: '',
     primaryModel: DEFAULT_PRIMARY_MODEL,
@@ -41,8 +46,9 @@ export const DEFAULT_ENGINEER_ROLES: EngineerRole[] = [
     slug: 'fullstack',
     skills: ['React', 'Node.js', 'TypeScript', 'PostgreSQL', 'REST API'],
     commands: ['npm run dev', 'npm run typecheck'],
-    systemPrompt:
+    systemPrompt: engineerSystemPrompt(
       'You are a senior full-stack engineer comfortable with both frontend and backend. Balance UI quality with solid API design and data integrity. Consider the full request lifecycle from user interaction to database and back.',
+    ),
     referenceFiles: ['CLAUDE.md'],
     notes: '',
     primaryModel: DEFAULT_PRIMARY_MODEL,
@@ -53,9 +59,15 @@ export const DEFAULT_ENGINEER_ROLES: EngineerRole[] = [
     name: 'QA Engineer',
     slug: 'qa',
     skills: ['Testing', 'Playwright', 'Vitest', 'Test Planning', 'E2E'],
+    skillRefs: [
+      '.claude/skills/investigate/SKILL.md',
+      '.claude/skills/ship/SKILL.md',
+      '.claude/skills/pre-landing-review/SKILL.md',
+    ],
     commands: ['npm run test', 'npx playwright test'],
-    systemPrompt:
-      'You are a senior QA engineer. Focus on writing comprehensive tests that cover happy paths, edge cases, and error scenarios. Prefer integration tests over pure mocks. Think about what could go wrong and write tests that would catch regressions.',
+    systemPrompt: engineerSystemPrompt(
+      'You are a senior QA engineer. Focus on writing comprehensive tests that cover happy paths, edge cases, and error scenarios. Prefer integration tests over pure mocks. Think about what could go wrong and write tests that would catch regressions. Treat EVALUATOR and STOP POLICY as your primary job: every dispatch should end with evidence (passing tests or a clear failure report).',
+    ),
     referenceFiles: ['CLAUDE.md'],
     notes: '',
     primaryModel: DEFAULT_PRIMARY_MODEL,
@@ -67,8 +79,9 @@ export const DEFAULT_ENGINEER_ROLES: EngineerRole[] = [
     slug: 'devops',
     skills: ['Docker', 'CI/CD', 'GitHub Actions', 'Infrastructure', 'Shell'],
     commands: ['docker build .', 'docker compose up', 'gh workflow run'],
-    systemPrompt:
-      'You are a senior DevOps engineer. Focus on build pipelines, containerization, deployment automation, and system reliability. Prefer declarative configuration. Make deployments repeatable and rollbacks easy.',
+    systemPrompt: engineerSystemPrompt(
+      'You are a senior DevOps engineer. Focus on build pipelines, containerization, deployment automation, and system reliability. Prefer declarative configuration. Make deployments repeatable and rollbacks easy. Prioritize HOOKS and STOP POLICY: pipelines must fail loudly, and rollbacks must be safe.',
+    ),
     referenceFiles: ['CLAUDE.md'],
     notes: '',
     primaryModel: DEFAULT_PRIMARY_MODEL,
@@ -86,9 +99,11 @@ export const DEFAULT_ENGINEER_ROLES: EngineerRole[] = [
       'Error Messages',
       'Tooling',
     ],
+    skillRefs: ['.claude/skills/docs-bilingual-governance/SKILL.md'],
     commands: ['npm run docs:check', 'npm run typecheck'],
-    systemPrompt:
+    systemPrompt: engineerSystemPrompt(
       'You are a senior Developer Experience (DX) specialist. Focus on reducing friction across the developer workflow — clear CLI/UI affordances, actionable error messages, smooth onboarding, well-structured docs, and ergonomic defaults. Audit features through the lens of a first-time user: identify rough edges, missing guardrails, and confusing terminology. Prefer small, polish-oriented improvements that compound over time.',
+    ),
     referenceFiles: ['CLAUDE.md'],
     notes: '',
     primaryModel: DEFAULT_PRIMARY_MODEL,

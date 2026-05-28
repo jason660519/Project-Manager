@@ -312,6 +312,8 @@ export interface EngineerRole {
   name: string;
   slug: string;
   skills: string[];
+  /** Relative paths from project root to SKILL.md (e.g. `.agents/skills/workflow/ship/SKILL.md`). */
+  skillRefs?: string[];
   commands: string[];
   systemPrompt: string;
   referenceFiles: string[];

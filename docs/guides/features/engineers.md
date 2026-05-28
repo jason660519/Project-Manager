@@ -105,13 +105,28 @@ If you have not added any roles yet, the header shows an extra **Initialize 6 De
 - DevOps Engineer
 - DevEx Engineer
 
-Each default carries a sensible slug, skills list, and starter system prompt that you can tweak. The button disappears once at least one role exists.
+Each default carries a sensible slug, skills list, and starter system prompt that you can tweak. Every default system prompt includes the shared **8-module agent operating contract** (`lib/defaults/agentArchitecturePrompt.ts`) — LOOP, HOOKS, STATE, EVALUATOR, STOP POLICY, SUBAGENT, CONTEXT, and TOOLS/MCP — followed by role-specific focus text. The button disappears once at least one role exists.
+
+Projects that already initialized roles keep their saved prompts; re-seed from defaults only if you want the new architecture block on disk (edit manually or replace roles via config).
 
 You can also create roles manually with **+ Add Role** — that adds an empty `New Role` and immediately opens the detail sheet for editing.
 
 ## Engineer Detail sheet
 
 Clicking a row opens a right-side slide-in panel (`EngineerDetailSheet`). The panel scrolls independently and saves through the parent — clicking elsewhere on the overlay closes it.
+
+At the top of the panel, expand **Agent Architecture** to see the eight-module autonomous-agent map (LOOP, HOOKS, STATE, EVALUATOR, STOP POLICY, SUBAGENT, CONTEXT, TOOLS/MCP). Each spoke links to the matching form section and shows whether this role is **configured**, **partial**, a **platform** concern, or a **gap**. CONTEXT and TOOLS/MCP are highlighted because most dispatch quality issues trace to prompt injection and capability assignment.
+
+| Module | Maps to in this sheet | Owned by |
+|---|---|---|
+| LOOP | Default Agent | Role |
+| HOOKS | — | Platform (Cursor hooks, PM skills) |
+| STATE M. | Working Scope paths + mode | Role |
+| EVALUATOR | AI Provider Test prompt + Run Test | Role |
+| STOP POLICY | Primary model + fallbacks (partial); verify/stop rules | Role + platform (`ship` skill) |
+| SUBAGENT | Default Agent runtime (Task / subagent) | Role + adapter |
+| CONTEXT | System Prompt, Skills, Working Scope | Role |
+| TOOLS / MCP | Capabilities + Ability / Tools sheet | Role + Integrations Hub |
 
 The detail body is broken into seven sections:
 
@@ -189,12 +204,24 @@ The footer carries three actions:
 
 The unsaved-state indicator (`unsaved`) appears in the header while edits are pending.
 
+## Agent Team files (protocol + skills)
+
+Each project can define team collaboration under `.project-manager/agent-team/`:
+
+| File | Purpose |
+|---|---|
+| `protocol.md` | Collaboration rules — when to **broadcast** vs **private (DM)**, handoff format, planner/worker/evaluator duties |
+| `.agents/skills/**/SKILL.md` | Project-scoped skill packs (tool steps, task division) |
+| `.claude/skills/**/SKILL.md` | Also scanned when present (e.g. Claude Code skills in the repo) |
+
+On first dispatch, Project Manager creates `protocol.md` from the bundled template if the file is missing. Engineer roles may list explicit paths in **`skillRefs`** (relative to project root); otherwise skills are matched from the role's **Skills** textarea labels against skill frontmatter names and tags.
+
 ## How roles are used at dispatch time
 
 When you open the Task Dispatch modal from anywhere (Dashboard or Features), the **Engineer** dropdown lists every saved role. Picking one:
 
 1. Pre-selects the role's **Default Agent** if any.
-2. Injects the **System Prompt** into the agent's prompt.
+2. Merges dispatch context in order: **protocol.md** → **role system prompt** → matched **SKILL.md** bodies → reference files → working scope → task body.
 3. Adds a working-scope reminder when scope paths are set (warning banner in `strict` mode).
 4. Routes through the role's **Primary Model** when the dispatch is a direct AI call (not a CLI agent).
 5. Surfaces a coloured slug chip on the resulting row so you can see at a glance who is on which feature.
