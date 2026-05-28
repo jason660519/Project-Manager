@@ -1,7 +1,8 @@
 import type { ArenaResult } from './useArenaChat';
 import type { Translations } from '../../../../lib/i18n';
+import type { LlmArenaEvaluationLevel, LlmArenaResultRow } from './LlmArenaEvaluation';
 
-export type EvaluationLevel = 'pending' | 'pass' | 'warning' | 'fail';
+export type EvaluationLevel = LlmArenaEvaluationLevel;
 export type InvocationPath = 'cli' | 'http';
 export type ExecutionPlane = 'vendor_saas' | 'on_prem' | 'unknown';
 export type LlmArenaCopy = Translations['keysArena']['llm'];
@@ -12,6 +13,10 @@ export interface RunHistoryEntry {
   latencyMs: number;
   inputTokens: number;
   outputTokens: number;
+  evaluationLevel?: EvaluationLevel;
+  evaluationMessage?: string;
+  overallScore?: number;
+  resultRow?: LlmArenaResultRow;
   error?: string;
 }
 
@@ -67,8 +72,10 @@ export function buildHistoryMarkdown(provider: string, model: string, entries: R
   if (entries.length === 0) {
     lines.push(`| - | ${copy.historyEmptyRow} | - | - | - |`);
   } else {
-    entries.forEach((entry) => {
-      const summary = entry.summary.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+  entries.forEach((entry) => {
+      const score = entry.overallScore == null ? '-' : String(entry.overallScore);
+      const evaluation = entry.evaluationLevel ? `${entry.evaluationLevel}: ${entry.evaluationMessage ?? ''}` : '-';
+      const summary = `${evaluation} | score=${score} | ${entry.summary}`.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
       lines.push(
         `| ${new Date(entry.timestamp).toISOString()} | ${summary} | ${entry.latencyMs} | ${entry.inputTokens} | ${entry.outputTokens} |`,
       );

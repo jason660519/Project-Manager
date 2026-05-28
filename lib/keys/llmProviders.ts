@@ -107,7 +107,18 @@ const PROVIDERS: LlmProviderSpec[] = [
     baseUrl: 'https://api.openai.com/v1',
     defaultModel: 'gpt-4o',
     tierModel: 'gpt-4o',
-    availableModels: ['gpt-5.5', 'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'o1', 'o1-mini', 'gpt-3.5-turbo'],
+    availableModels: [
+      'gpt-5.5',
+      'gpt-4o',
+      'gpt-4o-mini',
+      'gpt-4-turbo',
+      'o1',
+      'o1-mini',
+      'gpt-image-2',
+      'gpt-image-1.5',
+      'gpt-image-1',
+      'gpt-3.5-turbo',
+    ],
   },
   {
     id: 'gemini',
@@ -122,6 +133,9 @@ const PROVIDERS: LlmProviderSpec[] = [
     defaultModel: 'gemini-2.5-flash',
     tierModel: 'gemini-1.5-pro-latest',
     availableModels: [
+      'gemini-3.1-flash-image-preview',
+      'gemini-3-pro-image-preview',
+      'gemini-2.5-flash-image',
       'gemini-2.5-flash',
       'gemini-2.5-pro',
       'gemini-1.5-pro-latest',
@@ -253,7 +267,7 @@ const PROVIDERS: LlmProviderSpec[] = [
     // DashScope's OpenAI-compatible mode is the easiest entry point.
     baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     defaultModel: 'qwen-plus',
-    availableModels: ['qwen-plus', 'qwen-max', 'qwen-turbo', 'qwen-long'],
+    availableModels: ['qwen-image-2.0-pro', 'qwen-plus', 'qwen-max', 'qwen-turbo', 'qwen-long'],
   },
   {
     // Hugging Face Inference Providers gateway exposes a unified

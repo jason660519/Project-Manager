@@ -3,6 +3,7 @@
 import React from 'react';
 import type { ArenaModelSpec, ArenaResult } from './useArenaChat';
 import { buildHistoryMarkdown, type LlmArenaCopy, type RunHistoryEntry } from './LlmArenaTypes';
+import { buildLlmArenaHistoryMarkdown } from './LlmArenaEvaluation';
 
 interface LlmArenaDetailSheetProps {
   copy: LlmArenaCopy;
@@ -22,6 +23,7 @@ export function LlmArenaDetailSheet({
   onClose,
 }: LlmArenaDetailSheetProps) {
   if (selectedIndex === null || !selectedSpec) return null;
+  const latestResultRow = selectedHistory[0]?.resultRow;
 
   return (
     <div className="fixed inset-0 z-40 bg-black/40 p-4" onClick={onClose}>
@@ -39,9 +41,23 @@ export function LlmArenaDetailSheet({
           <section>
             <h4 className="mb-1 text-[11px] uppercase tracking-[0.14em] text-stone-400">Raw Output</h4>
             <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words border border-stone-200/12 bg-black/30 p-3 text-[11px] text-stone-200">
-              {selectedResult ? selectedResult.error ?? selectedResult.content ?? '—' : '—'}
+              {latestResultRow?.raw_output || (selectedResult ? selectedResult.error ?? selectedResult.content ?? '—' : '—')}
             </pre>
           </section>
+          {latestResultRow ? (
+            <section>
+              <h4 className="mb-1 text-[11px] uppercase tracking-[0.14em] text-stone-400">Evaluation Result</h4>
+              <div className="grid grid-cols-2 gap-2 rounded-sm border border-stone-200/12 bg-black/20 p-3 text-xs text-stone-300 sm:grid-cols-3">
+                <p><span className="text-stone-500">level</span><br />{latestResultRow.evaluation_level}</p>
+                <p><span className="text-stone-500">overall</span><br />{latestResultRow.overall_score}</p>
+                <p><span className="text-stone-500">HTTP</span><br />{latestResultRow.http_status ?? '—'}</p>
+                <p><span className="text-stone-500">quality</span><br />{latestResultRow.quality_score}</p>
+                <p><span className="text-stone-500">stability</span><br />{latestResultRow.stability_score}</p>
+                <p><span className="text-stone-500">compliance</span><br />{latestResultRow.compliance_score}</p>
+              </div>
+              <p className="mt-2 text-xs text-stone-300">{latestResultRow.evaluation_message}</p>
+            </section>
+          ) : null}
           <section>
             <h4 className="mb-1 text-[11px] uppercase tracking-[0.14em] text-stone-400">Rendered Output</h4>
             <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words border border-emerald-300/20 bg-emerald-500/10 p-3 text-[11px] text-stone-100">
@@ -54,7 +70,9 @@ export function LlmArenaDetailSheet({
               <button
                 type="button"
                 onClick={() => {
-                  const md = buildHistoryMarkdown(selectedSpec.provider, selectedSpec.model, selectedHistory, copy);
+                  const md = latestResultRow
+                    ? buildLlmArenaHistoryMarkdown(latestResultRow)
+                    : buildHistoryMarkdown(selectedSpec.provider, selectedSpec.model, selectedHistory, copy);
                   const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a');
@@ -85,7 +103,12 @@ export function LlmArenaDetailSheet({
                         <td className="whitespace-nowrap px-3 py-3 text-xs text-stone-400">
                           {new Date(entry.timestamp).toLocaleString()}
                         </td>
-                        <td className="px-3 py-3 text-xs text-stone-200">{entry.summary}</td>
+                        <td className="px-3 py-3 text-xs text-stone-200">
+                          <p>{entry.evaluationMessage ?? entry.summary}</p>
+                          {entry.overallScore != null ? (
+                            <p className="mt-1 font-mono text-[10px] text-stone-500">overall {entry.overallScore}</p>
+                          ) : null}
+                        </td>
                         <td className="px-3 py-3 text-xs font-mono text-stone-400">{entry.latencyMs}ms</td>
                         <td className="px-3 py-3 text-xs font-mono text-stone-400">
                           {entry.inputTokens}↓ {entry.outputTokens}↑

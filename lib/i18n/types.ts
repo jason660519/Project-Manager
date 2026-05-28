@@ -558,10 +558,6 @@ export interface Translations {
       inputTitle: string;
       uploadImage: string;
       removeUploadedImage: string;
-      imageDetail: string;
-      imageDetailLow: string;
-      imageDetailHigh: string;
-      methodTitle: string;
       tableTitle: string;
       clearResults: string;
       addModel: string;
@@ -638,11 +634,6 @@ export interface Translations {
           instruction: string;
         };
       };
-      methodRows: Array<{
-        dimension: string;
-        observe: string;
-        passRule: string;
-      }>;
     };
   };
   codeEditor: {

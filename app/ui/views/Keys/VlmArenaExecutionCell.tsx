@@ -7,7 +7,7 @@ import { getVlmScenarioItems, vlmStatusMeta, type ScenarioId, type VlmArenaCopy 
 
 interface VlmArenaExecutionCellProps {
   result?: ArenaResult;
-  isRunning: boolean;
+  rowRunning?: boolean;
   imageDataUrl: string | null;
   hasUserPrompt: boolean;
   scenario: ScenarioId;
@@ -18,7 +18,7 @@ interface VlmArenaExecutionCellProps {
 
 export function VlmArenaExecutionCell({
   result,
-  isRunning,
+  rowRunning,
   imageDataUrl,
   hasUserPrompt,
   scenario,
@@ -47,11 +47,11 @@ export function VlmArenaExecutionCell({
       <td className="px-3 py-2">
         <button
           onClick={onRunSingle}
-          disabled={isRunning || !imageDataUrl || !hasUserPrompt}
+          disabled={rowRunning || !imageDataUrl || !hasUserPrompt}
           className="inline-flex h-7 items-center gap-1 rounded border border-emerald-200/25 bg-emerald-100/10 px-2 text-[11px] font-medium text-emerald-100 hover:bg-emerald-100/18 disabled:opacity-40"
           title={copy.runSingleTitle}
         >
-          {isRunning ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
+          {rowRunning ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
           {copy.columns.run}
         </button>
       </td>

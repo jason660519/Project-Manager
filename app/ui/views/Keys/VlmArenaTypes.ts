@@ -13,6 +13,10 @@ export interface RunHistoryEntry {
   scenario: ScenarioId;
   prompt: string;
   result: ArenaResult;
+  resultImage2dUrl?: string;
+  resultImage3dUrl?: string;
+  message?: string;
+  httpStatus?: number | null;
 }
 
 export interface ProviderLike {

@@ -4,19 +4,19 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-05-28T03:09:20.000Z",
+    "generatedAt": "2026-05-28T21:11:37.000Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
     "manifestAudience": "internal",
-    "totalDocuments": 76,
+    "totalDocuments": 79,
     "totalFolders": 12,
     "publicDocuments": 24,
-    "internalDocuments": 51,
+    "internalDocuments": 54,
     "restrictedDocuments": 1,
     "publishableDocuments": 9,
-    "reviewRequiredDocuments": 44,
-    "warningCount": 99
+    "reviewRequiredDocuments": 47,
+    "warningCount": 106
   },
   "folders": [
     {
@@ -26,7 +26,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "sourcePath": "docs",
       "label": "All Docs",
       "title": "Documentation",
-      "summary": "76 documentation files indexed from docs.",
+      "summary": "79 documentation files indexed from docs.",
       "parentSlug": null,
       "folderSlugs": [
         "architecture",
@@ -44,14 +44,14 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       ],
       "classificationCounts": {
         "public": 24,
-        "internal": 51,
+        "internal": 54,
         "restricted": 1
       },
       "publishableCount": 9,
-      "reviewRequiredCount": 44,
+      "reviewRequiredCount": 47,
       "visibilityCounts": {
         "public": 24,
-        "internal": 51,
+        "internal": 54,
         "restricted": 1
       },
       "warnings": [
@@ -419,7 +419,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "sourcePath": "docs/project-process",
       "label": "Project Process",
       "title": "Project Process",
-      "summary": "11 documentation files indexed from docs/project-process.",
+      "summary": "14 documentation files indexed from docs/project-process.",
       "parentSlug": "",
       "folderSlugs": [
         "project-process/commands"
@@ -430,24 +430,28 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "project-process/2026-05-19-execution-target-dispatch-update",
         "project-process/2026-05-24-commercial-readiness-status",
         "project-process/2026-05-25-commercial-readiness-update",
-        "project-process/2026-05-28-xmux-select-element-verification"
+        "project-process/2026-05-28-xmux-select-element-verification",
+        "project-process/2026-05-29-llm-arena-evaluation-validation-report",
+        "project-process/2026-05-29-llm-arena-reference-flow",
+        "project-process/2026-05-29-vlm-image-to-image-evaluation-report"
       ],
       "classificationCounts": {
         "public": 0,
-        "internal": 11,
+        "internal": 14,
         "restricted": 0
       },
       "publishableCount": 0,
-      "reviewRequiredCount": 6,
+      "reviewRequiredCount": 9,
       "visibilityCounts": {
         "public": 0,
-        "internal": 11,
+        "internal": 14,
         "restricted": 0
       },
       "warnings": [
         "Mentions secrets, tokens, or credentials",
         "Mentions local key storage",
         "Mentions execution or command policy",
+        "Mentions local service ports",
         "Mentions roadmap, pricing, investor, or strategy material"
       ]
     },
@@ -1031,7 +1035,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "table"
       ],
       "warnings": [],
-      "updatedAt": "2026-05-27T21:42:55.000Z"
+      "updatedAt": "2026-05-28T20:10:59.000Z"
     },
     {
       "id": "archive/archived-20260512-05-adr-tauri",
@@ -1570,7 +1574,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "table"
       ],
       "warnings": [],
-      "updatedAt": "2026-05-27T02:01:12.000Z"
+      "updatedAt": "2026-05-28T20:10:59.000Z"
     },
     {
       "id": "engineering/table-standards",
@@ -2894,6 +2898,112 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "updatedAt": "2026-05-28T02:14:54.000Z"
     },
     {
+      "id": "project-process/2026-05-29-llm-arena-evaluation-validation-report",
+      "slug": "project-process/2026-05-29-llm-arena-evaluation-validation-report",
+      "route": "/documentation/project-process/2026-05-29-llm-arena-evaluation-validation-report",
+      "sourcePath": "docs/project-process/2026-05-29-llm-arena-evaluation-validation-report.md",
+      "folderSlug": "project-process",
+      "folderPath": "docs/project-process",
+      "title": "LLM Arena Evaluation Validation Report",
+      "summary": "Implemented a Project Manager local-first adaptation of the reference LLM capability evaluation flow. - Added `LlmArenaEvaluation.ts` as the scoring and evaluation source of truth. - Adde...",
+      "content": "# LLM Arena Evaluation Validation Report\n\n> Date: 2026-05-29  \n> Scope: Keys / LLM Arena full evaluation logic alignment  \n> Reference page: `http://localhost:3001/superadmin/settings/api_key_and_model_setting#evaluations-global`\n\n## Change Summary\n\nImplemented a Project Manager local-first adaptation of the reference LLM capability evaluation flow.\n\n- Added `LlmArenaEvaluation.ts` as the scoring and evaluation source of truth.\n- Added configurable LLM Arena parameters: temperature, max tokens, timeout, sample count, and scoring profile.\n- Extended `useArenaChat` results with requested/effective model, output lines, HTTP status, retry count, error type, and timeout handling.\n- Connected automatic evaluation to LLM Arena history and table rendering.\n- Extended detail/export output to include the aligned result-row contract and five score dimensions.\n- Added unit coverage for pass, explicit empty output, fallback warning, self-report mismatch, and result-row formatting.\n\n## Scenario Coverage\n\n| Scenario | Verification |\n| --- | --- |\n| Normal model evaluation | Unit test verifies matched requested/effective model and meaningful self-report output returns `pass` and high score. |\n| Abnormal empty/fallback output | Unit test verifies explicit empty-output/fallback text returns `fail` and quality score `0`. |\n| Fallback model mismatch | Unit test verifies requested/effective mismatch returns `warning` with compliance score `90`. |\n| Self-reported version mismatch | Unit test verifies MiniMax M2.7 request self-reporting M2.1 returns `fail` unless covered by the known M2.5/M2.1 exception. |\n| Timeout classification | `useArenaChat` wraps provider calls with `timeoutMs` and classifies timeout/abort as `timeout`. |\n| Concurrent runs | LLM Arena tracks `runningIndexes` per row and `runSelectedRows` uses `Promise.allSettled` for selected rows. |\n| Output format | Unit test verifies result row includes `arena`, `interface`, `task_bucket`, scores, token totals, hashes, and evaluation fields. |\n\n## Reference Alignment Notes\n\n- The reference system supports CLI and HTTP adapter channels. Project Manager Keys LLM Arena currently has a direct HTTP provider path only, so `interface` is emitted as `raw_api`.\n- The reference stores history in Supabase. Project Manager keeps this module local-first and persists current results/history through local storage.\n- The reference exact pass/warning/fail text and model self-report parsing are reused in Project Manager, with a score layer added from the existing Project Manager `llm-vlm-arena-evaluation-spec-v1`.\n- No secret values are rendered or exported.\n\n## Verification Commands\n\nCompleted in this implementation pass:\n\n```bash\nnpm run test -- __tests__/keys.llm-arena-evaluation.test.ts __tests__/keys.llm-arena-model-selection.test.tsx __tests__/keys.context-persistence.test.tsx\nnpm run typecheck\nnpm run docs:check\nnpm run docs:site:sync\nnpm run docs:site:check\nnpm run standards:check\nnpm run build\n```\n\nResults:\n\n- `npm run test -- ...`: 3 files passed, 12 tests passed.\n- `npm run typecheck`: route types generated and `tsc --noEmit` passed.\n- `npm run docs:check`: docs governance passed.\n- `npm run docs:site:sync`: synced 79 internal-preview docs and 9 public docs.\n- `npm run docs:site:check`: manifests are current.\n- `npm run standards:check`: `P0=0 P1=0 P2=0`.\n- `npm run build`: production build passed, static routes generated.\n",
+      "contentHash": "59babb9c557522ea",
+      "readingMinutes": 3,
+      "classification": "internal",
+      "classificationSource": "policy",
+      "classificationConfidence": 0.96,
+      "classificationReason": "Project process, logs, archive, and feature-tracking docs are internal operating records.",
+      "matchedPolicyRule": "CLS-INTERNAL-PROCESS",
+      "publish": false,
+      "reviewStatus": "ai-classified",
+      "needsReview": true,
+      "visibility": "internal",
+      "audience": [
+        "team",
+        "operators"
+      ],
+      "tags": [
+        "project-process",
+        "table"
+      ],
+      "warnings": [
+        "Mentions secrets, tokens, or credentials",
+        "Mentions local service ports"
+      ],
+      "updatedAt": "2026-05-28T21:11:37.000Z"
+    },
+    {
+      "id": "project-process/2026-05-29-llm-arena-reference-flow",
+      "slug": "project-process/2026-05-29-llm-arena-reference-flow",
+      "route": "/documentation/project-process/2026-05-29-llm-arena-reference-flow",
+      "sourcePath": "docs/project-process/2026-05-29-llm-arena-reference-flow.md",
+      "folderSlug": "project-process",
+      "folderPath": "docs/project-process",
+      "title": "LLM Arena Reference Flow Breakdown",
+      "summary": "The reference LLM capability evaluation is an adapter-driven global worksheet. 1. Input rows are imported from CLI Adapter and HTTP Adapter tables. 2. Each row carries provider, adapter i...",
+      "content": "# LLM Arena Reference Flow Breakdown\n\n> Date: 2026-05-29  \n> Reference: `/Volumes/KLEVV-4T-1/Real Estate Management Projects/Owner-Property-Management-AI-SPA/apps/superadmin`  \n> Page: `http://localhost:3001/superadmin/settings/api_key_and_model_setting#evaluations-global`\n\n## Business Flow\n\nThe reference LLM capability evaluation is an adapter-driven global worksheet.\n\n1. Input rows are imported from CLI Adapter and HTTP Adapter tables.\n2. Each row carries provider, adapter id, requested model, prompt, optional file name, run status, raw output, rendered output, HTTP metrics, and history metadata.\n3. Rows with no prior run are shown as pending. Rows with previous output are included only when `evaluateAdapterRun` returns `pass`, unless the row is currently `running` or `paused`.\n4. A single-row run dispatches to the source adapter engine by `adapterChannel` and `adapterItemId`.\n5. Bulk run starts all CLI adapters, waits until all settle, then starts all HTTP adapters and waits until all settle.\n6. The active run endpoint keeps an in-memory per-user run map keyed by `userId:adapterId`, streams logs, records command preview, and exposes polling by cursor.\n7. CLI mode spawns the configured CLI command and retries only through CLI fallback models.\n8. HTTP mode calls provider endpoints directly and retries only through HTTP fallback models.\n9. On completion, the run is evaluated, persisted to `adapter_evaluation_runs`, mirrored into LLM observability, and surfaced back to the global table through a summary API.\n10. The final UI renders raw output, rendered output, evaluation level/message, TTFT, E2E, throughput, HTTP status, total run count, recent history, full server history, and Markdown export.\n\n## Validation Rules\n\nReference validation is conservative:\n\n- Missing adapter id/provider rejects the run.\n- Concurrent run on the same user/adapter returns conflict.\n- Strict preflight rejects unsupported Anthropic, Gemini, and OpenAI/Codex models when the validation cache has a closed model list.\n- Empty output, explicit fallback failure text, missing API key messages, timeout/abort messages, and HTTP failure text cannot count as valid model output.\n- Rendered output must have at least 8 meaningful non-space characters.\n- Effective model must be available before final pass.\n- Requested/effective model mismatch is a warning, not a silent pass.\n- Raw output must contain meaningful non-meta content before final pass.\n- Model self-introduction is parsed by known family aliases. Version mismatch fails, except the known MiniMax M2.5 to M2.1 OpenRouter route quirk is downgraded to warning.\n- GPT-5 requests that self-report GPT-4 are warnings because provider display language may be stale.\n\n## Metrics And Parameters\n\nProject Manager maps the reference behavior into a local LLM Arena evaluation config:\n\n| Parameter | Reference behavior | Project Manager mapping |\n| --- | --- | --- |\n| `promptTemplateVersion` | Prompt identity is tracked implicitly by adapter prompt text | `llm-identity-v1` |\n| `sampleCount` | History counts repeated rounds; reference rows show 8-14 rounds | Configurable 1-10 trials |\n| `timeoutMs` | HTTP: 25s default, 120s for GPT-5/Ollama | Configurable 5s-180s, default 120s |\n| `maxTokens` | HTTP attempts use 320 or 2048 depending provider path | Configurable 64-8192, default 2048 |\n| `temperature` | Adapter prompt tests are deterministic/low variance | Default 0.2 |\n| `historyWindow` | Recent success window is 10 | 10 |\n| `maxParallelRuns` | Bulk starts rows concurrently then waits for settlement | 4 configured; UI uses per-row running state |\n\nThe score dimensions follow the existing Project Manager evaluation spec and are produced for every run:\n\n| Metric | Weight in `balanced_default` | Meaning |\n| --- | ---: | --- |\n| `quality_score` | 0.45 | Output quality and reference-rule level |\n| `stability_score` | 0.20 | Recent success-rate consistency |\n| `latency_score` | 0.15 | Normalized E2E latency versus timeout |\n| `cost_score` | 0.15 | Token-efficiency proxy versus max token budget |\n| `compliance_score` | 0.05 | Contract/model identity compliance |\n\nAdditional profiles:\n\n- `quality_first`: 0.55 quality, 0.20 stability, 0.10 latency, 0.10 cost, 0.05 compliance.\n- `cost_latency_first`: 0.30 quality, 0.20 stability, 0.25 latency, 0.20 cost, 0.05 compliance.\n\n## Storage And Output Contract\n\nThe reference system stores completed runs in Supabase and exposes summaries through `/api/ai-settings/adapter-evaluation-runs`.\n\nProject Manager is currently local-first in this Keys surface. The adapted LLM Arena stores the latest run results and capped history in browser local storage, then emits a reference-aligned logical row:\n\n- identity: `run_id`, `arena`, `task_id`, `task_bucket`, `model_id`, `provider`, `interface`\n- reproducibility: prompt version, prompt/input/output hashes, temperature, max tokens, timeout\n- telemetry: latency, prompt/completion/total tokens, HTTP status, retry count\n- scoring: five dimension scores plus overall score\n- error fields: `error_type`, `error_message`\n- review fields: `evaluation_level`, `evaluation_message`, `human_review_required`, `notes`\n- output fields: `raw_output`, `rendered_output`\n\n## Implementation Mapping\n\n| Reference file | Project Manager target |\n| --- | --- |\n| `adapter-evaluation.ts` | `app/ui/views/Keys/LlmArenaEvaluation.ts` |\n| `evaluations-global-columns.tsx` | `app/ui/views/Keys/LlmArenaMatrixTable.tsx` |\n| `EvaluationsGlobalPanel.tsx` | `app/ui/views/Keys/LlmArenaSheet.tsx` + detail sheet |\n| `adapter-runs/route.ts` | `useArenaChat` timeout/error/result normalization |\n| `adapter_evaluation_runs` summary/export | local history + Markdown export |\n\n",
+      "contentHash": "24a03cbed5208779",
+      "readingMinutes": 4,
+      "classification": "internal",
+      "classificationSource": "policy",
+      "classificationConfidence": 0.96,
+      "classificationReason": "Project process, logs, archive, and feature-tracking docs are internal operating records.",
+      "matchedPolicyRule": "CLS-INTERNAL-PROCESS",
+      "publish": false,
+      "reviewStatus": "ai-classified",
+      "needsReview": true,
+      "visibility": "internal",
+      "audience": [
+        "team",
+        "operators"
+      ],
+      "tags": [
+        "project-process",
+        "table"
+      ],
+      "warnings": [
+        "Mentions secrets, tokens, or credentials",
+        "Mentions local service ports",
+        "Mentions execution or command policy"
+      ],
+      "updatedAt": "2026-05-28T21:10:08.000Z"
+    },
+    {
+      "id": "project-process/2026-05-29-vlm-image-to-image-evaluation-report",
+      "slug": "project-process/2026-05-29-vlm-image-to-image-evaluation-report",
+      "route": "/documentation/project-process/2026-05-29-vlm-image-to-image-evaluation-report",
+      "sourcePath": "docs/project-process/2026-05-29-vlm-image-to-image-evaluation-report.md",
+      "folderSlug": "project-process",
+      "folderPath": "docs/project-process",
+      "title": "VLM Arena Image-to-Image Evaluation Alignment Report",
+      "summary": "The reference implementation evaluates image-to-image models as a row-based benchmark table: - The reference page itself redirects to login in the browser, so the implementation was decom...",
+      "content": "# VLM Arena Image-to-Image Evaluation Alignment Report\n\n> Date: 2026-05-29  \n> Scope: Keys / VLM Arena  \n> Reference: `http://localhost:3001/superadmin/settings/api_key_and_model_setting#image-to-image-evaluation`\n\n## Reference Decomposition\n\nThe reference implementation evaluates image-to-image models as a row-based benchmark table:\n\n| Area | Reference behavior |\n| --- | --- |\n| Eligible models | Only image-output capable models: Gemini image models, OpenAI `gpt-image*`, and Qwen `qwen-image*`. Vision-only chat models are excluded or coerced to a supported image model. |\n| Input | One uploaded floor-plan image is applied to evaluation rows. Accepted source image types are image data URLs from JPG / PNG / WebP / GIF. |\n| Prompt construction | Prompt is built from real-estate floor-plan conversion role, style prompt, output-mode prompt, and hard constraints: no invented rooms, preserve entrance / wet areas / partitions / rough proportions, and mark uncertainty. |\n| Output modes | `2d`, `3d`, and `both`; default is `both`. In `both`, the runner makes separate 2D and 3D requests. |\n| Scoring / pass rule | A requested mode passes only when the provider returns an image URL/data URL for that mode. Text-only success is a failure with `未產圖：模型回傳文字但沒有圖片。`. |\n| Metrics | TTFT and throughput are not applicable and remain `—`; E2E ms and HTTP status are captured. |\n| Result format | Rows store raw text plus `resultImageUrl`, `resultImage2dUrl`, `resultImage3dUrl`, message, run status, E2E, HTTP status, last run time, and per-row history. |\n| Error handling | Missing image, provider failure, unsupported model, missing API key, and request errors become explicit failed row messages. |\n\n## Difference Checklist\n\n| Item | Previous Project Manager VLM Arena | Updated behavior |\n| --- | --- | --- |\n| Evaluation target | General VLM text + image reasoning scenarios | Image-to-image floor-plan generation benchmark |\n| Model list | All validated/registry VLM-capable providers could appear | Restricted to Gemini/OpenAI/Qwen image-output models |\n| Prompt | Scenario text appended to user prompt | Reference-compatible style + output + hard-constraint prompt |\n| Execution | One multimodal chat request per row | Separate 2D and 3D requests for `both` mode |\n| Success calculation | Any content without error counted as completed | All requested image URLs must exist |\n| Output columns | Text summary, latency, tokens, manual score | Raw output, 2D rendered, 3D rendered, status, E2E, HTTP |\n| Error handling | Generic arena error in result content | Explicit missing-image/provider/unsupported/key errors |\n\n## Changed Files\n\n| File | Change |\n| --- | --- |\n| `app/ui/views/Keys/VlmImageToImageEvaluation.ts` | Added reference-aligned image-to-image data model, model filtering, prompt builder, 2D/3D runner, provider image API adapters, and result scoring. |\n| `app/ui/views/Keys/VlmArenaSheet.tsx` | Rewired VLM Arena from text scenarios to row-based image-to-image evaluation state and parallel batch execution. |\n| `app/ui/views/Keys/VlmArenaMatrixTable.tsx` | Rebuilt table columns to show style/output/prompt/run/raw/2D/3D/E2E/HTTP/history. |\n| `app/ui/views/Keys/VlmArenaDetailSheet.tsx` | Updated detail sheet to show generated 2D/3D images, prompt, raw output, and run history. |\n| `app/ui/views/Keys/VlmArenaTypes.ts` | Extended run history with image URLs, message, and HTTP status. |\n| `lib/keys/llmProviders.ts` | Added curated image-output model IDs to Gemini, OpenAI, and Qwen provider registries. |\n| `lib/i18n/*` | Updated VLM Arena copy from generic VLM wording to image-to-image wording. |\n| `__tests__/keys.vlm-image-to-image-evaluation.test.ts` | Added prompt, model filtering, 2D/3D success, missing-image, and provider-error coverage. |\n\n## Verification\n\n| Command | Result |\n| --- | --- |\n| `npm test -- --run __tests__/keys.vlm-image-to-image-evaluation.test.ts` | Passed: 5 tests |\n| `npm test -- --run __tests__/keys.context-persistence.test.tsx __tests__/keys.llm-arena-model-selection.test.tsx __tests__/keys.vlm-image-to-image-evaluation.test.ts` | Passed: 3 files, 12 tests |\n| `npm run typecheck` | Passed |\n\n## Notes\n\n- The reference page itself redirects to login in the browser, so the implementation was decomposed from the local source checkout behind that route: `/Volumes/KLEVV-4T-1/Real Estate Management Projects/Owner-Property-Management-AI-SPA`.\n- Project Manager now contains client-side provider adapters for Gemini image output, OpenAI image edits, and Qwen multimodal generation, matching the reference request/response normalization.\n",
+      "contentHash": "14d67a607f64540e",
+      "readingMinutes": 3,
+      "classification": "internal",
+      "classificationSource": "policy",
+      "classificationConfidence": 0.96,
+      "classificationReason": "Project process, logs, archive, and feature-tracking docs are internal operating records.",
+      "matchedPolicyRule": "CLS-INTERNAL-PROCESS",
+      "publish": false,
+      "reviewStatus": "ai-classified",
+      "needsReview": true,
+      "visibility": "internal",
+      "audience": [
+        "team",
+        "operators"
+      ],
+      "tags": [
+        "project-process",
+        "table"
+      ],
+      "warnings": [
+        "Mentions secrets, tokens, or credentials",
+        "Mentions local service ports"
+      ],
+      "updatedAt": "2026-05-28T20:57:57.000Z"
+    },
+    {
       "id": "project-process/commands/daily-report",
       "slug": "project-process/commands/daily-report",
       "route": "/documentation/project-process/commands/daily-report",
@@ -2925,7 +3035,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "Mentions secrets, tokens, or credentials",
         "Mentions roadmap, pricing, investor, or strategy material"
       ],
-      "updatedAt": "2026-05-27T02:01:12.000Z"
+      "updatedAt": "2026-05-28T20:10:59.000Z"
     },
     {
       "id": "project-process/commands/debug-retro",
@@ -3138,6 +3248,9 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
     "project-process/2026-05-24-commercial-readiness-status",
     "project-process/2026-05-25-commercial-readiness-update",
     "project-process/2026-05-28-xmux-select-element-verification",
+    "project-process/2026-05-29-llm-arena-evaluation-validation-report",
+    "project-process/2026-05-29-llm-arena-reference-flow",
+    "project-process/2026-05-29-vlm-image-to-image-evaluation-report",
     "project-process/commands/daily-report",
     "project-process/commands/debug-retro",
     "project-process/commands/feature-kickoff",

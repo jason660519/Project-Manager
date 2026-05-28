@@ -4,6 +4,7 @@ import { getLlmProvider } from '../../../../lib/keys/llmProviders';
 import { loadProviderKey } from '../../../../lib/keys/loadProviderKey';
 import { callSingleProvider } from '../../../../lib/scanner/runProjectScan';
 import type { AnthropicMessage } from '../../../../lib/bridge';
+import { classifyLlmArenaError, type LlmArenaErrorType } from './LlmArenaEvaluation';
 
 export interface ArenaModelSpec {
   provider: LlmProviderId;
@@ -15,6 +16,12 @@ export interface ArenaResult {
   model: string;
   content?: string;
   error?: string;
+  requestedModel?: string;
+  effectiveModel?: string;
+  outputLines?: string[];
+  httpStatus?: number | null;
+  retryCount?: number;
+  errorType?: LlmArenaErrorType;
   latencyMs: number;
   inputTokens?: number;
   outputTokens?: number;
@@ -27,8 +34,20 @@ export interface UseArenaChatConfig {
   userPrompt: string;
   temperature?: number;
   maxTokens?: number;
+  timeoutMs?: number;
   imageDataUrl?: string | null;
   imageDetail?: 'auto' | 'low' | 'high';
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return promise;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId);
+  });
 }
 
 export function useArenaChat(storageKey?: string) {
@@ -57,6 +76,7 @@ export function useArenaChat(storageKey?: string) {
       userPrompt,
       temperature,
       maxTokens,
+      timeoutMs,
       imageDataUrl,
       imageDetail = 'auto',
     }: UseArenaChatConfig) => {
@@ -134,22 +154,33 @@ export function useArenaChat(storageKey?: string) {
             messages = [{ role: 'user', content: contentBlocks }];
           }
 
-          const response = await callSingleProvider(
-            spec.provider,
-            apiKey,
-            messages,
-            spec.model,
-            temperature,
-            maxTokens
+          const response = await withTimeout(
+            callSingleProvider(
+              spec.provider,
+              apiKey,
+              messages,
+              spec.model,
+              temperature,
+              maxTokens
+            ),
+            timeoutMs ?? 0,
+            `${spec.provider}/${spec.model}`,
           );
           const latencyMs = Math.round(performance.now() - start);
+          const outputLines = response.content.split(/\r?\n/).filter(Boolean);
 
           setResults((prev) => ({
             ...prev,
             [resultKey]: {
               provider: spec.provider,
               model: spec.model,
+              requestedModel: spec.model,
+              effectiveModel: response.model,
               content: response.content,
+              outputLines,
+              httpStatus: 200,
+              retryCount: 0,
+              errorType: response.content.trim() ? 'none' : 'empty_output',
               inputTokens: response.inputTokens,
               outputTokens: response.outputTokens,
               latencyMs,
@@ -158,12 +189,19 @@ export function useArenaChat(storageKey?: string) {
           }));
         } catch (error) {
           const latencyMs = Math.round(performance.now() - start);
+          const errorMessage = error instanceof Error ? error.message : String(error);
           setResults((prev) => ({
             ...prev,
             [resultKey]: {
               provider: spec.provider,
               model: spec.model,
-              error: error instanceof Error ? error.message : String(error),
+              requestedModel: spec.model,
+              effectiveModel: '',
+              outputLines: [errorMessage],
+              httpStatus: null,
+              retryCount: 0,
+              errorType: classifyLlmArenaError(error),
+              error: errorMessage,
               latencyMs,
               timestamp: Date.now(),
             },

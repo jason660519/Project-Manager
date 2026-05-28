@@ -1159,6 +1159,38 @@
         "kickoffAt": "2026-05-28T09:46:39.051Z",
         "resumedAt": "2026-05-28T10:26:18.362Z"
       }
+    },
+    {
+      "id": "F38",
+      "name": "API Key Quick-Validate Panel",
+      "category": "Frontend/UI",
+      "status": "in_progress",
+      "progress": 10,
+      "phase": "development",
+      "points": 3,
+      "locatedSection": "app/ui/views/Keys/ApiKeyValidationSheet.tsx",
+      "readmePath": ".project-manager/features/F38/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F38/",
+        "spec": ".project-manager/features/F38/feature-spec.md",
+        "tdd": ".project-manager/features/F38/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F38/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F38/",
+        "implementation": "app/ui/views/Keys/ApiKeyValidationSheet.tsx",
+        "test": "__tests__/api-key-validation-panel.test.tsx"
+      },
+      "notes": "Quick-validate panel with manual key input, format check, and /api/keys/validate integration",
+      "createdAt": "2026-05-28T19:55:55.856Z",
+      "updatedAt": "2026-05-28T19:55:55.856Z",
+      "updatedBy": "Claude",
+      "metadata": {
+        "evidencePaths": [
+          "app/ui/views/Keys/ApiKeyValidationSheet.tsx",
+          "__tests__/api-key-validation-panel.test.tsx",
+          ".project-manager/features/F38/dev-log.md"
+        ],
+        "kickoffAt": "2026-05-28T19:55:55.856Z"
+      }
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",
@@ -1169,6 +1201,6 @@
     "root": "/Volumes/KLEVV-4T-1/Project-Manager"
   },
   "schemaVersion": 8,
-  "updatedAt": "2026-05-28T10:26:18.362Z",
-  "updatedBy": "Codex"
+  "updatedAt": "2026-05-28T19:55:55.856Z",
+  "updatedBy": "Claude"
 }

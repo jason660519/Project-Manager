@@ -11,6 +11,7 @@ import { Eye, Gauge, History, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 import type { LlmProviderId } from '../../../../lib/keys/llmProviders';
 import type { Translations } from '../../../../lib/i18n';
 import type { ArenaModelSpec, ArenaResult } from './useArenaChat';
+import type { LlmArenaResultRow } from './LlmArenaEvaluation';
 import {
   evaluationMeta,
   executionPlaneLabel,
@@ -32,6 +33,7 @@ interface LlmArenaTableRow {
   index: number;
   spec: ArenaModelSpec;
   result?: ArenaResult;
+  resultRow?: LlmArenaResultRow;
   resultKey: string;
   historyCount: number;
 }
@@ -43,8 +45,7 @@ interface LlmArenaMatrixTableProps {
   providers: readonly ProviderLike[];
   results: Record<string, ArenaResult>;
   isRunning: boolean;
-  runningIndex?: number | null;
-  isRunningAll?: boolean;
+  runningIndexes: Set<number>;
   userPrompt: string;
   enabledByIndex: Record<number, boolean>;
   evaluationByIndex: Record<number, EvaluationLevel>;
@@ -73,8 +74,7 @@ export function LlmArenaMatrixTable({
   providers,
   results,
   isRunning,
-  runningIndex,
-  isRunningAll,
+  runningIndexes,
   userPrompt,
   enabledByIndex,
   evaluationByIndex,
@@ -104,6 +104,7 @@ export function LlmArenaMatrixTable({
           index,
           spec,
           result: results[resultKey],
+          resultRow: historyByResultKey[resultKey]?.[0]?.resultRow,
           resultKey,
           historyCount: (historyByResultKey[resultKey] ?? []).length,
         };
@@ -194,6 +195,20 @@ export function LlmArenaMatrixTable({
         },
       }),
       col.display({
+        id: 'col-effective-model',
+        header: 'Requested / Effective',
+        cell: ({ row }) => {
+          const requested = row.original.resultRow?.requested_model ?? row.original.spec.model;
+          const effective = row.original.resultRow?.effective_model ?? row.original.result?.effectiveModel ?? '—';
+          return (
+            <div className="min-w-[220px] space-y-1 font-mono text-[11px] text-stone-400">
+              <p title={requested}>指定：{requested}</p>
+              <p title={effective}>實際：{effective || '—'}</p>
+            </div>
+          );
+        },
+      }),
+      col.display({
         id: 'col-invocation',
         header: copy.columns.invocationPath,
         cell: () => (
@@ -217,11 +232,11 @@ export function LlmArenaMatrixTable({
         cell: ({ row }) => (
           <button
             onClick={() => onRunSingleRow(row.original.index)}
-            disabled={isRunning || !(promptOverrideByIndex[row.original.index] ?? userPrompt).trim()}
+            disabled={runningIndexes.has(row.original.index) || !(promptOverrideByIndex[row.original.index] ?? userPrompt).trim()}
             className="inline-flex h-7 items-center gap-1 rounded border border-emerald-200/25 bg-emerald-100/10 px-2 text-[11px] font-medium text-emerald-100 hover:bg-emerald-100/18 disabled:opacity-40"
             title={copy.runSingleTitle}
           >
-            {isRunning && runningIndex === row.original.index ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
+            {runningIndexes.has(row.original.index) ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
             {copy.columns.run}
           </button>
         ),
@@ -256,9 +271,10 @@ export function LlmArenaMatrixTable({
         header: copy.columns.rawOutput,
         cell: ({ row }) => {
           const rawBody = row.original.result ? row.original.result.error ?? row.original.result.content ?? '' : '';
+          const rawOutput = row.original.resultRow?.raw_output || rawBody;
           return (
             <div className="max-h-24 min-w-[240px] overflow-auto rounded-md border border-stone-200/15 bg-black/25 px-2 py-1 font-mono text-xs text-stone-300 whitespace-pre-wrap break-words">
-              {rawBody || copy.noOutput}
+              {rawOutput || copy.noOutput}
             </div>
           );
         },
@@ -302,9 +318,22 @@ export function LlmArenaMatrixTable({
                 placeholder={copy.evaluationNotePlaceholder}
                 className="w-full min-w-[160px] bg-[rgb(var(--pm-input))] border border-stone-200/20 text-stone-200 text-xs py-1 px-2 outline-none"
               />
+              {row.original.resultRow ? (
+                <div className="space-y-0.5 font-mono text-[10px] text-stone-400">
+                  <p>overall: {row.original.resultRow.overall_score}</p>
+                  <p>q:{row.original.resultRow.quality_score} s:{row.original.resultRow.stability_score}</p>
+                  <p>lat:{row.original.resultRow.latency_score} cost:{row.original.resultRow.cost_score}</p>
+                  <p>comp:{row.original.resultRow.compliance_score}</p>
+                </div>
+              ) : null}
             </div>
           );
         },
+      }),
+      col.display({
+        id: 'col-http-status',
+        header: 'HTTP',
+        cell: ({ row }) => <span className="text-xs font-mono text-stone-400">{row.original.resultRow?.http_status ?? '—'}</span>,
       }),
       col.display({
         id: 'col-ttft',
@@ -386,7 +415,7 @@ export function LlmArenaMatrixTable({
       copy,
       evaluationByIndex,
       isRunning,
-      runningIndex,
+      runningIndexes,
       noteByIndex,
       onEvaluationChange,
       onNoteChange,
@@ -444,7 +473,7 @@ export function LlmArenaMatrixTable({
             disabled={isRunning || !userPrompt.trim() || selectedModels.length === 0}
             className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-emerald-50 px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isRunningAll ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
+            {isRunning ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
             {copy.runAll}
           </button>
         </div>

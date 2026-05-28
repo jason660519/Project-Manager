@@ -8,12 +8,18 @@ import { useI18n } from '../../../../lib/i18n';
 import { LlmArenaMatrixTable } from './LlmArenaMatrixTable';
 import { LlmArenaDetailSheet } from './LlmArenaDetailSheet';
 import { formatResultSummary, type EvaluationLevel, type RunHistoryEntry } from './LlmArenaTypes';
+import { LlmArenaMethodPanel } from './LlmArenaMethodPanel';
+import {
+  LLM_ARENA_EVALUATION_CONFIG,
+  buildLlmArenaResultRow,
+  sanitizeLlmArenaNumber,
+} from './LlmArenaEvaluation';
 
 export function LlmArenaSheet() {
   const { t } = useI18n();
   const copy = t.keysArena.llm;
   const { llmState, setLlmState, validatedLlmProviders } = useKeysContext();
-  const { runComparison, results, clearResults, isRunning } = useArenaChat('pm.arena.llm.results');
+  const { runComparison, results, clearResults } = useArenaChat('pm.arena.llm.results');
   const allProviders = validatedLlmProviders;
   const seenResultTimestampRef = useRef<Record<string, number>>({});
   const [enabledByIndex, setEnabledByIndex] = useState<Record<number, boolean>>({});
@@ -22,8 +28,7 @@ export function LlmArenaSheet() {
   const [promptOverrideByIndex, setPromptOverrideByIndex] = useState<Record<number, string>>({});
   const [historyByResultKey, setHistoryByResultKey] = useState<Record<string, RunHistoryEntry[]>>({});
   const [selectedDetailIndex, setSelectedDetailIndex] = useState<number | null>(null);
-  const [runningIndex, setRunningIndex] = useState<number | null>(null);
-  const [isRunningAll, setIsRunningAll] = useState(false);
+  const [runningIndexes, setRunningIndexes] = useState<Set<number>>(new Set());
   const autoAddSignatureRef = useRef<string>('');
   const providersSignature = allProviders
     .map((provider) => `${provider.id}:${provider.availableModels.join(',')}`)
@@ -114,7 +119,27 @@ export function LlmArenaSheet() {
       const lastSeen = seenResultTimestampRef.current[resultKey] ?? 0;
       if (!result.timestamp || result.timestamp <= lastSeen) return;
       if (indexByResultKey[resultKey] === undefined) return;
+      const index = indexByResultKey[resultKey];
+      const spec = llmState.selectedModels[index];
+      if (!spec) return;
       seenResultTimestampRef.current[resultKey] = result.timestamp;
+      const existingSuccesses = historyByResultKey[resultKey]?.filter((entry) => !entry.error).length ?? 0;
+      const existingTotal = historyByResultKey[resultKey]?.length ?? 0;
+      const successRateRecent = existingTotal === 0 ? null : existingSuccesses / existingTotal;
+      const resultRow = buildLlmArenaResultRow({
+        runId: `pm-llm-arena-${result.timestamp}-${resultKey}`,
+        provider: spec.provider,
+        model: spec.model,
+        systemPrompt: llmState.systemPrompt,
+        userPrompt: promptOverrideByIndex[index] ?? llmState.userPrompt,
+        result,
+        temperature: llmState.temperature,
+        maxTokens: llmState.maxTokens,
+        timeoutMs: llmState.timeoutMs,
+        profile: llmState.scoringProfile,
+        successRateRecent,
+        note: noteByIndex[index] ?? null,
+      });
       nextEntries.push({
         key: resultKey,
         entry: {
@@ -123,9 +148,15 @@ export function LlmArenaSheet() {
           latencyMs: result.latencyMs,
           inputTokens: result.inputTokens ?? 0,
           outputTokens: result.outputTokens ?? 0,
+          evaluationLevel: resultRow.evaluation_level,
+          evaluationMessage: resultRow.evaluation_message,
+          overallScore: resultRow.overall_score,
+          resultRow,
           error: result.error,
         },
       });
+      setEvaluationByIndex((prev) => ({ ...prev, [index]: resultRow.evaluation_level }));
+      setNoteByIndex((prev) => ({ ...prev, [index]: resultRow.evaluation_message }));
     });
 
     if (nextEntries.length === 0) return;
@@ -138,7 +169,20 @@ export function LlmArenaSheet() {
       });
       return next;
     });
-  }, [results, llmState.selectedModels, copy]);
+  }, [
+    results,
+    llmState.selectedModels,
+    llmState.systemPrompt,
+    llmState.userPrompt,
+    llmState.temperature,
+    llmState.maxTokens,
+    llmState.timeoutMs,
+    llmState.scoringProfile,
+    historyByResultKey,
+    promptOverrideByIndex,
+    noteByIndex,
+    copy,
+  ]);
 
   const addModel = () => {
     const defaultProvider = allProviders[0];
@@ -171,15 +215,24 @@ export function LlmArenaSheet() {
     const spec = llmState.selectedModels[index];
     const effectivePrompt = promptOverrideByIndex[index] ?? llmState.userPrompt;
     if (!spec || !effectivePrompt.trim()) return;
-    setRunningIndex(index);
+    setRunningIndexes((prev) => new Set(prev).add(index));
     try {
-      await runComparison({
-        models: [spec],
-        systemPrompt: llmState.systemPrompt,
-        userPrompt: effectivePrompt,
-      });
+      for (let trial = 0; trial < llmState.sampleCount; trial += 1) {
+        await runComparison({
+          models: [spec],
+          systemPrompt: llmState.systemPrompt,
+          userPrompt: effectivePrompt,
+          temperature: llmState.temperature,
+          maxTokens: llmState.maxTokens,
+          timeoutMs: llmState.timeoutMs,
+        });
+      }
     } finally {
-      setRunningIndex(null);
+      setRunningIndexes((prev) => {
+        const next = new Set(prev);
+        next.delete(index);
+        return next;
+      });
     }
   };
 
@@ -192,14 +245,7 @@ export function LlmArenaSheet() {
     const enabledIndexes = llmState.selectedModels
       .map((_, index) => index)
       .filter((index) => enabledByIndex[index] !== false);
-    setIsRunningAll(true);
-    try {
-      for (const index of enabledIndexes) {
-        await runSingleRow(index);
-      }
-    } finally {
-      setIsRunningAll(false);
-    }
+    await Promise.allSettled(enabledIndexes.map(runSingleRow));
   };
 
   const handleClearAll = () => {
@@ -208,6 +254,50 @@ export function LlmArenaSheet() {
     seenResultTimestampRef.current = {};
     setEvaluationByIndex({});
     setNoteByIndex({});
+  };
+
+  const updateLlmNumber = (
+    key: 'temperature' | 'maxTokens' | 'timeoutMs' | 'sampleCount',
+    value: number,
+  ) => {
+    setLlmState((prev) => {
+      if (key === 'temperature') {
+        return { ...prev, temperature: sanitizeLlmArenaNumber(value, prev.temperature, 0, 2) };
+      }
+      if (key === 'maxTokens') {
+        return {
+          ...prev,
+          maxTokens: sanitizeLlmArenaNumber(
+            value,
+            prev.maxTokens,
+            LLM_ARENA_EVALUATION_CONFIG.minMaxTokens,
+            LLM_ARENA_EVALUATION_CONFIG.maxMaxTokens,
+          ),
+        };
+      }
+      if (key === 'timeoutMs') {
+        return {
+          ...prev,
+          timeoutMs: sanitizeLlmArenaNumber(
+            value,
+            prev.timeoutMs,
+            LLM_ARENA_EVALUATION_CONFIG.minTimeoutMs,
+            LLM_ARENA_EVALUATION_CONFIG.maxTimeoutMs,
+          ),
+        };
+      }
+      return {
+        ...prev,
+        sampleCount: Math.round(
+          sanitizeLlmArenaNumber(
+            value,
+            prev.sampleCount,
+            LLM_ARENA_EVALUATION_CONFIG.minSampleCount,
+            LLM_ARENA_EVALUATION_CONFIG.maxSampleCount,
+          ),
+        ),
+      };
+    });
   };
 
   const handleAutoAddTopModels = async () => {
@@ -295,15 +385,32 @@ export function LlmArenaSheet() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
+      <LlmArenaMethodPanel
+        copy={copy}
+        systemPrompt={llmState.systemPrompt}
+        userPrompt={llmState.userPrompt}
+        temperature={llmState.temperature}
+        maxTokens={llmState.maxTokens}
+        timeoutMs={llmState.timeoutMs}
+        sampleCount={llmState.sampleCount}
+        scoringProfile={llmState.scoringProfile}
+        onSystemPromptChange={(systemPrompt) => setLlmState((prev) => ({ ...prev, systemPrompt }))}
+        onUserPromptChange={(userPrompt) => setLlmState((prev) => ({ ...prev, userPrompt }))}
+        onTemperatureChange={(value) => updateLlmNumber('temperature', value)}
+        onMaxTokensChange={(value) => updateLlmNumber('maxTokens', value)}
+        onTimeoutMsChange={(value) => updateLlmNumber('timeoutMs', value)}
+        onSampleCountChange={(value) => updateLlmNumber('sampleCount', value)}
+        onScoringProfileChange={(scoringProfile) => setLlmState((prev) => ({ ...prev, scoringProfile }))}
+        onAutoAddTopModels={() => void handleAutoAddTopModels()}
+      />
       <LlmArenaMatrixTable
         copy={copy}
         commonCopy={t.keysArena.common}
         selectedModels={llmState.selectedModels}
         providers={allProviders}
         results={results}
-        isRunning={isRunning}
-        runningIndex={runningIndex}
-        isRunningAll={isRunningAll}
+        isRunning={runningIndexes.size > 0}
+        runningIndexes={runningIndexes}
         userPrompt={llmState.userPrompt}
         enabledByIndex={enabledByIndex}
         evaluationByIndex={evaluationByIndex}

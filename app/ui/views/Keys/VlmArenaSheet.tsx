@@ -2,189 +2,147 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useKeysContext } from './KeysContext';
-import { useArenaChat, type ArenaResult } from './useArenaChat';
 import { listLlmProviders, type LlmProviderId } from '../../../../lib/keys/llmProviders';
 import { useI18n } from '../../../../lib/i18n';
 import { VlmArenaMethodPanel } from './VlmArenaMethodPanel';
 import { VlmArenaMatrixTable } from './VlmArenaMatrixTable';
 import { VlmArenaDetailSheet } from './VlmArenaDetailSheet';
-import { getVlmScenarioItems, type RowScore, type RunHistoryEntry, type ScenarioId } from './VlmArenaTypes';
+import type { RunHistoryEntry } from './VlmArenaTypes';
+import {
+  buildImageToImagePrompt,
+  coerceImageToImageSelections,
+  imageToImageProvidersFrom,
+  runImageOutputs,
+  syncRowsWithSelectedModels,
+  testImageToImageModel,
+  type VlmImageToImageOutputMode,
+  type VlmImageToImageRow,
+  type VlmImageToImageStyle,
+} from './VlmImageToImageEvaluation';
 
-const ENV_TOP_MODEL_PRESETS: Array<{ provider: LlmProviderId; model: string }> = [
-  { provider: 'anthropic', model: 'claude-sonnet-4-6' },
-  { provider: 'openai', model: 'gpt-4o' },
-  { provider: 'gemini', model: 'gemini-2.5-pro' },
-  { provider: 'grok', model: 'grok-2-latest' },
-  { provider: 'openrouter', model: 'openai/gpt-4o' },
-  { provider: 'qwen', model: 'qwen-max' },
+const IMAGE_OUTPUT_MODEL_PRESETS: Array<{ provider: LlmProviderId; model: string }> = [
+  { provider: 'gemini', model: 'gemini-3.1-flash-image-preview' },
+  { provider: 'openai', model: 'gpt-image-1' },
+  { provider: 'qwen', model: 'qwen-image-2.0-pro' },
 ];
 
 export function VlmArenaSheet() {
   const { t } = useI18n();
   const copy = t.keysArena.vlm;
   const { vlmState, setVlmState } = useKeysContext();
-  const { runComparison, results, clearResults, isRunning } = useArenaChat();
-  const allProviders = listLlmProviders();
+  const allProviders = useMemo(() => imageToImageProvidersFrom(listLlmProviders()), []);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const seenResultTimestampRef = useRef<Record<string, number>>({});
-  const [scenarioByIndex, setScenarioByIndex] = useState<Record<number, ScenarioId>>({});
-  const [enabledByIndex, setEnabledByIndex] = useState<Record<number, boolean>>({});
-  const [rowSystemPromptByIndex, setRowSystemPromptByIndex] = useState<Record<number, string>>({});
-  const [rowUserPromptByIndex, setRowUserPromptByIndex] = useState<Record<number, string>>({});
-  const [scoreByIndex, setScoreByIndex] = useState<Record<number, RowScore>>({});
-  const [noteByIndex, setNoteByIndex] = useState<Record<number, string>>({});
   const [historyByResultKey, setHistoryByResultKey] = useState<Record<string, RunHistoryEntry[]>>({});
   const [selectedDetailIndex, setSelectedDetailIndex] = useState<number | null>(null);
+  const [rows, setRows] = useState<VlmImageToImageRow[]>([]);
 
   useEffect(() => {
-    setScenarioByIndex((prev) => {
-      const next = { ...prev };
-      vlmState.selectedModels.forEach((_, index) => {
-        if (!next[index]) next[index] = 'space_read';
-      });
-      Object.keys(next).forEach((key) => {
-        const index = Number(key);
-        if (Number.isFinite(index) && index >= vlmState.selectedModels.length) delete next[index];
-      });
-      return next;
+    setVlmState((prev) => {
+      const coerced = coerceImageToImageSelections(prev.selectedModels, allProviders);
+      const changed = coerced.length !== prev.selectedModels.length
+        || coerced.some((spec, index) => (
+          spec.provider !== prev.selectedModels[index]?.provider || spec.model !== prev.selectedModels[index]?.model
+        ));
+      return changed ? { ...prev, selectedModels: coerced } : prev;
     });
-    setEnabledByIndex((prev) => {
-      const next = { ...prev };
-      vlmState.selectedModels.forEach((_, index) => {
-        if (typeof next[index] !== 'boolean') next[index] = true;
-      });
-      Object.keys(next).forEach((key) => {
-        const index = Number(key);
-        if (Number.isFinite(index) && index >= vlmState.selectedModels.length) delete next[index];
-      });
-      return next;
-    });
-    setScoreByIndex((prev) => {
-      const next = { ...prev };
-      vlmState.selectedModels.forEach((_, index) => {
-        if (!next[index]) next[index] = 'unrated';
-      });
-      Object.keys(next).forEach((key) => {
-        const index = Number(key);
-        if (Number.isFinite(index) && index >= vlmState.selectedModels.length) delete next[index];
-      });
-      return next;
-    });
-    setRowSystemPromptByIndex((prev) => {
-      const next = { ...prev };
-      vlmState.selectedModels.forEach((_, index) => {
-        if (typeof next[index] !== 'string') next[index] = vlmState.systemPrompt;
-      });
-      Object.keys(next).forEach((key) => {
-        const index = Number(key);
-        if (Number.isFinite(index) && index >= vlmState.selectedModels.length) delete next[index];
-      });
-      return next;
-    });
-    setRowUserPromptByIndex((prev) => {
-      const next = { ...prev };
-      vlmState.selectedModels.forEach((_, index) => {
-        if (typeof next[index] !== 'string') next[index] = vlmState.userPrompt;
-      });
-      Object.keys(next).forEach((key) => {
-        const index = Number(key);
-        if (Number.isFinite(index) && index >= vlmState.selectedModels.length) delete next[index];
-      });
-      return next;
-    });
-    setNoteByIndex((prev) => {
-      const next = { ...prev };
-      vlmState.selectedModels.forEach((_, index) => {
-        if (typeof next[index] !== 'string') next[index] = '';
-      });
-      Object.keys(next).forEach((key) => {
-        const index = Number(key);
-        if (Number.isFinite(index) && index >= vlmState.selectedModels.length) delete next[index];
-      });
-      return next;
-    });
-  }, [vlmState.selectedModels, vlmState.systemPrompt, vlmState.userPrompt]);
-
-  const scenarioMap = useMemo(
-    () => Object.fromEntries(getVlmScenarioItems(copy).map((item) => [item.id, item])),
-    [copy]
-  );
-
-  const buildRowPrompt = (index: number) => {
-    const scenario = scenarioMap[scenarioByIndex[index] ?? 'space_read'];
-    return [
-      (rowUserPromptByIndex[index] ?? '').trim(),
-      `${copy.promptTaskPrefix}${scenario?.label ?? copy.promptTaskFallback}`,
-      scenario?.instruction ?? '',
-      copy.promptOutputFormat,
-    ]
-      .filter(Boolean)
-      .join('\n\n');
-  };
+  }, [allProviders, setVlmState]);
 
   useEffect(() => {
-    const indexByResultKey: Record<string, number> = {};
-    vlmState.selectedModels.forEach((spec, index) => {
-      indexByResultKey[`${spec.provider}-${spec.model}`] = index;
-    });
-    const nextEntries: Array<{ key: string; entry: RunHistoryEntry }> = [];
-    Object.entries(results).forEach(([resultKey, result]) => {
-      const lastSeen = seenResultTimestampRef.current[resultKey] ?? 0;
-      if (!result.timestamp || result.timestamp <= lastSeen) return;
-      const rowIndex = indexByResultKey[resultKey];
-      if (rowIndex === undefined) return;
-      seenResultTimestampRef.current[resultKey] = result.timestamp;
-      nextEntries.push({
-        key: resultKey,
-        entry: {
-          timestamp: result.timestamp,
-          scenario: scenarioByIndex[rowIndex] ?? 'space_read',
-          prompt: buildRowPrompt(rowIndex),
-          result,
-        },
-      });
-    });
-    if (nextEntries.length === 0) return;
-    setHistoryByResultKey((prev) => {
-      const next = { ...prev };
-      nextEntries.forEach(({ key, entry }) => {
-        const history = next[key] ? [...next[key]] : [];
-        history.unshift(entry);
-        next[key] = history.slice(0, 10);
-      });
-      return next;
-    });
-  }, [results, scenarioByIndex, vlmState.selectedModels]);
+    setRows((prev) => syncRowsWithSelectedModels(prev, vlmState.selectedModels));
+  }, [vlmState.selectedModels]);
 
   const runSingleRow = async (index: number) => {
-    const spec = vlmState.selectedModels[index];
-    if (!spec || !vlmState.imageDataUrl || !rowUserPromptByIndex[index]?.trim()) return;
-
-    await runComparison({
-      models: [spec],
-      systemPrompt: rowSystemPromptByIndex[index] ?? '',
-      userPrompt: buildRowPrompt(index),
-      imageDataUrl: vlmState.imageDataUrl,
-      imageDetail: vlmState.imageDetail,
-    });
+    const row = rows[index];
+    if (!row || !vlmState.imageDataUrl) return;
+    const startedAtMs = Date.now();
+    setRows((prev) => prev.map((item, itemIndex) => itemIndex === index
+      ? {
+          ...item,
+          runStatus: 'running',
+          message: '模型評估中...',
+          resultText: '',
+          resultImageUrl: '',
+          resultImage2dUrl: '',
+          resultImage3dUrl: '',
+          runStartedAtMs: startedAtMs,
+          e2eMs: null,
+          httpStatus: null,
+        }
+      : item));
+    const startMs = performance.now();
+    try {
+      const resultPatch = await runImageOutputs(row, vlmState.imageDataUrl, testImageToImageModel);
+      const next = {
+        ...resultPatch,
+        runStartedAtMs: null,
+        e2eMs: performance.now() - startMs,
+        lastRunAt: new Date().toISOString(),
+      };
+      setRows((prev) => prev.map((item, itemIndex) => itemIndex === index ? { ...item, ...next } : item));
+      appendHistory(row, next);
+    } catch (error) {
+      const next = {
+        runStatus: 'failed' as const,
+        message: error instanceof Error ? error.message : '測試失敗。',
+        runStartedAtMs: null,
+        e2eMs: performance.now() - startMs,
+        httpStatus: null,
+        lastRunAt: new Date().toISOString(),
+      };
+      setRows((prev) => prev.map((item, itemIndex) => itemIndex === index ? { ...item, ...next } : item));
+      appendHistory(row, next);
+    }
   };
 
   const runSelectedRows = async () => {
     if (!vlmState.imageDataUrl) return;
-    const enabledIndexes = vlmState.selectedModels
-      .map((_, index) => index)
-      .filter((index) => enabledByIndex[index] !== false && !!rowUserPromptByIndex[index]?.trim());
-    for (const index of enabledIndexes) {
-      await runSingleRow(index);
-    }
+    const enabledIndexes = rows
+      .map((row, index) => (row.shouldTest && row.runStatus !== 'running' ? index : -1))
+      .filter((index) => index >= 0);
+    await Promise.allSettled(enabledIndexes.map(runSingleRow));
+  };
+
+  const appendHistory = (row: VlmImageToImageRow, patch: Partial<VlmImageToImageRow>) => {
+    const result = { ...row, ...patch };
+    const key = `${row.provider}-${row.model}`;
+    setHistoryByResultKey((prev) => {
+      const history = prev[key] ? [...prev[key]] : [];
+      history.unshift({
+        timestamp: Date.now(),
+        scenario: 'render_2d_3d',
+        prompt: row.prompt,
+        result: {
+          provider: row.provider,
+          model: row.model,
+          content: result.resultText,
+          error: result.runStatus === 'failed' ? result.message : undefined,
+          latencyMs: Math.round(result.e2eMs ?? 0),
+          timestamp: Date.now(),
+        },
+        resultImage2dUrl: result.resultImage2dUrl,
+        resultImage3dUrl: result.resultImage3dUrl,
+        message: result.message,
+        httpStatus: result.httpStatus,
+      });
+      return { ...prev, [key]: history.slice(0, 10) };
+    });
   };
 
   const clearAll = () => {
-    clearResults();
+    setRows((prev) => prev.map((row) => ({
+      ...row,
+      runStatus: 'idle',
+      resultText: '',
+      resultImageUrl: '',
+      resultImage2dUrl: '',
+      resultImage3dUrl: '',
+      message: '',
+      runStartedAtMs: null,
+      e2eMs: null,
+      httpStatus: null,
+      lastRunAt: null,
+    })));
     setHistoryByResultKey({});
-    seenResultTimestampRef.current = {};
-    setScoreByIndex({});
-    setNoteByIndex({});
   };
 
   const addModel = () => {
@@ -200,7 +158,7 @@ export function VlmArenaSheet() {
 
   const addTopModelsFromEnv = () => {
     const providerMap = new Map(allProviders.map((provider) => [provider.id, provider]));
-    const validPresets = ENV_TOP_MODEL_PRESETS.filter((preset) => {
+    const validPresets = IMAGE_OUTPUT_MODEL_PRESETS.filter((preset) => {
       const provider = providerMap.get(preset.provider);
       if (!provider) return false;
       return provider.availableModels.includes(preset.model);
@@ -239,6 +197,17 @@ export function VlmArenaSheet() {
     });
   };
 
+  const patchRow = (index: number, patch: Partial<VlmImageToImageRow>) => {
+    setRows((prev) => prev.map((row, rowIndex) => {
+      if (rowIndex !== index) return row;
+      const next = { ...row, ...patch };
+      if (patch.style || patch.outputMode) {
+        next.prompt = buildImageToImagePrompt(next.style, next.outputMode);
+      }
+      return next;
+    }));
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -260,27 +229,18 @@ export function VlmArenaSheet() {
       <VlmArenaMethodPanel
         copy={copy}
         imageDataUrl={vlmState.imageDataUrl}
-        imageDetail={vlmState.imageDetail}
         fileInputRef={fileInputRef}
         onFileChange={handleFileChange}
         onRemoveImage={removeImage}
-        onImageDetailChange={(next) => setVlmState((s) => ({ ...s, imageDetail: next }))}
       />
 
       <VlmArenaMatrixTable
         copy={copy}
-        selectedModels={vlmState.selectedModels}
         providers={allProviders}
-        results={results}
-        isRunning={isRunning}
+        rows={rows}
+        isRunning={rows.some((row) => row.runStatus === 'running')}
         imageDataUrl={vlmState.imageDataUrl}
-        canRunAll={Object.values(rowUserPromptByIndex).some((prompt) => !!prompt?.trim())}
-        enabledByIndex={enabledByIndex}
-        scenarioByIndex={scenarioByIndex}
-        rowSystemPromptByIndex={rowSystemPromptByIndex}
-        rowUserPromptByIndex={rowUserPromptByIndex}
-        scoreByIndex={scoreByIndex}
-        noteByIndex={noteByIndex}
+        canRunAll={rows.some((row) => row.shouldTest)}
         historyByResultKey={historyByResultKey}
         onClearAll={clearAll}
         onAddModel={addModel}
@@ -289,24 +249,18 @@ export function VlmArenaSheet() {
         onRunSingleRow={(index) => void runSingleRow(index)}
         onRemoveModel={removeModel}
         onUpdateModel={updateModel}
-        onToggleEnabled={(index, enabled) => setEnabledByIndex((prev) => ({ ...prev, [index]: enabled }))}
-        onScenarioChange={(index, scenario) => setScenarioByIndex((prev) => ({ ...prev, [index]: scenario }))}
-        onRowSystemPromptChange={(index, prompt) => setRowSystemPromptByIndex((prev) => ({ ...prev, [index]: prompt }))}
-        onRowUserPromptChange={(index, prompt) => setRowUserPromptByIndex((prev) => ({ ...prev, [index]: prompt }))}
-        onScoreChange={(index, score) => setScoreByIndex((prev) => ({ ...prev, [index]: score }))}
-        onNoteChange={(index, note) => setNoteByIndex((prev) => ({ ...prev, [index]: note }))}
+        onToggleEnabled={(index, enabled) => patchRow(index, { shouldTest: enabled })}
+        onStyleChange={(index, style: VlmImageToImageStyle) => patchRow(index, { style })}
+        onOutputModeChange={(index, outputMode: VlmImageToImageOutputMode) => patchRow(index, { outputMode })}
+        onPromptChange={(index, prompt) => patchRow(index, { prompt })}
         onOpenDetail={setSelectedDetailIndex}
       />
 
       <VlmArenaDetailSheet
         copy={copy}
         selectedDetailIndex={selectedDetailIndex}
-        selectedModel={selectedDetailIndex !== null ? vlmState.selectedModels[selectedDetailIndex] : undefined}
-        result={selectedDetailIndex !== null ? results[`${vlmState.selectedModels[selectedDetailIndex]?.provider}-${vlmState.selectedModels[selectedDetailIndex]?.model}`] : undefined}
-        history={selectedDetailIndex !== null ? historyByResultKey[`${vlmState.selectedModels[selectedDetailIndex]?.provider}-${vlmState.selectedModels[selectedDetailIndex]?.model}`] ?? [] : []}
-        scenarioByIndex={scenarioByIndex}
-        scenarioMap={scenarioMap}
-        buildRowPrompt={buildRowPrompt}
+        row={selectedDetailIndex !== null ? rows[selectedDetailIndex] : undefined}
+        history={selectedDetailIndex !== null ? historyByResultKey[`${rows[selectedDetailIndex]?.provider}-${rows[selectedDetailIndex]?.model}`] ?? [] : []}
         onClose={() => setSelectedDetailIndex(null)}
       />
     </div>

@@ -18,6 +18,11 @@ import {
   type ValidatedModelSupportSummary,
 } from '../../../../lib/keys/providerMetadata';
 import { listLlmProviders } from '../../../../lib/keys/llmProviders';
+import {
+  LLM_ARENA_EVALUATION_CONFIG,
+  sanitizeLlmArenaNumber,
+  type LlmArenaScoringProfile,
+} from './LlmArenaEvaluation';
 
 // Re-export slug helpers + KeysTab so existing imports from this module keep
 // working. The constants themselves live in a server-safe module so
@@ -36,6 +41,10 @@ interface ArenaState {
   userPrompt: string;
   selectedModels: { provider: LlmProviderId; model: string }[];
   temperature: number;
+  maxTokens: number;
+  timeoutMs: number;
+  sampleCount: number;
+  scoringProfile: LlmArenaScoringProfile;
 }
 
 interface VlmArenaState extends ArenaState {
@@ -70,11 +79,20 @@ interface KeysContextType {
   }>;
 }
 
+const DEFAULT_LLM_USER_PROMPT = '你是哪一家公司的哪一個模型？';
+const LEGACY_DEFAULT_LLM_USER_PROMPTS = new Set([
+  'Explain how a neural network works in simple terms.',
+]);
+
 const defaultLlmState: ArenaState = {
   systemPrompt: 'You are a helpful AI assistant. Respond clearly and concisely.',
-  userPrompt: 'Explain how a neural network works in simple terms.',
+  userPrompt: DEFAULT_LLM_USER_PROMPT,
   selectedModels: [],
-  temperature: 0.7,
+  temperature: LLM_ARENA_EVALUATION_CONFIG.defaultTemperature,
+  maxTokens: LLM_ARENA_EVALUATION_CONFIG.defaultMaxTokens,
+  timeoutMs: LLM_ARENA_EVALUATION_CONFIG.defaultTimeoutMs,
+  sampleCount: LLM_ARENA_EVALUATION_CONFIG.defaultSampleCount,
+  scoringProfile: 'balanced_default',
 };
 
 const defaultVlmState: VlmArenaState = {
@@ -82,6 +100,10 @@ const defaultVlmState: VlmArenaState = {
   userPrompt: 'What is happening in this image?',
   selectedModels: [],
   temperature: 0.4,
+  maxTokens: LLM_ARENA_EVALUATION_CONFIG.defaultMaxTokens,
+  timeoutMs: LLM_ARENA_EVALUATION_CONFIG.defaultTimeoutMs,
+  sampleCount: LLM_ARENA_EVALUATION_CONFIG.defaultSampleCount,
+  scoringProfile: 'balanced_default',
   imageDataUrl: null,
   imageDetail: 'auto',
 };
@@ -113,6 +135,32 @@ function sanitizeArenaState(value: unknown, fallback: ArenaState): ArenaState {
       typeof value.temperature === 'number' && Number.isFinite(value.temperature)
         ? value.temperature
         : fallback.temperature,
+    maxTokens: sanitizeLlmArenaNumber(
+      value.maxTokens,
+      fallback.maxTokens,
+      LLM_ARENA_EVALUATION_CONFIG.minMaxTokens,
+      LLM_ARENA_EVALUATION_CONFIG.maxMaxTokens,
+    ),
+    timeoutMs: sanitizeLlmArenaNumber(
+      value.timeoutMs,
+      fallback.timeoutMs,
+      LLM_ARENA_EVALUATION_CONFIG.minTimeoutMs,
+      LLM_ARENA_EVALUATION_CONFIG.maxTimeoutMs,
+    ),
+    sampleCount: Math.round(
+      sanitizeLlmArenaNumber(
+        value.sampleCount,
+        fallback.sampleCount,
+        LLM_ARENA_EVALUATION_CONFIG.minSampleCount,
+        LLM_ARENA_EVALUATION_CONFIG.maxSampleCount,
+      ),
+    ),
+    scoringProfile:
+      value.scoringProfile === 'quality_first' ||
+      value.scoringProfile === 'balanced_default' ||
+      value.scoringProfile === 'cost_latency_first'
+        ? value.scoringProfile
+        : fallback.scoringProfile,
   };
 }
 
@@ -129,6 +177,10 @@ function sanitizeVlmState(value: unknown, fallback: VlmArenaState): VlmArenaStat
   };
 }
 
+function normalizeDefaultLlmUserPrompt(userPrompt: string): string {
+  return LEGACY_DEFAULT_LLM_USER_PROMPTS.has(userPrompt) ? DEFAULT_LLM_USER_PROMPT : userPrompt;
+}
+
 function loadPersistedKeysState(): PersistedKeysState | null {
   if (typeof window === 'undefined') return null;
   try {
@@ -138,10 +190,14 @@ function loadPersistedKeysState(): PersistedKeysState | null {
     if (!isRecord(parsed)) return null;
     if (parsed.version !== 1) return null;
     const activeTab = typeof parsed.activeTab === 'string' ? (parsed.activeTab as KeysTab) : 'api_key_validation';
+    const llmState = sanitizeArenaState(parsed.llmState, defaultLlmState);
     return {
       version: 1,
       activeTab,
-      llmState: sanitizeArenaState(parsed.llmState, defaultLlmState),
+      llmState: {
+        ...llmState,
+        userPrompt: normalizeDefaultLlmUserPrompt(llmState.userPrompt),
+      },
       vlmState: sanitizeVlmState(parsed.vlmState, defaultVlmState),
     };
   } catch {
