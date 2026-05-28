@@ -2,7 +2,7 @@
 
 import type { LlmProviderId } from '../../../../lib/keys/llmProviders';
 import { loadProviderKey } from '../../../../lib/keys/loadProviderKey';
-import type { ProviderLike } from './VlmArenaTypes';
+import type { ProviderLike, RunHistoryEntry } from './VlmArenaTypes';
 
 export type VlmImageToImageStyle = 'modern' | 'nordic' | 'japanese' | 'luxury' | 'rental' | 'minimal';
 export type VlmImageToImageOutputMode = '2d' | '3d' | 'both';
@@ -45,6 +45,14 @@ export type VlmImageToImageTestFn = (
   imageDataUrl: string,
 ) => Promise<VlmImageToImageTestResult>;
 
+export interface VlmImageToImageState {
+  version: 1;
+  rows: VlmImageToImageRow[];
+  historyByResultKey: Record<string, RunHistoryEntry[]>;
+}
+
+export type VlmImageToImageStateListener = (state: VlmImageToImageState) => void;
+
 export const VLM_IMAGE_TO_IMAGE_STYLE_OPTIONS: Array<{
   id: VlmImageToImageStyle;
   label: string;
@@ -83,6 +91,12 @@ export const VLM_IMAGE_TO_IMAGE_CAPABLE_MODELS: Array<{
 ];
 
 const IMAGE_MIME_PATTERN = /^data:(image\/(?:jpeg|png|webp|gif));base64,(.+)$/i;
+const VLM_IMAGE_TO_IMAGE_STORAGE_KEY = 'projectManager:keys-vlm-image-to-image:v1';
+const MAX_HISTORY_PER_MODEL = 10;
+
+let currentState: VlmImageToImageState | null = null;
+const listeners = new Set<VlmImageToImageStateListener>();
+const activeImageTasks = new Map<string, Promise<void>>();
 
 function providerLabel(providers: readonly ProviderLike[], providerId: LlmProviderId): string {
   return providers.find((provider) => provider.id === providerId)?.label ?? providerId;
@@ -205,29 +219,235 @@ export function createImageToImageRow(no: number, provider: LlmProviderId, model
   };
 }
 
+function emptyVlmImageToImageState(): VlmImageToImageState {
+  return { version: 1, rows: [], historyByResultKey: {} };
+}
+
+function canUseLocalStorage(): boolean {
+  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+}
+
+function cloneState(state: VlmImageToImageState): VlmImageToImageState {
+  return {
+    version: 1,
+    rows: state.rows.map((row) => ({ ...row })),
+    historyByResultKey: Object.fromEntries(
+      Object.entries(state.historyByResultKey).map(([key, history]) => [key, history.map((entry) => ({ ...entry }))]),
+    ),
+  };
+}
+
+function sanitizeRunStatus(value: unknown): VlmImageRunStatus {
+  return value === 'running' || value === 'done' || value === 'failed' ? value : 'idle';
+}
+
+function isVlmImageStyle(value: unknown): value is VlmImageToImageStyle {
+  return VLM_IMAGE_TO_IMAGE_STYLE_OPTIONS.some((option) => option.id === value);
+}
+
+function isVlmImageOutputMode(value: unknown): value is VlmImageToImageOutputMode {
+  return VLM_IMAGE_TO_IMAGE_OUTPUT_OPTIONS.some((option) => option.id === value);
+}
+
+function sanitizeRow(value: unknown, index: number): VlmImageToImageRow | null {
+  if (!value || typeof value !== 'object') return null;
+  const source = value as Partial<VlmImageToImageRow>;
+  if (!source.provider || !source.model) return null;
+  const fallback = createImageToImageRow(index + 1, source.provider, source.model);
+  const style = isVlmImageStyle(source.style) ? source.style : fallback.style;
+  const outputMode = isVlmImageOutputMode(source.outputMode) ? source.outputMode : fallback.outputMode;
+  return {
+    ...fallback,
+    ...source,
+    id: typeof source.id === 'string' && source.id.trim().length > 0 ? source.id : fallback.id,
+    no: typeof source.no === 'number' ? source.no : index + 1,
+    shouldTest: source.shouldTest !== false,
+    style,
+    outputMode,
+    prompt: typeof source.prompt === 'string' && source.prompt.trim().length > 0
+      ? source.prompt
+      : buildImageToImagePrompt(style, outputMode),
+    runStatus: sanitizeRunStatus(source.runStatus),
+    resultText: typeof source.resultText === 'string' ? source.resultText : '',
+    resultImageUrl: typeof source.resultImageUrl === 'string' ? source.resultImageUrl : '',
+    resultImage2dUrl: typeof source.resultImage2dUrl === 'string' ? source.resultImage2dUrl : '',
+    resultImage3dUrl: typeof source.resultImage3dUrl === 'string' ? source.resultImage3dUrl : '',
+    message: typeof source.message === 'string' ? source.message : '',
+    runStartedAtMs: typeof source.runStartedAtMs === 'number' ? source.runStartedAtMs : null,
+    e2eMs: typeof source.e2eMs === 'number' ? source.e2eMs : null,
+    httpStatus: typeof source.httpStatus === 'number' ? source.httpStatus : null,
+    lastRunAt: typeof source.lastRunAt === 'string' ? source.lastRunAt : null,
+  };
+}
+
+function sanitizeHistory(value: unknown): Record<string, RunHistoryEntry[]> {
+  if (!value || typeof value !== 'object') return {};
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([, history]) => Array.isArray(history))
+      .map(([key, history]) => [key, (history as RunHistoryEntry[]).slice(0, MAX_HISTORY_PER_MODEL)]),
+  );
+}
+
+function loadStoredVlmImageToImageState(): VlmImageToImageState {
+  if (!canUseLocalStorage()) return emptyVlmImageToImageState();
+  try {
+    const raw = window.localStorage.getItem(VLM_IMAGE_TO_IMAGE_STORAGE_KEY);
+    if (!raw) return emptyVlmImageToImageState();
+    const parsed = JSON.parse(raw) as Partial<VlmImageToImageState>;
+    return {
+      version: 1,
+      rows: Array.isArray(parsed.rows)
+        ? parsed.rows.map((item, index) => sanitizeRow(item, index)).filter((row): row is VlmImageToImageRow => row !== null)
+        : [],
+      historyByResultKey: sanitizeHistory(parsed.historyByResultKey),
+    };
+  } catch {
+    return emptyVlmImageToImageState();
+  }
+}
+
+function persistVlmImageToImageState(state: VlmImageToImageState): void {
+  if (!canUseLocalStorage()) return;
+  try {
+    window.localStorage.setItem(VLM_IMAGE_TO_IMAGE_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Keep the in-memory store usable if localStorage is full or disabled.
+  }
+}
+
+export function getVlmImageToImageState(): VlmImageToImageState {
+  if (!currentState) currentState = loadStoredVlmImageToImageState();
+  return cloneState(currentState);
+}
+
+function commitVlmImageToImageState(nextState: VlmImageToImageState): VlmImageToImageState {
+  currentState = cloneState(nextState);
+  persistVlmImageToImageState(currentState);
+  const snapshot = cloneState(currentState);
+  listeners.forEach((listener) => listener(snapshot));
+  return snapshot;
+}
+
+function updateVlmImageToImageState(updater: (state: VlmImageToImageState) => VlmImageToImageState): VlmImageToImageState {
+  return commitVlmImageToImageState(updater(getVlmImageToImageState()));
+}
+
+export function subscribeVlmImageToImageState(listener: VlmImageToImageStateListener): () => void {
+  listeners.add(listener);
+  listener(getVlmImageToImageState());
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function patchVlmImageToImageRow(rowId: string, patch: Partial<VlmImageToImageRow>): void {
+  updateVlmImageToImageState((state) => ({
+    ...state,
+    rows: state.rows.map((row) => (row.id === rowId ? { ...row, ...patch } : row)),
+  }));
+}
+
+function appendVlmImageToImageHistory(row: VlmImageToImageRow, patch: Partial<VlmImageToImageRow>): void {
+  const result = { ...row, ...patch };
+  const key = `${row.provider}-${row.model}`;
+  updateVlmImageToImageState((state) => {
+    const history = state.historyByResultKey[key] ? [...state.historyByResultKey[key]] : [];
+    history.unshift({
+      timestamp: Date.now(),
+      scenario: 'render_2d_3d',
+      prompt: row.prompt,
+      result: {
+        provider: row.provider,
+        model: row.model,
+        content: result.resultText,
+        error: result.runStatus === 'failed' ? result.message : undefined,
+        latencyMs: Math.round(result.e2eMs ?? 0),
+        timestamp: Date.now(),
+      },
+      resultImage2dUrl: result.resultImage2dUrl,
+      resultImage3dUrl: result.resultImage3dUrl,
+      message: result.message,
+      httpStatus: result.httpStatus,
+    });
+    return {
+      ...state,
+      historyByResultKey: { ...state.historyByResultKey, [key]: history.slice(0, MAX_HISTORY_PER_MODEL) },
+    };
+  });
+}
+
+export function clearVlmImageToImageRuns(): void {
+  updateVlmImageToImageState((state) => ({
+    ...state,
+    rows: state.rows.map((row) => ({
+      ...row,
+      runStatus: 'idle',
+      resultText: '',
+      resultImageUrl: '',
+      resultImage2dUrl: '',
+      resultImage3dUrl: '',
+      message: '',
+      runStartedAtMs: null,
+      e2eMs: null,
+      httpStatus: null,
+      lastRunAt: null,
+    })),
+    historyByResultKey: {},
+  }));
+}
+
+export function resetVlmImageToImageStoreForTests(state: VlmImageToImageState = emptyVlmImageToImageState()): void {
+  currentState = cloneState(state);
+  activeImageTasks.clear();
+  if (canUseLocalStorage()) {
+    try {
+      window.localStorage.removeItem(VLM_IMAGE_TO_IMAGE_STORAGE_KEY);
+      window.localStorage.setItem(VLM_IMAGE_TO_IMAGE_STORAGE_KEY, JSON.stringify(currentState));
+    } catch {
+      // Test-only reset should not fail when localStorage is mocked read-only.
+    }
+  }
+  const snapshot = cloneState(currentState);
+  listeners.forEach((listener) => listener(snapshot));
+}
+
 export function syncRowsWithSelectedModels(
   rows: VlmImageToImageRow[],
   selectedModels: Array<{ provider: LlmProviderId; model: string }>,
 ): VlmImageToImageRow[] {
+  const usedRowIds = new Set<string>();
   return selectedModels.map((spec, index) => {
-    const existing = rows.find((row) => row.provider === spec.provider && row.model === spec.model)
-      ?? rows[index];
+    const exact = rows.find((row) => row.provider === spec.provider && row.model === spec.model && !usedRowIds.has(row.id));
+    const indexed = rows[index];
+    const existing = exact ?? (indexed && indexed.runStatus === 'idle' && !usedRowIds.has(indexed.id) ? indexed : undefined);
     const style = existing?.style ?? 'modern';
     const outputMode = existing?.outputMode ?? 'both';
-    return {
-      ...createImageToImageRow(index + 1, spec.provider, spec.model),
+    const base = createImageToImageRow(index + 1, spec.provider, spec.model);
+    const id = exact?.id ?? base.id;
+    usedRowIds.add(id);
+    const next = {
+      ...base,
       ...existing,
-      id: existing?.id ?? createImageToImageRow(index + 1, spec.provider, spec.model).id,
+      id,
       no: index + 1,
       provider: spec.provider,
       model: spec.model,
       style,
       outputMode,
       prompt: existing?.prompt ?? buildImageToImagePrompt(style, outputMode),
-      runStatus: existing?.runStatus === 'running' ? 'idle' : existing?.runStatus ?? 'idle',
-      runStartedAtMs: null,
+      runStatus: existing?.runStatus ?? 'idle',
+      runStartedAtMs: existing?.runStartedAtMs ?? null,
     };
+    return next;
   });
+}
+
+export function syncVlmImageRowsToSelections(selectedModels: Array<{ provider: LlmProviderId; model: string }>): void {
+  updateVlmImageToImageState((state) => ({
+    ...state,
+    rows: syncRowsWithSelectedModels(state.rows, selectedModels),
+  }));
 }
 
 export async function runImageOutputs(
@@ -264,6 +484,92 @@ export async function runImageOutputs(
     message: success ? '測試完成。' : failedMessage ?? (missingImage ? '未產圖：模型回傳文字但沒有圖片。' : '測試失敗。'),
     httpStatus: firstHttpStatus ?? (success ? 200 : null),
   };
+}
+
+export function isVlmImageTaskActive(rowId: string): boolean {
+  return activeImageTasks.has(rowId);
+}
+
+export function runVlmImageRow(
+  rowId: string,
+  imageDataUrl: string,
+  testModel: VlmImageToImageTestFn = testImageToImageModel,
+): Promise<void> {
+  const active = activeImageTasks.get(rowId);
+  if (active) return active;
+
+  const row = getVlmImageToImageState().rows.find((item) => item.id === rowId);
+  if (!row || !imageDataUrl) return Promise.resolve();
+
+  const nowEpochMs = Date.now();
+  const startedAtMs = row.runStatus === 'running' && row.runStartedAtMs ? row.runStartedAtMs : nowEpochMs;
+  const elapsedBeforeDispatchMs = Math.max(0, nowEpochMs - startedAtMs);
+  const startMs = (typeof performance !== 'undefined' ? performance.now() : nowEpochMs) - elapsedBeforeDispatchMs;
+  patchVlmImageToImageRow(row.id, {
+    runStatus: 'running',
+    message: '模型評估中...',
+    resultText: '',
+    resultImageUrl: '',
+    resultImage2dUrl: '',
+    resultImage3dUrl: '',
+    runStartedAtMs: startedAtMs,
+    e2eMs: null,
+    httpStatus: null,
+  });
+
+  const task = (async () => {
+    try {
+      const latestRow = getVlmImageToImageState().rows.find((item) => item.id === row.id) ?? row;
+      const resultPatch = await runImageOutputs(latestRow, imageDataUrl, testModel);
+      const nowMs = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      const next = {
+        ...resultPatch,
+        runStartedAtMs: null,
+        e2eMs: nowMs - startMs,
+        lastRunAt: new Date().toISOString(),
+      };
+      patchVlmImageToImageRow(row.id, next);
+      appendVlmImageToImageHistory(latestRow, next);
+    } catch (error) {
+      const nowMs = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      const next = {
+        runStatus: 'failed' as const,
+        message: error instanceof Error ? error.message : '測試失敗。',
+        runStartedAtMs: null,
+        e2eMs: nowMs - startMs,
+        httpStatus: null,
+        lastRunAt: new Date().toISOString(),
+      };
+      const latestRow = getVlmImageToImageState().rows.find((item) => item.id === row.id) ?? row;
+      patchVlmImageToImageRow(row.id, next);
+      appendVlmImageToImageHistory(latestRow, next);
+    } finally {
+      activeImageTasks.delete(row.id);
+    }
+  })();
+
+  activeImageTasks.set(row.id, task);
+  return task;
+}
+
+export function runVlmImageRows(
+  rowIds: string[],
+  imageDataUrl: string,
+  testModel: VlmImageToImageTestFn = testImageToImageModel,
+): Promise<PromiseSettledResult<void>[]> {
+  return Promise.allSettled(rowIds.map((rowId) => runVlmImageRow(rowId, imageDataUrl, testModel)));
+}
+
+export function resumePersistedVlmImageTasks(
+  imageDataUrl: string | null,
+  testModel: VlmImageToImageTestFn = testImageToImageModel,
+): void {
+  if (!imageDataUrl) return;
+  getVlmImageToImageState().rows
+    .filter((row) => row.runStatus === 'running' && !isVlmImageTaskActive(row.id))
+    .forEach((row) => {
+      void runVlmImageRow(row.id, imageDataUrl, testModel);
+    });
 }
 
 function imageProviderSignal(): AbortSignal | undefined {

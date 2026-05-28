@@ -4,7 +4,7 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-05-28T21:11:37.000Z",
+    "generatedAt": "2026-05-28T21:41:29.000Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
@@ -12,7 +12,7 @@ export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
     "totalDocuments": 9,
     "totalFolders": 4,
     "publicDocuments": 24,
-    "internalDocuments": 54,
+    "internalDocuments": 55,
     "restrictedDocuments": 1,
     "publishableDocuments": 9,
     "reviewRequiredDocuments": 47,

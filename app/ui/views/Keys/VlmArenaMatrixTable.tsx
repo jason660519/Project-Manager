@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Eye, Loader2, Play, Plus } from 'lucide-react';
 import type { ArenaModelSpec } from './useArenaChat';
 import { type ProviderLike, type RunHistoryEntry, type VlmArenaCopy } from './VlmArenaTypes';
@@ -48,6 +48,21 @@ function statusClassName(row: VlmImageToImageRow): string {
   if (row.runStatus === 'failed') return 'bg-red-500/15 text-red-300';
   if (row.runStatus === 'running') return 'bg-sky-500/15 text-sky-200';
   return 'bg-stone-500/15 text-stone-400';
+}
+
+function RunningElapsedLabel({ startedAtMs }: { startedAtMs: number | null }) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!startedAtMs) return undefined;
+    setNowMs(Date.now());
+    const interval = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, [startedAtMs]);
+
+  if (!startedAtMs) return null;
+  const seconds = Math.max(0, Math.floor((nowMs - startedAtMs) / 1000));
+  return <span className="mt-1 block text-[10px] font-mono text-sky-200/80">運行中 {seconds}s</span>;
 }
 
 function renderImagePreview(url: string, label: string, emptyText: string) {
@@ -219,9 +234,12 @@ export function VlmArenaMatrixTable({
                     {renderImagePreview(row.resultImage3dUrl, '3D', row.outputMode === '2d' ? '未要求 3D 圖。' : '尚無 3D 圖。')}
                   </td>
                   <td className="px-3 py-2">
-                    <span className={`inline-flex rounded-sm px-2 py-0.5 text-[10px] font-semibold ${statusClassName(row)}`}>
-                      {statusLabel(row, copy)}
-                    </span>
+                    <div className="min-w-[84px]">
+                      <span className={`inline-flex rounded-sm px-2 py-0.5 text-[10px] font-semibold ${statusClassName(row)}`}>
+                        {statusLabel(row, copy)}
+                      </span>
+                      {row.runStatus === 'running' ? <RunningElapsedLabel startedAtMs={row.runStartedAtMs} /> : null}
+                    </div>
                   </td>
                   <td className="px-3 py-2 text-xs font-mono text-stone-400">—</td>
                   <td className="px-3 py-2 text-xs font-mono text-stone-400">{row.e2eMs == null ? '—' : Math.round(row.e2eMs)}</td>

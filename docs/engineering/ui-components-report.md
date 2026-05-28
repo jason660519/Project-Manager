@@ -112,7 +112,6 @@ node scripts/update-ui-components-report.mjs
 - [KeysView](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/KeysView.tsx)
 - [LlmArenaDetailSheet](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Keys/LlmArenaDetailSheet.tsx)
 - [LlmArenaMatrixTable](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Keys/LlmArenaMatrixTable.tsx)
-- [LlmArenaMethodPanel](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Keys/LlmArenaMethodPanel.tsx)
 - [LlmArenaSheet](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Keys/LlmArenaSheet.tsx)
 - [LogsView](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/LogsView.tsx)
 - [McpLogsViewer](file:///Volumes/KLEVV-4T-1/Project-Manager/app/ui/views/Plugins/_shared/McpLogsViewer.tsx)

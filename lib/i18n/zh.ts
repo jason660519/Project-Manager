@@ -464,11 +464,6 @@ export const zh: Translations = {
       noValue: '—',
     },
     llm: {
-      methodTitle: 'LLM Evaluation Settings',
-      methodDocLink: 'Open evaluation method doc ↗',
-      autoAddTopModels: 'Add top models from saved keys',
-      autoAddNoModels: 'No model can be added. Import or save a provider key in API Key Validation first.',
-      autoAddAdded: 'Added {count} top model(s).',
       tableTitle: 'LLM Arena Evaluation Table',
       searchPlaceholder: 'Search provider / model / output',
       allPlanes: 'All execution planes',
@@ -536,33 +531,6 @@ export const zh: Translations = {
         failedPrefix: 'Failed:',
         completedEmpty: 'Completed: no content',
       },
-      methodRows: [
-        {
-          dimension: 'Instruction following',
-          observe: 'Check whether system and user prompts are followed across format, tone, and output structure.',
-          passRule: 'Key instruction hit rate is at least 90% with no obvious constraint violation.',
-        },
-        {
-          dimension: 'Factual accuracy',
-          observe: 'Verify key claims and watch for hallucinated information.',
-          passRule: 'Core conclusions have no major errors, and uncertain information is clearly marked.',
-        },
-        {
-          dimension: 'Reasoning and completeness',
-          observe: 'Check whether the answer has logical steps and covers the main sub-questions.',
-          passRule: 'Reasoning is traceable and the main subtopics are covered.',
-        },
-        {
-          dimension: 'Actionability',
-          observe: 'Check whether the output can be used for downstream work such as task breakdown, specs, or code.',
-          passRule: 'The output can be adopted directly or with minor edits.',
-        },
-        {
-          dimension: 'Latency and cost',
-          observe: 'Track latency and token use for input and output.',
-          passRule: 'Latency and token usage stay within the acceptable range for the task tier.',
-        },
-      ],
     },
     vlm: {
       inputTitle: 'Test Input',

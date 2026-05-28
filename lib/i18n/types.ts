@@ -475,12 +475,6 @@ export interface Translations {
       noValue: string;
     };
     llm: {
-      methodTitle: string;
-      methodDocLink: string;
-      autoAddTopModels: string;
-      autoAddNoModels: string;
-      /** Uses {count} placeholder */
-      autoAddAdded: string;
       tableTitle: string;
       searchPlaceholder: string;
       allPlanes: string;
@@ -548,11 +542,6 @@ export interface Translations {
         failedPrefix: string;
         completedEmpty: string;
       };
-      methodRows: Array<{
-        dimension: string;
-        observe: string;
-        passRule: string;
-      }>;
     };
     vlm: {
       inputTitle: string;

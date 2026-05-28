@@ -464,11 +464,6 @@ export const zhHant: Translations = {
       noValue: '—',
     },
     llm: {
-      methodTitle: 'LLM 能力評測設定',
-      methodDocLink: '查看評測方法文件 ↗',
-      autoAddTopModels: '一鍵新增頂尖模型（依已存金鑰）',
-      autoAddNoModels: '找不到可新增模型：請先在 API Key Validation 匯入或儲存 provider key。',
-      autoAddAdded: '已新增 {count} 個頂尖模型。',
       tableTitle: 'LLM Arena 評測表',
       searchPlaceholder: '搜尋 provider / model / output',
       allPlanes: '全部運算面',
@@ -536,13 +531,6 @@ export const zhHant: Translations = {
         failedPrefix: '失敗：',
         completedEmpty: '完成：無內容',
       },
-      methodRows: [
-        { dimension: '指令遵循', observe: '檢查是否完整遵循 system + user prompt（格式、語氣、輸出結構）', passRule: '關鍵指令命中率 >= 90%，且無明顯違反限制條件' },
-        { dimension: '事實正確性', observe: '比對關鍵敘述是否可被驗證、是否出現幻覺資訊', passRule: '核心結論無重大錯誤；不確定資訊需明確標註' },
-        { dimension: '推理與完整度', observe: '觀察答案是否有邏輯步驟、覆蓋主要問題子項', passRule: '回答具可追溯推理，且主要子題皆有覆蓋' },
-        { dimension: '可執行性', observe: '輸出是否可直接用於後續工作（需求拆解、規格、程式碼）', passRule: '輸出可直接採用或僅需輕微編修' },
-        { dimension: '延遲與成本', observe: '觀察 latency + token 使用（input/output）', passRule: '延遲與 token 控制在可接受範圍（依任務等級）' },
-      ],
     },
     vlm: {
       inputTitle: '測試輸入',

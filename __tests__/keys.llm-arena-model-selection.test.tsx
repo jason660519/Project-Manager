@@ -1,6 +1,6 @@
 import React, { useLayoutEffect } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { I18nProvider } from '../lib/i18n';
 import { KeysProvider, useKeysContext } from '../app/ui/views/Keys/KeysContext';
 import { LlmArenaSheet } from '../app/ui/views/Keys/LlmArenaSheet';
@@ -76,6 +76,26 @@ describe('Keys / LLM Arena model selection', () => {
       const modelSelect = findModelSelect(container, ['claude-test-a', 'claude-test-b']);
       expect(modelSelect).toBeTruthy();
       expect(optionValues(modelSelect!)).toEqual(['claude-test-a', 'claude-test-b']);
+    });
+  });
+
+  it('does not render the removed evaluation settings panel', async () => {
+    saveProviderMetadata('anthropic', {
+      lastValidatedAt: '2026-05-27T00:00:00Z',
+      status: 'ok',
+      dynamicModels: ['claude-test-a'],
+    });
+
+    render(
+      <I18nProvider>
+        <KeysProvider initialTab="llm_arena">
+          <Harness selectedModels={[{ provider: 'anthropic', model: 'claude-test-a' }]} />
+        </KeysProvider>
+      </I18nProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText('LLM Evaluation Settings')).not.toBeInTheDocument();
     });
   });
 
@@ -157,4 +177,3 @@ describe('Keys / LLM Arena model selection', () => {
     });
   });
 });
-

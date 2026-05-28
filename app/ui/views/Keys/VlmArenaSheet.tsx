@@ -7,14 +7,18 @@ import { useI18n } from '../../../../lib/i18n';
 import { VlmArenaMethodPanel } from './VlmArenaMethodPanel';
 import { VlmArenaMatrixTable } from './VlmArenaMatrixTable';
 import { VlmArenaDetailSheet } from './VlmArenaDetailSheet';
-import type { RunHistoryEntry } from './VlmArenaTypes';
 import {
   buildImageToImagePrompt,
+  clearVlmImageToImageRuns,
   coerceImageToImageSelections,
+  getVlmImageToImageState,
   imageToImageProvidersFrom,
-  runImageOutputs,
-  syncRowsWithSelectedModels,
-  testImageToImageModel,
+  patchVlmImageToImageRow,
+  resumePersistedVlmImageTasks,
+  runVlmImageRow,
+  runVlmImageRows,
+  subscribeVlmImageToImageState,
+  syncVlmImageRowsToSelections,
   type VlmImageToImageOutputMode,
   type VlmImageToImageRow,
   type VlmImageToImageStyle,
@@ -32,9 +36,12 @@ export function VlmArenaSheet() {
   const { vlmState, setVlmState } = useKeysContext();
   const allProviders = useMemo(() => imageToImageProvidersFrom(listLlmProviders()), []);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [historyByResultKey, setHistoryByResultKey] = useState<Record<string, RunHistoryEntry[]>>({});
   const [selectedDetailIndex, setSelectedDetailIndex] = useState<number | null>(null);
-  const [rows, setRows] = useState<VlmImageToImageRow[]>([]);
+  const [arenaState, setArenaState] = useState(getVlmImageToImageState);
+  const rows = arenaState.rows;
+  const historyByResultKey = arenaState.historyByResultKey;
+
+  useEffect(() => subscribeVlmImageToImageState(setArenaState), []);
 
   useEffect(() => {
     setVlmState((prev) => {
@@ -48,101 +55,29 @@ export function VlmArenaSheet() {
   }, [allProviders, setVlmState]);
 
   useEffect(() => {
-    setRows((prev) => syncRowsWithSelectedModels(prev, vlmState.selectedModels));
+    syncVlmImageRowsToSelections(vlmState.selectedModels);
   }, [vlmState.selectedModels]);
 
-  const runSingleRow = async (index: number) => {
+  useEffect(() => {
+    resumePersistedVlmImageTasks(vlmState.imageDataUrl);
+  }, [vlmState.imageDataUrl, rows]);
+
+  const runSingleRow = (index: number) => {
     const row = rows[index];
     if (!row || !vlmState.imageDataUrl) return;
-    const startedAtMs = Date.now();
-    setRows((prev) => prev.map((item, itemIndex) => itemIndex === index
-      ? {
-          ...item,
-          runStatus: 'running',
-          message: '模型評估中...',
-          resultText: '',
-          resultImageUrl: '',
-          resultImage2dUrl: '',
-          resultImage3dUrl: '',
-          runStartedAtMs: startedAtMs,
-          e2eMs: null,
-          httpStatus: null,
-        }
-      : item));
-    const startMs = performance.now();
-    try {
-      const resultPatch = await runImageOutputs(row, vlmState.imageDataUrl, testImageToImageModel);
-      const next = {
-        ...resultPatch,
-        runStartedAtMs: null,
-        e2eMs: performance.now() - startMs,
-        lastRunAt: new Date().toISOString(),
-      };
-      setRows((prev) => prev.map((item, itemIndex) => itemIndex === index ? { ...item, ...next } : item));
-      appendHistory(row, next);
-    } catch (error) {
-      const next = {
-        runStatus: 'failed' as const,
-        message: error instanceof Error ? error.message : '測試失敗。',
-        runStartedAtMs: null,
-        e2eMs: performance.now() - startMs,
-        httpStatus: null,
-        lastRunAt: new Date().toISOString(),
-      };
-      setRows((prev) => prev.map((item, itemIndex) => itemIndex === index ? { ...item, ...next } : item));
-      appendHistory(row, next);
-    }
+    void runVlmImageRow(row.id, vlmState.imageDataUrl);
   };
 
-  const runSelectedRows = async () => {
+  const runSelectedRows = () => {
     if (!vlmState.imageDataUrl) return;
-    const enabledIndexes = rows
-      .map((row, index) => (row.shouldTest && row.runStatus !== 'running' ? index : -1))
-      .filter((index) => index >= 0);
-    await Promise.allSettled(enabledIndexes.map(runSingleRow));
-  };
-
-  const appendHistory = (row: VlmImageToImageRow, patch: Partial<VlmImageToImageRow>) => {
-    const result = { ...row, ...patch };
-    const key = `${row.provider}-${row.model}`;
-    setHistoryByResultKey((prev) => {
-      const history = prev[key] ? [...prev[key]] : [];
-      history.unshift({
-        timestamp: Date.now(),
-        scenario: 'render_2d_3d',
-        prompt: row.prompt,
-        result: {
-          provider: row.provider,
-          model: row.model,
-          content: result.resultText,
-          error: result.runStatus === 'failed' ? result.message : undefined,
-          latencyMs: Math.round(result.e2eMs ?? 0),
-          timestamp: Date.now(),
-        },
-        resultImage2dUrl: result.resultImage2dUrl,
-        resultImage3dUrl: result.resultImage3dUrl,
-        message: result.message,
-        httpStatus: result.httpStatus,
-      });
-      return { ...prev, [key]: history.slice(0, 10) };
-    });
+    const enabledRowIds = rows
+      .filter((row) => row.shouldTest && row.runStatus !== 'running')
+      .map((row) => row.id);
+    void runVlmImageRows(enabledRowIds, vlmState.imageDataUrl);
   };
 
   const clearAll = () => {
-    setRows((prev) => prev.map((row) => ({
-      ...row,
-      runStatus: 'idle',
-      resultText: '',
-      resultImageUrl: '',
-      resultImage2dUrl: '',
-      resultImage3dUrl: '',
-      message: '',
-      runStartedAtMs: null,
-      e2eMs: null,
-      httpStatus: null,
-      lastRunAt: null,
-    })));
-    setHistoryByResultKey({});
+    clearVlmImageToImageRuns();
   };
 
   const addModel = () => {
@@ -198,14 +133,13 @@ export function VlmArenaSheet() {
   };
 
   const patchRow = (index: number, patch: Partial<VlmImageToImageRow>) => {
-    setRows((prev) => prev.map((row, rowIndex) => {
-      if (rowIndex !== index) return row;
-      const next = { ...row, ...patch };
-      if (patch.style || patch.outputMode) {
-        next.prompt = buildImageToImagePrompt(next.style, next.outputMode);
-      }
-      return next;
-    }));
+    const row = rows[index];
+    if (!row) return;
+    const next = { ...patch };
+    if (patch.style || patch.outputMode) {
+      next.prompt = buildImageToImagePrompt(patch.style ?? row.style, patch.outputMode ?? row.outputMode);
+    }
+    patchVlmImageToImageRow(row.id, next);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

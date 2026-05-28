@@ -9,7 +9,7 @@
 Implemented a Project Manager local-first adaptation of the reference LLM capability evaluation flow.
 
 - Added `LlmArenaEvaluation.ts` as the scoring and evaluation source of truth.
-- Added configurable LLM Arena parameters: temperature, max tokens, timeout, sample count, and scoring profile.
+- Kept LLM Arena evaluation parameters in the internal config layer: temperature, max tokens, timeout, sample count, and scoring profile.
 - Extended `useArenaChat` results with requested/effective model, output lines, HTTP status, retry count, error type, and timeout handling.
 - Connected automatic evaluation to LLM Arena history and table rendering.
 - Extended detail/export output to include the aligned result-row contract and five score dimensions.

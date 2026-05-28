@@ -50,6 +50,60 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): 
   });
 }
 
+function isTauriRuntime(): boolean {
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+}
+
+function estimateTokens(text: string): number {
+  return Math.max(0, Math.ceil(text.length / 4));
+}
+
+async function callBrowserArenaProvider(args: {
+  provider: LlmProviderId;
+  apiKey: string;
+  model: string;
+  systemPrompt: string;
+  userPrompt: string;
+  temperature?: number;
+  maxTokens?: number;
+}): Promise<{ content: string; inputTokens: number; outputTokens: number; model: string; httpStatus: number | null }> {
+  const res = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      provider: args.provider,
+      model: args.model,
+      systemPrompt: args.systemPrompt,
+      apiKey: args.apiKey,
+      temperature: args.temperature,
+      maxTokens: args.maxTokens,
+      messages: [{ role: 'user', content: args.userPrompt }],
+    }),
+  });
+  const data = (await res.json().catch(() => null)) as
+    | {
+        content?: string;
+        model?: string;
+        inputTokens?: number;
+        outputTokens?: number;
+        error?: string;
+        details?: string[];
+      }
+    | null;
+  if (!res.ok) {
+    const details = Array.isArray(data?.details) ? ` ${data.details.join(' | ')}` : '';
+    throw new Error(`${data?.error ?? `HTTP ${res.status}`}${details}`.trim());
+  }
+  const content = data?.content ?? '';
+  return {
+    content,
+    inputTokens: typeof data?.inputTokens === 'number' ? data.inputTokens : estimateTokens(`${args.systemPrompt}\n${args.userPrompt}`),
+    outputTokens: typeof data?.outputTokens === 'number' ? data.outputTokens : estimateTokens(content),
+    model: data?.model || args.model,
+    httpStatus: res.status,
+  };
+}
+
 export function useArenaChat(storageKey?: string) {
   const [isRunning, setIsRunning] = useState(false);
   const [results, setResults] = useState<Record<string, ArenaResult>>(() => {
@@ -110,9 +164,52 @@ export function useArenaChat(storageKey?: string) {
             throw new Error(`Unknown provider: ${spec.provider}`);
           }
 
-          // Build messages payload based on apiKind
+          // Browser mode has no Tauri bridge for Gemini/OpenAI-compatible providers.
+          // Route pure-text LLM Arena calls through the local Next API proxy so all
+          // providers use the same local-server path as Chat.
+          if (!imageDataUrl && !isTauriRuntime()) {
+            const response = await withTimeout(
+              callBrowserArenaProvider({
+                provider: spec.provider,
+                apiKey,
+                model: spec.model,
+                systemPrompt,
+                userPrompt,
+                temperature,
+                maxTokens,
+              }),
+              timeoutMs ?? 0,
+              `${spec.provider}/${spec.model}`,
+            );
+            const latencyMs = Math.round(performance.now() - start);
+            const outputLines = response.content.split(/\r?\n/).filter(Boolean);
+
+            setResults((prev) => ({
+              ...prev,
+              [resultKey]: {
+                provider: spec.provider,
+                model: spec.model,
+                requestedModel: spec.model,
+                effectiveModel: response.model,
+                content: response.content,
+                outputLines,
+                httpStatus: response.httpStatus,
+                retryCount: 0,
+                errorType: response.content.trim() ? 'none' : 'empty_output',
+                inputTokens: response.inputTokens,
+                outputTokens: response.outputTokens,
+                latencyMs,
+                timestamp: Date.now(),
+              },
+            }));
+            return;
+          }
+
+          // Build messages payload based on apiKind.
           let messages: AnthropicMessage[] = [];
-          if (providerSpec.apiKind === 'anthropic') {
+          if (!imageDataUrl) {
+            messages = [{ role: 'user', content: fullText }];
+          } else if (providerSpec.apiKind === 'anthropic') {
             const contentBlocks: any[] = [];
             if (parsedImage) {
               contentBlocks.push({
@@ -190,6 +287,13 @@ export function useArenaChat(storageKey?: string) {
         } catch (error) {
           const latencyMs = Math.round(performance.now() - start);
           const errorMessage = error instanceof Error ? error.message : String(error);
+          const errorType = classifyLlmArenaError(error);
+          console.error('[llm-arena] provider run failed', {
+            provider: spec.provider,
+            model: spec.model,
+            errorType,
+            message: errorMessage,
+          });
           setResults((prev) => ({
             ...prev,
             [resultKey]: {
@@ -200,7 +304,7 @@ export function useArenaChat(storageKey?: string) {
               outputLines: [errorMessage],
               httpStatus: null,
               retryCount: 0,
-              errorType: classifyLlmArenaError(error),
+              errorType,
               error: errorMessage,
               latencyMs,
               timestamp: Date.now(),

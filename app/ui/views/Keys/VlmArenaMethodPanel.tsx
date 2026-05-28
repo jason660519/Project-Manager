@@ -20,28 +20,43 @@ export function VlmArenaMethodPanel({
   onRemoveImage,
 }: VlmArenaMethodPanelProps) {
   return (
-    <section className="border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72 p-4 shadow-xl backdrop-blur-sm rounded-sm">
-      <h2 className="mb-3 flex items-center gap-2 text-sm font-medium uppercase tracking-[0.16em] text-stone-100">
+    <section className="flex shrink-0 items-center gap-4 border border-stone-200/18 bg-[rgb(var(--pm-panel))]/72 px-4 py-3 shadow-xl backdrop-blur-sm rounded-sm">
+      <div className="flex min-w-[150px] items-center gap-2">
         <ImageIcon size={14} className="text-emerald-400" />
-        {copy.inputTitle}
-      </h2>
+        <h2 className="text-sm font-medium uppercase tracking-[0.16em] text-stone-100">{copy.inputTitle}</h2>
+      </div>
+      <input type="file" className="hidden" accept="image/*" ref={fileInputRef} onChange={onFileChange} />
       {!imageDataUrl ? (
-        <div
-          className="border-2 border-dashed border-stone-200/20 rounded-md p-8 flex flex-col items-center justify-center text-stone-400 cursor-pointer hover:border-emerald-400/50 hover:text-emerald-300 transition-colors bg-black/10"
+        <button
+          type="button"
+          className="flex h-16 w-52 items-center justify-center gap-3 rounded-md border border-dashed border-stone-200/25 bg-black/10 px-3 text-left text-stone-400 transition-colors hover:border-emerald-400/50 hover:text-emerald-300"
           onClick={() => fileInputRef.current?.click()}
         >
-          <UploadCloud size={30} className="mb-2" />
-          <span className="text-xs uppercase tracking-widest">{copy.uploadImage}</span>
-          <span className="text-[10px] mt-1 opacity-70">JPEG / PNG / WEBP</span>
-          <input type="file" className="hidden" accept="image/*" ref={fileInputRef} onChange={onFileChange} />
-        </div>
+          <UploadCloud size={20} />
+          <span className="min-w-0">
+            <span className="block truncate text-xs uppercase tracking-widest">{copy.uploadImage}</span>
+            <span className="mt-0.5 block text-[10px] opacity-70">JPEG / PNG / WEBP</span>
+          </span>
+        </button>
       ) : (
-        <div className="relative border border-stone-200/20 rounded-md overflow-hidden bg-black/50 aspect-video flex items-center justify-center">
-          <img src={imageDataUrl} alt="Uploaded preview" className="max-h-full object-contain" />
+        <div className="flex min-w-0 items-center gap-3">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="h-16 w-28 overflow-hidden rounded-md border border-stone-200/20 bg-black/50"
+            title={copy.uploadImage}
+          >
+            <img src={imageDataUrl} alt="Uploaded preview" className="h-full w-full object-contain" />
+          </button>
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-stone-200">Image ready</p>
+            <p className="text-[10px] uppercase tracking-[0.14em] text-stone-500">Click thumbnail to replace</p>
+          </div>
           <button
             onClick={onRemoveImage}
-            className="absolute top-2 right-2 bg-black/60 hover:bg-red-500/80 text-white p-1 rounded-full backdrop-blur-sm transition-colors"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-400/25 bg-red-500/10 text-red-100 transition-colors hover:bg-red-500/20"
             aria-label={copy.removeUploadedImage}
+            title={copy.removeUploadedImage}
           >
             <X size={14} />
           </button>

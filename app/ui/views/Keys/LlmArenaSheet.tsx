@@ -8,12 +8,7 @@ import { useI18n } from '../../../../lib/i18n';
 import { LlmArenaMatrixTable } from './LlmArenaMatrixTable';
 import { LlmArenaDetailSheet } from './LlmArenaDetailSheet';
 import { formatResultSummary, type EvaluationLevel, type RunHistoryEntry } from './LlmArenaTypes';
-import { LlmArenaMethodPanel } from './LlmArenaMethodPanel';
-import {
-  LLM_ARENA_EVALUATION_CONFIG,
-  buildLlmArenaResultRow,
-  sanitizeLlmArenaNumber,
-} from './LlmArenaEvaluation';
+import { buildLlmArenaResultRow } from './LlmArenaEvaluation';
 
 export function LlmArenaSheet() {
   const { t } = useI18n();
@@ -256,50 +251,6 @@ export function LlmArenaSheet() {
     setNoteByIndex({});
   };
 
-  const updateLlmNumber = (
-    key: 'temperature' | 'maxTokens' | 'timeoutMs' | 'sampleCount',
-    value: number,
-  ) => {
-    setLlmState((prev) => {
-      if (key === 'temperature') {
-        return { ...prev, temperature: sanitizeLlmArenaNumber(value, prev.temperature, 0, 2) };
-      }
-      if (key === 'maxTokens') {
-        return {
-          ...prev,
-          maxTokens: sanitizeLlmArenaNumber(
-            value,
-            prev.maxTokens,
-            LLM_ARENA_EVALUATION_CONFIG.minMaxTokens,
-            LLM_ARENA_EVALUATION_CONFIG.maxMaxTokens,
-          ),
-        };
-      }
-      if (key === 'timeoutMs') {
-        return {
-          ...prev,
-          timeoutMs: sanitizeLlmArenaNumber(
-            value,
-            prev.timeoutMs,
-            LLM_ARENA_EVALUATION_CONFIG.minTimeoutMs,
-            LLM_ARENA_EVALUATION_CONFIG.maxTimeoutMs,
-          ),
-        };
-      }
-      return {
-        ...prev,
-        sampleCount: Math.round(
-          sanitizeLlmArenaNumber(
-            value,
-            prev.sampleCount,
-            LLM_ARENA_EVALUATION_CONFIG.minSampleCount,
-            LLM_ARENA_EVALUATION_CONFIG.maxSampleCount,
-          ),
-        ),
-      };
-    });
-  };
-
   const handleAutoAddTopModels = async () => {
     const topModelByProvider: Partial<Record<string, string>> = {
       anthropic: 'claude-opus-4-1',
@@ -385,24 +336,6 @@ export function LlmArenaSheet() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
-      <LlmArenaMethodPanel
-        copy={copy}
-        systemPrompt={llmState.systemPrompt}
-        userPrompt={llmState.userPrompt}
-        temperature={llmState.temperature}
-        maxTokens={llmState.maxTokens}
-        timeoutMs={llmState.timeoutMs}
-        sampleCount={llmState.sampleCount}
-        scoringProfile={llmState.scoringProfile}
-        onSystemPromptChange={(systemPrompt) => setLlmState((prev) => ({ ...prev, systemPrompt }))}
-        onUserPromptChange={(userPrompt) => setLlmState((prev) => ({ ...prev, userPrompt }))}
-        onTemperatureChange={(value) => updateLlmNumber('temperature', value)}
-        onMaxTokensChange={(value) => updateLlmNumber('maxTokens', value)}
-        onTimeoutMsChange={(value) => updateLlmNumber('timeoutMs', value)}
-        onSampleCountChange={(value) => updateLlmNumber('sampleCount', value)}
-        onScoringProfileChange={(scoringProfile) => setLlmState((prev) => ({ ...prev, scoringProfile }))}
-        onAutoAddTopModels={() => void handleAutoAddTopModels()}
-      />
       <LlmArenaMatrixTable
         copy={copy}
         commonCopy={t.keysArena.common}
