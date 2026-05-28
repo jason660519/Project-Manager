@@ -994,7 +994,7 @@ export function ProjectsView({
               }`}
             >
               <div
-                className="flex cursor-pointer items-start justify-between gap-3 px-4 py-3"
+                className="flex cursor-pointer flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start sm:justify-between"
                 onClick={() => onSelectProject(project.id)}
               >
                 <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -1007,7 +1007,7 @@ export function ProjectsView({
                     title="Include this project in Dashboard"
                   />
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium text-stone-100">
                         {project.config.project.name}
                       </span>
@@ -1033,10 +1033,10 @@ export function ProjectsView({
                     </p>
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-3 text-xs text-stone-400">
+                <div className="flex w-full shrink-0 flex-wrap items-center gap-2 text-xs text-stone-400 sm:w-auto sm:justify-end">
                   <span>{features.length} features</span>
                   {/* Two actions only: Initialize/Initialized toggle + Delete. */}
-                  <div className="flex items-center gap-1">
+                  <div className="flex flex-wrap items-center gap-1">
                     {showInitialize &&
                       (isReady ? (
                         <>

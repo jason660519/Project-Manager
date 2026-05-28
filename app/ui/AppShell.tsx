@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { ViewId } from '../../lib/types';
 import { I18nProvider } from '../../lib/i18n';
 import type { ChatContext } from '../../lib/chat/types';
+import { useFontZoomShortcuts } from '../../lib/hooks/useFontZoomShortcuts';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 
@@ -23,6 +24,7 @@ export function AppShell({
   chatContext,
 }: AppShellProps) {
   const isXmux = currentView === 'xmux';
+  useFontZoomShortcuts();
 
   return (
     <I18nProvider>

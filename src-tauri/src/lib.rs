@@ -26,6 +26,20 @@ struct ExitEvent {
     code: i32,
 }
 
+#[derive(Serialize, Clone)]
+struct FontZoomShortcutEvent {
+    action: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    direction: Option<&'static str>,
+    shortcut: &'static str,
+    source: &'static str,
+}
+
+const FONT_ZOOM_EVENT: &str = "font-zoom-shortcut";
+const FONT_ZOOM_IN_MENU_ID: &str = "font-zoom-in";
+const FONT_ZOOM_OUT_MENU_ID: &str = "font-zoom-out";
+const FONT_ZOOM_ACTUAL_SIZE_MENU_ID: &str = "font-zoom-actual-size";
+
 // ── Commands ──────────────────────────────────────────────────────────────────
 
 // Filenames for the consolidated dashboard layout (ADR-008).
@@ -65,6 +79,161 @@ fn normalize_github_remote_url(remote_url: &str) -> Option<String> {
     }
 
     Some(format!("https://github.com/{owner}/{repo}"))
+}
+
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn register_windows_font_zoom_shortcuts<R: tauri::Runtime>(
+    app: &tauri::App<R>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use tauri_plugin_global_shortcut::{Code, Modifiers, ShortcutState};
+
+    app.handle().plugin(
+        tauri_plugin_global_shortcut::Builder::new()
+            .with_shortcuts([
+                "Super+Equal",
+                "Super+NumpadAdd",
+                "Super+Minus",
+                "Super+NumpadSubtract",
+            ])?
+            .with_handler(|app, shortcut, event| {
+                if event.state != ShortcutState::Pressed {
+                    return;
+                }
+
+                let payload = if shortcut.matches(Modifiers::SUPER, Code::Equal) {
+                    Some(FontZoomShortcutEvent {
+                        action: "in",
+                        direction: Some("in"),
+                        shortcut: "Win++",
+                        source: "windows-global-shortcut",
+                    })
+                } else if shortcut.matches(Modifiers::SUPER, Code::NumpadAdd) {
+                    Some(FontZoomShortcutEvent {
+                        action: "in",
+                        direction: Some("in"),
+                        shortcut: "Win+NumpadAdd",
+                        source: "windows-global-shortcut",
+                    })
+                } else if shortcut.matches(Modifiers::SUPER, Code::Minus) {
+                    Some(FontZoomShortcutEvent {
+                        action: "out",
+                        direction: Some("out"),
+                        shortcut: "Win+-",
+                        source: "windows-global-shortcut",
+                    })
+                } else if shortcut.matches(Modifiers::SUPER, Code::NumpadSubtract) {
+                    Some(FontZoomShortcutEvent {
+                        action: "out",
+                        direction: Some("out"),
+                        shortcut: "Win+NumpadSubtract",
+                        source: "windows-global-shortcut",
+                    })
+                } else {
+                    None
+                };
+
+                if let Some(payload) = payload {
+                    if let Err(error) = app.emit(FONT_ZOOM_EVENT, payload) {
+                        log::warn!("failed to emit font zoom shortcut event: {error}");
+                    }
+                }
+            })
+            .build(),
+    )?;
+    Ok(())
+}
+
+fn emit_font_zoom_shortcut<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    action: &'static str,
+    direction: Option<&'static str>,
+    shortcut: &'static str,
+    source: &'static str,
+) {
+    let payload = FontZoomShortcutEvent {
+        action,
+        direction,
+        shortcut,
+        source,
+    };
+    if let Err(error) = app.emit(FONT_ZOOM_EVENT, payload) {
+        log::warn!("failed to emit font zoom shortcut event: {error}");
+    }
+}
+
+fn configure_app_menu<R: tauri::Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
+    use tauri::menu::{Menu, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
+
+    let app_handle = app.handle();
+    let menu = Menu::default(app_handle)?;
+    let zoom_in = MenuItemBuilder::with_id(FONT_ZOOM_IN_MENU_ID, "Zoom In")
+        .accelerator("CmdOrCtrl++")
+        .build(app)?;
+    let zoom_out = MenuItemBuilder::with_id(FONT_ZOOM_OUT_MENU_ID, "Zoom Out")
+        .accelerator("CmdOrCtrl+-")
+        .build(app)?;
+    let actual_size =
+        MenuItemBuilder::with_id(FONT_ZOOM_ACTUAL_SIZE_MENU_ID, "Actual Size")
+            .accelerator("CmdOrCtrl+0")
+            .build(app)?;
+
+    let view_submenu = menu
+        .items()?
+        .into_iter()
+        .find_map(|item| {
+            let submenu = item.as_submenu()?.clone();
+            match submenu.text() {
+                Ok(text) if text == "View" => Some(submenu),
+                _ => None,
+            }
+        });
+
+    if let Some(view) = view_submenu {
+        view.append(&PredefinedMenuItem::separator(app)?)?;
+        view.append_items(&[&zoom_in, &zoom_out, &actual_size])?;
+    } else {
+        let view = SubmenuBuilder::new(app, "View")
+            .items(&[&zoom_in, &zoom_out, &actual_size])
+            .build()?;
+        let items = menu.items()?;
+        let insert_position = items
+            .iter()
+            .position(|item| {
+                item.as_submenu()
+                    .and_then(|submenu| submenu.text().ok())
+                    .is_some_and(|text| text == "Window" || text == "Help")
+            })
+            .unwrap_or(items.len());
+        menu.insert(&view, insert_position)?;
+    }
+
+    menu.set_as_app_menu()?;
+    app.on_menu_event(|app, event| match event.id().0.as_str() {
+        FONT_ZOOM_IN_MENU_ID => emit_font_zoom_shortcut(
+            app,
+            "in",
+            Some("in"),
+            "CmdOrCtrl++",
+            "app-menu",
+        ),
+        FONT_ZOOM_OUT_MENU_ID => emit_font_zoom_shortcut(
+            app,
+            "out",
+            Some("out"),
+            "CmdOrCtrl+-",
+            "app-menu",
+        ),
+        FONT_ZOOM_ACTUAL_SIZE_MENU_ID => emit_font_zoom_shortcut(
+            app,
+            "reset",
+            None,
+            "CmdOrCtrl+0",
+            "app-menu",
+        ),
+        _ => {}
+    });
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -4963,6 +5132,11 @@ pub fn run() {
                         .level(log::LevelFilter::Info)
                         .build(),
                 )?;
+            }
+            configure_app_menu(app)?;
+            #[cfg(target_os = "windows")]
+            if let Err(error) = register_windows_font_zoom_shortcuts(app) {
+                log::warn!("failed to register Windows font zoom shortcuts: {error}");
             }
             Ok(())
         })

@@ -43,6 +43,13 @@ interface VlmArenaState extends ArenaState {
   imageDetail: 'auto' | 'low' | 'high';
 }
 
+interface PersistedKeysState {
+  version: 1;
+  activeTab: KeysTab;
+  llmState: ArenaState;
+  vlmState: VlmArenaState;
+}
+
 interface KeysContextType {
   activeTab: KeysTab;
   setActiveTab: (tab: KeysTab) => void;
@@ -79,6 +86,69 @@ const defaultVlmState: VlmArenaState = {
   imageDetail: 'auto',
 };
 
+const KEYS_STATE_STORAGE_KEY = 'projectManager:keys-state:v1';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function sanitizeArenaState(value: unknown, fallback: ArenaState): ArenaState {
+  if (!isRecord(value)) return fallback;
+  const rawModels = Array.isArray(value.selectedModels) ? value.selectedModels : [];
+  const selectedModels = rawModels
+    .map((item) => {
+      if (!isRecord(item)) return null;
+      const provider = typeof item.provider === 'string' ? (item.provider as LlmProviderId) : null;
+      const model = typeof item.model === 'string' ? item.model : null;
+      if (!provider || !model) return null;
+      return { provider, model };
+    })
+    .filter((item): item is { provider: LlmProviderId; model: string } => item !== null)
+    .slice(0, 10);
+  return {
+    systemPrompt: typeof value.systemPrompt === 'string' ? value.systemPrompt : fallback.systemPrompt,
+    userPrompt: typeof value.userPrompt === 'string' ? value.userPrompt : fallback.userPrompt,
+    selectedModels,
+    temperature:
+      typeof value.temperature === 'number' && Number.isFinite(value.temperature)
+        ? value.temperature
+        : fallback.temperature,
+  };
+}
+
+function sanitizeVlmState(value: unknown, fallback: VlmArenaState): VlmArenaState {
+  if (!isRecord(value)) return fallback;
+  const arena = sanitizeArenaState(value, fallback);
+  return {
+    ...arena,
+    imageDataUrl: typeof value.imageDataUrl === 'string' ? value.imageDataUrl : null,
+    imageDetail:
+      value.imageDetail === 'auto' || value.imageDetail === 'low' || value.imageDetail === 'high'
+        ? value.imageDetail
+        : fallback.imageDetail,
+  };
+}
+
+function loadPersistedKeysState(): PersistedKeysState | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(KEYS_STATE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (!isRecord(parsed)) return null;
+    if (parsed.version !== 1) return null;
+    const activeTab = typeof parsed.activeTab === 'string' ? (parsed.activeTab as KeysTab) : 'api_key_validation';
+    return {
+      version: 1,
+      activeTab,
+      llmState: sanitizeArenaState(parsed.llmState, defaultLlmState),
+      vlmState: sanitizeVlmState(parsed.vlmState, defaultVlmState),
+    };
+  } catch {
+    return null;
+  }
+}
+
 const KeysContext = createContext<KeysContextType | null>(null);
 
 export function KeysProvider({
@@ -88,9 +158,10 @@ export function KeysProvider({
   children: ReactNode;
   initialTab?: KeysTab;
 }) {
+  const persistedState = useMemo(() => loadPersistedKeysState(), []);
   const [activeTab, setActiveTab] = useState<KeysTab>(initialTab);
-  const [llmState, setLlmState] = useState<ArenaState>(defaultLlmState);
-  const [vlmState, setVlmState] = useState<VlmArenaState>(defaultVlmState);
+  const [llmState, setLlmState] = useState<ArenaState>(persistedState?.llmState ?? defaultLlmState);
+  const [vlmState, setVlmState] = useState<VlmArenaState>(persistedState?.vlmState ?? defaultVlmState);
   const [providerMetadata, setProviderMetadata] = useState<ProviderMetadataMap>(() =>
     loadAllProviderMetadata(),
   );
@@ -104,6 +175,21 @@ export function KeysProvider({
       setValidatedModelSupport(loadValidatedModelSupportSummary());
     });
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const payload: PersistedKeysState = {
+        version: 1,
+        activeTab,
+        llmState,
+        vlmState,
+      };
+      window.localStorage.setItem(KEYS_STATE_STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      // Ignore persistence failures (quota/private mode) without breaking UI.
+    }
+  }, [activeTab, llmState, vlmState]);
 
   const validatedLlmProviders = useMemo(() => {
     const all = listLlmProviders();

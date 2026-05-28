@@ -43,10 +43,13 @@ interface LlmArenaMatrixTableProps {
   providers: readonly ProviderLike[];
   results: Record<string, ArenaResult>;
   isRunning: boolean;
+  runningIndex?: number | null;
+  isRunningAll?: boolean;
   userPrompt: string;
   enabledByIndex: Record<number, boolean>;
   evaluationByIndex: Record<number, EvaluationLevel>;
   noteByIndex: Record<number, string>;
+  promptOverrideByIndex: Record<number, string>;
   historyByResultKey: Record<string, RunHistoryEntry[]>;
   onClearAll: () => void;
   onAddModel: () => void;
@@ -57,6 +60,7 @@ interface LlmArenaMatrixTableProps {
   onToggleEnabled: (index: number, enabled: boolean) => void;
   onEvaluationChange: (index: number, level: EvaluationLevel) => void;
   onNoteChange: (index: number, note: string) => void;
+  onRowPromptChange: (index: number, value: string) => void;
   onOpenDetail: (index: number) => void;
 }
 
@@ -69,10 +73,13 @@ export function LlmArenaMatrixTable({
   providers,
   results,
   isRunning,
+  runningIndex,
+  isRunningAll,
   userPrompt,
   enabledByIndex,
   evaluationByIndex,
   noteByIndex,
+  promptOverrideByIndex,
   historyByResultKey,
   onClearAll,
   onAddModel,
@@ -83,6 +90,7 @@ export function LlmArenaMatrixTable({
   onToggleEnabled,
   onEvaluationChange,
   onNoteChange,
+  onRowPromptChange,
   onOpenDetail,
 }: LlmArenaMatrixTableProps) {
   const [searchText, setSearchText] = useState('');
@@ -209,11 +217,11 @@ export function LlmArenaMatrixTable({
         cell: ({ row }) => (
           <button
             onClick={() => onRunSingleRow(row.original.index)}
-            disabled={isRunning || !userPrompt.trim()}
+            disabled={isRunning || !(promptOverrideByIndex[row.original.index] ?? userPrompt).trim()}
             className="inline-flex h-7 items-center gap-1 rounded border border-emerald-200/25 bg-emerald-100/10 px-2 text-[11px] font-medium text-emerald-100 hover:bg-emerald-100/18 disabled:opacity-40"
             title={copy.runSingleTitle}
           >
-            {isRunning ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
+            {isRunning && runningIndex === row.original.index ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
             {copy.columns.run}
           </button>
         ),
@@ -229,11 +237,19 @@ export function LlmArenaMatrixTable({
       col.display({
         id: 'col-prompt',
         header: copy.columns.testPrompt,
-        cell: () => (
-          <p className="max-w-[220px] line-clamp-3 whitespace-pre-wrap break-words text-xs text-stone-300">
-            {userPrompt || '—'}
-          </p>
-        ),
+        cell: ({ row }) => {
+          const idx = row.original.index;
+          const value = promptOverrideByIndex[idx] ?? userPrompt;
+          return (
+            <textarea
+              value={value}
+              onChange={(e) => onRowPromptChange(idx, e.target.value)}
+              placeholder={userPrompt || '—'}
+              rows={3}
+              className="w-full min-w-[220px] resize-y bg-[rgb(var(--pm-input))] border border-stone-200/15 p-1.5 font-mono text-[11px] leading-relaxed text-stone-200 outline-none focus:ring-1 focus:ring-emerald-400/50"
+            />
+          );
+        },
       }),
       col.display({
         id: 'col-raw',
@@ -370,14 +386,17 @@ export function LlmArenaMatrixTable({
       copy,
       evaluationByIndex,
       isRunning,
+      runningIndex,
       noteByIndex,
       onEvaluationChange,
       onNoteChange,
       onOpenDetail,
       onRemoveModel,
       onRunSingleRow,
+      onRowPromptChange,
       onToggleEnabled,
       onUpdateModel,
+      promptOverrideByIndex,
       providers,
       userPrompt,
     ],
@@ -425,7 +444,7 @@ export function LlmArenaMatrixTable({
             disabled={isRunning || !userPrompt.trim() || selectedModels.length === 0}
             className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-emerald-50 px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isRunning ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
+            {isRunningAll ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
             {copy.runAll}
           </button>
         </div>

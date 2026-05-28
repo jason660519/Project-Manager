@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { LlmProviderId } from '../../../../lib/keys/llmProviders';
 import { getLlmProvider } from '../../../../lib/keys/llmProviders';
 import { loadProviderKey } from '../../../../lib/keys/loadProviderKey';
@@ -31,9 +31,24 @@ export interface UseArenaChatConfig {
   imageDetail?: 'auto' | 'low' | 'high';
 }
 
-export function useArenaChat() {
+export function useArenaChat(storageKey?: string) {
   const [isRunning, setIsRunning] = useState(false);
-  const [results, setResults] = useState<Record<string, ArenaResult>>({});
+  const [results, setResults] = useState<Record<string, ArenaResult>>(() => {
+    if (!storageKey || typeof window === 'undefined') return {};
+    try {
+      const raw = localStorage.getItem(storageKey);
+      return raw ? (JSON.parse(raw) as Record<string, ArenaResult>) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    if (!storageKey || typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(results));
+    } catch {}
+  }, [results, storageKey]);
 
   const runComparison = useCallback(
     async ({

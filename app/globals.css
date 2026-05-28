@@ -7,6 +7,9 @@
 
 :root {
   color-scheme: dark;
+  --pm-font-zoom: 1;
+  font-size: calc(16px * var(--pm-font-zoom));
+  transition: font-size 120ms ease;
 
   /* default = Hermes Teal adapted to PM's emerald palette */
   --pm-bg-rgb:       7 27 24;

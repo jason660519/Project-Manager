@@ -5,7 +5,6 @@ import { useKeysContext } from './KeysContext';
 import { useArenaChat } from './useArenaChat';
 import { hasProviderKey } from '../../../../lib/keys/loadProviderKey';
 import { useI18n } from '../../../../lib/i18n';
-import { LlmArenaMethodPanel } from './LlmArenaMethodPanel';
 import { LlmArenaMatrixTable } from './LlmArenaMatrixTable';
 import { LlmArenaDetailSheet } from './LlmArenaDetailSheet';
 import { formatResultSummary, type EvaluationLevel, type RunHistoryEntry } from './LlmArenaTypes';
@@ -14,15 +13,17 @@ export function LlmArenaSheet() {
   const { t } = useI18n();
   const copy = t.keysArena.llm;
   const { llmState, setLlmState, validatedLlmProviders } = useKeysContext();
-  const { runComparison, results, clearResults, isRunning } = useArenaChat();
+  const { runComparison, results, clearResults, isRunning } = useArenaChat('pm.arena.llm.results');
   const allProviders = validatedLlmProviders;
   const seenResultTimestampRef = useRef<Record<string, number>>({});
   const [enabledByIndex, setEnabledByIndex] = useState<Record<number, boolean>>({});
   const [evaluationByIndex, setEvaluationByIndex] = useState<Record<number, EvaluationLevel>>({});
   const [noteByIndex, setNoteByIndex] = useState<Record<number, string>>({});
+  const [promptOverrideByIndex, setPromptOverrideByIndex] = useState<Record<number, string>>({});
   const [historyByResultKey, setHistoryByResultKey] = useState<Record<string, RunHistoryEntry[]>>({});
   const [selectedDetailIndex, setSelectedDetailIndex] = useState<number | null>(null);
-  const [autoAddHint, setAutoAddHint] = useState<string>('');
+  const [runningIndex, setRunningIndex] = useState<number | null>(null);
+  const [isRunningAll, setIsRunningAll] = useState(false);
   const autoAddSignatureRef = useRef<string>('');
   const providersSignature = allProviders
     .map((provider) => `${provider.id}:${provider.availableModels.join(',')}`)
@@ -85,6 +86,15 @@ export function LlmArenaSheet() {
       llmState.selectedModels.forEach((_, index) => {
         if (typeof next[index] !== 'string') next[index] = '';
       });
+      Object.keys(next).forEach((key) => {
+        const index = Number(key);
+        if (Number.isFinite(index) && index >= llmState.selectedModels.length) delete next[index];
+      });
+      return next;
+    });
+
+    setPromptOverrideByIndex((prev) => {
+      const next = { ...prev };
       Object.keys(next).forEach((key) => {
         const index = Number(key);
         if (Number.isFinite(index) && index >= llmState.selectedModels.length) delete next[index];
@@ -159,12 +169,22 @@ export function LlmArenaSheet() {
 
   const runSingleRow = async (index: number) => {
     const spec = llmState.selectedModels[index];
-    if (!spec || !llmState.userPrompt.trim()) return;
-    await runComparison({
-      models: [spec],
-      systemPrompt: llmState.systemPrompt,
-      userPrompt: llmState.userPrompt,
-    });
+    const effectivePrompt = promptOverrideByIndex[index] ?? llmState.userPrompt;
+    if (!spec || !effectivePrompt.trim()) return;
+    setRunningIndex(index);
+    try {
+      await runComparison({
+        models: [spec],
+        systemPrompt: llmState.systemPrompt,
+        userPrompt: effectivePrompt,
+      });
+    } finally {
+      setRunningIndex(null);
+    }
+  };
+
+  const handleRowPromptChange = (index: number, value: string) => {
+    setPromptOverrideByIndex((prev) => ({ ...prev, [index]: value }));
   };
 
   const runSelectedRows = async () => {
@@ -172,8 +192,13 @@ export function LlmArenaSheet() {
     const enabledIndexes = llmState.selectedModels
       .map((_, index) => index)
       .filter((index) => enabledByIndex[index] !== false);
-    for (const index of enabledIndexes) {
-      await runSingleRow(index);
+    setIsRunningAll(true);
+    try {
+      for (const index of enabledIndexes) {
+        await runSingleRow(index);
+      }
+    } finally {
+      setIsRunningAll(false);
     }
   };
 
@@ -214,9 +239,8 @@ export function LlmArenaSheet() {
       'zhipu',
     ];
 
-    const existing = new Set(llmState.selectedModels.map((m) => `${m.provider}::${m.model}`));
     const providersById = new Map(allProviders.map((p) => [p.id, p]));
-    const nextToAdd: { provider: (typeof llmState.selectedModels)[number]['provider']; model: string }[] = [];
+    const candidateModels: { provider: (typeof llmState.selectedModels)[number]['provider']; model: string }[] = [];
 
     for (const providerId of rank) {
       const provider = providersById.get(providerId as any);
@@ -230,23 +254,29 @@ export function LlmArenaSheet() {
         provider.availableModels[0] ||
         '';
       if (!model) continue;
-      const dedupeKey = `${provider.id}::${model}`;
-      if (existing.has(dedupeKey)) continue;
-      existing.add(dedupeKey);
-      nextToAdd.push({ provider: provider.id, model });
-      if (nextToAdd.length >= 8) break;
+      candidateModels.push({ provider: provider.id, model });
     }
 
-    if (nextToAdd.length === 0) {
-      setAutoAddHint(copy.autoAddNoModels);
-      return;
-    }
+    if (candidateModels.length === 0) return;
 
-    setLlmState((prev) => ({
-      ...prev,
-      selectedModels: [...prev.selectedModels, ...nextToAdd],
-    }));
-    setAutoAddHint(copy.autoAddAdded.replace('{count}', String(nextToAdd.length)));
+    setLlmState((prev) => {
+      const remainingSlots = Math.max(0, 10 - prev.selectedModels.length);
+      if (remainingSlots === 0) return prev;
+      const existing = new Set(prev.selectedModels.map((m) => `${m.provider}::${m.model}`));
+      const additions = candidateModels
+        .filter((candidate) => {
+          const dedupeKey = `${candidate.provider}::${candidate.model}`;
+          if (existing.has(dedupeKey)) return false;
+          existing.add(dedupeKey);
+          return true;
+        })
+        .slice(0, remainingSlots);
+      if (additions.length === 0) return prev;
+      return {
+        ...prev,
+        selectedModels: [...prev.selectedModels, ...additions],
+      };
+    });
   };
 
   useEffect(() => {
@@ -265,16 +295,6 @@ export function LlmArenaSheet() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
-      <LlmArenaMethodPanel
-        copy={copy}
-        systemPrompt={llmState.systemPrompt}
-        userPrompt={llmState.userPrompt}
-        onSystemPromptChange={(next) => setLlmState((s) => ({ ...s, systemPrompt: next }))}
-        onUserPromptChange={(next) => setLlmState((s) => ({ ...s, userPrompt: next }))}
-        onAutoAddTopModels={() => void handleAutoAddTopModels()}
-        autoAddHint={autoAddHint}
-      />
-
       <LlmArenaMatrixTable
         copy={copy}
         commonCopy={t.keysArena.common}
@@ -282,10 +302,13 @@ export function LlmArenaSheet() {
         providers={allProviders}
         results={results}
         isRunning={isRunning}
+        runningIndex={runningIndex}
+        isRunningAll={isRunningAll}
         userPrompt={llmState.userPrompt}
         enabledByIndex={enabledByIndex}
         evaluationByIndex={evaluationByIndex}
         noteByIndex={noteByIndex}
+        promptOverrideByIndex={promptOverrideByIndex}
         historyByResultKey={historyByResultKey}
         onClearAll={handleClearAll}
         onAddModel={addModel}
@@ -296,6 +319,7 @@ export function LlmArenaSheet() {
         onToggleEnabled={(index, enabled) => setEnabledByIndex((prev) => ({ ...prev, [index]: enabled }))}
         onEvaluationChange={(index, level) => setEvaluationByIndex((prev) => ({ ...prev, [index]: level }))}
         onNoteChange={(index, note) => setNoteByIndex((prev) => ({ ...prev, [index]: note }))}
+        onRowPromptChange={handleRowPromptChange}
         onOpenDetail={setSelectedDetailIndex}
       />
 

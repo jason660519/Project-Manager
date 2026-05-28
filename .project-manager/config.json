@@ -1126,6 +1126,39 @@
         ],
         "kickoffAt": "2026-05-28T01:29:41.000Z"
       }
+    },
+    {
+      "id": "F37",
+      "name": "Windows Font Zoom Shortcuts and Global Font Scaling",
+      "category": "Desktop Runtime",
+      "status": "in_progress",
+      "progress": 96,
+      "phase": "development",
+      "points": 5,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F37/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F37/",
+        "spec": ".project-manager/features/F37/feature-spec.md",
+        "tdd": ".project-manager/features/F37/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F37/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F37/",
+        "implementation": "src-tauri/src/lib.rs",
+        "test": "__tests__/fontZoom.test.ts"
+      },
+      "notes": "Actual Size reset and View menu zoom actions added; Tauri/Windows manual validation pending",
+      "createdAt": "2026-05-28T09:46:39.051Z",
+      "updatedAt": "2026-05-28T10:26:18.362Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "src-tauri/src/lib.rs",
+          "__tests__/fontZoom.test.ts",
+          ".project-manager/features/F37/dev-log.md"
+        ],
+        "kickoffAt": "2026-05-28T09:46:39.051Z",
+        "resumedAt": "2026-05-28T10:26:18.362Z"
+      }
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",
@@ -1136,6 +1169,6 @@
     "root": "/Volumes/KLEVV-4T-1/Project-Manager"
   },
   "schemaVersion": 8,
-  "updatedAt": "2026-05-28T04:00:00.000Z",
+  "updatedAt": "2026-05-28T10:26:18.362Z",
   "updatedBy": "Codex"
 }

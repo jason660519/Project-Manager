@@ -852,6 +852,12 @@ export async function augmentArgsWithMcp(
 
 export type AgentStdioPayload = { pid: number; line: string };
 export type AgentExitPayload = { pid: number; code: number };
+export type FontZoomShortcutPayload = {
+  action?: 'in' | 'out' | 'reset';
+  direction?: 'in' | 'out';
+  shortcut: string;
+  source: string;
+};
 export type UnlistenFn = () => void;
 
 async function listen<T>(event: string, cb: (payload: T) => void): Promise<UnlistenFn> {
@@ -869,6 +875,13 @@ export function onAgentStderr(cb: (p: AgentStdioPayload) => void): Promise<Unlis
 
 export function onAgentExit(cb: (p: AgentExitPayload) => void): Promise<UnlistenFn> {
   return listen<AgentExitPayload>('agent-exit', cb);
+}
+
+export function onFontZoomShortcut(
+  cb: (payload: FontZoomShortcutPayload) => void,
+): Promise<UnlistenFn> {
+  if (!isTauri()) return Promise.resolve(() => {});
+  return listen<FontZoomShortcutPayload>('font-zoom-shortcut', cb);
 }
 
 // ── Config file watch ─────────────────────────────────────────────────────────

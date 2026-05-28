@@ -1,10 +1,17 @@
 import React, { useLayoutEffect } from 'react';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
 import { I18nProvider } from '../lib/i18n';
 import { KeysProvider, useKeysContext } from '../app/ui/views/Keys/KeysContext';
 import { LlmArenaSheet } from '../app/ui/views/Keys/LlmArenaSheet';
 import { saveProviderMetadata } from '../lib/keys/providerMetadata';
+import type { LlmProviderId } from '../lib/keys/llmProviders';
+
+const hasProviderKeyMock = vi.fn<(provider: LlmProviderId) => Promise<boolean>>();
+
+vi.mock('../lib/keys/loadProviderKey', () => ({
+  hasProviderKey: (provider: LlmProviderId) => hasProviderKeyMock(provider),
+}));
 
 function Harness({ selectedModels }: { selectedModels: Array<{ provider: any; model: string }> }) {
   const { setLlmState } = useKeysContext();
@@ -33,6 +40,11 @@ function findModelSelect(container: HTMLElement, modelIds: string[]) {
 }
 
 describe('Keys / LLM Arena model selection', () => {
+  beforeEach(() => {
+    hasProviderKeyMock.mockReset();
+    hasProviderKeyMock.mockResolvedValue(false);
+  });
+
   it('limits providers + models to the validated dynamic model set', async () => {
     saveProviderMetadata('anthropic', {
       lastValidatedAt: '2026-05-27T00:00:00Z',
@@ -113,6 +125,35 @@ describe('Keys / LLM Arena model selection', () => {
     await waitFor(() => {
       const providerSelect = findProviderSelect(container, ['anthropic', 'openai', 'gemini']);
       expect(providerSelect).toBeUndefined();
+    });
+  });
+
+  it('does not duplicate models when auto-add runs with existing selections', async () => {
+    saveProviderMetadata('anthropic', {
+      lastValidatedAt: '2026-05-27T00:00:00Z',
+      status: 'ok',
+      dynamicModels: ['claude-opus-4-1'],
+    });
+    saveProviderMetadata('openai', {
+      lastValidatedAt: '2026-05-27T00:00:00Z',
+      status: 'ok',
+      dynamicModels: ['o1'],
+    });
+    hasProviderKeyMock.mockImplementation(async (provider) => provider === 'anthropic' || provider === 'openai');
+
+    const { container } = render(
+      <I18nProvider>
+        <KeysProvider initialTab="llm_arena">
+          <Harness selectedModels={[{ provider: 'anthropic', model: 'claude-opus-4-1' }]} />
+        </KeysProvider>
+      </I18nProvider>,
+    );
+
+    await waitFor(() => {
+      const modelSelects = Array.from(container.querySelectorAll('select')).filter((select) =>
+        select.querySelector('option[value="o1"]'),
+      );
+      expect(modelSelects.length).toBe(1);
     });
   });
 });
