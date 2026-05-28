@@ -22,7 +22,11 @@ import {
 } from 'lucide-react';
 import { deriveBrowserLabel } from '../terminal/blockLayout';
 import { openExternalUrl } from '../../lib/bridge';
-import { isXmuxSelectedElementPayload } from '../../lib/xmux/selectedElementSnippet';
+import {
+  formatXmuxSelectedElementSnippet,
+  isXmuxSelectedElementPayload,
+  setXmuxSnippetDragData,
+} from '../../lib/xmux/selectedElementSnippet';
 import { BrowserSlot } from './BrowserSlot';
 import {
   backendKind,
@@ -252,6 +256,10 @@ export function BrowserContent({
   const [cssInspectorOpen, setCssInspectorOpen] = useState(false);
   const [cssInspectorTab, setCssInspectorTab] = useState<CssInspectorTab>('design');
   const [cssInspectorPayload, setCssInspectorPayload] = useState<CssInspectorPayload | null>(null);
+  const [selectedDragContext, setSelectedDragContext] = useState<{
+    snippet: string;
+    payload: CssInspectorPayload;
+  } | null>(null);
   const browserPaneRef = useRef<HTMLDivElement>(null);
   const selectSessionRef = useRef(0);
 
@@ -455,6 +463,7 @@ export function BrowserContent({
       const inspectorPayload = parseCssInspectorPayload(payload);
       if (!inspectorPayload) {
         setSelectMode(false);
+        setSelectedDragContext(null);
         setStatus({
           tone: 'error',
           message: 'Select Element returned no usable DOM context.',
@@ -462,6 +471,8 @@ export function BrowserContent({
         return;
       }
       setCssInspectorPayload(inspectorPayload);
+      const snippet = formatXmuxSelectedElementSnippet(inspectorPayload);
+      setSelectedDragContext({ snippet, payload: inspectorPayload });
       const text = JSON.stringify(payload, null, 2);
       await navigator.clipboard.writeText(text).catch(() => {});
       window.dispatchEvent(
@@ -476,7 +487,7 @@ export function BrowserContent({
       setSelectMode(false);
       setStatus({
         tone: 'success',
-        message: `Selected element captured (${tag}) and sent to AI Assistant.`,
+        message: `Selected element captured (${tag}), sent to AI Assistant, and ready to drag.`,
       });
     },
     [],
@@ -496,9 +507,10 @@ export function BrowserContent({
     const session = selectSessionRef.current + 1;
     selectSessionRef.current = session;
     setSelectMode(true);
+    setSelectedDragContext(null);
     setStatus({
       tone: 'info',
-      message: 'Select Element mode is active. Click a page element to copy DOM context.',
+      message: 'Select Element mode is active. Click a page element to send DOM context, or click blank page space to cancel.',
     });
     void selectNativeBrowserElement(itemId)
       .then((rawPayload) => completeSelectElement(rawPayload, session))
@@ -677,6 +689,13 @@ export function BrowserContent({
           </button>
         </div>
       ) : null}
+      {selectedDragContext ? (
+        <SelectedElementDragChip
+          snippet={selectedDragContext.snippet}
+          payload={selectedDragContext.payload}
+          onClear={() => setSelectedDragContext(null)}
+        />
+      ) : null}
       {showBlockedHint ? (
         <div className="relative z-[100] flex shrink-0 items-center gap-2 border-b border-amber-900/40 bg-amber-950/40 px-2 py-1 text-[11px] text-amber-200">
           <Info size={12} className="shrink-0" />
@@ -760,6 +779,50 @@ export function BrowserContent({
           </BrowserSidePanel>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+function SelectedElementDragChip({
+  snippet,
+  payload,
+  onClear,
+}: {
+  snippet: string;
+  payload: CssInspectorPayload;
+  onClear: () => void;
+}) {
+  const label = `${payload.positionTag ?? 'selected'} · ${payload.elementTag ?? payload.domTree?.tag ?? 'element'}`;
+  const selector = payload.selector ?? payload.cssPath ?? '';
+
+  return (
+    <div className="relative z-[100] flex shrink-0 items-center gap-2 border-b border-blue-500/25 bg-blue-950/30 px-2 py-1 text-[11px] text-blue-100">
+      <Clipboard size={12} className="shrink-0 text-blue-200" />
+      <div
+        draggable
+        onDragStart={(event) => {
+          setXmuxSnippetDragData(event.dataTransfer, snippet, payload);
+          event.dataTransfer.dropEffect = 'copy';
+        }}
+        className="flex min-w-0 flex-1 cursor-grab items-center gap-2 border border-blue-400/30 bg-blue-500/10 px-2 py-1 active:cursor-grabbing"
+        aria-label="Drag selected element context"
+        title="Drag selected element context into another AI input"
+      >
+        <span className="shrink-0 font-mono text-[10px] text-blue-100">{label}</span>
+        {selector ? (
+          <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-blue-200/70">
+            {selector}
+          </span>
+        ) : null}
+      </div>
+      <button
+        type="button"
+        onClick={onClear}
+        className="shrink-0 px-1 text-[11px] text-blue-200/70 hover:text-blue-50"
+        aria-label="Clear selected element context"
+      >
+        Clear
+      </button>
     </div>
   );
 }

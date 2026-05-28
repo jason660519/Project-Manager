@@ -267,6 +267,29 @@ describe('ChatPanel', () => {
     });
   });
 
+  it('treats whitespace-only chat input as blank before appending Xmux context', async () => {
+    renderPanel(true, true);
+    const input = screen.getByPlaceholderText(/ask me anything/i) as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: ' \n\t' } });
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('pm:xmux-selected-element', {
+          detail: {
+            positionTag: 'top',
+            elementTag: 'header',
+            selector: 'body > header',
+          },
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(input.value.startsWith('[xmux element: top · header]')).toBe(true);
+      expect(input.value.startsWith(' \n\t')).toBe(false);
+    });
+  });
+
   it('ignores empty Xmux selected element payloads', async () => {
     renderPanel(true, true);
     const input = screen.getByPlaceholderText(/ask me anything/i) as HTMLTextAreaElement;

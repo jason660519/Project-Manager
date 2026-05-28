@@ -21,6 +21,8 @@ This page documents the assistant as it ships today: how to toggle it, what cont
 
 Both surfaces share the same input component, settings, and underlying chat backend — the only difference is layout and history persistence.
 
+For the broader multi-sheet operator surface that supervises assistants, AI Engineers, workflow runs, permissions, memory, and audit history, see [AI Assistants Control Console](ai-assistants-control-console.md).
+
 ## At a glance
 
 Click the **Bot** icon in the TopBar to open the floating panel. It opens already expanded near where you left it last time, with the input focused and ready.

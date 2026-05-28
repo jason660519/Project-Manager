@@ -1059,7 +1059,7 @@
       "name": "Agent Workflow DAG Control Plane",
       "category": "AI Workflows",
       "status": "in_progress",
-      "progress": 40,
+      "progress": 55,
       "phase": "development",
       "points": 8,
       "locatedSection": "lib/agent-workflows",
@@ -1073,13 +1073,15 @@
         "implementation": "lib/agent-workflows",
         "test": "__tests__/agentWorkflowDag.test.ts"
       },
-      "notes": "Define Project Manager's multi-agent DAG control plane before runtime integration: Software Dev and Deep Research templates, per-agent session isolation, tool bundle refs, and a future WorkerRuntimeAdapter boundary for local/xmux/CubeSandbox/E2B.",
+      "notes": "Expanded F35 from type-level DAG foundation into product/engineering control-plane spec with glossary, diagrams, AI Assistants Control Console guidance, Edit Engineer Role terminology, and product-level test scenarios.",
       "createdAt": "2026-05-28T00:00:00.000Z",
-      "updatedAt": "2026-05-28T01:00:00.000Z",
+      "updatedAt": "2026-05-28T02:00:00.000Z",
       "updatedBy": "Codex",
       "metadata": {
         "evidencePaths": [
           "docs/architecture/ADR-013-agent-workflow-dag-control-plane.md",
+          "docs/guides/features/ai-assistants-control-console.md",
+          "docs/guides/features/agent-workflows.md",
           "lib/agent-workflows/dagDefinitions.ts",
           "lib/agent-workflows/sessionScope.ts",
           "__tests__/agentWorkflowDag.test.ts"
@@ -1128,6 +1130,6 @@
     "root": "/Volumes/KLEVV-4T-1/Project-Manager"
   },
   "schemaVersion": 8,
-  "updatedAt": "2026-05-28T00:00:00.000Z",
+  "updatedAt": "2026-05-28T02:00:00.000Z",
   "updatedBy": "Codex"
 }

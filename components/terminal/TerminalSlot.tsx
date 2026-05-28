@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { attach, detach, notifySlotVisible } from './TerminalRegistry';
+import { getXmuxDraggedSnippet } from '../../lib/xmux/selectedElementSnippet';
+import { attach, detach, notifySlotVisible, writeTerminalInput } from './TerminalRegistry';
 
 // Thin React shell over TerminalRegistry: claims a slot for `itemId` on mount,
 // returns it to limbo on unmount. PTY + xterm survive across mounts.
@@ -31,5 +32,21 @@ export function TerminalSlot({
     notifySlotVisible(itemId);
   }, [isActive, itemId]);
 
-  return <div ref={slotRef} className="h-full min-h-0 min-w-0 w-full overflow-hidden" />;
+  return (
+    <div
+      ref={slotRef}
+      className="h-full min-h-0 min-w-0 w-full overflow-hidden"
+      onDragOver={(event) => {
+        if (!getXmuxDraggedSnippet(event.dataTransfer)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'copy';
+      }}
+      onDrop={(event) => {
+        const snippet = getXmuxDraggedSnippet(event.dataTransfer);
+        if (!snippet) return;
+        event.preventDefault();
+        writeTerminalInput(itemId, snippet);
+      }}
+    />
+  );
 }

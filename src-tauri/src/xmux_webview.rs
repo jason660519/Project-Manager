@@ -537,6 +537,11 @@ new Promise((resolve) => {
       resolve(JSON.stringify({ error: 'Clicked target was not an element.' }));
       return;
     }
+    if (el === document.documentElement || el === document.body) {
+      cleanup();
+      resolve(JSON.stringify({ cancelled: true, reason: 'blank-area' }));
+      return;
+    }
     const rect = el.getBoundingClientRect();
     const payload = {
       source: 'Project Manager Xmux Select Element',

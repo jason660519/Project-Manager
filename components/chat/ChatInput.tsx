@@ -2,6 +2,10 @@
 
 import { FileText, Send, X } from 'lucide-react';
 import { KeyboardEvent, useEffect, useRef, useState } from 'react';
+import {
+  appendXmuxSnippetToInput,
+  getXmuxDraggedSnippet,
+} from '../../lib/xmux/selectedElementSnippet';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -132,8 +136,7 @@ export function ChatInput({
       setValue: setInputValue,
       appendValue: (suffix: string) => {
         const current = valueRef.current;
-        const separator = current.length === 0 ? '' : current.endsWith('\n') ? '\n' : '\n\n';
-        const next = `${current}${separator}${suffix}`;
+        const next = appendXmuxSnippetToInput(current, suffix);
         valueRef.current = next;
         setValue(next);
         focusInput(true, next.length);
@@ -235,6 +238,26 @@ export function ChatInput({
     textareaRef.current?.focus();
   };
 
+  const appendSnippetAtEnd = (snippet: string) => {
+    const next = appendXmuxSnippetToInput(valueRef.current, snippet);
+    valueRef.current = next;
+    setValue(next);
+    focusInput(true, next.length);
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLTextAreaElement>) => {
+    if (!getXmuxDraggedSnippet(event.dataTransfer)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLTextAreaElement>) => {
+    const snippet = getXmuxDraggedSnippet(event.dataTransfer);
+    if (!snippet) return;
+    event.preventDefault();
+    appendSnippetAtEnd(snippet);
+  };
+
   return (
     <div>
       {/* File chips */}
@@ -289,6 +312,8 @@ export function ChatInput({
             setValue(event.target.value);
           }}
           onKeyDown={handleKeyDown}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
           placeholder={placeholder}
           rows={1}
           className="min-h-[34px] max-h-[200px] w-full resize-none rounded-lg border border-stone-200/15 bg-stone-950/70 px-3 py-2 text-[11px] text-stone-100 outline-none placeholder:text-stone-500 focus:border-amber-200/40 leading-relaxed"

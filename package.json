@@ -11,6 +11,8 @@
     "typecheck": "next typegen && tsc --noEmit",
     "guard:legacy-surfaces": "node scripts/check-legacy-surfaces.mjs",
     "branch:check": "node scripts/check-branch-hygiene.mjs",
+    "feature:kickoff": "node scripts/create-feature-checkpoint.mjs",
+    "feature:resume": "node scripts/resume-feature-checkpoint.mjs",
     "bridge:typecheck": "tsc --noEmit --project ../shared-bridge/tsconfig.json",
     "standards:check": "/Volumes/KLEVV-4T-1/Company-AI-App-Standards/scripts/company-standards.sh check .",
     "standards:fix": "/Volumes/KLEVV-4T-1/Company-AI-App-Standards/scripts/company-standards.sh fix .",

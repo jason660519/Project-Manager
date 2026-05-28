@@ -1,63 +1,93 @@
 # F35 Test Scenarios
 
+## Purpose
+
+Translate the Agent Workflow DAG Control Plane into real user journeys that future unit, integration, browser, and Tauri tests can cover. These scenarios are product-level, not just type-level.
+
 ## Personas
 
 | Persona | Goal | Risk |
 | --- | --- | --- |
-| Technical lead | Run software development workflow with parallel implementers and review gates | Hidden shared memory biases reviewers |
-| Research operator | Fan out research topics and merge a report | Summarizer reads unverified intermediate chatter instead of declared artifacts |
-| Maintainer | Add CubeSandbox later without redesigning Dispatch | Runtime-specific details leak into the workflow schema |
-| Security reviewer | Audit tool and memory boundaries | Secrets or SSH keys are accidentally serialized into workflow definitions |
+| Technical lead | Run software development workflow with parallel implementers and review gates. | Hidden shared memory biases reviewers or hides implementation risk. |
+| Research operator | Fan out research topics and merge a report. | Summarizer reads unverified intermediate chatter instead of declared artifacts. |
+| Maintainer | Add CubeSandbox later without redesigning Dispatch. | Runtime-specific details leak into the workflow schema. |
+| Security reviewer | Audit tool and memory boundaries. | Secrets or SSH keys are accidentally serialized into workflow definitions. |
+| New operator | Understand terms in AI Assistants Console and Edit Engineer Role. | User configures wrong model, memory, scope, or capability because labels are unclear. |
 
-## Scenarios
+## Scenario Matrix
 
-### F35-S01: Software Development fan-out
+| Scenario ID | User path | Risk | Unit / integration coverage | E2E / manual candidate | Status |
+| --- | --- | --- | --- | --- | --- |
+| F35-S01 | User opens Development sheet and sees F35 artifacts. | Follow-up engineer cannot find spec/TDD/dev log. | Config JSON path check. | Dashboard document-link click. | Covered by config + manual candidate |
+| F35-S02 | User reads glossary before configuring workflows. | Product terms drift across Console, Engineers, Dispatch, and Sessions. | Docs existence / heading check candidate. | Documentation page review. | Candidate |
+| F35-S03 | User dispatches Software Development workflow. | Nodes run in wrong order or skip review/test gates. | `agentWorkflowDag.test.ts` validates node roles and dependencies. | Dispatch modal workflow template later. | Partially covered |
+| F35-S04 | User dispatches Deep Research workflow. | Branches do not fan out or report node merges raw memory. | `agentWorkflowDag.test.ts` validates branch dependencies. | Console workflow run view later. | Partially covered |
+| F35-S05 | Reviewer Worker fails and resumes. | Resume loads sibling worker's session. | Session key tests vary by node/agent/run. | Sessions view grouping later. | Covered at unit level |
+| F35-S06 | Summarizer runs after parallel workers. | Summarizer reads private transcripts instead of declared artifacts. | Artifact contract and session policy tests candidate. | Manual artifact-only handoff review later. | Candidate |
+| F35-S07 | User edits Engineer Role primary model and fallback chain. | CLI/direct provider behavior is misunderstood. | Engineer detail tests candidate. | Edit Engineer Role field walkthrough. | Candidate |
+| F35-S08 | User assigns capability in Edit Engineer Role. | Worker receives untested tool or unsupported capability. | Capability resolver tests candidate. | Integrations Hub -> Engineers -> Dispatch manual flow. | Candidate |
+| F35-S09 | User switches runtime preference from xmux to CubeSandbox. | Workflow model becomes provider-specific. | Runtime provider type tests covered. | CubeSandbox PoC later. | Partially covered |
+| F35-S10 | Permission blocks command execution. | Worker runs risky command without approval. | Permission gate tests candidate. | Console Permissions sheet later. | Candidate |
+| F35-S11 | Coordinator retries a runtime failure. | Retry loops forever or hides failure. | WorkflowRun state-machine tests candidate. | Run log manual review later. | Candidate |
+| F35-S12 | Operator audits memory access. | Worker memory pollution is invisible. | Session scope tests covered. | Audit sheet memory-access event later. | Partially covered |
 
-1. Load `software-dev-parallel`.
-2. Inspect node roles and dependencies.
-3. Confirm planner is upstream of implementer nodes.
-4. Confirm reviewer/tester nodes depend on implementation outputs.
-5. Confirm summarizer depends on review and test outputs.
+## Detailed User Journeys
 
-Expected: workflow is acyclic and exposes clear gates for future Dispatch UI.
+### F35-S03: Software Development fan-out
 
-### F35-S02: Deep Research fan-out
+1. User selects a Development feature.
+2. User chooses `Software Development` workflow.
+3. Coordinator creates a WorkflowRun.
+4. Planner Worker produces `implementation-plan`.
+5. Implementer Workers run in parallel.
+6. Reviewer Workers read implementation artifacts, not hidden implementer transcripts.
+7. Tester/Evaluator Workers run after reviews.
+8. Summarizer reads declared outputs and writes handoff.
 
-1. Load `deep-research-parallel`.
-2. Inspect researcher, writer, and report nodes.
-3. Confirm writer nodes depend on search outputs.
-4. Confirm report node depends on writer outputs.
+Expected: workflow is acyclic, gates are visible, every node has a session scope and output contract.
 
-Expected: workflow supports parallel search/write branches and one final report artifact.
+### F35-S04: Deep Research fan-out
 
-### F35-S03: Worker memory isolation
+1. User opens AI Assistants Control Console.
+2. User starts Deep Research with topics A/B/C.
+3. Coordinator creates parallel search Workers.
+4. Writer Workers synthesize only their assigned topic artifacts.
+5. Report Worker merges topic drafts and source notes.
 
-1. Build scopes for the same workflow run and two different nodes.
-2. Generate store keys.
-3. Build scopes for the same node and two different agents.
+Expected: source notes and report sections are artifacts; private branch transcripts are not merged by default.
 
-Expected: every key is unique and path-safe.
+### F35-S05: Failed Worker resume
 
-### F35-S04: Runtime provider swap
+1. `review-a` fails after writing partial logs.
+2. User selects Resume.
+3. Coordinator resolves `projectId + workflowId + workflowRunId + nodeId + agentId`.
+4. Runtime adapter resumes from the matching checkpoint.
 
-1. Inspect runtime profiles on built-in nodes.
-2. Change a copy of a node from `xmux` to `cube-sandbox`.
-3. Validate the workflow shape.
+Expected: `review-a` resumes its own checkpoint; `review-b` session remains unread and untouched.
 
-Expected: the DAG definition remains valid because runtime provider is declarative.
+### F35-S07: Edit Engineer Role field comprehension
 
-### F35-S05: Tool bundle resolution boundary
+1. User opens AI Assistants Control Console -> AI Engineers.
+2. User opens Edit Engineer Role.
+3. User reviews Role Name, Slug, Default Agent, Primary Model, Fallback Chain, Skills, System Prompt, Capabilities, Test Prompt, Working Scope.
+4. User saves a Reviewer role.
+5. Dispatch uses the role in a workflow node.
 
-1. Inspect node tool bundle refs.
-2. Confirm refs point to source kind and source id only.
-3. Confirm no raw secret values exist.
+Expected: each field has a clear purpose and maps to Worker creation behavior.
 
-Expected: Integrations Hub can later resolve candidates without workflow definitions storing credentials.
+### F35-S08: Tool bundle resolution
 
-### F35-S06: Failed worker resume
+1. Role requests Eyes and browser/search tools.
+2. Adapter declares only text and shell support.
+3. Integrations Hub has no passed Eyes candidate.
+4. Coordinator blocks Worker creation.
 
-1. Build a session scope for `workflowRunId=run-a`, `nodeId=review-a`, `agentId=reviewer-1`.
-2. Generate a restore-point key.
-3. Build another scope for `nodeId=review-b`.
+Expected: UI explains missing/unsupported capability before runtime execution begins.
 
-Expected: resume target is exact; sibling reviewer history is not loaded.
+## Conversion Rule
+
+When implementing UI or runtime slices, convert each scenario into:
+
+- one unit test for data contract or state machine behavior;
+- one integration test for component-level wiring;
+- one browser/Tauri manual script when runtime or desktop permissions are involved.

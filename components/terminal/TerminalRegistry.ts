@@ -256,6 +256,17 @@ export function notifySlotVisible(itemId: string): void {
   }
 }
 
+export function writeTerminalInput(itemId: string, text: string): void {
+  const session = sessions.get(itemId);
+  if (!session || session.destroyed || !text) return;
+  session.term.focus();
+  if (session.pty) {
+    session.pty.write(text);
+    return;
+  }
+  session.term.write(text);
+}
+
 export function detach(itemId: string): void {
   const session = sessions.get(itemId);
   if (!session) return;

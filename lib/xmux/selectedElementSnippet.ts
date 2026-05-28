@@ -11,6 +11,8 @@ export interface XmuxSelectedElementSnippetPayload {
   [key: string]: unknown;
 }
 
+export const XMUX_SELECTED_ELEMENT_MIME = 'application/x-project-manager-xmux-selected-element';
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
@@ -68,7 +70,35 @@ export function formatXmuxSelectedElementSnippet(payload: XmuxSelectedElementSni
 
 /** Append selected-element context after the current input text (never before or in the middle). */
 export function appendXmuxSnippetToInput(current: string, snippet: string): string {
-  if (current.length === 0) return snippet;
-  const separator = current.endsWith('\n') ? '\n' : '\n\n';
+  if (current.trim().length === 0) return snippet;
+  const separator = current.endsWith('\n') ? '' : '\n\n';
   return `${current}${separator}${snippet}`;
+}
+
+export function getXmuxDraggedSnippet(dataTransfer: DataTransfer): string {
+  const custom = dataTransfer.getData(XMUX_SELECTED_ELEMENT_MIME);
+  if (custom.trim()) return custom;
+  const plain = dataTransfer.getData('text/plain');
+  if (plain.includes('[xmux element:')) return plain;
+  return '';
+}
+
+export function setXmuxSnippetDragData(
+  dataTransfer: DataTransfer,
+  snippet: string,
+  payload?: XmuxSelectedElementSnippetPayload,
+): void {
+  dataTransfer.effectAllowed = 'copy';
+  dataTransfer.setData(XMUX_SELECTED_ELEMENT_MIME, snippet);
+  dataTransfer.setData('text/plain', snippet);
+  dataTransfer.setData(
+    'text/html',
+    `<pre>${snippet
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')}</pre>`,
+  );
+  if (payload) {
+    dataTransfer.setData('application/json', JSON.stringify(payload, null, 2));
+  }
 }

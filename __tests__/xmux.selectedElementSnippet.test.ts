@@ -3,6 +3,8 @@ import {
   appendXmuxSnippetToInput,
   formatXmuxSelectedElementSnippet,
   isXmuxSelectedElementPayload,
+  setXmuxSnippetDragData,
+  XMUX_SELECTED_ELEMENT_MIME,
 } from '../lib/xmux/selectedElementSnippet';
 
 describe('xmux selected element snippet', () => {
@@ -32,6 +34,37 @@ describe('xmux selected element snippet', () => {
   it('uses the snippet alone when input is empty', () => {
     const snippet = '[xmux element: bottom · button]';
     expect(appendXmuxSnippetToInput('', snippet)).toBe(snippet);
+  });
+
+  it('treats whitespace-only input as blank before inserting the snippet', () => {
+    const snippet = '[xmux element: bottom · button]';
+    expect(appendXmuxSnippetToInput('  \n\t', snippet)).toBe(snippet);
+  });
+
+  it('appends after unsubmitted multiline input without inserting into the middle', () => {
+    const snippet = '[xmux element: bottom · button]';
+    expect(appendXmuxSnippetToInput('line 1\nline 2\n', snippet)).toBe(
+      'line 1\nline 2\n[xmux element: bottom · button]',
+    );
+  });
+
+  it('sets plain text, html, custom mime, and JSON data for drag targets', () => {
+    const store = new Map<string, string>();
+    const dataTransfer = {
+      effectAllowed: '',
+      setData: (type: string, value: string) => {
+        store.set(type, value);
+      },
+    } as unknown as DataTransfer;
+    const snippet = '[xmux element: bottom · button]\n<button>Go</button>';
+
+    setXmuxSnippetDragData(dataTransfer, snippet, { elementTag: 'button' });
+
+    expect(dataTransfer.effectAllowed).toBe('copy');
+    expect(store.get(XMUX_SELECTED_ELEMENT_MIME)).toBe(snippet);
+    expect(store.get('text/plain')).toBe(snippet);
+    expect(store.get('text/html')).toContain('&lt;button&gt;Go&lt;/button&gt;');
+    expect(store.get('application/json')).toContain('"elementTag": "button"');
   });
 
   it('rejects empty and cancelled selected element payloads', () => {

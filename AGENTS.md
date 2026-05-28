@@ -48,6 +48,10 @@ When the user asks for `/daily-report`, `daily-report`, `每日工作日誌`, or
 
 When the user asks for `/debug-retro`, `debug-retro`, `沉澱本次debug經驗`, or asks to convert a debugging session into reusable TDD/E2E scenarios, follow `docs/project-process/commands/debug-retro.md` and update the affected feature's `debug-retro.md`, `test-scenarios.md`, and dashboard metadata.
 
+When the user asks for `/feature-kickoff`, `feature-kickoff`, `新增今天工作ID`, `先登記Development sheet`, `先建Feature Spec/TDD/Dev log`, or asks to create the feature checkpoint before implementation, follow `docs/project-process/commands/feature-kickoff.md` and use `npm run feature:kickoff -- ...` to create or update the Development sheet feature entry and canonical `.project-manager/features/<ID>/` artifacts before code changes.
+
+When the user asks for `/feature-resume Fxx`, `feature-resume`, `接續 Fxx`, `接續同事的 feature id`, or asks to continue an existing work ID, follow `docs/project-process/commands/feature-resume.md` and use `npm run feature:resume -- --id Fxx ...` to read the existing feature artifacts, append a continuation block to `dev-log.md`, and update Development sheet metadata before code changes.
+
 ## Context7
 
 Use Context7 MCP to fetch current documentation whenever the task asks about a library, framework, SDK, API, CLI tool, or cloud service. Start with `resolve-library-id` unless the user provides an exact `/org/project` library ID, then use `query-docs` with the selected library ID and the full question.

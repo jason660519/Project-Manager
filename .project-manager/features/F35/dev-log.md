@@ -42,3 +42,33 @@ CubeSandbox is treated as a future `WorkerRuntimeAdapter` provider. The first im
 - F35 progress set to 40%.
 - Complete: control-plane contracts, built-in DAG templates, session namespace helpers, docs, and focused tests.
 - Remaining: runtime adapter interface implementation, Dispatch template UI integration, tool candidate resolver, and live session persistence wiring.
+
+## 2026-05-28 - Specification upgrade for shared vocabulary and console usage
+
+### User feedback
+
+The first F35 slice was too implementation-heavy. It defined DAG types and tests but did not explain enough product vocabulary or user operation:
+
+- Coordinator, AI Engineers, Workers, Workflow, Memory, Session, Runtime Adapter, Harness, Checkpoint, and related terms were not clearly defined.
+- AI Assistants Control Console behavior was not explained as an operator surface.
+- Edit Engineer Role field names were not mapped to Worker creation behavior.
+- Dispatch flow diagrams were missing.
+
+### Changes
+
+- Expanded `feature-spec.md` into a product + engineering control-plane spec.
+- Added glossary, control-plane flow, Software Development flow, Deep Research flow, memory/session isolation flow, and Edit Engineer Role vocabulary.
+- Expanded `test-scenarios.md` into product-level journeys and scenario matrix.
+- Expanded `tdd-spec.md` with documentation/vocabulary contract and future WorkflowRun state-machine cases.
+- Added user-facing guides:
+  - `docs/guides/features/ai-assistants-control-console.md`
+  - `docs/guides/features/agent-workflows.md`
+
+### Verification
+
+- `npm run docs:site:sync` - pass, synced 76 internal-preview docs and 9 public docs.
+- `npm run docs:check` - pass.
+- `npm run docs:site:check` - pass.
+- `npm run test -- --run __tests__/agentWorkflowDag.test.ts __tests__/agentWorkflows.test.ts` - pass, 2 files / 15 tests.
+- `npm run standards:check` - exit 0 with existing P2 hard-coded color advisory outside this feature slice.
+- `npm run typecheck` - pass.

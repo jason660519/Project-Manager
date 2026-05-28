@@ -7,7 +7,7 @@ Introduce the first Project Manager control-plane model for multi-agent workflow
 ## Current State
 
 - Status: in_progress
-- Progress: 40%
+- Progress: 55%
 - Phase: development
 - Owner: Codex
 - Created: 2026-05-28
@@ -17,6 +17,8 @@ Introduce the first Project Manager control-plane model for multi-agent workflow
 - Define typed workflow DAG nodes, dependencies, retry policy, runtime profile, tool bundle references, and output contracts.
 - Provide default Software Development and Deep Research workflow templates.
 - Define per-agent session scope helpers so worker memory and chat history do not share a global store.
+- Define shared vocabulary for Coordinator, AI Assistant, AI Engineer, Worker, Workflow, Memory, Session, Runtime Adapter, Harness, Checkpoint, and Resume Point.
+- Document AI Assistants Control Console and Edit Engineer Role terminology before UI expansion.
 - Add architecture documentation and tests before any CubeSandbox runtime implementation.
 
 ## Non-Goals
@@ -32,3 +34,8 @@ Introduce the first Project Manager control-plane model for multi-agent workflow
 - TDD spec: `tdd-spec.md`
 - User scenarios: `test-scenarios.md`
 - Dev log: `dev-log.md`
+
+## Related Guides
+
+- `docs/guides/features/ai-assistants-control-console.md`
+- `docs/guides/features/agent-workflows.md`

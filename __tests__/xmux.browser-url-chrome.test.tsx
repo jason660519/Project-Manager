@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BrowserContent } from '../components/browser/BrowserContent';
 import { BROWSER_CHROME_HEIGHT_PX } from '../components/browser/browser-bounds';
 import { __resetForTests as resetBrowserRegistry } from '../components/browser/BrowserRegistry';
+import { XMUX_SELECTED_ELEMENT_MIME } from '../lib/xmux/selectedElementSnippet';
 
 const setSlotHidden = vi.fn();
 const navigate = vi.fn();
@@ -391,6 +392,7 @@ describe('xmux browser URL chrome', () => {
     await waitFor(() => {
       expect(selectNativeBrowserElement).toHaveBeenCalledWith('browser-inspector-test');
       expect(selectButton).toHaveAttribute('aria-pressed', 'true');
+      expect(selectButton.className).toContain('text-blue-200');
     });
 
     await user.click(selectButton);
@@ -432,6 +434,20 @@ describe('xmux browser URL chrome', () => {
       expect(screen.getByText(/Selected element captured/)).toBeInTheDocument();
       expect(selectButton).toHaveAttribute('aria-pressed', 'false');
     });
+    const dragContext = screen.getByLabelText('Drag selected element context');
+    const dragStore = new Map<string, string>();
+    fireEvent.dragStart(dragContext, {
+      dataTransfer: {
+        effectAllowed: '',
+        dropEffect: '',
+        setData: (type: string, value: string) => {
+          dragStore.set(type, value);
+        },
+      },
+    });
+    expect(dragStore.get(XMUX_SELECTED_ELEMENT_MIME)).toContain('[xmux element: bottom · button]');
+    expect(dragStore.get('text/plain')).toContain('selector: body > button');
+    expect(dragStore.get('application/json')).toContain('"elementTag": "button"');
 
     await user.click(screen.getByLabelText('Show browser console'));
     expect(screen.getByText('Console')).toBeInTheDocument();
@@ -497,5 +513,73 @@ describe('xmux browser URL chrome', () => {
     expect(writeText).not.toHaveBeenCalled();
     expect(selectedListener).not.toHaveBeenCalled();
     window.removeEventListener('pm:xmux-selected-element', selectedListener);
+  });
+
+  it('treats blank page selection payloads as cancellation without dispatching assistant context', async () => {
+    const user = userEvent.setup();
+    const selectedListener = vi.fn();
+    window.addEventListener('pm:xmux-selected-element', selectedListener);
+
+    render(
+      <BrowserContent
+        itemId="browser-blank-select-test"
+        url="https://example.com"
+        homepageUrl="https://example.com"
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    const selectButton = screen.getByLabelText('Select Element mode');
+    await user.click(selectButton);
+    await waitFor(() => expect(selectButton).toHaveAttribute('aria-pressed', 'true'));
+
+    finishSelectElement(JSON.stringify({ cancelled: true, reason: 'blank-area' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Select Element mode cancelled/)).toBeInTheDocument();
+      expect(selectButton).toHaveAttribute('aria-pressed', 'false');
+    });
+    expect(selectedListener).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText('Drag selected element context')).not.toBeInTheDocument();
+
+    window.removeEventListener('pm:xmux-selected-element', selectedListener);
+  });
+
+  it('keeps Select Element state stable across repeated selections', async () => {
+    const user = userEvent.setup();
+    render(
+      <BrowserContent
+        itemId="browser-repeat-select-test"
+        url="https://example.com"
+        homepageUrl="https://example.com"
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    const selectButton = screen.getByLabelText('Select Element mode');
+    await user.click(selectButton);
+    await waitFor(() => expect(selectButton).toHaveAttribute('aria-pressed', 'true'));
+    finishSelectElement(defaultSelectElementPayload());
+    await waitFor(() => {
+      expect(selectButton).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.getByLabelText('Drag selected element context')).toHaveTextContent('bottom · button');
+    });
+
+    await user.click(selectButton);
+    await waitFor(() => expect(selectButton).toHaveAttribute('aria-pressed', 'true'));
+    finishSelectElement(
+      JSON.stringify({
+        positionTag: 'top',
+        elementTag: 'input',
+        selector: 'form > input',
+        domTree: { tag: 'input' },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(selectButton).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.getByLabelText('Drag selected element context')).toHaveTextContent('top · input');
+      expect(screen.queryByText('bottom · button')).not.toBeInTheDocument();
+    });
   });
 });

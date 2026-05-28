@@ -194,6 +194,26 @@ Restricts which file paths this engineer may modify. Two pieces:
 
 If there are zero allowed paths, the field is treated as "no scope restriction".
 
+## Role vocabulary in workflow dispatch
+
+When an AI Engineer is used by an Agent Workflow, the Edit Engineer Role fields become part of the Worker creation contract.
+
+| Field | Dispatch meaning | Worker creation effect |
+|---|---|---|
+| Role Name | Human-readable job title. | Appears in node assignment, run logs, and summaries. |
+| Slug | Stable short ID. | Used for matching workflow role hints and filtering runs. |
+| Default Agent | Preferred adapter or harness. | Seeds runtime selection when the workflow node has no override. |
+| Primary Provider | Preferred LLM company. | Routes direct AI calls and runtimes that support provider selection. |
+| Primary Model | Exact model ID. | Passed to the provider or CLI model flag. |
+| Fallback Chain | Ordered backup providers/models. | Applies to direct AI calls; CLI runtimes may only use the primary. |
+| Skills | Role capability labels. | Matched to project skill packs and prompt context. |
+| System Prompt | Durable role instruction. | Prepended to the node prompt after project protocol. |
+| Capabilities | Qualified tool and modality candidates. | Must be resolved through Integrations Hub before worker start. |
+| Test Prompt | Provider/model sanity check. | Verifies the selected model behaves as expected. |
+| Working Scope | File/path boundary. | Injected into the prompt; strict mode surfaces warnings before dispatch. |
+
+The workflow Coordinator should block a Worker before runtime start when a required provider, model, capability, permission, or memory scope is missing.
+
 ### Save / Reset / Delete
 
 The footer carries three actions:
