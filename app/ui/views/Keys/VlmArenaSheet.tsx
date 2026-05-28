@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useKeysContext } from './KeysContext';
 import { listLlmProviders, type LlmProviderId } from '../../../../lib/keys/llmProviders';
 import { useI18n } from '../../../../lib/i18n';
+import type { ArenaModelSpec } from './useArenaChat';
 import { VlmArenaMethodPanel } from './VlmArenaMethodPanel';
 import { VlmArenaMatrixTable } from './VlmArenaMatrixTable';
 import { VlmArenaDetailSheet } from './VlmArenaDetailSheet';
@@ -29,6 +30,16 @@ const IMAGE_OUTPUT_MODEL_PRESETS: Array<{ provider: LlmProviderId; model: string
   { provider: 'openai', model: 'gpt-image-1' },
   { provider: 'qwen', model: 'qwen-image-2.0-pro' },
 ];
+
+function moveItem<T>(items: T[], fromIndex: number, toIndex: number): T[] {
+  if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= items.length || toIndex >= items.length) {
+    return items;
+  }
+  const next = [...items];
+  const [item] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, item);
+  return next;
+}
 
 export function VlmArenaSheet() {
   const { t } = useI18n();
@@ -82,6 +93,7 @@ export function VlmArenaSheet() {
 
   const addModel = () => {
     const defaultProvider = allProviders[0];
+    if (!defaultProvider) return;
     setVlmState((prev) => ({
       ...prev,
       selectedModels: [
@@ -122,6 +134,7 @@ export function VlmArenaSheet() {
       ...prev,
       selectedModels: prev.selectedModels.filter((_, i) => i !== index)
     }));
+    setSelectedDetailIndex((prev) => (prev === index ? null : prev != null && prev > index ? prev - 1 : prev));
   };
 
   const updateModel = (index: number, providerId: string, modelStr: string) => {
@@ -129,6 +142,28 @@ export function VlmArenaSheet() {
       const next = [...prev.selectedModels];
       next[index] = { provider: providerId as any, model: modelStr };
       return { ...prev, selectedModels: next };
+    });
+  };
+
+  const importModels = (models: ArenaModelSpec[]) => {
+    setVlmState((prev) => ({
+      ...prev,
+      selectedModels: models.slice(0, 8),
+    }));
+    setSelectedDetailIndex(null);
+  };
+
+  const moveModel = (fromIndex: number, toIndex: number) => {
+    const length = vlmState.selectedModels.length;
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= length || toIndex >= length) return;
+    setVlmState((prev) => ({
+      ...prev,
+      selectedModels: moveItem(prev.selectedModels, fromIndex, toIndex),
+    }));
+    setSelectedDetailIndex((prev) => {
+      if (prev === fromIndex) return toIndex;
+      if (prev === toIndex) return fromIndex;
+      return prev;
     });
   };
 
@@ -179,6 +214,8 @@ export function VlmArenaSheet() {
         onClearAll={clearAll}
         onAddModel={addModel}
         onAddTopModels={addTopModelsFromEnv}
+        onImportModels={importModels}
+        onMoveModel={moveModel}
         onRunSelectedRows={() => void runSelectedRows()}
         onRunSingleRow={(index) => void runSingleRow(index)}
         onRemoveModel={removeModel}

@@ -9,6 +9,38 @@ import { LlmArenaMatrixTable } from './LlmArenaMatrixTable';
 import { LlmArenaDetailSheet } from './LlmArenaDetailSheet';
 import { formatResultSummary, type EvaluationLevel, type RunHistoryEntry } from './LlmArenaTypes';
 import { buildLlmArenaResultRow } from './LlmArenaEvaluation';
+import type { ArenaModelSpec } from './useArenaChat';
+
+function moveItem<T>(items: T[], fromIndex: number, toIndex: number): T[] {
+  if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= items.length || toIndex >= items.length) {
+    return items;
+  }
+  const next = [...items];
+  const [item] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, item);
+  return next;
+}
+
+function removeIndexedRecord<T>(record: Record<number, T>, removedIndex: number, length: number): Record<number, T> {
+  const next: Record<number, T> = {};
+  for (let index = 0; index < length; index += 1) {
+    if (index === removedIndex) continue;
+    const value = record[index];
+    if (value === undefined) continue;
+    next[index > removedIndex ? index - 1 : index] = value;
+  }
+  return next;
+}
+
+function moveIndexedRecord<T>(record: Record<number, T>, fromIndex: number, toIndex: number, length: number): Record<number, T> {
+  const values = Array.from({ length }, (_, index) => record[index]);
+  const moved = moveItem(values, fromIndex, toIndex);
+  const next: Record<number, T> = {};
+  moved.forEach((value, index) => {
+    if (value !== undefined) next[index] = value;
+  });
+  return next;
+}
 
 export function LlmArenaSheet() {
   const { t } = useI18n();
@@ -192,10 +224,15 @@ export function LlmArenaSheet() {
   };
 
   const removeModel = (index: number) => {
+    const length = llmState.selectedModels.length;
     setLlmState((prev) => ({
       ...prev,
       selectedModels: prev.selectedModels.filter((_, i) => i !== index)
     }));
+    setEnabledByIndex((prev) => removeIndexedRecord(prev, index, length));
+    setEvaluationByIndex((prev) => removeIndexedRecord(prev, index, length));
+    setNoteByIndex((prev) => removeIndexedRecord(prev, index, length));
+    setPromptOverrideByIndex((prev) => removeIndexedRecord(prev, index, length));
   };
 
   const updateModel = (index: number, providerId: string, modelStr: string) => {
@@ -204,6 +241,30 @@ export function LlmArenaSheet() {
       next[index] = { provider: providerId as any, model: modelStr };
       return { ...prev, selectedModels: next };
     });
+  };
+
+  const importModels = (models: ArenaModelSpec[]) => {
+    setLlmState((prev) => ({
+      ...prev,
+      selectedModels: models.slice(0, 10),
+    }));
+    setEnabledByIndex({});
+    setEvaluationByIndex({});
+    setNoteByIndex({});
+    setPromptOverrideByIndex({});
+  };
+
+  const moveModel = (fromIndex: number, toIndex: number) => {
+    const length = llmState.selectedModels.length;
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= length || toIndex >= length) return;
+    setLlmState((prev) => ({
+      ...prev,
+      selectedModels: moveItem(prev.selectedModels, fromIndex, toIndex),
+    }));
+    setEnabledByIndex((prev) => moveIndexedRecord(prev, fromIndex, toIndex, length));
+    setEvaluationByIndex((prev) => moveIndexedRecord(prev, fromIndex, toIndex, length));
+    setNoteByIndex((prev) => moveIndexedRecord(prev, fromIndex, toIndex, length));
+    setPromptOverrideByIndex((prev) => moveIndexedRecord(prev, fromIndex, toIndex, length));
   };
 
   const runSingleRow = async (index: number) => {
@@ -352,6 +413,8 @@ export function LlmArenaSheet() {
         historyByResultKey={historyByResultKey}
         onClearAll={handleClearAll}
         onAddModel={addModel}
+        onImportModels={importModels}
+        onMoveModel={moveModel}
         onRunSelectedRows={() => void runSelectedRows()}
         onRunSingleRow={(index) => void runSingleRow(index)}
         onRemoveModel={removeModel}

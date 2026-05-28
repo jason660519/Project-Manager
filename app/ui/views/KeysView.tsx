@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Bot, Image, KeyRound } from 'lucide-react';
 import {
   KeysProvider,
   useKeysContext,
@@ -20,12 +21,6 @@ import {
   type SheetTabItem,
 } from '../../../components/sheets/BottomSheetTabs';
 
-const KEY_TABS: ReadonlyArray<SheetTabItem<KeysTab>> = [
-  { key: 'api_key_validation', label: 'API Key Validation' },
-  { key: 'llm_arena', label: 'LLM Arena' },
-  { key: 'vlm_arena', label: 'VLM Arena' },
-];
-
 const KEYS_SHEET_ORDER_STORAGE_KEY = 'projectManager.keys.sheetOrder';
 
 function KeysViewContent({
@@ -36,8 +31,30 @@ function KeysViewContent({
   initialSheet: KeysSheetSlug;
 }) {
   const router = useRouter();
-  const { activeTab, setActiveTab } = useKeysContext();
+  const { activeTab, setActiveTab, llmState, vlmState } = useKeysContext();
   const [isTauri, setIsTauri] = useState(false);
+  const tabs: ReadonlyArray<SheetTabItem<KeysTab>> = [
+    {
+      key: 'api_key_validation',
+      label: 'API Key Validation',
+      icon: <KeyRound size={14} />,
+      title: 'API Key Validation sheet',
+    },
+    {
+      key: 'llm_arena',
+      label: 'LLM Arena',
+      icon: <Bot size={14} />,
+      badge: llmState.selectedModels.length,
+      title: 'LLM Arena model rows',
+    },
+    {
+      key: 'vlm_arena',
+      label: 'VLM Arena',
+      icon: <Image size={14} />,
+      badge: vlmState.selectedModels.length,
+      title: 'VLM Arena model rows',
+    },
+  ];
 
   useEffect(() => {
     const tauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -68,7 +85,7 @@ function KeysViewContent({
       scrollChildren={false}
       bottomTabs={
         <BottomSheetTabs
-          tabs={KEY_TABS}
+          tabs={tabs}
           activeKey={activeTab}
           onSelect={handleTabSelect}
           reorderable
