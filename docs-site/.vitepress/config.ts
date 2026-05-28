@@ -34,6 +34,7 @@ export default defineConfig({
     nav: [
       { text: 'Getting Started', link: '/getting-started' },
       { text: 'Features', link: '/features/xmux' },
+      { text: 'Standards', link: '/standards/' },
       { text: 'GitHub', link: 'https://github.com/jason660519/Project-Manager' },
     ],
 
@@ -74,6 +75,15 @@ export default defineConfig({
           { text: 'Integrations Hub', link: '/features/integrations-hub' },
           { text: 'Keys', link: '/features/keys' },
           { text: 'Company Standards', link: '/features/company-standards' },
+        ],
+      },
+      {
+        text: 'Company standards',
+        items: [
+          { text: 'Standards Index', link: '/standards/' },
+          { text: 'Multilingual Interface Architecture', link: '/standards/multilingual-interface-architecture' },
+          { text: 'Update Governance', link: '/standards/standards-update-governance' },
+          { text: 'Industry Practices', link: '/standards/industry-localization-practices' },
         ],
       },
       {

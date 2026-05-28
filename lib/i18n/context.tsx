@@ -1,13 +1,13 @@
 'use client';
 
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Locale, Translations } from './types';
 import { en } from './en';
 import { zhHant } from './zh-hant';
 import { zh } from './zh';
 import { ja } from './ja';
 import type { LangMeta } from '../hooks/useLang';
-import { LANGS } from '../hooks/useLang';
+import { directionForLang, LANGS } from '../hooks/useLang';
 
 const TRANSLATIONS: Record<Locale, Translations> = {
   en,
@@ -36,11 +36,15 @@ const I18nContext = createContext<I18nContextValue | null>(null);
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(readStoredLocale);
 
+  useEffect(() => {
+    document.documentElement.setAttribute('lang', locale);
+    document.documentElement.setAttribute('dir', directionForLang(locale));
+  }, [locale]);
+
   const setLocale = (id: Locale) => {
     setLocaleState(id);
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(STORAGE_KEY, id);
-      document.documentElement.setAttribute('lang', id);
     }
   };
 

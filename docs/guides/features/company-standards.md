@@ -46,7 +46,7 @@ Every "Open" button on the page routes through the Tauri shell's `openPath`, whi
 │   RE Realestate Mgmt   [Needed]   │   standards-checks [Next]            │
 │   CS Company Standards [Reference]│   ui-primitives   [Later]            │
 ├──────────────────────────────────────────────────────────────────────────┤
-│ Implementation Stance     │  Canonical Resources (8 file/folder links)   │
+│ Implementation Stance     │  Canonical Resources (9 file/folder links)   │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -123,7 +123,7 @@ A short, scannable position statement: **redesign the standards before extractin
 
 ### Canonical Resources
 
-A grid of 8 quick-open buttons that route through `openPath`. Each button shows label, description, and the absolute path on this machine (currently rooted at `/Volumes/KLEVV-4T-1/Company-AI-App-Standards` and `/Volumes/KLEVV-4T-1/Project-Manager`):
+A grid of 9 quick-open buttons that route through `openPath`. Each button shows label, description, and the absolute path on this machine (currently rooted at `/Volumes/KLEVV-4T-1/Company-AI-App-Standards` and `/Volumes/KLEVV-4T-1/Project-Manager`):
 
 | Resource | What it is |
 |---|---|
@@ -134,6 +134,7 @@ A grid of 8 quick-open buttons that route through `openPath`. Each button shows 
 | **Table Governance** | The company table baseline for dense operational data. |
 | **PM Table Profile** | Project Manager-specific table behaviour and implementation references. |
 | **PM Design Guide** | Repo-local product personality, shell, layout, and UX rules. |
+| **Multilingual Interface Architecture** | Company baseline for locale IDs, translation resources, language switching, formatting, fallback, review, and i18n checks. |
 | **Shared AI Desktop Style** | Current family-level visual language that should move upstream over time. |
 
 Buttons reveal the file (or folder) in your OS file manager. The hub doesn't render the docs inline — it surfaces the decision layer first, with raw paths as secondary information.
@@ -157,6 +158,15 @@ Buttons reveal the file (or folder) in your OS file manager. The hub doesn't ren
 | Diff against baseline | Show which baseline rules an app silently overrides — surface ADR-worthy deviations. |
 | Bundled resource viewer | Render the linked docs inside Project Manager (with the Documentation view's classification gate). |
 | Plugin runtime panel | When the standards plugin is installed, show its health beside the metric cards. |
+
+## Published standards pages
+
+| Page | Purpose |
+|---|---|
+| [Standards Index](../standards/index.md) | Public index of reusable company standards and their canonical source paths. |
+| [Multilingual Interface Architecture](../standards/multilingual-interface-architecture.md) | Mandatory i18n architecture standard for new and multilingual apps. |
+| [Standards Update Governance](../standards/standards-update-governance.md) | Quarterly update, push notification, and kickoff training process. |
+| [Industry Localization Practices](../standards/industry-localization-practices.md) | External practice comparison and company adaptation rationale. |
 
 ## References
 

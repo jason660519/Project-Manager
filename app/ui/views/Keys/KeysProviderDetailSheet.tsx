@@ -26,7 +26,7 @@ import {
   X,
 } from 'lucide-react';
 
-import { loadProviderSecret } from '../../../../lib/keys/keychain';
+import { loadProviderSecret, saveProviderSecret } from '../../../../lib/keys/keychain';
 import {
   classifyValidationFailure,
   formatRelativeTime,
@@ -205,6 +205,29 @@ export function KeysProviderDetailSheet({
     }
   }, [provider, value, refresh]);
 
+  const handleSaveOnly = useCallback(async () => {
+    if (!provider) return;
+    setFeedback(null);
+    setPhase('saving');
+    try {
+      await saveProviderSecret(provider, value);
+      setSavedValue(value);
+      setFeedback({
+        kind: 'ok',
+        msg: 'Key saved locally. Validation is not available for this provider.',
+      });
+    } catch (e: unknown) {
+      console.error(`[KeysSheet] saveProviderSecret(${provider.id}) threw:`, e);
+      setFeedback({
+        kind: 'fail',
+        msg: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setPhase('idle');
+      refresh();
+    }
+  }, [provider, refresh, value]);
+
   const handleRevalidate = useCallback(async () => {
     if (!provider) return;
     setFeedback(null);
@@ -301,7 +324,7 @@ export function KeysProviderDetailSheet({
             </span>
           )}
           <a
-            href={provider.docUrl}
+            href={provider.apiKeyUrl}
             target="_blank"
             rel="noreferrer"
             className="ml-auto text-[11px] text-stone-500 hover:text-stone-300 transition-colors"
@@ -336,16 +359,16 @@ export function KeysProviderDetailSheet({
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <button
-                onClick={() => void handleSaveAndValidate()}
-                disabled={busy || !value || !isDirty || !supportsValidation}
+                onClick={() => void (supportsValidation ? handleSaveAndValidate() : handleSaveOnly())}
+                disabled={busy || !isDirty || (supportsValidation && !value)}
                 className="inline-flex min-w-[150px] items-center justify-center gap-1.5 bg-stone-100 px-4 py-2 text-sm font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {phase === 'saving' ? (
                   <>
-                    <Loader2 size={13} className="animate-spin" /> Validating {elapsedSeconds}s
+                    <Loader2 size={13} className="animate-spin" /> {supportsValidation ? 'Validating' : 'Saving'} {elapsedSeconds}s
                   </>
                 ) : (
-                  'Save & Validate'
+                  supportsValidation ? 'Save & Validate' : 'Save Key'
                 )}
               </button>
               {hasKey && supportsValidation && (

@@ -41,3 +41,10 @@ test('sets document.documentElement.lang on locale change', () => {
   fireEvent.click(screen.getByText('Switch'));
   expect(document.documentElement.getAttribute('lang')).toBe('zh-hant');
 });
+
+test('sets document.documentElement.dir for the active locale', () => {
+  render(<I18nProvider><LangDisplay /></I18nProvider>);
+  expect(document.documentElement.getAttribute('dir')).toBe('ltr');
+  fireEvent.click(screen.getByText('Switch'));
+  expect(document.documentElement.getAttribute('dir')).toBe('ltr');
+});

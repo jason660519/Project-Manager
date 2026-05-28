@@ -4,17 +4,17 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-05-28T21:41:29.000Z",
+    "generatedAt": "2026-05-28T22:50:20.000Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
     "manifestAudience": "public",
-    "totalDocuments": 9,
-    "totalFolders": 4,
-    "publicDocuments": 24,
+    "totalDocuments": 13,
+    "totalFolders": 5,
+    "publicDocuments": 28,
     "internalDocuments": 55,
     "restrictedDocuments": 1,
-    "publishableDocuments": 9,
+    "publishableDocuments": 13,
     "reviewRequiredDocuments": 47,
     "warningCount": 106
   },
@@ -26,7 +26,7 @@ export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
       "sourcePath": "docs",
       "label": "All Docs",
       "title": "Documentation",
-      "summary": "9 documentation files indexed from docs.",
+      "summary": "13 documentation files indexed from docs.",
       "parentSlug": null,
       "folderSlugs": [
         "deployment",
@@ -34,14 +34,14 @@ export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
       ],
       "docIds": [],
       "classificationCounts": {
-        "public": 9,
+        "public": 13,
         "internal": 0,
         "restricted": 0
       },
-      "publishableCount": 9,
+      "publishableCount": 13,
       "reviewRequiredCount": 0,
       "visibilityCounts": {
-        "public": 9,
+        "public": 13,
         "internal": 0,
         "restricted": 0
       },
@@ -81,24 +81,25 @@ export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
       "sourcePath": "docs/guides",
       "label": "Guides",
       "title": "Guides",
-      "summary": "8 documentation files indexed from docs/guides.",
+      "summary": "12 documentation files indexed from docs/guides.",
       "parentSlug": "",
       "folderSlugs": [
-        "guides/features"
+        "guides/features",
+        "guides/standards"
       ],
       "docIds": [
         "guides/getting-started",
         "guides/index"
       ],
       "classificationCounts": {
-        "public": 8,
+        "public": 12,
         "internal": 0,
         "restricted": 0
       },
-      "publishableCount": 8,
+      "publishableCount": 12,
       "reviewRequiredCount": 0,
       "visibilityCounts": {
-        "public": 8,
+        "public": 12,
         "internal": 0,
         "restricted": 0
       },
@@ -131,6 +132,36 @@ export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
       "reviewRequiredCount": 0,
       "visibilityCounts": {
         "public": 6,
+        "internal": 0,
+        "restricted": 0
+      },
+      "warnings": []
+    },
+    {
+      "id": "guides/standards",
+      "slug": "guides/standards",
+      "route": "/documentation/guides/standards",
+      "sourcePath": "docs/guides/standards",
+      "label": "Standards",
+      "title": "Standards",
+      "summary": "4 documentation files indexed from docs/guides/standards.",
+      "parentSlug": "guides",
+      "folderSlugs": [],
+      "docIds": [
+        "guides/standards/index",
+        "guides/standards/industry-localization-practices",
+        "guides/standards/multilingual-interface-architecture",
+        "guides/standards/standards-update-governance"
+      ],
+      "classificationCounts": {
+        "public": 4,
+        "internal": 0,
+        "restricted": 0
+      },
+      "publishableCount": 4,
+      "reviewRequiredCount": 0,
+      "visibilityCounts": {
+        "public": 4,
         "internal": 0,
         "restricted": 0
       },
@@ -419,6 +450,137 @@ export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
       ],
       "warnings": [],
       "updatedAt": "2026-05-25T06:39:55.000Z"
+    },
+    {
+      "id": "guides/standards/index",
+      "slug": "guides/standards/index",
+      "route": "/documentation/guides/standards/index",
+      "sourcePath": "docs/guides/standards/index.md",
+      "folderSlug": "guides/standards",
+      "folderPath": "docs/guides/standards",
+      "title": "Company Standards Index",
+      "summary": "This section is the public browsing entry for reusable company product and engineering standards. The source-of-truth standards repository is `/Volumes/KLEVV-4T-1/Company-AI-App-Standards...",
+      "content": "\n# Company Standards Index\n\nThis section is the public browsing entry for reusable company product and engineering standards. The source-of-truth standards repository is `/Volumes/KLEVV-4T-1/Company-AI-App-Standards`; this docs site publishes the public, app-reusable view so later apps can link to one standard folder before implementation starts.\n\n## Current Standard Set\n\n| Standard | Canonical source | Public page |\n| --- | --- | --- |\n| AI engineer workflow | `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/ai-engineer-workflow.md` | [Company Standards Hub](../features/company-standards.md) |\n| UI design system | `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/ui-design-system.md` | [Company Standards Hub](../features/company-standards.md) |\n| Table governance | `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/patterns/table-governance.md` | [Company Standards Hub](../features/company-standards.md) |\n| File naming standards | `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/file-naming-standards.md` | [Company Standards Hub](../features/company-standards.md) |\n| Multi-app integration | `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/multi-app-integration.md` | [Company Standards Hub](../features/company-standards.md) |\n| Multilingual interface architecture | `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/patterns/multilingual-interface-architecture.md` | [Multilingual Interface Architecture](./multilingual-interface-architecture.md) |\n| Standards update governance | This public docs section | [Update Governance](./standards-update-governance.md) |\n| Industry localization practices | This public docs section | [Industry Practices](./industry-localization-practices.md) |\n\n## Search Outcome\n\nA targeted search of `/Volumes/KLEVV-4T-1/Company-AI-App-Standards` found no prior formal multilingual interface architecture standard. Project Manager has an app-local i18n implementation and translation contribution notes, but those notes are not a company-wide standard.\n\nThe new standard is therefore added as a company baseline document and published here for reuse by new apps.\n\n## Required Adoption Flow\n\n1. New app kickoff reads this standards index and the canonical Company Standards repository.\n2. The app declares source locale, supported locales, translation resource location, and fallback chain before UI implementation.\n3. The app wires an i18n checker into `standards:check` once multilingual UI exists.\n4. Any deviation is documented in the app repo ADR folder.\n5. Quarterly standards review folds repeated implementation mistakes back into this public standards section.\n\n## Public Browse Structure\n\n```text\nstandards/\n  index.md\n  multilingual-interface-architecture.md\n  standards-update-governance.md\n  industry-localization-practices.md\n```\n\nThe folder is intentionally stable so future apps can link to `/standards/` instead of copying ad hoc checklists into each repo.\n",
+      "contentHash": "132f055e164af00f",
+      "readingMinutes": 2,
+      "classification": "public",
+      "classificationSource": "frontmatter",
+      "classificationConfidence": 0.95,
+      "classificationReason": "Public index of company standards with no secrets, credentials, or private infrastructure details.",
+      "matchedPolicyRule": "CLS-FRONTMATTER-OVERRIDE",
+      "publish": true,
+      "reviewStatus": "approved",
+      "needsReview": false,
+      "visibility": "public",
+      "audience": [
+        "users",
+        "customers",
+        "engineers"
+      ],
+      "tags": [
+        "guides",
+        "table"
+      ],
+      "warnings": [],
+      "updatedAt": "2026-05-28T22:46:13.000Z"
+    },
+    {
+      "id": "guides/standards/industry-localization-practices",
+      "slug": "guides/standards/industry-localization-practices",
+      "route": "/documentation/guides/standards/industry-localization-practices",
+      "sourcePath": "docs/guides/standards/industry-localization-practices.md",
+      "folderSlug": "guides/standards",
+      "folderPath": "docs/guides/standards",
+      "title": "Industry Localization Practices",
+      "summary": "The company multilingual standard is aligned with current industry practice, but adapted for local-first AI apps where UI, generated reports, prompts, logs, and exports all become user-vi...",
+      "content": "\n# Industry Localization Practices\n\nThe company multilingual standard is aligned with current industry practice, but adapted for local-first AI apps where UI, generated reports, prompts, logs, and exports all become user-visible surfaces.\n\n## External Practice Map\n\n| Source | Practice | Company adaptation |\n| --- | --- | --- |\n| W3C | Treat language tags and locales as foundational web i18n identifiers, using BCP 47. | Company apps must use well-formed BCP 47 tags and reject invented IDs. |\n| Unicode CLDR | Use shared locale data for plural rules, day periods, language matching, territories, and time zones. | Apps must rely on `Intl`, ICU, CLDR-backed libraries, or approved equivalents for formatting and plurals. |\n| MDN / ECMAScript Intl | Use locale-aware APIs for dates, numbers, lists, relative time, plural rules, and collation. | Manual date, number, currency, and sort formatting is a release blocker. |\n| FormatJS | ICU messages model plural/select behavior by locale and require `other` branches. | Complex messages must use ICU-style plural/select handling or an equivalent checked message format. |\n| i18next | Define explicit language, namespace, and key fallback behavior. | Each app must document fallback chain and prevent silent production key fallback. |\n| Microsoft | Localization is broader than translation and includes formats, layout, terminology, review, vendor handoff, and validation. | Company standard requires glossary ownership, review status, and in-context QA. |\n| Shopify Polaris | Design flexible interfaces for text expansion, changed word order, cultural differences, and non-space wrapping. | Company UI rules block sentence concatenation, fixed narrow labels, flag language selectors, and untested text expansion. |\n\n## Why This Standard Is Stricter\n\nMost public i18n references target either web specs, design guidance, or one framework. Company AI apps need a stricter combined rule because the product surface includes:\n\n- Desktop app UI.\n- Agent prompts and AI-generated user-visible output.\n- Exported Markdown, PDF, CSV, and reports.\n- Notifications, logs, toasts, and execution states.\n- Local-first settings and project-specific overrides.\n\nThat means translation resources and locale selection must be treated as part of the product architecture, not only frontend rendering.\n\n## Best-Practice Comparison\n\n| Concern | Common industry baseline | Company rule |\n| --- | --- | --- |\n| Locale IDs | Use standards-based identifiers. | BCP 47 is mandatory; invented IDs are blocked. |\n| Translation storage | Extract strings from source code. | Typed schema or equivalent resource contract is mandatory. |\n| Fallback | Configure language fallback. | Fallback chain must be documented and missing keys must fail checks. |\n| Layout | Plan for expansion. | Text expansion, CJK wrapping, and RTL paths are explicit QA requirements. |\n| Formatting | Use locale-aware formatting. | Manual formatting of dates, currency, numbers, plural text, and sorting blocks release. |\n| Review | Validate localized product. | Native/domain review is required before a locale is marked maintained. |\n| AI output | Not usually covered. | AI-generated user-visible content must include target locale and glossary, and invalid candidates must fail clearly. |\n\n## Reference Links\n\n- [W3C Language Tags and Locale Identifiers](https://w3c.github.io/ltli/)\n- [Unicode CLDR charts](https://www.unicode.org/cldr/charts/latest)\n- [MDN JavaScript Internationalization](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Internationalization)\n- [FormatJS ICU Message syntax](https://formatjs.github.io/docs/core-concepts/icu-syntax/)\n- [i18next fallback principles](https://www.i18next.com/principles/fallback)\n- [Microsoft localization overview](https://learn.microsoft.com/en-us/globalization/localization/localization-overview)\n- [Shopify Polaris internationalization](https://polaris-react.shopify.com/foundations/internationalization)\n",
+      "contentHash": "44dec215eb75b9b0",
+      "readingMinutes": 3,
+      "classification": "public",
+      "classificationSource": "frontmatter",
+      "classificationConfidence": 0.95,
+      "classificationReason": "Public comparison of external localization practices with no secrets, credentials, or private infrastructure details.",
+      "matchedPolicyRule": "CLS-FRONTMATTER-OVERRIDE",
+      "publish": true,
+      "reviewStatus": "approved",
+      "needsReview": false,
+      "visibility": "public",
+      "audience": [
+        "users",
+        "customers",
+        "engineers"
+      ],
+      "tags": [
+        "guides"
+      ],
+      "warnings": [],
+      "updatedAt": "2026-05-28T22:46:13.000Z"
+    },
+    {
+      "id": "guides/standards/multilingual-interface-architecture",
+      "slug": "guides/standards/multilingual-interface-architecture",
+      "route": "/documentation/guides/standards/multilingual-interface-architecture",
+      "sourcePath": "docs/guides/standards/multilingual-interface-architecture.md",
+      "folderSlug": "guides/standards",
+      "folderPath": "docs/guides/standards",
+      "title": "Multilingual Interface Architecture",
+      "summary": "Canonical source: `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/patterns/multilingual-interface-architecture.md` This is the mandatory company standard for apps with user-facing UI,...",
+      "content": "\n# Multilingual Interface Architecture\n\nCanonical source: `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/patterns/multilingual-interface-architecture.md`\n\nThis is the mandatory company standard for apps with user-facing UI, docs, notifications, prompts, reports, or exported artifacts.\n\n## Core Rule\n\nInternationalization is an architecture boundary, not a late copy-editing task. UI text, locale negotiation, formatting, translation review, and regression checks must be designed before implementation.\n\n## Required Architecture\n\n| Layer | Requirement | Blocking rule |\n| --- | --- | --- |\n| Locale model | Use well-formed BCP 47 tags such as `en`, `zh-Hant`, `zh-Hans`, `ja`, or `en-AU`. | Do not invent IDs such as `tw`, `cn`, `jp`, or `traditional`. |\n| Source locale | Declare one source locale for product copy and glossary ownership. | Do not mix source languages in translation resources unless documented. |\n| Resource store | Keep all user-visible strings in typed resources or approved message catalogs. | No hardcoded copy in components, tables, modals, toasts, empty states, or errors. |\n| Message keys | Use stable semantic keys. | Do not use full English sentences as long-term product UI keys. |\n| Formatting | Format dates, numbers, currencies, lists, and plurals through locale-aware APIs. | Do not concatenate formatted values manually. |\n| Runtime locale | Provide deterministic locale resolution and a visible language switcher where supported. | Do not silently switch language without a user override path. |\n| Fallback | Define an explicit fallback chain per app. | Missing keys must fail CI or show a visible development failure. |\n| Review | Require native or domain reviewer approval before a locale is maintained. | Machine translation alone cannot make a locale production-ready. |\n| QA | Test source locale, one CJK locale, one long-text locale, and RTL layout where supported. | Do not ship layout changes without text expansion and missing-key checks. |\n\n## Locale Rules\n\n1. Use BCP 47 casing in public APIs and docs: language lowercase, script title case, region uppercase.\n2. Keep language, script, and region separate in product decisions.\n3. Store user preference separately from auto-detected browser or system locale.\n4. Resolve locale in this order: user setting, project/workspace setting, supported browser/system locale, nearest supported parent locale, source locale.\n5. Record unsupported locale requests for product review where privacy rules allow.\n\n## Translation Resource Rules\n\n1. Each app must have a canonical translation folder such as `lib/i18n/`, `src/i18n/`, or `locales/`.\n2. Every locale file must implement the same schema as the source locale.\n3. Translation resources are product assets and require review.\n4. Maintain a glossary for product names, feature names, domain terms, provider names, and protected phrases.\n5. Translation changes must be reviewable in small diffs.\n6. Do not split sentences into multiple keys for layout convenience.\n7. Do not concatenate translated fragments.\n8. Placeholder names must describe meaning, for example `{projectName}`.\n9. Rich text messages must keep links and UI controls outside grammar-dependent sentence structure unless the framework supports safe rich-message formatting.\n\n## Implementation Rules\n\nFor TypeScript and React apps:\n\n1. Define a `Translations` interface or equivalent schema from the source locale.\n2. Make every locale satisfy that schema at compile time.\n3. Components read translated strings through hooks or helpers.\n4. Common strings belong in shared namespaces such as `common`, `navigation`, `actions`, `status`, `errors`, and `emptyStates`.\n5. Feature strings belong in feature namespaces.\n6. Route metadata, page titles, aria labels, table column labels, buttons, modal titles, and toast text are all translatable.\n7. Tests must fail on missing keys, hardcoded UI copy, duplicate keys, and placeholder mismatches.\n\n## Formatting Rules\n\nUse `Intl` or an approved i18n library for:\n\n- `DateTimeFormat` for dates, times, time zones, and hour cycles.\n- `NumberFormat` for decimals, currency, percent, and units.\n- `ListFormat` for localized lists.\n- `RelativeTimeFormat` for relative timestamps.\n- `PluralRules` or ICU MessageFormat for plural-sensitive messages.\n- `Collator` for locale-sensitive sorting and search.\n\nNever assume a fixed date order, 12-hour clock, decimal separator, thousands separator, English plural rule, name order, or space-based line wrapping.\n\n## Language Switch Logic\n\nEvery multilingual app must document:\n\n1. Supported locale list.\n2. Maintained versus preview locale status.\n3. Source locale.\n4. Fallback chain.\n5. Persistence location for user preference.\n6. Whether project or workspace locale can override user locale.\n7. How locale affects generated reports, exports, AI prompts, notifications, and logs.\n8. Whether language changes live-update, reload, or apply at next navigation.\n\nThe switcher must show language names in their own language where practical, preserve task state where feasible, and visibly report locale loading failures.\n\n## AI-Generated Content\n\n1. AI prompts that generate user-visible output must include target locale and glossary.\n2. AI output is not approved translation memory.\n3. AI translation candidates stay candidates until reviewed.\n4. If a candidate fails schema, glossary, or placeholder validation, fail the workflow and show the failed keys.\n5. Do not invent fallback text when candidates are missing or invalid.\n6. Prompt, report, and export templates follow the same i18n rules as UI.\n\n## Required Checks\n\n```text\ni18n:check\n  - no hardcoded user-facing strings in configured UI paths\n  - all locales satisfy source schema\n  - no missing keys\n  - placeholders match across locales\n  - ICU plural/select messages include required branches\n  - glossary-protected terms are preserved or intentionally mapped\n  - unsupported locale IDs are rejected\n```\n\nFor npm-based company apps, `npm run standards:check` must include or delegate to the app-local i18n checker once multilingual UI exists.\n\n## Avoidance Checklist\n\nThese mistakes are release blockers:\n\n- Hardcoded visible copy in components.\n- Translating only nav labels while errors, empty states, tables, toasts, and aria labels stay in the source language.\n- Using `zh` ambiguously when the product needs `zh-Hant` or `zh-Hans`.\n- Treating translation as a CSS problem after layout is built.\n- Concatenating translated fragments.\n- Reusing the same English word key for different product meanings.\n- Localizing dates by string slicing.\n- Formatting currency without currency code and locale.\n- Using country flags as language identifiers.\n- Relying on browser language without user override.\n- Marking machine-translated locales as maintained.\n- Letting missing keys fall through to raw key names in production.\n- Forgetting PDFs, CSVs, email templates, notification copy, and AI-generated reports.\n\n## References\n\n- [W3C Language Tags and Locale Identifiers](https://w3c.github.io/ltli/)\n- [Unicode CLDR charts](https://www.unicode.org/cldr/charts/latest)\n- [MDN JavaScript Internationalization](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Internationalization)\n- [FormatJS ICU Message syntax](https://formatjs.github.io/docs/core-concepts/icu-syntax/)\n- [i18next fallback principles](https://www.i18next.com/principles/fallback)\n- [Microsoft localization overview](https://learn.microsoft.com/en-us/globalization/localization/localization-overview)\n- [Shopify Polaris internationalization](https://polaris-react.shopify.com/foundations/internationalization)\n",
+      "contentHash": "c0d603ab0c578591",
+      "readingMinutes": 5,
+      "classification": "public",
+      "classificationSource": "frontmatter",
+      "classificationConfidence": 0.95,
+      "classificationReason": "Public multilingual UI architecture standard with no secrets, credentials, or private infrastructure details.",
+      "matchedPolicyRule": "CLS-FRONTMATTER-OVERRIDE",
+      "publish": true,
+      "reviewStatus": "approved",
+      "needsReview": false,
+      "visibility": "public",
+      "audience": [
+        "users",
+        "customers",
+        "engineers"
+      ],
+      "tags": [
+        "guides",
+        "table"
+      ],
+      "warnings": [],
+      "updatedAt": "2026-05-28T22:46:13.000Z"
+    },
+    {
+      "id": "guides/standards/standards-update-governance",
+      "slug": "guides/standards/standards-update-governance",
+      "route": "/documentation/guides/standards/standards-update-governance",
+      "sourcePath": "docs/guides/standards/standards-update-governance.md",
+      "folderSlug": "guides/standards",
+      "folderPath": "docs/guides/standards",
+      "title": "Standards Update Governance",
+      "summary": "This process keeps company standards reusable instead of letting each app rediscover the same mistakes. 1. Collect incidents: localization bugs, UI regressions, repeated review comments,...",
+      "content": "\n# Standards Update Governance\n\nThis process keeps company standards reusable instead of letting each app rediscover the same mistakes.\n\n## Ownership\n\n| Role | Responsibility |\n| --- | --- |\n| Standards owner | Maintains the canonical standards repo and approves version bumps. |\n| App owner | Documents repo-specific deviations in ADRs and wires local checks. |\n| AI engineer | Reads standards before implementation and records new recurring failure modes. |\n| Reviewer | Blocks releases when standards-sensitive changes skip required checks. |\n\n## Quarterly Cycle\n\n1. Collect incidents: localization bugs, UI regressions, repeated review comments, missing checker cases, and support feedback.\n2. Classify each issue: documentation gap, checker gap, glossary gap, app-specific deviation, or training gap.\n3. Update the canonical standard when the issue applies across apps.\n4. Add or tighten executable checks where possible.\n5. Publish a short change summary in the company engineering channel and Project Manager Company Standards hub.\n6. Update affected app handoff docs when a new rule changes implementation expectations.\n\n## New Project Training Gate\n\nBefore implementation starts, every new app kickoff must complete a standards read-through covering:\n\n1. AI engineer workflow.\n2. UI design system.\n3. File naming and archive policy.\n4. Table governance when the app has operational data.\n5. Multilingual interface architecture when the app has user-facing UI.\n6. App-specific `AGENTS.md`, `DESIGN.md`, and architecture ADRs.\n\nThe kickoff artifact must state which standards are directly applicable, which checks are wired, and which deviations need ADRs.\n\n## Push Notification Flow\n\nStandards updates are pushed through three channels:\n\n1. Company Standards repo change summary.\n2. Project Manager Company Standards docs-site page.\n3. Affected app handoff or project-process notes.\n\nMaterial updates must include:\n\n- Version or status change.\n- Why the change exists.\n- Apps affected.\n- Required action.\n- Deadline or adoption phase.\n- Verification command.\n\n## Feedback Loop\n\nEvery repeated standards failure must produce at least one durable artifact:\n\n- Checker rule.\n- Glossary update.\n- Standards document update.\n- App ADR.\n- Feature test scenario.\n- Training note.\n\nChat-only reminders are not enough for repeated issues.\n",
+      "contentHash": "5497486b0986ca05",
+      "readingMinutes": 2,
+      "classification": "public",
+      "classificationSource": "frontmatter",
+      "classificationConfidence": 0.95,
+      "classificationReason": "Public governance process for standards updates with no secrets, credentials, or private infrastructure details.",
+      "matchedPolicyRule": "CLS-FRONTMATTER-OVERRIDE",
+      "publish": true,
+      "reviewStatus": "approved",
+      "needsReview": false,
+      "visibility": "public",
+      "audience": [
+        "users",
+        "customers",
+        "engineers"
+      ],
+      "tags": [
+        "guides",
+        "table"
+      ],
+      "warnings": [],
+      "updatedAt": "2026-05-28T22:46:13.000Z"
     }
   ],
   "routes": [
@@ -426,6 +588,7 @@ export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
     "deployment",
     "guides",
     "guides/features",
+    "guides/standards",
     "deployment/readme",
     "guides/features/agent-workflows",
     "guides/features/ai-assistants-control-console",
@@ -434,6 +597,10 @@ export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
     "guides/features/workstation",
     "guides/features/xmux",
     "guides/getting-started",
-    "guides/index"
+    "guides/index",
+    "guides/standards/index",
+    "guides/standards/industry-localization-practices",
+    "guides/standards/multilingual-interface-architecture",
+    "guides/standards/standards-update-governance"
   ]
 } satisfies DocumentationSiteManifest;

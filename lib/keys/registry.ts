@@ -36,6 +36,9 @@ export interface ProviderSpec {
   validatePattern?: RegExp;
   supportedMethods: AuthMethod[];
   oauthConfig?: OAuthDeviceFlowConfig;
+  apiKeyUrl: string;
+  usageUrl: string;
+  developerDocsUrl: string;
 }
 
 const LS_PREFIX = 'projectManager-key:';
@@ -58,6 +61,9 @@ const AI_PROVIDERS: ProviderSpec[] = listLlmProviders().map((spec) => ({
   envVarNames: spec.envVarNames,
   validatePattern: spec.validatePattern,
   supportedMethods: ['apiKey', 'envImport'] as AuthMethod[],
+  apiKeyUrl: spec.apiKeyUrl,
+  usageUrl: spec.usageUrl,
+  developerDocsUrl: spec.developerDocsUrl,
 }));
 
 const INTEGRATION_PROVIDERS: ProviderSpec[] = [
@@ -69,6 +75,9 @@ const INTEGRATION_PROVIDERS: ProviderSpec[] = [
     keychainKey: 'github-token',
     lsKey: `${LS_PREFIX}github`,
     docUrl: 'https://github.com/settings/tokens',
+    apiKeyUrl: 'https://github.com/settings/tokens',
+    usageUrl: 'https://github.com/settings/billing/summary',
+    developerDocsUrl: 'https://docs.github.com/en/rest',
     envVarNames: ['GITHUB_TOKEN', 'GH_TOKEN', 'GITHUB_PAT'],
     // GitHub tokens come in several flavours (classic ghp_, fine-grained
     // github_pat_, OAuth gho_, GitHub App ghs_) — a permissive prefix check

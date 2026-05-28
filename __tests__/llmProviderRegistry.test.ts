@@ -38,7 +38,7 @@ describe('LLM provider registry', () => {
     }
   });
 
-  it('exposes apiKind / keychainKey / lsKey / envVarNames / docUrl on every provider', () => {
+  it('exposes apiKind / keychainKey / lsKey / envVarNames / official URLs on every provider', () => {
     for (const spec of listLlmProviders()) {
       expect(spec.id, `provider ${spec.id} has id`).toBeTruthy();
       expect(spec.label).toBeTruthy();
@@ -47,6 +47,9 @@ describe('LLM provider registry', () => {
       expect(spec.lsKey.startsWith('projectManager-key:')).toBe(true);
       expect(spec.envVarNames.length).toBeGreaterThan(0);
       expect(spec.docUrl.startsWith('https://')).toBe(true);
+      expect(spec.apiKeyUrl).toMatch(/^https?:\/\//);
+      expect(spec.usageUrl).toMatch(/^https?:\/\//);
+      expect(spec.developerDocsUrl).toMatch(/^https?:\/\//);
       expect(['anthropic', 'gemini', 'openai-compatible']).toContain(spec.apiKind);
       expect(spec.defaultModel).toBeTruthy();
     }

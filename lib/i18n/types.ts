@@ -78,6 +78,75 @@ export interface Translations {
     loading: string;
     noProjectsConfigured: string;
   };
+  keysValidation: {
+    intro: string;
+    importFromEnv: string;
+    loadingProviders: string;
+    table: {
+      columns: {
+        provider: string;
+        category: string;
+        apiKeyPage: string;
+        usage: string;
+        docs: string;
+        key: string;
+        status: string;
+        models: string;
+        availableModels: string;
+        lastValidated: string;
+        actions: string;
+      };
+      links: {
+        apiKeyPage: string;
+        usage: string;
+        docs: string;
+        apiKeyTitle: string;
+        usageTitle: string;
+        docsTitle: string;
+      };
+      status: {
+        all: string;
+        verified: string;
+        failed: string;
+        configured: string;
+        notSet: string;
+      };
+      category: {
+        all: string;
+        ai: string;
+        integration: string;
+      };
+      controls: {
+        title: string;
+        searchPlaceholder: string;
+        hiddenColumns: string;
+        freezeColumns: string;
+        viewPreset: string;
+        presetPlaceholder: string;
+        reset: string;
+        showHiddenRows: string;
+        export: string;
+        import: string;
+        addRow: string;
+      };
+      presets: {
+        full: string;
+        validation: string;
+        links: string;
+      };
+      actions: {
+        moveRowUp: string;
+        moveRowDown: string;
+        delete: string;
+        deleteCustomRow: string;
+        hideProviderRow: string;
+      };
+      live: string;
+      moreModels: string;
+      noProviders: string;
+      noProvidersMatch: string;
+    };
+  };
   phases: {
     development: string;
     e2eTesting: string;
