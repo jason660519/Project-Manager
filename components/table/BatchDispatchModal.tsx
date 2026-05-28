@@ -12,8 +12,13 @@ import {
 } from '../../lib/bridge';
 import {
   DEFAULT_AGENT_WORKFLOWS,
+  buildAgentWorkflowRunPrompt,
   buildAgentWorkflowPrompt,
+  createAgentWorkflowRun,
+  getAgentWorkflowDagById,
   getAgentWorkflowById,
+  listAgentWorkflowDags,
+  saveAgentWorkflowRun,
 } from '../../lib/agent-workflows';
 import { collectEnabledMcpServers } from '../../lib/storage/plugins';
 import { useI18n } from '../../lib/i18n';
@@ -109,6 +114,7 @@ export function BatchDispatchModal({
   const [selectedAdapterId, setSelectedAdapterId] = useState(agentAdapters[0]?.id ?? '');
   const [selectedTemplate, setSelectedTemplate] = useState(0);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState('');
+  const [selectedDagWorkflowId, setSelectedDagWorkflowId] = useState('');
   const [batchPhase, setBatchPhase] = useState<BatchPhase>('idle');
   const [items, setItems] = useState<BatchItem[]>(
     features.map((f) => ({ feature: f, phase: 'pending', logs: [] })),
@@ -127,6 +133,8 @@ export function BatchDispatchModal({
 
   const adapter = agentAdapters.find((a) => a.id === selectedAdapterId);
   const selectedWorkflow = selectedWorkflowId ? getAgentWorkflowById(selectedWorkflowId) ?? null : null;
+  const dagWorkflows = listAgentWorkflowDags();
+  const selectedDagWorkflow = selectedDagWorkflowId ? getAgentWorkflowDagById(selectedDagWorkflowId) ?? null : null;
 
   const mcpServerCount = adapter
     ? Object.keys(collectEnabledMcpServers(projectRoot)).length
@@ -134,13 +142,22 @@ export function BatchDispatchModal({
   const mcpFlag = adapter ? mcpInjectionFlag(adapter.command) : null;
   const mcpInjection = mcpFlag && mcpServerCount > 0 ? { count: mcpServerCount, flag: mcpFlag } : null;
 
-  const buildArgs = (feature: Feature): string[] => {
+  const buildArgs = async (feature: Feature): Promise<string[]> => {
     if (!adapter) return [];
     const agent = adapter as AgentAdapterConfig;
     const basePrompt = BATCH_TEMPLATES[selectedTemplate].build(feature);
-    const prompt = selectedWorkflow
+    let prompt = selectedWorkflow
       ? buildAgentWorkflowPrompt(selectedWorkflow, feature, basePrompt)
       : basePrompt;
+    if (selectedDagWorkflow) {
+      const workflowRun = createAgentWorkflowRun(selectedDagWorkflow, {
+        projectId: projectRoot,
+        featureId: feature.id,
+        selectedBy: 'batch-dispatch',
+      });
+      await saveAgentWorkflowRun(projectRoot, workflowRun);
+      prompt = buildAgentWorkflowRunPrompt(selectedDagWorkflow, workflowRun, feature, prompt);
+    }
     return agent.argsTemplate.map((arg) =>
       arg
         .replaceAll('{prompt}', prompt)
@@ -203,7 +220,7 @@ export function BatchDispatchModal({
       items.map(async (item) => {
         const { feature } = item;
         try {
-          const baseArgs = buildArgs(feature);
+          const baseArgs = await buildArgs(feature);
           const args = await augmentArgsWithMcp(adapter.command, baseArgs, mcpServers);
           onFeatureUpdate?.(feature.id, { status: 'in_progress' });
           const pid = await spawnAgent({ command: adapter.command, args, workingDir: projectRoot });
@@ -311,7 +328,37 @@ export function BatchDispatchModal({
                 </div>
               )}
 
-              {/* Workflow selector */}
+              {/* DAG workflow selector */}
+              <div>
+                <label className="mb-1 block text-sm font-medium text-stone-200">
+                  {d.dagWorkflowLabel}
+                </label>
+                <select
+                  value={selectedDagWorkflowId}
+                  onChange={(e) => setSelectedDagWorkflowId(e.target.value)}
+                  className="w-full border border-stone-200/20 bg-[rgb(var(--pm-input))] px-3 py-2 text-sm text-stone-100 outline-none"
+                >
+                  <option value="">{d.noDagWorkflow}</option>
+                  {dagWorkflows.map((workflow) => (
+                    <option key={workflow.id} value={workflow.id}>
+                      {workflow.title}
+                    </option>
+                  ))}
+                </select>
+                {selectedDagWorkflow && (
+                  <div className="mt-1.5 border border-emerald-300/15 bg-emerald-950/20 px-3 py-2 text-[11px] text-emerald-100/85">
+                    <span className="font-mono uppercase tracking-[0.12em] text-emerald-200/80">
+                      {selectedDagWorkflow.kind}
+                    </span>
+                    <span className="ml-2 text-stone-300">
+                      {selectedDagWorkflow.nodes.length} nodes · {selectedDagWorkflow.defaultRuntime.provider}
+                    </span>
+                    <span className="ml-2 text-stone-400">{selectedDagWorkflow.summary}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Prompt workflow selector */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-stone-200">
                   Agent Workflow

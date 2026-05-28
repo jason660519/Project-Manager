@@ -115,7 +115,8 @@ When Dispatch supports workflows, the user path should be:
 4. Confirm provider/model and runtime preferences.
 5. Review tool bundle and memory scopes.
 6. Start in dry-run, guarded, or approved execution mode.
-7. Monitor node status, artifacts, logs, and checkpoints.
+7. Open AI Assistants Control Console > Workflow Runs to inspect the persisted run.
+8. Monitor node status, artifacts, logs, and checkpoints.
 
 The Coordinator should block a workflow before runtime start if a required tool candidate, provider key, model, path permission, or memory policy is missing.
 
@@ -163,17 +164,19 @@ Implemented now:
 
 - Built-in Software Development and Deep Research DAG definitions.
 - DAG validation for duplicate IDs, dangling edges, missing dependencies, and cycles.
+- WorkflowRun and WorkflowNodeRun state helpers for ready/queued/running/completed/blocked flow.
+- Dispatch and Batch Dispatch template pickers for multi-agent DAG workflows.
+- WorkflowRun sidecar persistence under `.project-manager/workflow-runs/*.json`.
+- AI Assistants Control Console > Workflow Runs sheet for browsing persisted sidecars, node status, session scope, runtime profile, and artifacts.
 - Per-worker session scope and path-safe store keys.
 - Tool bundle references without raw sensitive values.
 - F35 feature spec, TDD spec, user scenarios, and dev log.
 
 Planned next:
 
-- WorkflowRun and WorkflowNodeRun state persistence.
-- Dispatch workflow template picker.
 - Integrations Hub tool/capability resolver.
 - Runtime adapter interface and local/xmux worker runner.
-- Console Workflow Runs sheet with artifacts, checkpoints, permissions, and audit events.
+- Workflow Runs controls for retry, resume, cancellation, checkpoint restore, permissions, and audit events.
 
 ## Related guides
 

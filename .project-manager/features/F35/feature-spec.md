@@ -172,6 +172,7 @@ The Console should become the operator's control room for agent orchestration.
 | Overview | See selected assistant identity, runtime health, and current state. | Show active WorkflowRuns and blocked states. |
 | AI Engineers | Create and edit role definitions. | Explain role fields in terms users can map to Worker behavior. |
 | Profiles / Skills / Memory | Review context sources. | Show whether a source is global, project-scoped, role-scoped, or worker-scoped. |
+| Workflow Runs | Inspect persisted DAG run sidecars. | Show run status, node status, dependencies, attempts, runtime profile, isolated session scope, and artifacts. |
 | Dreaming / Jobs | Offline proposal generation. | Output proposals/artifacts, not direct config mutations. |
 | Permissions | Risk gates for tools, file access, command execution, and memory writes. | A Worker cannot use a tool unless permissions and capability candidates pass. |
 | Audit | Who changed what, when, and why. | Workflow creation, retry, resume, cancellation, and memory access must be auditable. |
@@ -193,8 +194,9 @@ The Console should become the operator's control room for agent orchestration.
 | Contract | Purpose | Current / future |
 | --- | --- | --- |
 | `WorkflowDefinition` | Static DAG template. | Current F35 type. |
-| `WorkflowRun` | One execution of a workflow. | Next implementation slice. |
-| `WorkflowNodeRun` | One node's runtime state. | Next implementation slice. |
+| `WorkflowRun` | One execution of a workflow. | Current F35 state model. |
+| `WorkflowNodeRun` | One node's runtime state. | Current F35 state model. |
+| `WorkflowRunStore` | Sidecar persistence for initialized WorkflowRuns. | Current F35 file-backed store under `.project-manager/workflow-runs/*.json`. |
 | `WorkerSpec` | Worker creation payload. | Next implementation slice. |
 | `WorkerRuntimeProfile` | Runtime provider and isolation shape. | Current F35 type. |
 | `WorkerRuntimeAdapter` | Runtime provider interface. | Next implementation slice. |
@@ -208,7 +210,10 @@ The Console should become the operator's control room for agent orchestration.
 - Existing flat prompt workflow helpers remain backward compatible.
 - New tests live in `__tests__/agentWorkflowDag.test.ts`.
 - Architecture rationale is captured in `docs/architecture/ADR-013-agent-workflow-dag-control-plane.md`.
-- User-facing guides explain AI Assistants Control Console and Agent Workflows before UI expansion.
+- Dispatch surfaces expose a DAG workflow template picker while preserving legacy single-agent prompt workflows.
+- Dispatch persists initialized WorkflowRuns as sidecar JSON records before runtime launch.
+- AI Assistants Control Console exposes a Workflow Runs sheet backed by `.project-manager/workflow-runs/*.json`.
+- User-facing guides explain AI Assistants Control Console and Agent Workflows before deeper runtime expansion.
 - Feature config points Development sheet to README, feature spec, TDD spec, user scenarios, dev log, implementation, and test paths.
 
 ## Acceptance Criteria
@@ -221,13 +226,17 @@ The Console should become the operator's control room for agent orchestration.
 6. F35 feature docs define Coordinator, AI Assistant, AI Engineer, Worker, Workflow, DAG, Memory, Session, Artifact, Runtime Adapter, Harness, Checkpoint, and Resume Point.
 7. F35 feature docs include flow diagrams for control plane, Software Development, Deep Research, and memory/session isolation.
 8. User guides explain how the AI Assistants Control Console relates to AI Engineers, Dispatch, Integrations Hub, Sessions, and Logs.
-9. Existing `DEFAULT_AGENT_WORKFLOWS` tests continue to pass.
-10. `npm run docs:check`, `npm run docs:site:check`, and focused tests complete or failures are documented.
+9. WorkflowRun helpers initialize ready/queued nodes, advance downstream nodes after dependencies complete, and block after retry budget exhaustion.
+10. Dispatch can select a multi-agent DAG template separately from legacy single-agent prompt workflows.
+11. WorkflowRun sidecars serialize to `.project-manager/workflow-runs/<runId>.json`.
+12. AI Assistants Control Console can show persisted WorkflowRuns with node status, session scope, runtime profile, and artifacts.
+13. Existing `DEFAULT_AGENT_WORKFLOWS` tests continue to pass.
+14. `npm run docs:check`, `npm run docs:site:check`, and focused tests complete or failures are documented.
 
 ## Open Decisions
 
 - Whether user-authored workflow definitions should later live in `.project-manager/config.json`, `.project-manager/workflows/*.json`, or a hybrid of built-in TypeScript templates plus JSON overrides.
 - Whether the long-running scheduler belongs in Tauri/Rust or remains in renderer until workflow execution is stable.
 - How much raw prior-node transcript a downstream summarizer may request versus only reading declared artifacts.
-- Whether AI Assistants Control Console should get a dedicated Workflow Runs sheet before Dispatch UI is upgraded.
 - How to expose CubeSandbox templates and pause/resume state without leaking runtime-specific fields into user-authored workflow definitions.
+- How retry, resume, cancellation, permission decisions, and audit events should be wired into the Workflow Runs sheet.

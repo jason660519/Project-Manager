@@ -51,6 +51,36 @@
 | F5 | Runtime failure after retry budget | Node becomes failed and WorkflowRun becomes blocked |
 | F6 | User resumes node from checkpoint | Session scope matches project + workflow + run + node + agent |
 
+Implemented coverage now lives in `agentWorkflowDag.test.ts`:
+
+- initial WorkflowRun state creates ready root nodes and queued dependent nodes;
+- completed dependencies unblock downstream node runs;
+- runtime failures retry while budget remains and block after budget exhaustion;
+- dispatch prompts include WorkflowRun identity, node contracts, and session isolation rules.
+
+## Suite G: Dispatch template picker
+
+1. Task Dispatch renders a multi-agent DAG workflow template picker.
+2. The DAG picker is separate from the legacy single-agent Agent Workflow prompt selector.
+3. Selecting a DAG template stores `workflowTemplateId` and initializes a `workflowRunId` in dispatch prompt config.
+4. Batch Dispatch can wrap every selected feature with its own initialized WorkflowRun.
+
+## Suite H: WorkflowRun sidecar persistence
+
+1. `workflowRunsDirectory(projectRoot)` resolves to `<projectRoot>/.project-manager/workflow-runs`.
+2. `workflowRunPath(projectRoot, runId)` normalizes unsafe run IDs before creating a JSON path.
+3. `serializeAgentWorkflowRun()` and `parseAgentWorkflowRun()` round-trip valid runs.
+4. `saveAgentWorkflowRun()` writes pretty JSON through the bridge-backed store adapter.
+5. Task Dispatch and Batch Dispatch save initialized WorkflowRun records before runtime launch.
+
+## Suite I: AI Assistants Workflow Runs sheet
+
+1. AI Assistants Control Console exposes a `workflow-runs` sheet route.
+2. The sheet reads persisted WorkflowRun sidecars for the selected project root.
+3. The sheet shows run totals, active/ready/completed/blocked counts, and selected run details.
+4. Selected run detail shows node status, dependencies, attempts, runtime profile, isolated session scope, and artifacts.
+5. When no project or sidecars exist, the sheet shows an empty state instead of throwing.
+
 ## User Scenario Development Tests
 
 | ID | Scenario | Test Level | Expected |
@@ -63,6 +93,8 @@
 | F35-S06 | Integrations Hub candidate missing | Future integration | Resolver blocks the node before execution and surfaces a missing capability |
 | F35-S07 | User understands Edit Engineer Role fields | Docs now, UI tests later | Glossary maps role fields to Worker creation behavior |
 | F35-S08 | User operates AI Assistants Control Console | Docs now, UI tests later | Console guide explains sheets, state, permissions, memory, and audit expectations |
+| F35-S09 | User selects a DAG template in Dispatch | Component now | Dispatch exposes multi-agent template picker and wraps prompt with WorkflowRun identity |
+| F35-S10 | User inspects created WorkflowRun | Component now | Console Workflow Runs sheet shows the run, node status, isolated session scope, and artifacts |
 
 ## Manual Verification Later
 

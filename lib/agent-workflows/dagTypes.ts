@@ -129,3 +129,75 @@ export interface AgentWorkflowValidationResult {
   valid: boolean;
   errors: AgentWorkflowValidationError[];
 }
+
+export type AgentWorkflowRunStatus =
+  | 'draft'
+  | 'queued'
+  | 'running'
+  | 'blocked'
+  | 'completed'
+  | 'cancelled';
+
+export type AgentWorkflowNodeRunStatus =
+  | 'queued'
+  | 'ready'
+  | 'running'
+  | 'succeeded'
+  | 'failed'
+  | 'blocked'
+  | 'skipped';
+
+export type AgentWorkflowNodeRunErrorKind =
+  | 'runtime-error'
+  | 'tool-unavailable'
+  | 'validation-failed'
+  | 'permission-blocked'
+  | 'unknown';
+
+export interface AgentWorkflowArtifactRecord {
+  artifactId: string;
+  nodeId: string;
+  status: 'pending' | 'produced' | 'missing';
+  required: boolean;
+  description: string;
+  producedAt?: string;
+}
+
+export interface AgentWorkflowNodeRun {
+  id: string;
+  workflowRunId: string;
+  workflowId: string;
+  nodeId: string;
+  title: string;
+  role: AgentWorkflowNodeRole;
+  status: AgentWorkflowNodeRunStatus;
+  attempts: number;
+  maxAttempts: number;
+  retryOn: AgentWorkflowRetryPolicy['retryOn'];
+  dependencies: string[];
+  parallelGroup?: string;
+  sessionScope: AgentSessionScope;
+  runtime: AgentWorkflowRuntimeProfile;
+  model: AgentWorkflowModelSelection;
+  outputArtifacts: AgentWorkflowArtifactRecord[];
+  startedAt?: string;
+  completedAt?: string;
+  blockedReason?: string;
+  errorKind?: AgentWorkflowNodeRunErrorKind;
+  checkpointId?: string;
+}
+
+export interface AgentWorkflowRun {
+  id: string;
+  workflowId: string;
+  workflowVersion: number;
+  workflowTitle: string;
+  projectId: string;
+  featureId?: string;
+  status: AgentWorkflowRunStatus;
+  createdAt: string;
+  updatedAt: string;
+  nodeRuns: AgentWorkflowNodeRun[];
+  blockedReason?: string;
+  selectedBy?: string;
+}

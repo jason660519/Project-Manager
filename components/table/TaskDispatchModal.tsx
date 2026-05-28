@@ -10,8 +10,12 @@ import {
   spawnTerminal,
 } from '../../lib/bridge';
 import {
+  buildAgentWorkflowRunPrompt,
   buildAgentWorkflowPrompt,
+  createAgentWorkflowRun,
+  getAgentWorkflowDagById,
   getAgentWorkflowById,
+  saveAgentWorkflowRun,
 } from '../../lib/agent-workflows';
 import {
   createRuntimeAdapterFromConfig,
@@ -38,6 +42,7 @@ import type {
   HarnessTaskRole,
   IDEId,
 } from '../../lib/types';
+import type { AgentWorkflowDagDefinition, AgentWorkflowRun } from '../../lib/agent-workflows';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -79,6 +84,11 @@ interface RoleRunState {
 interface LogEntry {
   role: HarnessTaskRole;
   line: string;
+}
+
+interface DagWorkflowSelection {
+  workflow: AgentWorkflowDagDefinition;
+  run: AgentWorkflowRun;
 }
 
 const ROLES: HarnessTaskRole[] = ['planner', 'worker', 'evaluator'];
@@ -202,7 +212,25 @@ export function TaskDispatchModal({
   );
 
   // ── Dispatch logic ────────────────────────────────────────────────────────
-  const buildAssignmentPatch = useCallback((role: HarnessTaskRole, config: RoleConfigState): DispatchFeatureUpdate => {
+  const buildDagWorkflowSelection = useCallback((role: HarnessTaskRole, config: RoleConfigState): DagWorkflowSelection | null => {
+    if (!config.selectedDagWorkflowId) return null;
+    const workflow = getAgentWorkflowDagById(config.selectedDagWorkflowId);
+    if (!workflow) return null;
+    return {
+      workflow,
+      run: createAgentWorkflowRun(workflow, {
+        projectId: projectRoot,
+        featureId: feature.id,
+        selectedBy: role,
+      }),
+    };
+  }, [feature.id, projectRoot]);
+
+  const buildAssignmentPatch = useCallback((
+    role: HarnessTaskRole,
+    config: RoleConfigState,
+    dagSelection?: DagWorkflowSelection | null,
+  ): DispatchFeatureUpdate => {
     const adapter = adapters.find((a) => a.id === config.selectedAdapterId);
     const engineerRole = engineerRoles.find((r) => r.id === config.selectedRoleId);
     const lastDispatchModel = engineerRole?.primaryModel
@@ -215,6 +243,8 @@ export function TaskDispatchModal({
       stopCondition: config.autoLoop && config.stopCondition.trim() ? config.stopCondition.trim() : undefined,
       maxIterations: config.autoLoop ? config.maxIterations : undefined,
       lastDispatchModel,
+      workflowTemplateId: config.selectedDagWorkflowId || undefined,
+      workflowRunId: dagSelection?.run.id,
     };
     const adapterLabel = adapter?.name ?? config.selectedAdapterId;
     const roleLabel = engineerRole ? ` (${engineerRole.name})` : '';
@@ -248,7 +278,11 @@ export function TaskDispatchModal({
     return patch;
   }, [adapters, engineerRoles, feature, selectedPhase]);
 
-  const buildExecutionPrompt = useCallback(async (role: HarnessTaskRole, config: RoleConfigState): Promise<string> => {
+  const buildExecutionPrompt = useCallback(async (
+    role: HarnessTaskRole,
+    config: RoleConfigState,
+    dagSelection?: DagWorkflowSelection | null,
+  ): Promise<string> => {
     let effectivePrompt = config.prompt;
     const engineerRole = engineerRoles.find((r) => r.id === config.selectedRoleId);
     const adapter = adapters.find((a) => a.id === config.selectedAdapterId);
@@ -278,6 +312,9 @@ export function TaskDispatchModal({
     if (selectedWorkflow) {
       effectivePrompt = buildAgentWorkflowPrompt(selectedWorkflow, feature, effectivePrompt);
     }
+    if (dagSelection) {
+      effectivePrompt = buildAgentWorkflowRunPrompt(dagSelection.workflow, dagSelection.run, feature, effectivePrompt);
+    }
     return effectivePrompt;
   }, [adapters, d, engineerRoles, feature, llmProviders, projectRoot]);
 
@@ -289,8 +326,12 @@ export function TaskDispatchModal({
     const targetKind = getAdapterExecutionKind(adapter);
     const isIDE = targetKind === 'ide';
     const isAgentApp = targetKind === 'agent-app';
+    const dagSelection = buildDagWorkflowSelection(role, config);
+    if (dagSelection) {
+      await saveAgentWorkflowRun(projectRoot, dagSelection.run);
+    }
 
-    const assignmentPatch = buildAssignmentPatch(role, config);
+    const assignmentPatch = buildAssignmentPatch(role, config, dagSelection);
     onFeatureUpdate?.(
       feature.id,
       role === 'worker'
@@ -303,7 +344,7 @@ export function TaskDispatchModal({
         const runtimeAdapter = createRuntimeAdapterFromConfig(adapter);
         const result = await runtimeAdapter.execute({
           feature,
-          prompt: await buildExecutionPrompt(role, config),
+          prompt: await buildExecutionPrompt(role, config, dagSelection),
           projectRoot,
         });
         if (!result.success || !result.command || !result.args) {
@@ -325,7 +366,7 @@ export function TaskDispatchModal({
       const runtimeAdapter = createRuntimeAdapterFromConfig(adapter);
       const result = await runtimeAdapter.execute({
         feature,
-        prompt: await buildExecutionPrompt(role, config),
+        prompt: await buildExecutionPrompt(role, config, dagSelection),
         projectRoot,
       });
       if (!result.success || !result.command || !result.args) {
@@ -382,7 +423,7 @@ export function TaskDispatchModal({
       setLogs((prev) => [...prev, { role, line: `Error: ${err}` }]);
       setRunStates((prev) => ({ ...prev, [role]: { phase: 'error' as const, activePid: null } }));
     }
-  }, [adapters, buildAssignmentPatch, buildExecutionPrompt, configByRole, feature, onExecuted, onFeatureUpdate, onRunEnd, onRunLog, onRunStart, projectRoot]);
+  }, [adapters, buildAssignmentPatch, buildDagWorkflowSelection, buildExecutionPrompt, configByRole, feature, onExecuted, onFeatureUpdate, onRunEnd, onRunLog, onRunStart, projectRoot]);
 
   const handleDispatchAll = useCallback(async () => {
     const promises: Promise<void>[] = [];
@@ -417,17 +458,21 @@ export function TaskDispatchModal({
     const adapter = adapters.find((a) => a.id === config.selectedAdapterId);
     if (!adapter) return;
     try {
+      const dagSelection = buildDagWorkflowSelection(activeRole, config);
+      if (dagSelection) {
+        await saveAgentWorkflowRun(projectRoot, dagSelection.run);
+      }
       const runtimeAdapter = createRuntimeAdapterFromConfig(adapter);
       const result = await runtimeAdapter.execute({
         feature,
-        prompt: await buildExecutionPrompt(activeRole, config),
+        prompt: await buildExecutionPrompt(activeRole, config, dagSelection),
         projectRoot,
       });
       if (!result.success || !result.command || !result.args) throw new Error(result.message ?? 'Unable to build command');
       const args = await augmentArgsWithMcp(result.command, result.args, collectEnabledMcpServers(projectRoot));
       const flatArgs = args.map((a) => a.replace(/\r?\n/g, ' '));
       await spawnTerminal({ command: result.command, args: flatArgs, cwd: projectRoot });
-      const assignmentPatch = buildAssignmentPatch(activeRole, config);
+      const assignmentPatch = buildAssignmentPatch(activeRole, config, dagSelection);
       onFeatureUpdate?.(
         feature.id,
         activeRole === 'worker' ? { ...assignmentPatch, status: 'in_progress' } : assignmentPatch,

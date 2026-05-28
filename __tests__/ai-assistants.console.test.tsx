@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AIAssistantsConsoleClient } from '../app/ai_assistants/AIAssistantsConsoleClient';
+import type { AgentWorkflowRun } from '../lib/agent-workflows';
 
 const push = vi.fn();
 
@@ -76,5 +77,63 @@ describe('AIAssistantsConsoleClient', () => {
       'projectManager:ai-assistants-console:v1',
       expect.stringContaining('"scope":"tool:run_command"'),
     );
+  });
+
+  it('renders persisted workflow runs and isolated node session scopes', () => {
+    const sampleRun: AgentWorkflowRun = {
+      id: 'workflow-run-F35-software-dev-20260528041000',
+      workflowId: 'software-dev-parallel-v1',
+      workflowVersion: 1,
+      workflowTitle: 'Software Development Parallel DAG',
+      projectId: 'project-manager',
+      featureId: 'F35',
+      status: 'queued',
+      createdAt: '2026-05-28T04:10:00.000Z',
+      updatedAt: '2026-05-28T04:10:00.000Z',
+      selectedBy: 'dispatch',
+      nodeRuns: [
+        {
+          id: 'workflow-run-F35-software-dev-20260528041000:planner',
+          workflowRunId: 'workflow-run-F35-software-dev-20260528041000',
+          workflowId: 'software-dev-parallel-v1',
+          nodeId: 'planner',
+          title: 'Planner',
+          role: 'planner',
+          status: 'ready',
+          attempts: 0,
+          maxAttempts: 2,
+          retryOn: ['runtime-error'],
+          dependencies: [],
+          sessionScope: {
+            projectId: 'project-manager',
+            workflowId: 'software-dev-parallel-v1',
+            workflowRunId: 'workflow-run-F35-software-dev-20260528041000',
+            nodeId: 'planner',
+            agentId: 'planner-planner',
+          },
+          runtime: {
+            provider: 'xmux',
+            isolation: 'host-process',
+            workingDirectoryMode: 'project-root',
+          },
+          model: { mode: 'inherit-engineer-role' },
+          outputArtifacts: [
+            {
+              artifactId: 'implementation-plan',
+              nodeId: 'planner',
+              status: 'pending',
+              required: true,
+              description: 'Plan and verification matrix',
+            },
+          ],
+        },
+      ],
+    };
+
+    render(<AIAssistantsConsoleClient activeSheet="workflow-runs" initialWorkflowRuns={[sampleRun]} />);
+
+    expect(screen.getAllByText('Workflow Runs').length).toBeGreaterThan(0);
+    expect(screen.getByText('Software Development Parallel DAG')).toBeInTheDocument();
+    expect(screen.getByText(/workflow-run-F35-software-dev-20260528041000\/planner\/planner-planner/)).toBeInTheDocument();
   });
 });

@@ -2,7 +2,11 @@
 
 import { useMemo } from 'react';
 import { getAdapterExecutionKind } from '../../lib/adapters/registry';
-import { DEFAULT_AGENT_WORKFLOWS } from '../../lib/agent-workflows/definitions';
+import {
+  DEFAULT_AGENT_WORKFLOWS,
+  getAgentWorkflowDagById,
+  listAgentWorkflowDags,
+} from '../../lib/agent-workflows';
 import { checkCommandExistsTauri, mcpInjectionFlag, supportsMcpInjection } from '../../lib/bridge';
 import { listLlmProviders } from '../../lib/keys/llmProviders';
 import { collectEnabledMcpServers } from '../../lib/storage/plugins';
@@ -23,6 +27,7 @@ export interface RoleConfigState {
   selectedAdapterId: string;
   prompt: string;
   selectedWorkflowId: string;
+  selectedDagWorkflowId: string;
   autoLoop: boolean;
   stopCondition: string;
   maxIterations: number;
@@ -86,6 +91,7 @@ export function initialRoleConfigState(
 
   const prompt = feature.promptConfig?.body ?? '';
   const selectedWorkflowId = '';
+  const selectedDagWorkflowId = feature.promptConfig?.workflowTemplateId ?? '';
   const autoLoop = feature.promptConfig?.autoLoop ?? false;
   const stopCondition = feature.promptConfig?.stopCondition ?? '';
   const maxIterations = feature.promptConfig?.maxIterations ?? 3;
@@ -95,6 +101,7 @@ export function initialRoleConfigState(
     selectedAdapterId,
     prompt,
     selectedWorkflowId,
+    selectedDagWorkflowId,
     autoLoop,
     stopCondition,
     maxIterations,
@@ -416,6 +423,10 @@ export function RoleConfigPanel({
   const selectedRole = engineerRoles.find((r) => r.id === state.selectedRoleId);
   const selectedAdapter = adapters.find((a) => a.id === state.selectedAdapterId);
   const targetKind = getAdapterExecutionKind(selectedAdapter);
+  const dagWorkflows = useMemo(() => listAgentWorkflowDags(), []);
+  const selectedDagWorkflow = state.selectedDagWorkflowId
+    ? getAgentWorkflowDagById(state.selectedDagWorkflowId)
+    : undefined;
 
   // Group adapters by target kind.
   const ideAdapters = adapters.filter((a) => getAdapterExecutionKind(a) === 'ide');
@@ -522,6 +533,31 @@ export function RoleConfigPanel({
       )}
 
       {/* Workflow */}
+      <div>
+        <label className="mb-1 block text-sm font-medium text-stone-200">{d.dagWorkflowLabel}</label>
+        <select
+          value={state.selectedDagWorkflowId}
+          onChange={(e) => onStateChange({ selectedDagWorkflowId: e.target.value })}
+          className="w-full border border-stone-200/20 bg-[rgb(var(--pm-input))] px-3 py-2 text-sm text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/35"
+        >
+          <option value="">{d.noDagWorkflow}</option>
+          {dagWorkflows.map((w) => (
+            <option key={w.id} value={w.id}>{w.title}</option>
+          ))}
+        </select>
+        {selectedDagWorkflow && (
+          <div className="mt-1.5 border border-emerald-300/15 bg-emerald-950/20 px-3 py-2 text-[11px] text-emerald-100/85">
+            <span className="font-mono uppercase tracking-[0.12em] text-emerald-200/80">
+              {selectedDagWorkflow.kind}
+            </span>
+            <span className="ml-2 text-stone-300">
+              {selectedDagWorkflow.nodes.length} nodes · {selectedDagWorkflow.defaultRuntime.provider}
+            </span>
+            <span className="ml-2 text-stone-400">{selectedDagWorkflow.summary}</span>
+          </div>
+        )}
+      </div>
+
       <div>
         <label className="mb-1 block text-sm font-medium text-stone-200">{d.workflowLabel}</label>
         <select

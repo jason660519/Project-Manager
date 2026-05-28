@@ -34,8 +34,13 @@ vi.mock('../lib/adapters/registry', () => ({
 
 vi.mock('../lib/agent-workflows', () => ({
   DEFAULT_AGENT_WORKFLOWS: [],
+  buildAgentWorkflowRunPrompt: vi.fn((_workflow, _run, _feature, prompt) => prompt),
   buildAgentWorkflowPrompt: vi.fn().mockReturnValue(''),
+  createAgentWorkflowRun: vi.fn((_workflow) => ({ id: 'run-1', status: 'queued', nodeRuns: [] })),
+  getAgentWorkflowDagById: vi.fn().mockReturnValue(null),
   getAgentWorkflowById: vi.fn().mockReturnValue(null),
+  listAgentWorkflowDags: vi.fn().mockReturnValue([]),
+  saveAgentWorkflowRun: vi.fn().mockResolvedValue('/tmp/project/.project-manager/workflow-runs/run-1.json'),
 }));
 
 vi.mock('../lib/keys/llmProviders', () => ({
@@ -131,6 +136,17 @@ describe('TaskDispatchModal [render]', () => {
 
     // Should show the runtime label
     expect(screen.getByText('Execution Target')).toBeInTheDocument();
+  });
+
+  it('renders the multi-agent DAG workflow template picker', () => {
+    render(
+      <I18nProvider>
+        <TaskDispatchModal {...baseProps} />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByText('Workflow Template (DAG)')).toBeInTheDocument();
+    expect(screen.getByText('— No multi-agent workflow template —')).toBeInTheDocument();
   });
 
   it('renders target hints for external IDE', () => {

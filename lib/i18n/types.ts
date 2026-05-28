@@ -369,6 +369,7 @@ export interface Translations {
     taskRoleEvaluator: string;
     engineerLabel: string;
     workflowLabel: string;
+    dagWorkflowLabel: string;
     modelProviderLabel: string;
     modelIdLabel: string;
     modelPromptTitle: string;
@@ -378,6 +379,7 @@ export interface Translations {
     openFileLabel: string;
     noRole: string;
     noWorkflow: string;
+    noDagWorkflow: string;
     loadingSpec: string;
     systemPromptPrefix: string;
     refsPrefix: string;

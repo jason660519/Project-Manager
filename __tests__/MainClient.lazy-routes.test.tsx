@@ -81,12 +81,14 @@ vi.mock('../app/ui/views/DocumentationView', () => ({
 vi.mock('../app/ai_assistants/AIAssistantsConsoleClient', () => ({
   AIAssistantsConsoleClient: ({
     activeSheet,
+    projectRoot,
     engineersPanel,
   }: {
     activeSheet?: string;
+    projectRoot?: string;
     engineersPanel?: React.ReactNode;
   }) => (
-    <div data-testid="ai-assistants-view" data-active-sheet={activeSheet ?? ''}>
+    <div data-testid="ai-assistants-view" data-active-sheet={activeSheet ?? ''} data-project-root={projectRoot ?? ''}>
       {engineersPanel ? <span data-testid="engineers-panel-prop" /> : null}
     </div>
   ),

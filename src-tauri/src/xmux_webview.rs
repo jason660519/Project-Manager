@@ -370,7 +370,7 @@ new Promise((resolve) => {
   }
 
   const style = document.createElement('style');
-  style.textContent = '* { cursor: crosshair !important; } [data-pm-xmux-hover="true"] { outline: 2px solid #38bdf8 !important; outline-offset: 2px !important; }';
+  style.textContent = '* { cursor: crosshair !important; } [data-pm-xmux-hover="true"] { outline: 2px solid Highlight !important; outline-offset: 2px !important; }';
   document.documentElement.appendChild(style);
 
   let hovered = null;

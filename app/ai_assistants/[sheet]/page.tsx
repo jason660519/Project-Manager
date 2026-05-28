@@ -7,6 +7,7 @@ const VALID_SHEETS: AIAssistantSheetId[] = [
   'overview',
   'profile',
   'skills',
+  'workflow-runs',
   'daily-logs',
   'dreaming',
   'permissions',

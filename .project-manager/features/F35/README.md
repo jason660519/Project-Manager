@@ -7,7 +7,7 @@ Introduce the first Project Manager control-plane model for multi-agent workflow
 ## Current State
 
 - Status: in_progress
-- Progress: 55%
+- Progress: 84%
 - Phase: development
 - Owner: Codex
 - Created: 2026-05-28
@@ -19,6 +19,9 @@ Introduce the first Project Manager control-plane model for multi-agent workflow
 - Define per-agent session scope helpers so worker memory and chat history do not share a global store.
 - Define shared vocabulary for Coordinator, AI Assistant, AI Engineer, Worker, Workflow, Memory, Session, Runtime Adapter, Harness, Checkpoint, and Resume Point.
 - Document AI Assistants Control Console and Edit Engineer Role terminology before UI expansion.
+- Add WorkflowRun / WorkflowNodeRun state helpers and expose DAG template selection in Dispatch.
+- Persist initialized WorkflowRuns as `.project-manager/workflow-runs/*.json` sidecars.
+- Expose persisted WorkflowRuns in AI Assistants Control Console for run/node/session/artifact inspection.
 - Add architecture documentation and tests before any CubeSandbox runtime implementation.
 
 ## Non-Goals

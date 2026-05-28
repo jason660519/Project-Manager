@@ -1059,7 +1059,7 @@
       "name": "Agent Workflow DAG Control Plane",
       "category": "AI Workflows",
       "status": "in_progress",
-      "progress": 55,
+      "progress": 84,
       "phase": "development",
       "points": 8,
       "locatedSection": "lib/agent-workflows",
@@ -1073,9 +1073,9 @@
         "implementation": "lib/agent-workflows",
         "test": "__tests__/agentWorkflowDag.test.ts"
       },
-      "notes": "Expanded F35 from type-level DAG foundation into product/engineering control-plane spec with glossary, diagrams, AI Assistants Control Console guidance, Edit Engineer Role terminology, and product-level test scenarios.",
+      "notes": "WorkflowRun / WorkflowNodeRun state helpers, Dispatch DAG template picker, sidecar persistence, and AI Assistants Workflow Runs inspection are implemented. F35 now initializes run/node state, saves WorkflowRun JSON under .project-manager/workflow-runs, keeps worker sessions isolated, and surfaces persisted DAG state in the Console.",
       "createdAt": "2026-05-28T00:00:00.000Z",
-      "updatedAt": "2026-05-28T02:00:00.000Z",
+      "updatedAt": "2026-05-28T13:15:00.000Z",
       "updatedBy": "Codex",
       "metadata": {
         "evidencePaths": [
@@ -1083,8 +1083,14 @@
           "docs/guides/features/ai-assistants-control-console.md",
           "docs/guides/features/agent-workflows.md",
           "lib/agent-workflows/dagDefinitions.ts",
+          "lib/agent-workflows/runState.ts",
+          "lib/agent-workflows/runStore.ts",
           "lib/agent-workflows/sessionScope.ts",
-          "__tests__/agentWorkflowDag.test.ts"
+          "app/ai_assistants/AIAssistantsConsoleClient.tsx",
+          "components/table/TaskDispatchModal.tsx",
+          "components/table/BatchDispatchModal.tsx",
+          "__tests__/agentWorkflowDag.test.ts",
+          "__tests__/ai-assistants.console.test.tsx"
         ],
         "kickoffAt": "2026-05-28T00:00:00.000Z"
       }
@@ -1130,6 +1136,6 @@
     "root": "/Volumes/KLEVV-4T-1/Project-Manager"
   },
   "schemaVersion": 8,
-  "updatedAt": "2026-05-28T02:00:00.000Z",
+  "updatedAt": "2026-05-28T04:00:00.000Z",
   "updatedBy": "Codex"
 }

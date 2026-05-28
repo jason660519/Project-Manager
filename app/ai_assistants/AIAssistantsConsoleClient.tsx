@@ -9,6 +9,7 @@ import {
   Database,
   FileClock,
   FileText,
+  GitBranch,
   History,
   KeyRound,
   LockKeyhole,
@@ -51,12 +52,19 @@ import type {
   DailyLogSeverity,
   PermissionState,
 } from '../../lib/ai-assistants/types';
+import {
+  listAgentWorkflowRuns,
+  type AgentWorkflowNodeRun,
+  type AgentWorkflowRun,
+} from '../../lib/agent-workflows';
 import { ChatPageClient } from '../chat/ChatPageClient';
 
 interface AIAssistantsConsoleClientProps {
   initialChatContext?: ChatContext;
   activeSheet?: AIAssistantSheetId | 'instances';
   engineersPanel?: React.ReactNode;
+  projectRoot?: string;
+  initialWorkflowRuns?: AgentWorkflowRun[];
 }
 
 const SHEET_TABS: ReadonlyArray<SheetTabItem<AIAssistantSheetId>> = [
@@ -65,6 +73,7 @@ const SHEET_TABS: ReadonlyArray<SheetTabItem<AIAssistantSheetId>> = [
   { key: 'overview', label: 'Overview', icon: <Activity size={14} /> },
   { key: 'profile', label: 'Profile', icon: <FileText size={14} /> },
   { key: 'skills', label: 'Skills', icon: <SlidersHorizontal size={14} /> },
+  { key: 'workflow-runs', label: 'Workflow Runs', icon: <GitBranch size={14} /> },
   { key: 'daily-logs', label: 'Daily Logs', icon: <FileClock size={14} /> },
   { key: 'dreaming', label: 'Dreaming', icon: <Brain size={14} /> },
   { key: 'permissions', label: 'Permissions', icon: <ShieldCheck size={14} /> },
@@ -99,7 +108,7 @@ function riskClass(risk: string): string {
 }
 
 function statusClass(status: string): string {
-  if (['connected', 'ready', 'granted', 'completed'].includes(status)) {
+  if (['connected', 'ready', 'granted', 'completed', 'succeeded', 'produced'].includes(status)) {
     return 'border-emerald-300/25 bg-emerald-950/25 text-emerald-100';
   }
   if (['degraded', 'guarded', 'warning', 'paused', 'queued', 'untested'].includes(status)) {
@@ -152,6 +161,8 @@ const inputClass =
 
 const selectClass =
   'w-full rounded border border-stone-200/15 bg-stone-950/70 px-3 py-2 text-[12px] text-stone-100 outline-none focus:border-amber-200/40';
+
+const EMPTY_WORKFLOW_RUNS: AgentWorkflowRun[] = [];
 
 function OverviewSheet({
   assistant,
@@ -499,6 +510,210 @@ function SkillsSheet({
   );
 }
 
+function workflowRunNodeCounts(run: AgentWorkflowRun): Record<AgentWorkflowNodeRun['status'], number> {
+  return run.nodeRuns.reduce<Record<AgentWorkflowNodeRun['status'], number>>(
+    (counts, nodeRun) => ({
+      ...counts,
+      [nodeRun.status]: counts[nodeRun.status] + 1,
+    }),
+    {
+      queued: 0,
+      ready: 0,
+      running: 0,
+      succeeded: 0,
+      failed: 0,
+      blocked: 0,
+      skipped: 0,
+    },
+  );
+}
+
+function WorkflowRunsSheet({
+  projectRoot,
+  initialWorkflowRuns = EMPTY_WORKFLOW_RUNS,
+}: {
+  projectRoot?: string;
+  initialWorkflowRuns?: AgentWorkflowRun[];
+}) {
+  const [runs, setRuns] = useState<AgentWorkflowRun[]>(initialWorkflowRuns);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(initialWorkflowRuns[0]?.id ?? null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setRuns(initialWorkflowRuns);
+    setSelectedRunId((prev) => prev ?? initialWorkflowRuns[0]?.id ?? null);
+  }, [initialWorkflowRuns]);
+
+  useEffect(() => {
+    if (!projectRoot) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    listAgentWorkflowRuns(projectRoot)
+      .then((loadedRuns) => {
+        if (cancelled) return;
+        setRuns(loadedRuns);
+        setSelectedRunId((prev) => {
+          if (prev && loadedRuns.some((run) => run.id === prev)) return prev;
+          return loadedRuns[0]?.id ?? null;
+        });
+      })
+      .catch((loadError: unknown) => {
+        if (cancelled) return;
+        setError(loadError instanceof Error ? loadError.message : 'Unable to load WorkflowRun sidecars.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectRoot]);
+
+  const selectedRun = runs.find((run) => run.id === selectedRunId) ?? runs[0] ?? null;
+  const selectedCounts = selectedRun ? workflowRunNodeCounts(selectedRun) : null;
+  const totalReadyNodes = runs.reduce((total, run) => total + workflowRunNodeCounts(run).ready, 0);
+  const activeRuns = runs.filter((run) => ['queued', 'running', 'blocked'].includes(run.status)).length;
+  const completedRuns = runs.filter((run) => run.status === 'completed').length;
+  const blockedRuns = runs.filter((run) => run.status === 'blocked').length;
+
+  return (
+    <div className="grid min-h-full gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <section className="flex min-h-0 flex-col overflow-hidden rounded border border-stone-200/15 bg-white/[0.03]">
+        <div className="grid border-b border-stone-200/10 sm:grid-cols-4">
+          <Metric label="Runs" value={runs.length} detail="Persisted WorkflowRun sidecars" />
+          <Metric label="Active" value={activeRuns} detail="Queued, running, or blocked" />
+          <Metric label="Ready Nodes" value={totalReadyNodes} detail="Nodes ready for worker launch" />
+          <Metric label="Done / Blocked" value={`${completedRuns}/${blockedRuns}`} detail="Completed runs versus blocked runs" />
+        </div>
+        <div className="flex items-center justify-between gap-3 border-b border-stone-200/10 px-4 py-3">
+          <div>
+            <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-stone-200">Workflow Runs</h2>
+            <p className="mt-1 text-[11px] text-stone-500">
+              {projectRoot ? `${projectRoot}/.project-manager/workflow-runs` : 'Select a project to load WorkflowRun sidecars.'}
+            </p>
+          </div>
+          <Badge tone={loading ? 'queued' : error ? 'error' : 'ready'}>
+            {loading ? 'loading' : error ? 'error' : 'ready'}
+          </Badge>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto">
+          <table className="w-full min-w-[920px] text-left text-[12px]">
+            <thead className="sticky top-0 border-b border-stone-200/10 bg-stone-950 text-[10px] uppercase tracking-[0.1em] text-stone-500">
+              <tr>
+                <th className="px-3 py-2">Run</th>
+                <th className="px-3 py-2">Workflow</th>
+                <th className="px-3 py-2">Feature</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Nodes</th>
+                <th className="px-3 py-2">Updated</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-200/10">
+              {runs.map((run) => {
+                const counts = workflowRunNodeCounts(run);
+                return (
+                  <tr
+                    key={run.id}
+                    className={clsx(
+                      'cursor-pointer text-stone-300 hover:bg-white/[0.04]',
+                      selectedRun?.id === run.id && 'bg-emerald-600/15',
+                    )}
+                    onClick={() => setSelectedRunId(run.id)}
+                  >
+                    <td className="px-3 py-3">
+                      <div className="font-mono text-[10px] text-stone-200">{run.id}</div>
+                      <div className="mt-1 text-[10px] text-stone-500">{run.selectedBy ?? 'dispatch'}</div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="font-semibold text-stone-100">{run.workflowTitle}</div>
+                      <div className="mt-1 font-mono text-[10px] text-stone-500">{run.workflowId}@v{run.workflowVersion}</div>
+                    </td>
+                    <td className="px-3 py-3 font-mono text-[10px] text-stone-400">{run.featureId ?? '-'}</td>
+                    <td className="px-3 py-3"><Badge tone={run.status}>{run.status}</Badge></td>
+                    <td className="px-3 py-3 text-stone-400">
+                      ready {counts.ready} / running {counts.running} / done {counts.succeeded}
+                    </td>
+                    <td className="px-3 py-3 font-mono text-[10px] text-stone-500">{run.updatedAt}</td>
+                  </tr>
+                );
+              })}
+              {runs.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-3 py-10 text-center text-stone-500">
+                    {error ?? (projectRoot ? 'No WorkflowRun sidecars found yet.' : 'No project selected for WorkflowRun loading.')}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <aside className="flex min-h-0 flex-col overflow-hidden rounded border border-stone-200/15 bg-white/[0.03]">
+        <div className="border-b border-stone-200/10 px-4 py-3">
+          <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-stone-200">Run Detail</h2>
+          <p className="mt-1 font-mono text-[10px] text-stone-500">{selectedRun?.id ?? 'No run selected'}</p>
+        </div>
+        {selectedRun && selectedCounts ? (
+          <div className="min-h-0 flex-1 overflow-auto p-4">
+            <div className="grid grid-cols-3 gap-2 text-center text-[11px]">
+              <div className="rounded border border-stone-200/10 bg-stone-950/50 px-2 py-2">
+                <div className="text-stone-500">Ready</div>
+                <div className="mt-1 text-sm font-semibold text-stone-100">{selectedCounts.ready}</div>
+              </div>
+              <div className="rounded border border-stone-200/10 bg-stone-950/50 px-2 py-2">
+                <div className="text-stone-500">Running</div>
+                <div className="mt-1 text-sm font-semibold text-stone-100">{selectedCounts.running}</div>
+              </div>
+              <div className="rounded border border-stone-200/10 bg-stone-950/50 px-2 py-2">
+                <div className="text-stone-500">Blocked</div>
+                <div className="mt-1 text-sm font-semibold text-stone-100">{selectedCounts.blocked + selectedCounts.failed}</div>
+              </div>
+            </div>
+            <div className="mt-4 space-y-3">
+              {selectedRun.nodeRuns.map((nodeRun) => (
+                <div key={nodeRun.id} className="rounded border border-stone-200/10 bg-stone-950/45 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-[12px] font-semibold text-stone-100">{nodeRun.title}</div>
+                      <div className="mt-1 font-mono text-[10px] text-stone-500">{nodeRun.nodeId} / {nodeRun.role}</div>
+                    </div>
+                    <Badge tone={nodeRun.status}>{nodeRun.status}</Badge>
+                  </div>
+                  <div className="mt-3 grid gap-2 text-[10px] text-stone-500">
+                    <div>Dependencies: {nodeRun.dependencies.join(', ') || 'none'}</div>
+                    <div>Attempts: {nodeRun.attempts}/{nodeRun.maxAttempts}</div>
+                    <div>Runtime: {nodeRun.runtime.provider} / {nodeRun.runtime.isolation}</div>
+                    <div>Session: {nodeRun.sessionScope.workflowRunId}/{nodeRun.sessionScope.nodeId}/{nodeRun.sessionScope.agentId}</div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-1">
+                    {nodeRun.outputArtifacts.map((artifact) => (
+                      <Badge key={artifact.artifactId} tone={artifact.status}>
+                        {artifact.artifactId}: {artifact.status}
+                      </Badge>
+                    ))}
+                  </div>
+                  {nodeRun.blockedReason && (
+                    <p className="mt-3 rounded border border-red-400/20 bg-red-950/20 px-2 py-1.5 text-[11px] text-red-100">
+                      {nodeRun.blockedReason}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-1 items-center justify-center p-6 text-center text-[12px] text-stone-500">
+            WorkflowRun detail appears after Dispatch creates a sidecar.
+          </div>
+        )}
+      </aside>
+    </div>
+  );
+}
+
 function DailyLogsSheet({ assistant }: { assistant: AIAssistantConfig }) {
   const [category, setCategory] = useState<DailyLogCategory | 'all'>('all');
   const [severity, setSeverity] = useState<DailyLogSeverity | 'all'>('all');
@@ -769,6 +984,8 @@ export function AIAssistantsConsoleClient({
   initialChatContext,
   activeSheet = 'chat',
   engineersPanel,
+  projectRoot,
+  initialWorkflowRuns,
 }: AIAssistantsConsoleClientProps) {
   const router = useRouter();
   const [state, setState] = useState<AIAssistantsConsoleState>(() => loadAIAssistantsConsoleState());
@@ -825,6 +1042,8 @@ export function AIAssistantsConsoleClient({
     content = <ProfileSheet assistant={selectedAssistant} onSave={(source) => updateSelected((assistant) => updateProfileSource(assistant, source))} />;
   } else if (effectiveSheet === 'skills') {
     content = <SkillsSheet assistant={selectedAssistant} onToggle={(skill) => updateSelected((assistant) => updateSkill(assistant, skill))} />;
+  } else if (effectiveSheet === 'workflow-runs') {
+    content = <WorkflowRunsSheet projectRoot={projectRoot} initialWorkflowRuns={initialWorkflowRuns} />;
   } else if (effectiveSheet === 'daily-logs') {
     content = <DailyLogsSheet assistant={selectedAssistant} />;
   } else if (effectiveSheet === 'dreaming') {

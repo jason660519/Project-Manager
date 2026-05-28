@@ -21,6 +21,7 @@ The floating AI Assistant and the standalone chat page are conversation surfaces
 | AI Engineers | Role definitions used by dispatch and workflow nodes. | Controls role name, prompt, model, fallback chain, skills, working scope, and capabilities. |
 | Profiles | Assistant profile source and behavior defaults. | Separates general assistant personality from role-specific AI Engineer instructions. |
 | Skills / Memory | Context sources available to assistants and workers. | Shows whether context is global, project-scoped, role-scoped, or worker-scoped. |
+| Workflow Runs | Persisted DAG runs created by Dispatch. | Shows run status, node readiness, worker session scope, runtime profile, and artifacts. |
 | Dreaming / Jobs | Offline proposal generation and background work. | Produces proposals and artifacts without silently changing project config. |
 | Permissions | Tool, command, file, network, and memory-write approvals. | Blocks risky work before a worker starts. |
 | Audit | Who changed or accessed what, when, and why. | Makes workflow creation, retry, resume, cancellation, and memory reads reviewable. |
@@ -74,7 +75,18 @@ The Console should answer these operator questions:
 4. Review Skills / Memory to make sure the worker will not inherit unrelated context.
 5. Check Permissions for blocked tools, commands, file paths, and memory writes.
 6. Start or inspect a workflow proposal from Chat, Dreaming / Jobs, or Dispatch.
-7. Monitor active workers in Overview and read evidence in Sessions, Logs, and Audit.
+7. Open Workflow Runs to inspect persisted run/node state from `.project-manager/workflow-runs/*.json`.
+8. Monitor active workers in Overview and read evidence in Sessions, Logs, and Audit.
+
+## Workflow Runs sheet
+
+The Workflow Runs sheet is the first visible F35 control-plane surface. It reads the selected project's `.project-manager/workflow-runs/*.json` sidecars and summarizes:
+
+- total runs, active runs, ready nodes, completed runs, and blocked runs;
+- each run's workflow template, feature ID, status, node counts, and update time;
+- selected run detail with every node's role, status, dependencies, attempts, runtime provider, isolated session scope, and output artifacts.
+
+Use this sheet after Dispatch creates a DAG workflow run. It is currently a read surface; retry, resume, cancel, and live scheduler actions belong to the next runtime-adapter slices.
 
 ## Memory isolation rules
 
@@ -100,7 +112,7 @@ For multi-agent DAG workflows, the session key must include project, workflow, r
 
 ## Current status
 
-The current implementation already has chat, AI Engineers, provider/model selection, capability assignment, sessions, logs, and a first F35 workflow DAG contract. The next product step is to connect these into a visible Workflow Runs surface inside the Console and Dispatch flow.
+The current implementation already has chat, AI Engineers, provider/model selection, capability assignment, sessions, logs, F35 workflow DAG contracts, Dispatch DAG template selection, WorkflowRun sidecar persistence, and a Workflow Runs sheet for browsing persisted DAG state. The next product step is to add runtime adapters and live scheduler controls.
 
 ## Related guides
 

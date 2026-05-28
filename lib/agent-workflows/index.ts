@@ -17,17 +17,41 @@ export {
   agentSessionStoreKey,
   buildAgentSessionScope,
 } from './sessionScope';
+export {
+  buildAgentWorkflowRunPrompt,
+  completeWorkflowNodeRun,
+  createAgentWorkflowRun,
+  failWorkflowNodeRun,
+  listReadyWorkflowNodeRuns,
+  startWorkflowNodeRun,
+} from './runState';
+export {
+  listAgentWorkflowRuns,
+  parseAgentWorkflowRun,
+  readAgentWorkflowRun,
+  saveAgentWorkflowRun,
+  serializeAgentWorkflowRun,
+  workflowRunPath,
+  workflowRunsDirectory,
+} from './runStore';
+export type { AgentWorkflowRunStoreAdapter } from './runStore';
 export type { AgentWorkflowDefinition, AgentWorkflowMode } from './definitions';
 export type {
   AgentSessionScope,
+  AgentWorkflowArtifactRecord,
   AgentWorkflowDagDefinition,
   AgentWorkflowDagKind,
   AgentWorkflowEdgeDefinition,
   AgentWorkflowModelSelection,
   AgentWorkflowNodeDefinition,
+  AgentWorkflowNodeRun,
+  AgentWorkflowNodeRunErrorKind,
+  AgentWorkflowNodeRunStatus,
   AgentWorkflowNodeRole,
   AgentWorkflowOutputContract,
   AgentWorkflowRetryPolicy,
+  AgentWorkflowRun,
+  AgentWorkflowRunStatus,
   AgentWorkflowRuntimeIsolation,
   AgentWorkflowRuntimeProfile,
   AgentWorkflowRuntimeProvider,

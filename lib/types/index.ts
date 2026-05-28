@@ -29,6 +29,10 @@ export interface FeaturePromptConfig {
   workingDir?: string;
   /** "providerId/modelId" of the model that actually ran on the last dispatch, e.g. "openai/gpt-5.5". */
   lastDispatchModel?: string;
+  /** Optional F35 multi-agent DAG template selected for dispatch, e.g. "software-dev-parallel". */
+  workflowTemplateId?: string;
+  /** Last initialized WorkflowRun id for a DAG template dispatch. */
+  workflowRunId?: string;
 }
 
 export interface FeaturePaths {

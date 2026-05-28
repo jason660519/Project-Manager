@@ -40,8 +40,13 @@ vi.mock('../lib/adapters/registry', () => ({
 
 vi.mock('../lib/agent-workflows', () => ({
   DEFAULT_AGENT_WORKFLOWS: [],
+  buildAgentWorkflowRunPrompt: vi.fn((_workflow, _run, _feature, prompt) => prompt),
   buildAgentWorkflowPrompt: vi.fn().mockReturnValue(''),
+  createAgentWorkflowRun: vi.fn((_workflow) => ({ id: 'run-1', status: 'queued', nodeRuns: [] })),
+  getAgentWorkflowDagById: vi.fn().mockReturnValue(null),
   getAgentWorkflowById: vi.fn().mockReturnValue(null),
+  listAgentWorkflowDags: vi.fn().mockReturnValue([]),
+  saveAgentWorkflowRun: vi.fn().mockResolvedValue('/tmp/project/.project-manager/workflow-runs/run-1.json'),
 }));
 
 vi.mock('../lib/keys/llmProviders', () => ({

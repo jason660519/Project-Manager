@@ -1317,6 +1317,7 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
         assistantSheet ? (
           <AIAssistantsConsoleClient
             activeSheet={assistantSheet}
+            projectRoot={selectedProject?.config.project.root}
             engineersPanel={
               selectedProject ? (
                 <EngineersView
