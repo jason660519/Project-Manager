@@ -168,7 +168,7 @@ const SEED_PROJECTS: ProjectEntry[] = [
   {
     id: 'project-manager',
     config: ensureEngineerRoles(sampleConfig2 as ProjectManagerConfig),
-    configPath: '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager/config.json',
+    configPath: '/Users/Project-Manager/.project-manager/config.json',
   },
 ];
 

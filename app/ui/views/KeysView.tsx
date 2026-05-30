@@ -94,7 +94,7 @@ function KeysViewContent({
       }
     >
       {/* Mounted in parallel + display toggled so per-tab state is preserved */}
-      <div className={activeTab === 'api_key_validation' ? 'h-full overflow-auto p-4' : 'hidden'}>
+      <div className={activeTab === 'api_key_validation' ? 'h-full min-h-0 overflow-hidden p-4' : 'hidden'}>
         <ApiKeyValidationSheet
           isTauri={isTauri}
           projectRoot={projectRoot}

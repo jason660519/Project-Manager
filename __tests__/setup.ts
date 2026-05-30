@@ -18,8 +18,27 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/',
 }));
 
-// jsdom doesn't implement scrollIntoView — add a no-op stub.
 Element.prototype.scrollIntoView = vi.fn();
+
+if (typeof HTMLCanvasElement !== 'undefined') {
+  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+    value: vi.fn(() => {
+      const ctx: any = {
+        fillRect: vi.fn(),
+        fillText: vi.fn(),
+        clearRect: vi.fn(),
+        measureText: vi.fn(() => ({ width: 0 })),
+      };
+      return ctx;
+    }),
+    writable: true,
+  });
+
+  Object.defineProperty(HTMLCanvasElement.prototype, 'toDataURL', {
+    value: vi.fn(() => 'data:image/png;base64,'),
+    writable: true,
+  });
+}
 
 // xmux layout + xterm need these in jsdom.
 class ResizeObserverMock {

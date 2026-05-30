@@ -39,7 +39,7 @@ export default function PluginGuidePanel({ isOpen, onClose }: PluginGuidePanelPr
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const guidePath = '/Volumes/KLEVV-4T-1/Project-Manager/docs/engineering/plugin-guide.md';
+  const guidePath = '/Users/Project-Manager/docs/engineering/plugin-guide.md';
 
   useEffect(() => {
     if (!isOpen) return;

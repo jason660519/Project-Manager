@@ -1929,7 +1929,7 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
                 <button
                   type="button"
                   onClick={() =>
-                    void openPath('/Volumes/KLEVV-4T-1/Project-Manager/docs/engineering/plugin-guide.md').catch(
+                    void openPath('/Users/Project-Manager/docs/engineering/plugin-guide.md').catch(
                       () => {},
                     )
                   }

@@ -105,7 +105,7 @@ export function ChatSettings({ current, onChange }: ChatSettingsProps) {
         : provider;
   const modelHelper = currentSpec
     ? currentSpec.modelSource === 'validated'
-      ? `${models.length} models from the latest API key validation. You can still type another model ID.`
+      ? `${models.length} model suggestions from the curated catalogue and latest model refresh. You can still type another model ID.`
       : currentSpec.metadata?.status === 'fail'
         ? `Validation failed: ${currentSpec.metadata.errorReason ?? 'unknown error'}. Static suggestions are shown; manual model IDs are allowed.`
         : 'Static model suggestions are shown until this provider is validated. You can type any model ID.'
@@ -120,7 +120,7 @@ export function ChatSettings({ current, onChange }: ChatSettingsProps) {
     }
     const spec = providerOptions.find((p) => p.id === newProvider);
     if (spec && !spec.models.includes(model)) {
-      setModel(spec.models[0] || spec.defaultModel || '');
+      setModel(spec.defaultModel && spec.models.includes(spec.defaultModel) ? spec.defaultModel : spec.models[0] || '');
     }
   };
 

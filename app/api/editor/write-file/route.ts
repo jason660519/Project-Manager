@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 
-const PROJECT_ROOT = '/Volumes/KLEVV-4T-1/Project-Manager';
+const PROJECT_ROOT = process.cwd();
 
 export async function POST(request: NextRequest) {
   // Only allow in development mode

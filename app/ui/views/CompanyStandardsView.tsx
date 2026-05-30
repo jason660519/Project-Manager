@@ -24,16 +24,17 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { openPath } from '../../../lib/bridge';
 
-const STANDARDS_ROOT = '/Volumes/KLEVV-4T-1/Company-AI-App-Standards';
+const PROJECT_ROOT = '/Users/Project-Manager';
+const STANDARDS_ROOT = '/Users/Company-AI-App-Standards';
 const CONTRACT_DOC =
-  '/Volumes/KLEVV-4T-1/Project-Manager/docs/integrations/company-standards-plugin-contract.md';
+  `${PROJECT_ROOT}/docs/integrations/company-standards-plugin-contract.md`;
 const COMPANY_UI_DOC = `${STANDARDS_ROOT}/docs/ui-design-system.md`;
 const COMPANY_MULTI_APP_DOC = `${STANDARDS_ROOT}/docs/multi-app-integration.md`;
 const BASELINE_DOC = `${STANDARDS_ROOT}/docs/patterns/table-governance.md`;
 const PROFILE_DOC = `${STANDARDS_ROOT}/docs/patterns/project-manager-table-profile.md`;
-const PM_DESIGN_DOC = '/Volumes/KLEVV-4T-1/Project-Manager/DESIGN.md';
+const PM_DESIGN_DOC = `${PROJECT_ROOT}/DESIGN.md`;
 const PM_SHARED_STYLE_DOC =
-  '/Volumes/KLEVV-4T-1/Project-Manager/docs/design/shared-ai-desktop-style.md';
+  `${PROJECT_ROOT}/docs/design/shared-ai-desktop-style.md`;
 
 type Tone = 'emerald' | 'cyan' | 'amber' | 'blue' | 'stone';
 

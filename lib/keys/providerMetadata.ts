@@ -8,14 +8,16 @@
  * Keys table falls back to "Configured (not validated)" until the user
  * re-runs validation, which is acceptable.
  *
- * `dynamicModels` takes precedence over the static `availableModels` list in
- * `llmProviders.ts` — once we've seen what the provider actually exposes for
- * this key, the static list becomes the fallback.
+ * `dynamicModels` supplements the static `availableModels` list in
+ * `llmProviders.ts`. The curated static catalogue stays first so UI defaults
+ * remain stable even when a provider's live `/models` endpoint returns noisy
+ * entries or changes ordering.
  */
 
 const STORAGE_KEY = 'pm:keys-metadata';
 const MODEL_SUPPORT_STORAGE_KEY = 'pm:keys-validated-model-support';
 const METADATA_CHANGED_EVENT = 'pm:keys-metadata-changed';
+export const MODEL_LIST_STALE_MS = 24 * 60 * 60 * 1000;
 
 export interface ProviderMetadata {
   /** ISO 8601 timestamp of the last validation attempt. */
@@ -50,6 +52,12 @@ export interface ValidationFailureSummary {
   detail: string;
   hint: string;
 }
+
+export type ModelListState =
+  | { kind: 'catalogue'; label: 'Catalogue'; detail: string }
+  | { kind: 'refreshed'; label: string; detail: string }
+  | { kind: 'stale'; label: string; detail: string }
+  | { kind: 'failed'; label: 'Failed'; detail: string };
 
 /** Safe wrapper — returns `null` outside the browser or on parse failures. */
 function readMap(): ProviderMetadataMap {
@@ -148,6 +156,23 @@ export function computeValidatedModelSupportSummary(
   };
 }
 
+export function mergeCuratedAndDynamicModels(
+  curatedModels: readonly string[],
+  dynamicModels: readonly string[] | null | undefined,
+): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+
+  [...curatedModels, ...(dynamicModels ?? [])].forEach((model) => {
+    const normalized = model.trim();
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    out.push(normalized);
+  });
+
+  return out;
+}
+
 export function subscribeProviderMetadataChanges(listener: () => void): () => void {
   if (typeof window === 'undefined') return () => {};
 
@@ -177,9 +202,73 @@ export function resolveModelList(
 ): { models: string[]; isDynamic: boolean } {
   const meta = loadProviderMetadata(providerId);
   if (meta?.status === 'ok' && meta.dynamicModels && meta.dynamicModels.length > 0) {
-    return { models: meta.dynamicModels, isDynamic: true };
+    return {
+      models: mergeCuratedAndDynamicModels(staticModels, meta.dynamicModels),
+      isDynamic: true,
+    };
   }
   return { models: [...staticModels], isDynamic: false };
+}
+
+export function getModelListState(
+  meta: ProviderMetadata | null | undefined,
+  options: { now?: number; staleMs?: number } = {},
+): ModelListState {
+  const now = options.now ?? Date.now();
+  const staleMs = options.staleMs ?? MODEL_LIST_STALE_MS;
+
+  if (meta?.status === 'fail') {
+    return {
+      kind: 'failed',
+      label: 'Failed',
+      detail: meta.errorReason ?? 'Last refresh failed',
+    };
+  }
+
+  if (meta?.status !== 'ok' || !meta.dynamicModels || meta.dynamicModels.length === 0) {
+    return {
+      kind: 'catalogue',
+      label: 'Catalogue',
+      detail: 'Using curated model catalogue',
+    };
+  }
+
+  const ts = Date.parse(meta.lastValidatedAt);
+  if (!Number.isFinite(ts)) {
+    return {
+      kind: 'stale',
+      label: 'Stale',
+      detail: 'Model list timestamp is unavailable',
+    };
+  }
+
+  const ageMs = Math.max(0, now - ts);
+  const relative = formatDurationAgo(ageMs, meta.lastValidatedAt);
+  if (ageMs > staleMs) {
+    return {
+      kind: 'stale',
+      label: `Stale ${relative}`,
+      detail: `Last refreshed ${relative}`,
+    };
+  }
+
+  return {
+    kind: 'refreshed',
+    label: `Refreshed ${relative}`,
+    detail: `Latest model refresh completed ${relative}`,
+  };
+}
+
+function formatDurationAgo(ageMs: number, iso: string): string {
+  const seconds = Math.floor(ageMs / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return iso.slice(0, 10);
 }
 
 /**

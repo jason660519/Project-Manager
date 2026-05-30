@@ -45,7 +45,7 @@ describe('Keys / LLM Arena model selection', () => {
     hasProviderKeyMock.mockResolvedValue(false);
   });
 
-  it('limits providers + models to the validated dynamic model set', async () => {
+  it('limits providers to validated keys while keeping curated models before refreshed models', async () => {
     saveProviderMetadata('anthropic', {
       lastValidatedAt: '2026-05-27T00:00:00Z',
       status: 'ok',
@@ -75,7 +75,10 @@ describe('Keys / LLM Arena model selection', () => {
     await waitFor(() => {
       const modelSelect = findModelSelect(container, ['claude-test-a', 'claude-test-b']);
       expect(modelSelect).toBeTruthy();
-      expect(optionValues(modelSelect!)).toEqual(['claude-test-a', 'claude-test-b']);
+      const values = optionValues(modelSelect!);
+      expect(values.indexOf('claude-sonnet-4-6')).toBeGreaterThanOrEqual(0);
+      expect(values.indexOf('claude-test-a')).toBeGreaterThan(values.indexOf('claude-sonnet-4-6'));
+      expect(values).toEqual(expect.arrayContaining(['claude-test-a', 'claude-test-b']));
     });
   });
 
@@ -117,7 +120,7 @@ describe('Keys / LLM Arena model selection', () => {
     await waitFor(() => {
       const modelSelect = findModelSelect(container, ['claude-old']);
       expect(modelSelect).toBeTruthy();
-      expect(optionValues(modelSelect!)).toEqual(['claude-old']);
+      expect(optionValues(modelSelect!)).toEqual(expect.arrayContaining(['claude-sonnet-4-6', 'claude-old']));
     });
 
     saveProviderMetadata('anthropic', {
@@ -129,7 +132,8 @@ describe('Keys / LLM Arena model selection', () => {
     await waitFor(() => {
       const modelSelect = findModelSelect(container, ['claude-new-1', 'claude-new-2']);
       expect(modelSelect).toBeTruthy();
-      expect(optionValues(modelSelect!)).toEqual(['claude-new-1', 'claude-new-2']);
+      expect(optionValues(modelSelect!)).toEqual(expect.arrayContaining(['claude-sonnet-4-6', 'claude-new-1', 'claude-new-2']));
+      expect(modelSelect).toHaveValue('claude-sonnet-4-6');
     });
   });
 

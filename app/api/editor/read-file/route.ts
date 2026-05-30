@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 
-const PROJECT_ROOT = '/Volumes/KLEVV-4T-1/Project-Manager';
+const PROJECT_ROOT = process.cwd();
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
 
 export async function POST(request: NextRequest) {

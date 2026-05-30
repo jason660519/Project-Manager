@@ -57,7 +57,7 @@ Optional install inputs:
 Hermes Agent is registered as a CLI plugin with:
 
 ```text
-command: /Volumes/KLEVV-4T-1/Project-Manager/.project-manager/bin/hermes
+command: /Users/Project-Manager/.project-manager/bin/hermes
 args:    chat -q {prompt}
 ```
 

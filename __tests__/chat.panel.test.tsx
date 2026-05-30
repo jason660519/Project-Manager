@@ -105,8 +105,8 @@ describe('ChatPanel', () => {
     await user.selectOptions(screen.getByLabelText(/provider/i), 'anthropic');
 
     const modelInput = screen.getByLabelText(/model id/i);
-    expect(modelInput).toHaveValue('claude-live-a');
-    expect(screen.getByText(/2 models from the latest api key validation/i)).toBeInTheDocument();
+    expect(modelInput).toHaveValue('claude-sonnet-4-6');
+    expect(screen.getByText(/model suggestions from the curated catalogue and latest model refresh/i)).toBeInTheDocument();
 
     await user.clear(modelInput);
     await user.type(modelInput, 'claude-custom-999');

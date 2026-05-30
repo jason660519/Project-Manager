@@ -11,14 +11,16 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Upload } from 'lucide-react';
+import { Loader2, RefreshCw, Upload } from 'lucide-react';
 
 import { PROVIDERS, type ProviderSpec } from '../../../../lib/keys/registry';
 import { useI18n } from '../../../../lib/i18n';
 import { loadProviderSecret } from '../../../../lib/keys/keychain';
 import { listLlmProviders } from '../../../../lib/keys/llmProviders';
 import {
+  getModelListState,
   loadAllProviderMetadata,
+  mergeCuratedAndDynamicModels,
   maskKey,
   type ProviderMetadataMap,
 } from '../../../../lib/keys/providerMetadata';
@@ -30,6 +32,10 @@ import {
   type KeysRowStatus,
 } from './KeysProviderTable';
 import { KeysProviderDetailSheet } from './KeysProviderDetailSheet';
+import {
+  getProviderApiContract,
+  revalidateStoredKey,
+} from '../../../../lib/keys/validation';
 
 const CUSTOM_PROVIDER_STORAGE_KEY = 'projectManager.keys.apiKeyValidation.customProviders.v1';
 const ROW_PREFS_STORAGE_KEY = 'projectManager.keys.apiKeyValidation.rowPrefs.v1';
@@ -269,6 +275,8 @@ export function ApiKeyValidationSheet({
   const [showImport, setShowImport] = useState(false);
   const [oauthProvider, setOauthProvider] = useState<ProviderSpec | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<ProviderSpec | null>(null);
+  const [refreshingModels, setRefreshingModels] = useState(false);
+  const [refreshModelsMessage, setRefreshModelsMessage] = useState<string | null>(null);
 
   const builtInProviders = useMemo(
     () => [
@@ -351,7 +359,11 @@ export function ApiKeyValidationSheet({
       const hasKey = value.length > 0;
       const meta = metadata[provider.id];
       const dynamicModels = meta?.status === 'ok' ? meta.dynamicModels ?? [] : [];
-      const models = dynamicModels.length > 0 ? dynamicModels : staticModelsFor(provider.id);
+      const staticModels = staticModelsFor(provider.id);
+      const models = dynamicModels.length > 0
+        ? mergeCuratedAndDynamicModels(staticModels, dynamicModels)
+        : staticModels;
+      const supportsModelRefresh = provider.category === 'ai' && getProviderApiContract(provider) !== null;
 
       return {
         provider,
@@ -360,6 +372,8 @@ export function ApiKeyValidationSheet({
         status: deriveStatus(hasKey, meta?.status),
         models,
         modelsAreDynamic: dynamicModels.length > 0,
+        modelListState: getModelListState(meta),
+        canRefreshModels: hasKey && supportsModelRefresh,
         lastValidatedAt: meta?.lastValidatedAt ?? null,
         errorReason: meta?.status === 'fail' ? meta.errorReason ?? null : null,
         isCustom: customProviderIds.has(provider.id),
@@ -428,19 +442,96 @@ export function ApiKeyValidationSheet({
     setRowPrefs((prev) => ({ ...prev, hiddenBuiltInIds: [] }));
   }, []);
 
+  const refreshProviderModels = useCallback(async (provider: ProviderSpec) => {
+    const contract = getProviderApiContract(provider);
+    if (!contract) {
+      setRefreshModelsMessage(`${provider.label} does not support model refresh yet.`);
+      return;
+    }
+    if (!secrets[provider.id]) {
+      setRefreshModelsMessage(`${provider.label} has no configured key.`);
+      return;
+    }
+
+    setRefreshingModels(true);
+    setRefreshModelsMessage(null);
+    try {
+      const result = await revalidateStoredKey(provider);
+      setRefreshModelsMessage(
+        result.ok
+          ? `${provider.label} model list refreshed.`
+          : `${provider.label} model refresh failed: ${result.errorReason ?? 'Unknown error'}`,
+      );
+      refresh();
+    } finally {
+      setRefreshingModels(false);
+    }
+  }, [refresh, secrets]);
+
+  const refreshModelsList = useCallback(async () => {
+    if (refreshingModels) return;
+    setRefreshingModels(true);
+    setRefreshModelsMessage(null);
+    const candidates = rows
+      .filter((row) => (
+        row.status === 'verified' &&
+        row.canRefreshModels &&
+        (row.modelListState.kind === 'catalogue' || row.modelListState.kind === 'stale')
+      ))
+      .map((row) => row.provider);
+
+    if (candidates.length === 0) {
+      setRefreshModelsMessage('No verified providers need a model refresh.');
+      setRefreshingModels(false);
+      return;
+    }
+
+    try {
+      const results = await Promise.allSettled(candidates.map((provider) => revalidateStoredKey(provider)));
+      const okCount = results.filter((result) => result.status === 'fulfilled' && result.value.ok).length;
+      const failCount = results.length - okCount;
+      setRefreshModelsMessage(
+        failCount === 0
+          ? `Models refreshed for ${okCount} provider${okCount === 1 ? '' : 's'}.`
+          : `Models refreshed for ${okCount} provider${okCount === 1 ? '' : 's'}; ${failCount} failed.`,
+      );
+      refresh();
+    } finally {
+      setRefreshingModels(false);
+    }
+  }, [refresh, refreshingModels, rows]);
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="flex h-full min-h-0 flex-col gap-4">
+      <div className="flex flex-none flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-stone-400">
           {t.keysValidation.intro}
         </p>
-        <button
-          onClick={() => setShowImport(true)}
-          className="inline-flex items-center gap-1.5 border border-stone-200/22 px-3 py-1.5 text-[11px] uppercase tracking-[0.14em] text-stone-200 hover:bg-stone-200/8 transition-colors"
-        >
-          <Upload size={12} /> {t.keysValidation.importFromEnv}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => void refreshModelsList()}
+            disabled={refreshingModels}
+            className="inline-flex items-center gap-1.5 border border-stone-200/22 px-3 py-1.5 text-[11px] uppercase tracking-[0.14em] text-stone-200 hover:bg-stone-200/8 transition-colors disabled:cursor-not-allowed disabled:opacity-45"
+            title="Refresh cached model lists for configured AI providers"
+          >
+            {refreshingModels ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <RefreshCw size={12} />
+            )}
+            Refresh Models list
+          </button>
+          <button
+            onClick={() => setShowImport(true)}
+            className="inline-flex items-center gap-1.5 border border-stone-200/22 px-3 py-1.5 text-[11px] uppercase tracking-[0.14em] text-stone-200 hover:bg-stone-200/8 transition-colors"
+          >
+            <Upload size={12} /> {t.keysValidation.importFromEnv}
+          </button>
+        </div>
       </div>
+      {refreshModelsMessage && (
+        <p className="flex-none text-[11px] text-stone-400">{refreshModelsMessage}</p>
+      )}
 
       {loaded ? (
         <KeysProviderTable
@@ -452,11 +543,13 @@ export function ApiKeyValidationSheet({
           onMoveRow={moveRow}
           onDeleteRow={deleteRow}
           onPatchCustomProvider={patchCustomProvider}
+          onRefreshModels={(provider) => void refreshProviderModels(provider)}
+          isRefreshingModels={refreshingModels}
           onImportRows={importRows}
           onShowAllRows={showAllRows}
         />
       ) : (
-        <div className="border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72 px-4 py-8 text-center text-xs text-stone-500">
+        <div className="flex-none border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72 px-4 py-8 text-center text-xs text-stone-500">
           {t.keysValidation.loadingProviders}
         </div>
       )}

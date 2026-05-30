@@ -13,6 +13,7 @@ import type { KeysTab } from '../../../../lib/keys/sheetSlugs';
 import {
   loadAllProviderMetadata,
   loadValidatedModelSupportSummary,
+  mergeCuratedAndDynamicModels,
   subscribeProviderMetadataChanges,
   type ProviderMetadataMap,
   type ValidatedModelSupportSummary,
@@ -253,8 +254,7 @@ export function KeysProvider({
       .map((provider) => {
         const meta = providerMetadata[provider.id];
         if (meta?.status !== 'ok') return null;
-        const models = meta.dynamicModels?.filter(Boolean) ?? [];
-        const deduped = Array.from(new Set(models));
+        const deduped = mergeCuratedAndDynamicModels(provider.availableModels, meta.dynamicModels);
         if (deduped.length === 0) return null;
         return {
           id: provider.id,

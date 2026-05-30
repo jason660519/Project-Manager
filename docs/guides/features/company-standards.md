@@ -123,7 +123,7 @@ A short, scannable position statement: **redesign the standards before extractin
 
 ### Canonical Resources
 
-A grid of 9 quick-open buttons that route through `openPath`. Each button shows label, description, and the absolute path on this machine (currently rooted at `/Volumes/KLEVV-4T-1/Company-AI-App-Standards` and `/Volumes/KLEVV-4T-1/Project-Manager`):
+A grid of 9 quick-open buttons that route through `openPath`. Each button shows label, description, and the absolute path on this machine (currently rooted at `/Users/Company-AI-App-Standards` and `/Users/Project-Manager`):
 
 | Resource | What it is |
 |---|---|

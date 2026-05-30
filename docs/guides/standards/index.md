@@ -8,24 +8,24 @@ classificationReason: Public index of company standards with no secrets, credent
 
 # Company Standards Index
 
-This section is the public browsing entry for reusable company product and engineering standards. The source-of-truth standards repository is `/Volumes/KLEVV-4T-1/Company-AI-App-Standards`; this docs site publishes the public, app-reusable view so later apps can link to one standard folder before implementation starts.
+This section is the public browsing entry for reusable company product and engineering standards. The source-of-truth standards repository is `/Users/Company-AI-App-Standards`; this docs site publishes the public, app-reusable view so later apps can link to one standard folder before implementation starts.
 
 ## Current Standard Set
 
 | Standard | Canonical source | Public page |
 | --- | --- | --- |
-| AI engineer workflow | `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/ai-engineer-workflow.md` | [Company Standards Hub](../features/company-standards.md) |
-| UI design system | `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/ui-design-system.md` | [Company Standards Hub](../features/company-standards.md) |
-| Table governance | `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/patterns/table-governance.md` | [Company Standards Hub](../features/company-standards.md) |
-| File naming standards | `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/file-naming-standards.md` | [Company Standards Hub](../features/company-standards.md) |
-| Multi-app integration | `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/multi-app-integration.md` | [Company Standards Hub](../features/company-standards.md) |
-| Multilingual interface architecture | `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/patterns/multilingual-interface-architecture.md` | [Multilingual Interface Architecture](./multilingual-interface-architecture.md) |
+| AI engineer workflow | `/Users/Company-AI-App-Standards/docs/ai-engineer-workflow.md` | [Company Standards Hub](../features/company-standards.md) |
+| UI design system | `/Users/Company-AI-App-Standards/docs/ui-design-system.md` | [Company Standards Hub](../features/company-standards.md) |
+| Table governance | `/Users/Company-AI-App-Standards/docs/patterns/table-governance.md` | [Company Standards Hub](../features/company-standards.md) |
+| File naming standards | `/Users/Company-AI-App-Standards/docs/file-naming-standards.md` | [Company Standards Hub](../features/company-standards.md) |
+| Multi-app integration | `/Users/Company-AI-App-Standards/docs/multi-app-integration.md` | [Company Standards Hub](../features/company-standards.md) |
+| Multilingual interface architecture | `/Users/Company-AI-App-Standards/docs/patterns/multilingual-interface-architecture.md` | [Multilingual Interface Architecture](./multilingual-interface-architecture.md) |
 | Standards update governance | This public docs section | [Update Governance](./standards-update-governance.md) |
 | Industry localization practices | This public docs section | [Industry Practices](./industry-localization-practices.md) |
 
 ## Search Outcome
 
-A targeted search of `/Volumes/KLEVV-4T-1/Company-AI-App-Standards` found no prior formal multilingual interface architecture standard. Project Manager has an app-local i18n implementation and translation contribution notes, but those notes are not a company-wide standard.
+A targeted search of `/Users/Company-AI-App-Standards` found no prior formal multilingual interface architecture standard. Project Manager has an app-local i18n implementation and translation contribution notes, but those notes are not a company-wide standard.
 
 The new standard is therefore added as a company baseline document and published here for reuse by new apps.
 

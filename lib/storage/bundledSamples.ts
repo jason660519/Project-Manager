@@ -18,6 +18,8 @@ const BUNDLED_BY_PROJECT_ROOT: Record<string, ProjectManagerConfig> = {
     ensureEngineerRoles(sampleConfig1 as ProjectManagerConfig),
   '/Volumes/KLEVV-4T-1/Project-Manager':
     ensureEngineerRoles(sampleConfig2 as ProjectManagerConfig),
+  '/Users/Project-Manager':
+    ensureEngineerRoles(sampleConfig2 as ProjectManagerConfig),
 };
 
 function projectRootFromConfigPath(configPath: string): string {

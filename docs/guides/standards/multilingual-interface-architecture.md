@@ -8,7 +8,7 @@ classificationReason: Public multilingual UI architecture standard with no secre
 
 # Multilingual Interface Architecture
 
-Canonical source: `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/patterns/multilingual-interface-architecture.md`
+Canonical source: `/Users/Company-AI-App-Standards/docs/patterns/multilingual-interface-architecture.md`
 
 This is the mandatory company standard for apps with user-facing UI, docs, notifications, prompts, reports, or exported artifacts.
 

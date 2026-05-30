@@ -51,6 +51,7 @@ interface ProviderLike {
   id: LlmProviderId;
   label: string;
   availableModels: string[];
+  defaultModel?: string;
 }
 
 interface LlmArenaTableRow {
@@ -312,7 +313,11 @@ export function LlmArenaMatrixTable({
               value={spec.provider}
               onChange={(event) => {
                 const nextProvider = providers.find((p) => p.id === event.target.value);
-                onUpdateModel(index, event.target.value, nextProvider?.availableModels[0] || '');
+                const nextModel =
+                  nextProvider?.defaultModel && nextProvider.availableModels.includes(nextProvider.defaultModel)
+                    ? nextProvider.defaultModel
+                    : nextProvider?.availableModels[0] || '';
+                onUpdateModel(index, event.target.value, nextModel);
               }}
               disabled={runningIndexes.has(index)}
               onClick={(event) => event.stopPropagation()}

@@ -75,7 +75,7 @@ const fallbackWorkspaces: WorkspaceRow[] = [
     id: 'project-manager',
     name: 'Project Management',
     branch: 'dispatch-wip-20260525*',
-    cwd: '/Volumes/KLEVV-4T-1/Project-Manager',
+    cwd: '/Users/Project-Manager',
     notification: 'xmux review requested',
     homepageUrl: DEFAULT_HOMEPAGE,
   },
@@ -105,7 +105,7 @@ const fallbackWorkspaces: WorkspaceRow[] = [
     id: 'company-ai-app-standards',
     name: 'Company-AI-App-Standards',
     branch: 'main*',
-    cwd: '/Volumes/KLEVV-4T-1/Company-AI-App-Standards',
+    cwd: '/Users/Company-AI-App-Standards',
     homepageUrl: DEFAULT_HOMEPAGE,
   },
 ];

@@ -6,10 +6,10 @@ This project follows Company AI App Standards v0.1.
 
 Before implementation, read:
 
-1. `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/ai-engineer-workflow.md`
-2. `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/ui-design-system.md`
-3. `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/patterns/table-governance.md`
-4. `/Volumes/KLEVV-4T-1/Company-AI-App-Standards/docs/file-naming-standards.md`
+1. `/Users/Company-AI-App-Standards/docs/ai-engineer-workflow.md`
+2. `/Users/Company-AI-App-Standards/docs/ui-design-system.md`
+3. `/Users/Company-AI-App-Standards/docs/patterns/table-governance.md`
+4. `/Users/Company-AI-App-Standards/docs/file-naming-standards.md`
 5. `./docs/file-naming-standards.md`
 6. `./docs/engineering/table-standards.md`
 7. `./DESIGN.md`

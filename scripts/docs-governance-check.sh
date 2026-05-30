@@ -10,6 +10,14 @@ if [[ ! -d "$DOCS_DIR" ]]; then
   exit 1
 fi
 
+if command -v rg >/dev/null 2>&1; then
+  SEARCH_Q() { rg -q "$1" "$2"; }
+  SEARCH_N() { rg -n "$1" "$2"; }
+else
+  SEARCH_Q() { grep -qE "$1" "$2"; }
+  SEARCH_N() { grep -nE "$1" "$2"; }
+fi
+
 echo "== Project Manager Docs Governance Check =="
 
 # 1) Ensure markdown filenames are English-safe.
@@ -25,11 +33,11 @@ done < <(find "$DOCS_DIR" -type f -name "*.md" -print0)
 # 2) Ensure bilingual layout blocks exist in root technical docs.
 echo "\n[2/4] Checking bilingual section layout in docs root..."
 while IFS= read -r -d '' file; do
-  if ! rg -q "^## English Version$" "$file"; then
+  if ! SEARCH_Q "^## English Version$" "$file"; then
     echo "[WARN] Missing '## English Version': $file"
     EXIT_CODE=1
   fi
-  if ! rg -q "^## 中文版本$" "$file"; then
+  if ! SEARCH_Q "^## 中文版本$" "$file"; then
     echo "[WARN] Missing '## 中文版本': $file"
     EXIT_CODE=1
   fi
@@ -38,8 +46,8 @@ done < <(find "$DOCS_DIR" -maxdepth 1 -type f -name "*.md" -print0)
 # 3) Ensure English section appears before Chinese section.
 echo "\n[3/4] Checking section ordering..."
 while IFS= read -r -d '' file; do
-  en_line="$(rg -n "^## English Version$" "$file" | head -n1 | cut -d: -f1 || true)"
-  zh_line="$(rg -n "^## 中文版本$" "$file" | head -n1 | cut -d: -f1 || true)"
+  en_line="$(SEARCH_N "^## English Version$" "$file" | head -n1 | cut -d: -f1 || true)"
+  zh_line="$(SEARCH_N "^## 中文版本$" "$file" | head -n1 | cut -d: -f1 || true)"
 
   if [[ -n "$en_line" && -n "$zh_line" ]]; then
     if (( en_line >= zh_line )); then
@@ -60,7 +68,7 @@ while IFS= read -r -d '' file; do
     if [[ "$line" =~ ^[0-9]+:##\ .*\ /\ .* ]] && [[ "$line" =~ [一-龥] ]]; then
       echo "$file:$line" >> "$tmp_file"
     fi
-  done < <(rg -n "^## .* / .*" "$file" || true)
+  done < <(SEARCH_N "^## .* / .*" "$file" || true)
 done < <(find "$DOCS_DIR" -maxdepth 1 -type f -name "*.md" -print0)
 
 if [[ -s "$tmp_file" ]]; then

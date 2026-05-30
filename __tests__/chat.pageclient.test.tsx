@@ -135,7 +135,7 @@ describe('ChatPageClient', () => {
     await user.selectOptions(screen.getByLabelText(/provider/i), 'openai');
 
     const modelInput = screen.getByLabelText(/model id/i);
-    expect(modelInput).toHaveValue('gpt-live-a');
+    expect(modelInput).toHaveValue('gpt-4o');
     await user.clear(modelInput);
     await user.type(modelInput, 'gpt-custom-2026');
     await user.click(screen.getByRole('button', { name: /apply/i }));

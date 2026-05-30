@@ -11,12 +11,14 @@ import {
   computeValidatedModelSupportSummary,
   formatRelativeTime,
   formatValidationFailure,
+  getModelListState,
   loadAllProviderMetadata,
   loadValidatedModelSupportSummary,
   loadProviderMetadata,
   maskKey,
   resolveModelList,
   saveProviderMetadata,
+  mergeCuratedAndDynamicModels,
 } from '../lib/keys/providerMetadata';
 
 // Minimal localStorage shim — Vitest's jsdom env is on by default but we
@@ -114,7 +116,7 @@ describe('resolveModelList', () => {
     expect(result.models).toEqual(['claude-static-1']);
   });
 
-  it('uses dynamic list when metadata.ok has models', () => {
+  it('keeps curated models first and appends dynamic models when metadata.ok has models', () => {
     saveProviderMetadata('anthropic', {
       lastValidatedAt: 't',
       status: 'ok',
@@ -122,7 +124,7 @@ describe('resolveModelList', () => {
     });
     const result = resolveModelList('anthropic', ['claude-static-1']);
     expect(result.isDynamic).toBe(true);
-    expect(result.models).toEqual(['claude-live-1', 'claude-live-2']);
+    expect(result.models).toEqual(['claude-static-1', 'claude-live-1', 'claude-live-2']);
   });
 
   it('falls back to static when metadata is failure', () => {
@@ -134,6 +136,49 @@ describe('resolveModelList', () => {
     const result = resolveModelList('anthropic', ['claude-static-1']);
     expect(result.isDynamic).toBe(false);
     expect(result.models).toEqual(['claude-static-1']);
+  });
+});
+
+describe('mergeCuratedAndDynamicModels', () => {
+  it('dedupes while preserving curated model order before refreshed models', () => {
+    expect(
+      mergeCuratedAndDynamicModels(
+        ['claude-sonnet-4-6', 'claude-opus-4-1'],
+        ['claude-opus-4-1', 'claude-live-new', ''],
+      ),
+    ).toEqual(['claude-sonnet-4-6', 'claude-opus-4-1', 'claude-live-new']);
+  });
+});
+
+describe('getModelListState', () => {
+  it('reports catalogue before a provider has refreshed models', () => {
+    expect(getModelListState(null).kind).toBe('catalogue');
+  });
+
+  it('reports refreshed for a fresh dynamic model list', () => {
+    const now = Date.parse('2026-05-30T12:00:00Z');
+    const state = getModelListState(
+      {
+        lastValidatedAt: '2026-05-30T11:55:00Z',
+        status: 'ok',
+        dynamicModels: ['gpt-live'],
+      },
+      { now },
+    );
+    expect(state.kind).toBe('refreshed');
+    expect(state.label).toContain('5m ago');
+  });
+
+  it('reports stale after the refresh age exceeds the threshold', () => {
+    const state = getModelListState(
+      {
+        lastValidatedAt: '2026-05-29T00:00:00Z',
+        status: 'ok',
+        dynamicModels: ['gpt-live'],
+      },
+      { now: Date.parse('2026-05-30T12:00:00Z') },
+    );
+    expect(state.kind).toBe('stale');
   });
 });
 

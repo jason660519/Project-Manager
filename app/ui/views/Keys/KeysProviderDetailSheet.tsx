@@ -31,6 +31,7 @@ import {
   classifyValidationFailure,
   formatRelativeTime,
   loadProviderMetadata,
+  mergeCuratedAndDynamicModels,
   type ProviderMetadata,
 } from '../../../../lib/keys/providerMetadata';
 import { listLlmProviders } from '../../../../lib/keys/llmProviders';
@@ -54,7 +55,7 @@ interface KeysProviderDetailSheetProps {
   onOpenOAuth?: (provider: ProviderSpec) => void;
 }
 
-type Phase = 'idle' | 'saving' | 'revalidating' | 'clearing';
+type Phase = 'idle' | 'saving' | 'revalidating' | 'refreshingModels' | 'clearing';
 
 /** Exhaustiveness guard — fail loud if a new ProviderMetadata.status lands without UI coverage. */
 function assertNever(value: never): never {
@@ -164,7 +165,9 @@ export function KeysProviderDetailSheet({
     ? listLlmProviders().find((p) => p.id === provider.id)?.availableModels ?? []
     : [];
   const dynamicModels = meta?.status === 'ok' ? meta.dynamicModels ?? [] : [];
-  const modelsForDisplay = dynamicModels.length > 0 ? dynamicModels : staticModels;
+  const modelsForDisplay = dynamicModels.length > 0
+    ? mergeCuratedAndDynamicModels(staticModels, dynamicModels)
+    : staticModels;
   const modelsAreDynamic = dynamicModels.length > 0;
 
   const refresh = useCallback(() => {
@@ -250,6 +253,39 @@ export function KeysProviderDetailSheet({
       );
     } catch (e: unknown) {
       console.error(`[KeysSheet] revalidateStoredKey(${provider.id}) threw:`, e);
+      const failure = classifyValidationFailure(e instanceof Error ? e.message : String(e));
+      setFeedback({
+        kind: 'fail',
+        msg: `${failure.label}: ${failure.hint}`,
+      });
+    } finally {
+      setPhase('idle');
+      refresh();
+    }
+  }, [provider, refresh]);
+
+  const handleRefreshModels = useCallback(async () => {
+    if (!provider) return;
+    setFeedback(null);
+    setPhase('refreshingModels');
+    try {
+      const result = await revalidateStoredKey(provider);
+      setFeedback(
+        result.ok
+          ? {
+              kind: 'ok',
+              msg: `Models refreshed · ${result.models.length} model${result.models.length === 1 ? '' : 's'} returned`,
+            }
+          : {
+              kind: 'fail',
+              msg: (() => {
+                const failure = classifyValidationFailure(result.errorReason);
+                return `${failure.label}: ${failure.hint}`;
+              })(),
+            },
+      );
+    } catch (e: unknown) {
+      console.error(`[KeysSheet] refreshModels(${provider.id}) threw:`, e);
       const failure = classifyValidationFailure(e instanceof Error ? e.message : String(e));
       setFeedback({
         kind: 'fail',
@@ -442,13 +478,30 @@ export function KeysProviderDetailSheet({
           {/* Models */}
           {modelsForDisplay.length > 0 && (
             <section>
-              <div className="mb-2 flex items-baseline gap-2">
+              <div className="mb-2 flex flex-wrap items-center gap-2">
                 <h4 className="text-[11px] uppercase tracking-[0.14em] text-stone-400">
                   Available models
                 </h4>
                 <span className="text-[10px] text-stone-500">
                   {modelsForDisplay.length} · {modelsAreDynamic ? 'live' : 'catalogue'}
                 </span>
+                {hasKey && supportsValidation && (
+                  <button
+                    onClick={() => void handleRefreshModels()}
+                    disabled={busy}
+                    className="ml-auto inline-flex min-h-7 items-center gap-1.5 border border-stone-200/22 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-stone-200 hover:bg-stone-200/8 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {phase === 'refreshingModels' ? (
+                      <>
+                        <Loader2 size={11} className="animate-spin" /> Refreshing {elapsedSeconds}s
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw size={11} /> Refresh Models list
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {modelsForDisplay.map((m) => (

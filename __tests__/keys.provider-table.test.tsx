@@ -23,6 +23,12 @@ function rowFixture(overrides: Partial<KeysRowData> = {}, providerPatch: Partial
     status: 'not_set',
     models: ['gpt-4o'],
     modelsAreDynamic: false,
+    modelListState: {
+      kind: 'catalogue',
+      label: 'Catalogue',
+      detail: 'Using curated model catalogue',
+    },
+    canRefreshModels: false,
     lastValidatedAt: null,
     errorReason: null,
     ...overrides,
@@ -38,6 +44,8 @@ function renderTable(props: Partial<React.ComponentProps<typeof KeysProviderTabl
       onMoveRow={vi.fn()}
       onDeleteRow={vi.fn()}
       onPatchCustomProvider={vi.fn()}
+      onRefreshModels={vi.fn()}
+      isRefreshingModels={false}
       onImportRows={vi.fn()}
       onShowAllRows={vi.fn()}
       copy={en.keysValidation.table}
@@ -133,6 +141,18 @@ describe('KeysProviderTable', () => {
     expect(onMoveRow).toHaveBeenNthCalledWith(1, row.provider.id, 'up');
     expect(onMoveRow).toHaveBeenNthCalledWith(2, row.provider.id, 'down');
     expect(onDeleteRow).toHaveBeenCalledWith(row.provider.id);
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+
+  it('refreshes one provider model list without triggering row selection', () => {
+    const onRefreshModels = vi.fn();
+    const onRowClick = vi.fn();
+    const row = rowFixture({ hasKey: true, status: 'verified', canRefreshModels: true });
+    renderTable({ rows: [row], onRefreshModels, onRowClick });
+
+    fireEvent.click(screen.getByTitle('Refresh Models list'));
+
+    expect(onRefreshModels).toHaveBeenCalledWith(row.provider);
     expect(onRowClick).not.toHaveBeenCalled();
   });
 

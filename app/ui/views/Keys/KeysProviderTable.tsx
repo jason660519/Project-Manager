@@ -21,8 +21,10 @@ import {
   ExternalLink,
   Import,
   KeyRound,
+  Loader2,
   Plug,
   Plus,
+  RefreshCw,
   RotateCcw,
   Settings2,
   ShieldQuestion,
@@ -42,6 +44,7 @@ import type { ProviderSpec } from '../../../../lib/keys/registry';
 import {
   classifyValidationFailure,
   formatRelativeTime,
+  type ModelListState,
 } from '../../../../lib/keys/providerMetadata';
 import type { Translations } from '../../../../lib/i18n';
 import {
@@ -62,6 +65,8 @@ export interface KeysRowData {
   status: KeysRowStatus;
   models: string[];
   modelsAreDynamic: boolean;
+  modelListState: ModelListState;
+  canRefreshModels: boolean;
   lastValidatedAt: string | null;
   errorReason: string | null;
 }
@@ -74,6 +79,8 @@ interface KeysProviderTableProps {
   onMoveRow: (providerId: string, direction: 'up' | 'down') => void;
   onDeleteRow: (providerId: string) => void;
   onPatchCustomProvider: (providerId: string, patch: Partial<ProviderSpec>) => void;
+  onRefreshModels: (provider: ProviderSpec) => void;
+  isRefreshingModels: boolean;
   onImportRows: (text: string) => void;
   onShowAllRows: () => void;
   copy: KeysValidationTableCopy;
@@ -90,6 +97,7 @@ const API_KEYS_COLUMN_IDS = [
   'col-key',
   'col-status',
   'col-model-count',
+  'col-model-state',
   'col-model-list',
   'col-last-validated',
   'col-actions',
@@ -104,9 +112,10 @@ const API_KEYS_DEFAULT_SIZING: Record<string, number> = {
   'col-key': 180,
   'col-status': 170,
   'col-model-count': 110,
+  'col-model-state': 160,
   'col-model-list': 310,
   'col-last-validated': 150,
-  'col-actions': 190,
+  'col-actions': 230,
 };
 
 const API_KEYS_PRESETS: ArenaTablePreset[] = [
@@ -275,6 +284,26 @@ function ModelsPreviewCell({ models, copy }: { models: string[]; copy: KeysValid
   );
 }
 
+function ModelListStateCell({ state }: { state: ModelListState }) {
+  const className =
+    state.kind === 'refreshed'
+      ? 'border-emerald-200/25 bg-emerald-500/10 text-emerald-200'
+      : state.kind === 'stale'
+        ? 'border-amber-200/25 bg-amber-500/10 text-amber-100'
+        : state.kind === 'failed'
+          ? 'border-rose-300/30 bg-rose-500/10 text-rose-200'
+          : 'border-stone-200/18 bg-stone-200/5 text-stone-300';
+
+  return (
+    <span
+      className={`inline-flex max-w-full items-center border px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] ${className}`}
+      title={state.detail}
+    >
+      <span className="truncate">{state.label}</span>
+    </span>
+  );
+}
+
 function SortMarker({ value }: { value: false | 'asc' | 'desc' }) {
   if (value === 'asc') return <span className="text-emerald-200">↑</span>;
   if (value === 'desc') return <span className="text-emerald-200">↓</span>;
@@ -289,6 +318,8 @@ export function KeysProviderTable({
   onMoveRow,
   onDeleteRow,
   onPatchCustomProvider,
+  onRefreshModels,
+  isRefreshingModels,
   onImportRows,
   onShowAllRows,
   copy,
@@ -308,6 +339,7 @@ export function KeysProviderTable({
       { id: 'col-key', label: copy.columns.key, hideable: true },
       { id: 'col-status', label: copy.columns.status, hideable: true, freezable: true },
       { id: 'col-model-count', label: copy.columns.models, hideable: true },
+      { id: 'col-model-state', label: 'Model list', hideable: true },
       { id: 'col-model-list', label: copy.columns.availableModels, hideable: true },
       { id: 'col-last-validated', label: copy.columns.lastValidated, hideable: true },
       { id: 'col-actions', label: copy.columns.actions, freezable: true },
@@ -511,6 +543,13 @@ export function KeysProviderTable({
         size: API_KEYS_DEFAULT_SIZING['col-model-list'],
         cell: (info) => <ModelsPreviewCell models={info.row.original.models} copy={copy} />,
       }),
+      columnHelper.accessor((row) => row.modelListState.label, {
+        id: 'col-model-state',
+        header: 'Model list',
+        size: API_KEYS_DEFAULT_SIZING['col-model-state'],
+        sortingFn: (a, b) => a.original.modelListState.label.localeCompare(b.original.modelListState.label),
+        cell: (info) => <ModelListStateCell state={info.row.original.modelListState} />,
+      }),
       columnHelper.accessor((row) => row.lastValidatedAt, {
         id: 'col-last-validated',
         header: copy.columns.lastValidated,
@@ -536,6 +575,18 @@ export function KeysProviderTable({
         enableSorting: false,
         cell: (info) => (
           <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onRefreshModels(info.row.original.provider);
+              }}
+              disabled={!info.row.original.canRefreshModels || isRefreshingModels}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-sm border border-stone-300/20 bg-stone-200/5 text-stone-200 hover:bg-stone-200/10 disabled:cursor-not-allowed disabled:opacity-35"
+              title="Refresh Models list"
+            >
+              {isRefreshingModels ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+            </button>
             <button
               type="button"
               onClick={(event) => {
@@ -574,7 +625,7 @@ export function KeysProviderTable({
         ),
       }),
     ],
-    [copy, onDeleteRow, onMoveRow, onPatchCustomProvider],
+    [copy, isRefreshingModels, onDeleteRow, onMoveRow, onPatchCustomProvider, onRefreshModels],
   );
 
   const table = useReactTable({
@@ -627,6 +678,7 @@ export function KeysProviderTable({
       status: original.status,
       has_key: original.hasKey ? 'yes' : 'no',
       model_count: original.models.length,
+      model_list_state: original.modelListState.label,
       api_key_url: original.provider.apiKeyUrl,
       usage_url: original.provider.usageUrl,
       developer_docs_url: original.provider.developerDocsUrl,
@@ -642,6 +694,7 @@ export function KeysProviderTable({
         { key: 'status', label: 'status' },
         { key: 'has_key', label: 'has_key' },
         { key: 'model_count', label: 'model_count' },
+        { key: 'model_list_state', label: 'model_list_state' },
         { key: 'api_key_url', label: 'api_key_url' },
         { key: 'usage_url', label: 'usage_url' },
         { key: 'developer_docs_url', label: 'developer_docs_url' },

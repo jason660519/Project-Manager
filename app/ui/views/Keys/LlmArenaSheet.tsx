@@ -11,6 +11,16 @@ import { formatResultSummary, type EvaluationLevel, type RunHistoryEntry } from 
 import { buildLlmArenaResultRow } from './LlmArenaEvaluation';
 import type { ArenaModelSpec } from './useArenaChat';
 
+function preferredModelForProvider(provider: {
+  availableModels: readonly string[];
+  defaultModel?: string;
+}): string {
+  if (provider.defaultModel && provider.availableModels.includes(provider.defaultModel)) {
+    return provider.defaultModel;
+  }
+  return provider.availableModels[0] ?? '';
+}
+
 function moveItem<T>(items: T[], fromIndex: number, toIndex: number): T[] {
   if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= items.length || toIndex >= items.length) {
     return items;
@@ -70,7 +80,7 @@ export function LlmArenaSheet() {
 
       const allowedByProvider = new Map(allProviders.map((p) => [p.id, p.availableModels]));
       const fallbackProvider = allProviders[0]?.id;
-      const fallbackModel = allProviders[0]?.availableModels[0] ?? '';
+      const fallbackModel = allProviders[0] ? preferredModelForProvider(allProviders[0]) : '';
 
       let changed = false;
       const nextSelected = prev.selectedModels.map((spec) => {
@@ -78,7 +88,8 @@ export function LlmArenaSheet() {
         if (allowedModels && allowedModels.includes(spec.model)) return spec;
         changed = true;
         if (allowedModels && allowedModels.length > 0) {
-          return { provider: spec.provider, model: allowedModels[0] };
+          const provider = allProviders.find((item) => item.id === spec.provider);
+          return { provider: spec.provider, model: provider ? preferredModelForProvider(provider) : allowedModels[0] };
         }
         return { provider: fallbackProvider, model: fallbackModel };
       });
@@ -218,7 +229,7 @@ export function LlmArenaSheet() {
       ...prev,
       selectedModels: [
         ...prev.selectedModels,
-        { provider: defaultProvider.id, model: defaultProvider.availableModels[0] || '' }
+        { provider: defaultProvider.id, model: preferredModelForProvider(defaultProvider) }
       ]
     }));
   };
@@ -313,20 +324,6 @@ export function LlmArenaSheet() {
   };
 
   const handleAutoAddTopModels = async () => {
-    const topModelByProvider: Partial<Record<string, string>> = {
-      anthropic: 'claude-opus-4-1',
-      openai: 'o1',
-      gemini: 'gemini-2.5-pro',
-      deepseek: 'deepseek-reasoner',
-      grok: 'grok-2-latest',
-      openrouter: 'anthropic/claude-3.5-sonnet',
-      perplexity: 'sonar-pro',
-      together: 'Qwen/Qwen2.5-72B-Instruct-Turbo',
-      qwen: 'qwen-max',
-      kimi: 'kimi-k2.6',
-      zhipu: 'glm-4-plus',
-    };
-
     const rank = [
       'anthropic',
       'openai',
@@ -349,12 +346,7 @@ export function LlmArenaSheet() {
       if (!provider) continue;
       const hasKey = await hasProviderKey(provider.id);
       if (!hasKey) continue;
-      const preferred = topModelByProvider[provider.id];
-      const model =
-        (preferred && provider.availableModels.includes(preferred) && preferred) ||
-        provider.defaultModel ||
-        provider.availableModels[0] ||
-        '';
+      const model = preferredModelForProvider(provider);
       if (!model) continue;
       candidateModels.push({ provider: provider.id, model });
     }
