@@ -47,6 +47,47 @@ const DASHBOARD_DIR_NAME: &str = ".project-manager";
 const CONFIG_FILENAME: &str = "config.json";
 const LEGACY_CONFIG_FILENAME: &str = ".project-manager.json";
 
+fn looks_like_project_manager_root(path: &Path) -> bool {
+    path.join("package.json").is_file() && path.join("src-tauri").join("tauri.conf.json").is_file()
+}
+
+fn find_project_manager_root() -> Option<PathBuf> {
+    if let Ok(root) = std::env::var("PM_ROOT") {
+        let path = PathBuf::from(root);
+        if looks_like_project_manager_root(&path) {
+            return Some(path);
+        }
+    }
+
+    if let Ok(mut current) = std::env::current_dir() {
+        loop {
+            if looks_like_project_manager_root(&current) {
+                return Some(current);
+            }
+            if !current.pop() {
+                break;
+            }
+        }
+    }
+
+    let manifest_parent = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .map(Path::to_path_buf);
+    manifest_parent.filter(|path| looks_like_project_manager_root(path))
+}
+
+#[tauri::command]
+async fn project_manager_root() -> Result<String, String> {
+    let root = find_project_manager_root()
+        .ok_or_else(|| "Cannot resolve Project Manager root on this machine".to_string())?;
+    root.to_str().map(|value| value.to_string()).ok_or_else(|| {
+        format!(
+            "Project Manager root is not valid UTF-8: {}",
+            root.display()
+        )
+    })
+}
+
 fn normalize_github_remote_url(remote_url: &str) -> Option<String> {
     let trimmed = remote_url
         .trim()
@@ -5179,6 +5220,7 @@ pub fn run() {
             read_file,
             write_file,
             scan_env_files,
+            project_manager_root,
             github_oauth_device_start,
             github_oauth_device_poll,
             list_sessions,

@@ -1662,8 +1662,20 @@ export interface EnvFileInfo {
   content: string;
 }
 
+export async function getProjectManagerRoot(): Promise<string> {
+  if (!isTauri()) {
+    const res = await fetch('/api/project-manager-root');
+    const body = (await res.json().catch(() => null)) as { root?: unknown; error?: string } | null;
+    if (!res.ok) {
+      throw new Error(body?.error ?? `Cannot resolve Project Manager root: ${res.status}`);
+    }
+    return typeof body?.root === 'string' ? body.root : '';
+  }
+  return invoke<string>('project_manager_root');
+}
+
 /**
- * Scan a project's top-level directory for dotenv-style files (.env, .env.local,
+ * Scan a top-level directory for dotenv-style files (.env, .env.local,
  * .envrc, …) and return each with its content preloaded.  Files larger than
  * 256 KB are skipped on the Rust side. Returns `[]` outside Tauri (no FS).
  */

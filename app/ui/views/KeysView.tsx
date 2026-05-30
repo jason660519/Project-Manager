@@ -26,11 +26,9 @@ const KEYS_SHEET_ORDER_STORAGE_KEY = 'projectManager.keys.sheetOrder';
 function KeysViewContent({
   projectRoot,
   initialSheet,
-  onRebindProjectRoot,
 }: {
   projectRoot?: string;
   initialSheet: KeysSheetSlug;
-  onRebindProjectRoot?: () => Promise<void>;
 }) {
   const router = useRouter();
   const { activeTab, setActiveTab, llmState, vlmState } = useKeysContext();
@@ -100,7 +98,6 @@ function KeysViewContent({
         <ApiKeyValidationSheet
           isTauri={isTauri}
           projectRoot={projectRoot}
-          onRebindProjectRoot={onRebindProjectRoot}
         />
       </div>
       <div className={activeTab === 'llm_arena' ? 'h-full overflow-hidden p-4' : 'hidden'}>
@@ -116,11 +113,9 @@ function KeysViewContent({
 export function KeysView({
   projectRoot,
   initialSheet,
-  onRebindProjectRoot,
 }: {
   projectRoot?: string;
   initialSheet?: KeysSheetSlug;
-  onRebindProjectRoot?: () => Promise<void>;
 }) {
   const resolvedSheet = initialSheet ?? DEFAULT_KEYS_SHEET_SLUG;
   return (
@@ -128,7 +123,6 @@ export function KeysView({
       <KeysViewContent
         projectRoot={projectRoot}
         initialSheet={resolvedSheet}
-        onRebindProjectRoot={onRebindProjectRoot}
       />
     </KeysProvider>
   );

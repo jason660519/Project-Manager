@@ -196,8 +196,25 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
   const [activeRuns, setActiveRuns] = useState<ActiveRun[]>([]);
   const [runHistory, setRunHistory] = useState<CompletedRun[]>([]);
   const [cronHistory, setCronHistory] = useState<CronRun[]>([]);
+  const [detectedProjectManagerRoot, setDetectedProjectManagerRoot] = useState<string>('');
   const cronJobsRef = useRef<CronJob[]>([]);
   const cronNextRunRef = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { getProjectManagerRoot } = await import('../../lib/bridge');
+        const root = await getProjectManagerRoot();
+        if (!cancelled) setDetectedProjectManagerRoot(root);
+      } catch {
+        if (!cancelled) setDetectedProjectManagerRoot('');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Load persisted state from localStorage on mount.  The repository wraps a
   // synchronous localStorage in Promises (for future SQLite/cloud backends),
@@ -290,7 +307,8 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId) ?? projects[0];
   const projectManagerRoot =
-    projects.find((p) => p.id === 'project-manager')?.config.project.root ??
+    detectedProjectManagerRoot ||
+    projects.find((p) => p.id === 'project-manager')?.config.project.root ||
     SEED_PROJECTS.find((p) => p.id === 'project-manager')?.config.project.root;
   const adapters = selectedProject ? listAdapters(selectedProject.config) : [];
   const selectedDashboardProjects = projects.filter((p) => selectedDashboardProjectIds.includes(p.id));
@@ -836,31 +854,6 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
     [isTauri],
   );
 
-  const handleRebindSelectedProjectRoot = useCallback(async () => {
-    if (!selectedProject) throw new Error('Select a project before rebinding its local folder.');
-    if (!isTauri) {
-      throw new Error('Folder rebinding requires the Project Manager desktop app.');
-    }
-
-    const { pickProjectFolders } = await import('../../lib/bridge');
-    const result = await pickProjectFolders({
-      multiple: false,
-      title: `Select local folder for ${selectedProject.config.project.name}`,
-    });
-    if (result.status === 'unsupported') {
-      throw new Error('Folder rebinding requires the Project Manager desktop app.');
-    }
-    if (result.status === 'cancelled' || result.paths.length === 0) return;
-
-    const { buildProjectEntryFromPath } = await import('../../lib/storage');
-    const entry = await buildProjectEntryFromPath(result.paths[0], {
-      isTauri,
-      existing: selectedProject,
-    });
-    setProjects((prev) => prev.map((p) => (p.id === selectedProject.id ? entry : p)));
-    setSelectedProjectId(entry.id);
-  }, [isTauri, selectedProject]);
-
   /**
    * Remove a project from PM's tracked list. Always removes the in-memory entry
    * (which then persists via the saveProjects effect); when `deleteConfigFile`
@@ -1334,9 +1327,8 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
       )}
       {currentView === 'keys' && (
         <KeysView
-          projectRoot={selectedProject?.config.project.root ?? projectManagerRoot}
+          projectRoot={projectManagerRoot}
           initialSheet={keysSheet}
-          onRebindProjectRoot={handleRebindSelectedProjectRoot}
         />
       )}
       {currentView === 'settings' && <SettingsView />}

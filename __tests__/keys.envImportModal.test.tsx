@@ -49,7 +49,7 @@ describe('EnvImportModal', () => {
     expect(await screen.findByText(/Validated: ANTHROPIC_API_KEY/)).toBeInTheDocument();
   });
 
-  it('scans the project root when one is supplied', async () => {
+  it('scans the Project Manager root when one is supplied', async () => {
     scanEnvFilesMock.mockResolvedValue([
       {
         path: '/repo/.env',
@@ -62,16 +62,17 @@ describe('EnvImportModal', () => {
     expect(await screen.findByText('OPENAI_API_KEY')).toBeInTheDocument();
     expect(screen.getByText('/repo')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Rescan/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Scan PM root/ })).toBeInTheDocument();
     expect(screen.getByText(/Detected \.env credentials for 2 providers/)).toBeInTheDocument();
     expect(screen.getByText(/Available providers: OpenAI, Kimi \(Moonshot\)/)).toBeInTheDocument();
     expect(scanEnvFilesMock).toHaveBeenCalledWith('/repo');
   });
 
-  it('shows a useful empty project scan state with a rescan action', async () => {
+  it('shows a useful empty Project Manager root scan state with a rescan action', async () => {
     scanEnvFilesMock.mockResolvedValue([]);
     render(<EnvImportModal projectRoot="/empty" onClose={vi.fn()} onImported={vi.fn()} />);
 
-    expect(await screen.findByText('No .env files found in this project.')).toBeInTheDocument();
+    expect(await screen.findByText('No .env files found in the Project Manager root.')).toBeInTheDocument();
     expect(screen.getByText('/empty')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Rescan/ })).toBeInTheDocument();
     expect(screen.queryByText(/No matching keys detected yet/)).not.toBeInTheDocument();
@@ -80,29 +81,21 @@ describe('EnvImportModal', () => {
     await waitFor(() => expect(scanEnvFilesMock).toHaveBeenCalledTimes(2));
   });
 
-  it('treats a missing project root as a rebindable local path problem', async () => {
-    const onRebindProjectRoot = vi.fn().mockResolvedValue(undefined);
+  it('treats a missing Project Manager root as a local startup problem', async () => {
     scanEnvFilesMock.mockRejectedValue(new Error('Project root does not exist: /old-machine/repo'));
 
     render(
       <EnvImportModal
         projectRoot="/old-machine/repo"
-        onRebindProjectRoot={onRebindProjectRoot}
         onClose={vi.fn()}
         onImported={vi.fn()}
       />,
     );
 
     expect(
-      await screen.findByText('This project folder is not available on this machine.'),
+      await screen.findByText('The Project Manager root is not available on this machine.'),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Rebind the project to its local folder/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Open projects/ })).toHaveAttribute(
-      'href',
-      '/project-progress-dashboard#projects',
-    );
-
-    await userEvent.click(screen.getByRole('button', { name: /Rebind folder/ }));
-    await waitFor(() => expect(onRebindProjectRoot).toHaveBeenCalledTimes(1));
+    expect(screen.getByText(/Start Project Manager from its repo folder/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Rebind folder/ })).not.toBeInTheDocument();
   });
 });

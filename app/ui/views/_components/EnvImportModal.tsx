@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, FileText, FolderOpen, Loader2, RefreshCw, Upload, X } from 'lucide-react';
+import { AlertTriangle, FileText, Loader2, RefreshCw, Upload, X } from 'lucide-react';
 import { parseEnvText } from '../../../../lib/keys/envParser';
 import { detectProviders, type DetectedKey } from '../../../../lib/keys/detectProviders';
 import { saveProviderSecret } from '../../../../lib/keys/keychain';
@@ -10,9 +10,8 @@ import { formatValidationFailure } from '../../../../lib/keys/providerMetadata';
 import { scanEnvFiles, type EnvFileInfo } from '../../../../lib/bridge';
 
 interface EnvImportModalProps {
-  /** Optional project root — when provided, the modal offers a "Scan project" tab. */
+  /** Project Manager root — when provided, the modal offers a "Scan PM root" tab. */
   projectRoot?: string;
-  onRebindProjectRoot?: () => Promise<void>;
   onClose: () => void;
   onImported: (count: number) => void;
 }
@@ -25,7 +24,6 @@ function isMissingProjectRootError(message: string): boolean {
 
 export function EnvImportModal({
   projectRoot,
-  onRebindProjectRoot,
   onClose,
   onImported,
 }: EnvImportModalProps) {
@@ -37,7 +35,6 @@ export function EnvImportModal({
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState('');
   const [missingProjectRoot, setMissingProjectRoot] = useState(false);
-  const [rebinding, setRebinding] = useState(false);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -58,7 +55,7 @@ export function EnvImportModal({
       if (files.length > 0) {
         setScanSelectedPath(files[0].path);
       } else {
-        setScanError('No .env files found in this project.');
+        setScanError('No .env files found in the Project Manager root.');
       }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
@@ -68,21 +65,6 @@ export function EnvImportModal({
       setScanning(false);
     }
   }, [projectRoot]);
-
-  const handleRebindProjectRoot = useCallback(async () => {
-    if (!onRebindProjectRoot) return;
-    setRebinding(true);
-    setError('');
-    try {
-      await onRebindProjectRoot();
-      setScanError('');
-      setMissingProjectRoot(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setRebinding(false);
-    }
-  }, [onRebindProjectRoot]);
 
   useEffect(() => {
     if (!saving) {
@@ -192,7 +174,7 @@ export function EnvImportModal({
         <div className="flex border-b border-stone-200/12 px-5">
           {projectRoot && (
             <TabButton active={tab === 'scan'} onClick={() => setTab('scan')}>
-              Scan project
+              Scan PM root
             </TabButton>
           )}
           <TabButton active={tab === 'paste'} onClick={() => setTab('paste')}>
@@ -224,7 +206,7 @@ GITHUB_TOKEN=github_token_..."
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-[11px] uppercase tracking-[0.14em] text-stone-500">
-                    Project scan
+                    Project Manager scan
                   </div>
                   {projectRoot && (
                     <div
@@ -258,37 +240,14 @@ GITHUB_TOKEN=github_token_..."
                 <div className="border border-stone-200/15 bg-stone-200/5 px-3 py-3">
                   <p className="text-sm text-stone-300">
                     {missingProjectRoot
-                      ? 'This project folder is not available on this machine.'
+                      ? 'The Project Manager root is not available on this machine.'
                       : scanError}
                   </p>
                   <p className="mt-1 text-[11px] text-stone-500">
                     {missingProjectRoot
-                      ? 'Rebind the project to its local folder, or switch to Paste / drop to import a file directly.'
-                      : 'Use Rescan after adding a top-level .env file, or switch to Paste / drop.'}
+                      ? 'Start Project Manager from its repo folder, or switch to Paste / drop to import a file directly.'
+                      : 'Use Rescan after adding a top-level .env file to the Project Manager root, or switch to Paste / drop.'}
                   </p>
-                  {missingProjectRoot && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void handleRebindProjectRoot()}
-                        disabled={!onRebindProjectRoot || rebinding}
-                        className="inline-flex items-center gap-1.5 border border-stone-200/22 px-3 py-1.5 text-[11px] uppercase tracking-[0.14em] text-stone-200 hover:bg-stone-200/8 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        {rebinding ? (
-                          <Loader2 size={12} className="animate-spin" />
-                        ) : (
-                          <FolderOpen size={12} className="text-stone-400" />
-                        )}
-                        Rebind folder
-                      </button>
-                      <a
-                        href="/project-progress-dashboard#projects"
-                        className="inline-flex items-center border border-stone-200/15 px-3 py-1.5 text-[11px] uppercase tracking-[0.14em] text-stone-400 hover:border-stone-200/30 hover:text-stone-200"
-                      >
-                        Open projects
-                      </a>
-                    </div>
-                  )}
                 </div>
               ) : detected.length > 0 ? (
                 <div className="border border-emerald-300/25 bg-emerald-300/5 px-3 py-3">
