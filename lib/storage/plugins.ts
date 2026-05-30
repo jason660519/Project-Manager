@@ -11,7 +11,12 @@ import type {
 } from '../types/plugins';
 import type { McpServerConfig } from '../bridge';
 import { getSecret, setSecret } from '../bridge';
+import { schedulePluginCatalogMirror } from './plugin-catalog-mirror';
 import { KEY_SHARED_PLUGINS } from './keys';
+
+export interface SavePluginCatalogOptions {
+  repoRoot?: string;
+}
 
 // API keys live in the OS Keychain under Tauri (ADR-004 — keys must never sit
 // in the renderer's localStorage). In `next dev` mode there is no Tauri runtime
@@ -83,8 +88,9 @@ const DEFAULT_CLIS: CliPlugin[] = [
     name: 'Hermes Agent CLI',
     enabled: false,
     installedAt: BUILT_IN_INSTALL_DATE,
-    command: '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager/bin/hermes',
+    command: '.project-manager/bin/hermes',
     argsTemplate: ['chat', '-q', '{prompt}'],
+    autostart: false,
   },
   {
     id: 'openclaw',
@@ -92,7 +98,8 @@ const DEFAULT_CLIS: CliPlugin[] = [
     name: 'OpenClaw CLI',
     enabled: false,
     installedAt: BUILT_IN_INSTALL_DATE,
-    command: '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager/bin/openclaw',
+    command: '.project-manager/bin/openclaw',
+    autostart: false,
     argsTemplate: ['agent', '--message', '{prompt}'],
   },
 ];
@@ -260,8 +267,9 @@ export function loadPluginCatalog(): PluginCatalog {
   return DEFAULT_CATALOG;
 }
 
-export function savePluginCatalog(catalog: PluginCatalog): void {
+export function savePluginCatalog(catalog: PluginCatalog, options?: SavePluginCatalogOptions): void {
   writeJSON(KEY_SHARED_PLUGINS, catalog);
+  schedulePluginCatalogMirror(catalog, options?.repoRoot);
 }
 
 // ── Selectors ────────────────────────────────────────────────────────────────
@@ -307,6 +315,10 @@ export function updatePlugin(
 
 export function togglePluginEnabled(catalog: PluginCatalog, id: string): PluginCatalog {
   return updatePlugin(catalog, id, (p) => ({ ...p, enabled: !p.enabled }));
+}
+
+export function togglePluginAutostart(catalog: PluginCatalog, id: string): PluginCatalog {
+  return updatePlugin(catalog, id, (p) => ({ ...p, autostart: !(p.autostart ?? false) }));
 }
 
 // ── Provider API keys (unchanged semantics) ──────────────────────────────────

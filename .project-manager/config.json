@@ -1165,7 +1165,7 @@
       "name": "API Key Quick-Validate Panel",
       "category": "Frontend/UI",
       "status": "in_progress",
-      "progress": 10,
+      "progress": 85,
       "phase": "development",
       "points": 3,
       "locatedSection": "app/ui/views/Keys/ApiKeyValidationSheet.tsx",
@@ -1191,6 +1191,70 @@
         ],
         "kickoffAt": "2026-05-28T19:55:55.856Z"
       }
+    },
+    {
+      "id": "F39",
+      "name": "User-Controlled Plugin Install, Catalog Mirror, and Startup",
+      "category": "Platform/DevOps",
+      "status": "in_progress",
+      "progress": 10,
+      "phase": "development",
+      "points": 8,
+      "locatedSection": "Integrations Hub / Plugins",
+      "readmePath": ".project-manager/features/F39/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F39/",
+        "spec": ".project-manager/features/F39/feature-spec.md",
+        "tdd": ".project-manager/features/F39/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F39/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F39/",
+        "implementation": "start_project_manager.sh",
+        "test": "__tests__/pluginCatalogMirror.test.ts"
+      },
+      "notes": "Plugin catalog mirror, autostart toggles, startup script gating, and dependency resolver are implemented; manual new-machine sidecar checks remain.",
+      "createdAt": "2026-05-30T01:26:23.684Z",
+      "updatedAt": "2026-05-30T05:25:00.000Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "start_project_manager.sh",
+          "__tests__/pluginCatalogMirror.test.ts",
+          ".project-manager/features/F39/dev-log.md"
+        ],
+        "kickoffAt": "2026-05-30T01:26:23.684Z"
+      }
+    },
+    {
+      "id": "F40",
+      "name": "Launcher Profile Manifest and Environment-Aware Aux Pages",
+      "category": "Platform/DevOps",
+      "status": "in_progress",
+      "progress": 70,
+      "phase": "development",
+      "points": 8,
+      "locatedSection": "scripts/pm-launcher",
+      "readmePath": ".project-manager/features/F40/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F40/",
+        "spec": ".project-manager/features/F40/feature-spec.md",
+        "tdd": ".project-manager/features/F40/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F40/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F40/",
+        "implementation": "start_project_manager.sh",
+        "test": "scripts/test-launcher-profile.sh"
+      },
+      "notes": "Launcher profile manifest, aux-page reachability policies, profile samples, and shell/tests are implemented; installer/app packaging follow-up remains.",
+      "createdAt": "2026-05-30T02:24:16.102Z",
+      "updatedAt": "2026-05-30T05:25:00.000Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "start_project_manager.sh",
+          "scripts/test-launcher-profile.sh",
+          ".project-manager/features/F40/dev-log.md"
+        ],
+        "kickoffAt": "2026-05-30T02:24:16.102Z"
+      }
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",
@@ -1201,6 +1265,6 @@
     "root": "/Volumes/KLEVV-4T-1/Project-Manager"
   },
   "schemaVersion": 8,
-  "updatedAt": "2026-05-28T19:55:55.856Z",
-  "updatedBy": "Claude"
+  "updatedAt": "2026-05-30T05:25:00.000Z",
+  "updatedBy": "Codex"
 }

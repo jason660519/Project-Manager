@@ -8,7 +8,7 @@ Project-Manager is the planning, task, and orchestration surface. Other company 
 
 ## OpenClaw Bridge
 
-Project-Manager hosts OpenClaw as a sidecar (`npm run openclaw`). The `@jason66/shared-bridge` package (`/Volumes/KLEVV-4T-1/shared-bridge/`) provides shared types and an `OpenClawBridge` client class for cross-app interactions:
+Project-Manager hosts OpenClaw as a sidecar (`npm run openclaw`). The repo-local bridge module (`lib/bridge-plugins/shared-bridge.ts`) provides shared types and an `OpenClawBridge` client class for cross-app interactions:
 
 | Capability | Direction | Transport |
 |---|---|---|

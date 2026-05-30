@@ -1,4 +1,6 @@
 import type { IntegrationRow } from '../types';
+import devConnectedInstanceSeeds from '../../../config/samples/connected-instances.dev.json';
+import { resolveProjectManagerRepoRoot } from '../../project-manager-root';
 
 export type ConnectedInstanceKind =
   | 'local-app'
@@ -70,7 +72,7 @@ export interface ConnectedInstanceScanSnapshot {
   warnings: string[];
 }
 
-export const CONNECTED_INSTANCE_DEFINITIONS: readonly ConnectedInstanceDefinition[] = [
+const LOCAL_CONNECTED_INSTANCE_DEFINITIONS: readonly ConnectedInstanceDefinition[] = [
   {
     id: 'project-manager-local',
     name: 'Project Manager Local Runtime',
@@ -80,7 +82,7 @@ export const CONNECTED_INSTANCE_DEFINITIONS: readonly ConnectedInstanceDefinitio
     company: 'Project Manager',
     scope: 'project',
     accessType: 'filesystem',
-    address: '/Volumes/KLEVV-4T-1/Project-Manager',
+    address: resolveProjectManagerRepoRoot(),
     statusLabel: 'Configured',
     capabilities: ['Next.js', 'Tauri', 'agent dispatch', 'project files'],
     services: ['Project Manager'],
@@ -127,81 +129,15 @@ export const CONNECTED_INSTANCE_DEFINITIONS: readonly ConnectedInstanceDefinitio
     discoverySource: 'launcher defaults',
     notes: 'Project Manager reserves port 18790 for its repo-local OpenClaw gateway.',
   },
-  {
-    id: 'living-room-server',
-    name: 'Living Room Server',
-    instanceKind: 'intranet-host',
-    category1: 'Intranet Compute',
-    category2: 'Host',
-    company: 'User Hardware',
-    scope: 'intranet',
-    accessType: 'ssh',
-    address: 'rick@192.168.1.6',
-    statusLabel: 'Known',
-    capabilities: ['CPU/GPU host', 'Docker services', 'local models', 'media generation'],
-    services: ['Ollama', 'Open WebUI', 'ComfyUI'],
-    owner: 'user',
-    risk: 'private LAN address',
-    discoverySource: 'launcher defaults',
-    notes: 'User-owned intranet server that exposes model and image-generation services.',
-  },
-  {
-    id: 'living-room-ollama',
-    name: 'Ollama API',
-    instanceKind: 'intranet-service',
-    category1: 'Intranet Service',
-    category2: 'Model API',
-    company: 'Ollama',
-    scope: 'intranet',
-    accessType: 'api',
-    address: 'http://192.168.1.6:11434/',
-    port: '11434',
-    statusLabel: 'Configured',
-    capabilities: ['local LLM inference', 'model hosting'],
-    services: ['Ollama'],
-    owner: 'user',
-    risk: 'private LAN API endpoint',
-    discoverySource: 'launcher defaults',
-    notes: 'Ollama API endpoint on the living room server; health is not live-probed in this MVP.',
-  },
-  {
-    id: 'living-room-open-webui',
-    name: 'Open WebUI',
-    instanceKind: 'intranet-service',
-    category1: 'Intranet Service',
-    category2: 'Model UI',
-    company: 'Open WebUI',
-    scope: 'intranet',
-    accessType: 'http',
-    address: 'http://192.168.1.6:38457/',
-    port: '38457',
-    statusLabel: 'Configured',
-    capabilities: ['model chat UI', 'Ollama frontend'],
-    services: ['Open WebUI', 'Ollama'],
-    owner: 'user',
-    risk: 'private LAN web endpoint',
-    discoverySource: 'launcher defaults',
-    notes: 'Browser UI for local model usage on the intranet server.',
-  },
-  {
-    id: 'living-room-comfyui',
-    name: 'ComfyUI',
-    instanceKind: 'intranet-service',
-    category1: 'Intranet Service',
-    category2: 'Image Generation',
-    company: 'ComfyUI',
-    scope: 'intranet',
-    accessType: 'http',
-    address: 'http://192.168.1.6:30000/',
-    port: '30000',
-    statusLabel: 'Configured',
-    capabilities: ['image generation', 'GPU workflows'],
-    services: ['ComfyUI'],
-    owner: 'user',
-    risk: 'private LAN web endpoint',
-    discoverySource: 'launcher defaults',
-    notes: 'Image-generation workflow UI on the living room server.',
-  },
+];
+
+const DEV_CONNECTED_INSTANCE_DEFINITIONS =
+  devConnectedInstanceSeeds as readonly ConnectedInstanceDefinition[];
+
+/** Local loopback seeds plus optional dev LAN examples from config/samples. */
+export const CONNECTED_INSTANCE_DEFINITIONS: readonly ConnectedInstanceDefinition[] = [
+  ...LOCAL_CONNECTED_INSTANCE_DEFINITIONS,
+  ...DEV_CONNECTED_INSTANCE_DEFINITIONS,
 ];
 
 export function mapConnectedInstanceRow(def: ConnectedInstanceDefinition): IntegrationRow {

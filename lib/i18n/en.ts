@@ -285,6 +285,10 @@ export const en: Translations = {
     remove: 'Remove',
     enable: 'Enable',
     disable: 'Disable',
+    autostartOn: 'Autostart on stack launch',
+    autostartOff: 'Disable autostart on stack launch',
+    sidecarNotInstalled:
+      'Project-scoped runtime is not installed yet. Use Install below or run the npm install script from the Project Manager repo root.',
     start: 'Start',
     stop: 'Stop',
     restart: 'Restart',

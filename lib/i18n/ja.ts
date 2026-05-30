@@ -287,6 +287,10 @@ export const ja: Translations = {
     remove: '削除',
     enable: '有効化',
     disable: '無効化',
+    autostartOn: 'core/all で自動起動',
+    autostartOff: 'スタック自動起動をオフ',
+    sidecarNotInstalled:
+      'プロジェクトスコープの runtime は未インストールです。下の Install を使うか、Project Manager ルートで npm インストールを実行してください。',
     start: '開始',
     stop: '停止',
     restart: '再起動',

@@ -70,6 +70,7 @@ import {
   selectProviders,
   setProviderApiKey,
   togglePluginEnabled,
+  togglePluginAutostart,
 } from '../../../../lib/storage/plugins';
 import {
   getAiCliPresetAllowlist,
@@ -141,8 +142,9 @@ import { CapabilitySheetView } from './CapabilitySheetView';
 import { ScanReportPanel } from './_shared/ScanReportPanel';
 import { DiscoverPlanDialog } from './_shared/DiscoverPlanDialog';
 import { DiscoveryResultPanel } from './_shared/DiscoveryResultPanel';
+import { resolveProjectManagerRepoRoot } from '../../../../lib/project-manager-root';
+
 const EMPTY_CATALOG: PluginCatalog = { schemaVersion: 2, plugins: [] };
-const PROJECT_MANAGER_ROOT = '/Volumes/KLEVV-4T-1/Project-Manager';
 const INTEGRATIONS_HUB_SHEET_ORDER_STORAGE_KEY = 'projectManager.integrationsHub.sheetOrder';
 const CONNECTED_INSTANCE_SCAN_STORAGE_KEY = 'projectManager.integrationsHub.connectedInstanceScan';
 
@@ -168,11 +170,14 @@ type PluginsRowDensity = 'compact' | 'comfortable';
 
 export interface PluginsHubViewProps {
   projectRoot?: string;
+  /** Project Manager repository root (for sidecar paths, mirror writes, terminal cwd). */
+  pmRepoRoot?: string;
   /** Sheet driven by the URL (`/integrations-hub/<sheet>`). Defaults to System Installed Apps. */
   initialSheet?: IntegrationSheet;
 }
 
-export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubViewProps) {
+export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: PluginsHubViewProps) {
+  const pmRoot = resolveProjectManagerRepoRoot(pmRepoRoot);
   const { t } = useI18n();
   const router = useRouter();
   const activeSheet: IntegrationSheet = normalizeIntegrationSheet(initialSheet ?? SYSTEM_INSTALLED_APPS_SHEET);
@@ -499,7 +504,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
 
   const updateCatalog = (next: PluginCatalog) => {
     setCatalog(next);
-    savePluginCatalog(next);
+    savePluginCatalog(next, { repoRoot: pmRoot });
     refreshManual();
   };
 
@@ -1176,9 +1181,9 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
     await spawnTerminal({
       command: command.command,
       args: command.args,
-      cwd: PROJECT_MANAGER_ROOT,
+      cwd: pmRoot || projectRoot || '.',
     });
-  }, []);
+  }, [pmRoot, projectRoot]);
 
   const mcpStart = async (plugin: McpPlugin) => {
     if (plugin.transport !== 'stdio' || !plugin.command) return;
@@ -2078,6 +2083,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
         onInstallMarketplace={handleInstall}
         onUninstallPlugin={(id) => updateCatalog(removePlugin(catalog, id))}
         onTogglePluginEnabled={(id) => updateCatalog(togglePluginEnabled(catalog, id))}
+        onTogglePluginAutostart={(id) => updateCatalog(togglePluginAutostart(catalog, id))}
         mcpStart={(p) => void mcpStart(p)}
         mcpStop={(id) => void mcpKill(id)}
         mcpRestart={async (p) => {
@@ -2087,7 +2093,7 @@ export function PluginsHubView({ projectRoot = '', initialSheet }: PluginsHubVie
         }}
         mcpViewLogs={setLogsForId}
         onOpenPath={(path) => void openPath(path).catch(() => {})}
-        runtimeRootPath={PROJECT_MANAGER_ROOT}
+        runtimeRootPath={pmRoot}
         onRunRuntimeCommand={handleRunRuntimeCommand}
         onSkillUninstall={async (path) => {
           if (!skillsDir) return;

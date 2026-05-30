@@ -9,6 +9,8 @@ interface BasePlugin {
   name: string;
   kind: PluginKind;
   enabled: boolean;
+  /** When true, dev stack commands (`core`/`all`) may autostart this plugin's sidecar. */
+  autostart?: boolean;
   installedAt: string;
 }
 

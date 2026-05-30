@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "profileId": "pm-repo-dev",
+  "pm": {
+    "port": 43187,
+    "startupWaitSeconds": 180,
+    "healthPath": "/project-progress-dashboard"
+  },
+  "auxiliaryPages": {
+    "policy": "respect-open-when",
+    "entries": [
+      {
+        "id": "ollama-api",
+        "label": "Ollama API",
+        "url": "http://192.168.1.6:11434/",
+        "scope": "intranet",
+        "enabled": true,
+        "openWhen": "reachable"
+      },
+      {
+        "id": "open-webui",
+        "label": "Open WebUI",
+        "url": "http://192.168.1.6:38457/",
+        "scope": "intranet",
+        "enabled": true,
+        "openWhen": "reachable"
+      },
+      {
+        "id": "comfyui",
+        "label": "ComfyUI",
+        "url": "http://192.168.1.6:30000/",
+        "scope": "intranet",
+        "enabled": true,
+        "openWhen": "reachable"
+      }
+    ]
+  },
+  "menu": {
+    "all": "啟動 PM + 已啟用 sidecar + 可連線的輔助頁面（含 dev LAN）",
+    "core": "啟動 PM + 依 plugin 設定自動啟動 sidecar",
+    "aux": "開啟已配置且可連線的輔助頁面（含 dev LAN）"
+  }
+}

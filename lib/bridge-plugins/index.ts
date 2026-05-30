@@ -1,4 +1,4 @@
-import { registerAllCapabilities, listCapabilitiesByApp, OpenClawBridge } from '@jason66/shared-bridge';
+import { registerAllCapabilities, listCapabilitiesByApp, OpenClawBridge } from './shared-bridge';
 
 export { registerAllCapabilities, listCapabilitiesByApp, OpenClawBridge };
 

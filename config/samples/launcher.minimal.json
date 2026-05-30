@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "profileId": "minimal",
+  "pm": {
+    "port": 43187,
+    "startupWaitSeconds": 120,
+    "healthPath": "/project-progress-dashboard"
+  },
+  "auxiliaryPages": {
+    "policy": "respect-open-when",
+    "entries": [
+      {
+        "id": "hermes-dashboard",
+        "label": "Hermes Agent Dashboard",
+        "url": "http://127.0.0.1:9119",
+        "scope": "local-sidecar",
+        "pluginId": "hermes-agent",
+        "enabled": true,
+        "openWhen": "running"
+      },
+      {
+        "id": "openclaw-dashboard",
+        "label": "OpenClaw Dashboard",
+        "url": "http://127.0.0.1:18790/",
+        "scope": "local-sidecar",
+        "pluginId": "openclaw",
+        "enabled": true,
+        "openWhen": "running"
+      }
+    ]
+  },
+  "menu": {
+    "all": "啟動 PM + 已啟用 sidecar + 可連線的輔助頁面",
+    "core": "啟動 PM + 依 plugin 設定自動啟動 sidecar",
+    "aux": "開啟已配置且可連線的輔助頁面"
+  }
+}

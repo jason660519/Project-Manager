@@ -286,6 +286,10 @@ export const zhHant: Translations = {
     remove: '移除',
     enable: '啟用',
     disable: '停用',
+    autostartOn: '隨 core/all 自動啟動',
+    autostartOff: '關閉隨 stack 自動啟動',
+    sidecarNotInstalled:
+      '專案範圍的 runtime 尚未安裝。請使用下方 Install，或在 Project Manager 根目錄執行 npm 安裝腳本。',
     start: '啟動',
     stop: '停止',
     restart: '重新啟動',

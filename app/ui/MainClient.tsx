@@ -1275,6 +1275,7 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
       {currentView === 'integrations-hub' && (
         <PluginsView
           projectRoot={selectedProject?.config.project.root ?? ''}
+          pmRepoRoot={projectManagerRoot}
           initialSheet={integrationsSheet}
         />
       )}

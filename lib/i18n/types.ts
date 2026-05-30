@@ -290,6 +290,9 @@ export interface Translations {
     remove: string;
     enable: string;
     disable: string;
+    autostartOn: string;
+    autostartOff: string;
+    sidecarNotInstalled: string;
     start: string;
     stop: string;
     restart: string;

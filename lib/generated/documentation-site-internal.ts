@@ -4,7 +4,7 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-05-28T22:50:20.000Z",
+    "generatedAt": "2026-05-30T05:16:12.859Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
@@ -2667,8 +2667,8 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "folderPath": "docs/integrations",
       "title": "Integrations",
       "summary": "Project-Manager follows Company AI App Standards v0.2 for cross-app plugin boundaries. Project-Manager is the planning, task, and orchestration surface. Other company apps may expose work...",
-      "content": "# Integrations\n\nProject-Manager follows Company AI App Standards v0.2 for cross-app plugin boundaries.\n\n## Current Role\n\nProject-Manager is the planning, task, and orchestration surface. Other company apps may expose work items, progress, or app-specific capabilities to Project-Manager through explicit plugin contracts.\n\n## OpenClaw Bridge\n\nProject-Manager hosts OpenClaw as a sidecar (`npm run openclaw`). The `@jason66/shared-bridge` package (`/Volumes/KLEVV-4T-1/shared-bridge/`) provides shared types and an `OpenClawBridge` client class for cross-app interactions:\n\n| Capability | Direction | Transport |\n|---|---|---|\n| `openclaw.agent.dispatch` | OpenClaw → PM | HTTP API via gateway (port 18790) |\n| `realestate.task.export` | Realestate → PM | HTTP API |\n\nOpenClaw can dispatch agent tasks, relay cross-app events, and report app health through its gateway at `http://127.0.0.1:18790`.\n\n## Required For Each Plugin\n\n- Provider and consumer app.\n- Capability name and version.\n- Input and output schema.\n- Permission scope.\n- Error and degraded-mode behavior.\n- Verification path.\n\nAvoid direct coupling to another app's local database or private settings. Use a documented API, file handoff, or event contract.\n\n## Company Standards Provider\n\nProject-Manager can optionally consume standards profiles/checks from the Company-AI-App-Standards app.  \nDraft contract: [company-standards-plugin-contract.md](./company-standards-plugin-contract.md)\n",
-      "contentHash": "4f74e62bcf023229",
+      "content": "# Integrations\n\nProject-Manager follows Company AI App Standards v0.2 for cross-app plugin boundaries.\n\n## Current Role\n\nProject-Manager is the planning, task, and orchestration surface. Other company apps may expose work items, progress, or app-specific capabilities to Project-Manager through explicit plugin contracts.\n\n## OpenClaw Bridge\n\nProject-Manager hosts OpenClaw as a sidecar (`npm run openclaw`). The repo-local bridge module (`lib/bridge-plugins/shared-bridge.ts`) provides shared types and an `OpenClawBridge` client class for cross-app interactions:\n\n| Capability | Direction | Transport |\n|---|---|---|\n| `openclaw.agent.dispatch` | OpenClaw → PM | HTTP API via gateway (port 18790) |\n| `realestate.task.export` | Realestate → PM | HTTP API |\n\nOpenClaw can dispatch agent tasks, relay cross-app events, and report app health through its gateway at `http://127.0.0.1:18790`.\n\n## Required For Each Plugin\n\n- Provider and consumer app.\n- Capability name and version.\n- Input and output schema.\n- Permission scope.\n- Error and degraded-mode behavior.\n- Verification path.\n\nAvoid direct coupling to another app's local database or private settings. Use a documented API, file handoff, or event contract.\n\n## Company Standards Provider\n\nProject-Manager can optionally consume standards profiles/checks from the Company-AI-App-Standards app.  \nDraft contract: [company-standards-plugin-contract.md](./company-standards-plugin-contract.md)\n",
+      "contentHash": "2572a44e8b33da8d",
       "readingMinutes": 1,
       "classification": "public",
       "classificationSource": "policy",
@@ -2687,7 +2687,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "integrations"
       ],
       "warnings": [],
-      "updatedAt": "2026-05-22T20:20:13.000Z"
+      "updatedAt": "2026-05-30T05:16:12.859Z"
     },
     {
       "id": "product/competitive-analysis",

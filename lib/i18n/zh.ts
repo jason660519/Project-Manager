@@ -286,6 +286,10 @@ export const zh: Translations = {
     remove: '移除',
     enable: '启用',
     disable: '停用',
+    autostartOn: '随 core/all 自动启动',
+    autostartOff: '关闭随 stack 自动启动',
+    sidecarNotInstalled:
+      '项目范围的 runtime 尚未安装。请使用下方 Install，或在 Project Manager 根目录运行 npm 安装脚本。',
     start: '启动',
     stop: '停止',
     restart: '重启',

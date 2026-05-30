@@ -55,12 +55,12 @@ export const MARKETPLACE: MarketplacePlugin[] = [
   {
     id: 'hermes-agent', name: 'Hermes Agent CLI', description: 'Project-scoped Hermes agent CLI with isolated memory, sessions, skills, and dashboard state.',
     category: 'dev', kind: 'cli', accentColor: 'bg-amber-700', initials: 'HA',
-    defaultCli: { command: '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager/bin/hermes', argsTemplate: ['chat', '-q', '{prompt}'] },
+    defaultCli: { command: '.project-manager/bin/hermes', argsTemplate: ['chat', '-q', '{prompt}'] },
   },
   {
     id: 'openclaw', name: 'OpenClaw CLI', description: 'Project-scoped OpenClaw agent CLI (with local gateway) — isolated state, workspace, updates, and rollback.',
     category: 'dev', kind: 'cli', accentColor: 'bg-rose-700', initials: 'OC',
-    defaultCli: { command: '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager/bin/openclaw', argsTemplate: ['agent', '--message', '{prompt}'] },
+    defaultCli: { command: '.project-manager/bin/openclaw', argsTemplate: ['agent', '--message', '{prompt}'] },
   },
   {
     id: 'aider', name: 'Aider CLI', description: 'AI pair programmer that edits code in your terminal.',

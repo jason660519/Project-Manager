@@ -4,8 +4,8 @@
 #   ./start_project_manager.sh           show interactive menu
 #   ./start_project_manager.sh start     start the Tauri desktop app
 #   ./start_project_manager.sh web       start Next.js web server only (no Tauri)
-#   ./start_project_manager.sh all       start PM + Hermes + OpenClaw and open all auxiliary pages
-#   ./start_project_manager.sh core      start PM + Hermes + OpenClaw only (essential pages)
+#   ./start_project_manager.sh all       start PM + optional sidecars and open all auxiliary pages
+#   ./start_project_manager.sh core      start PM; autostart sidecars only when enabled in plugin mirror
 #   ./start_project_manager.sh aux       open auxiliary software pages only
 #   ./start_project_manager.sh install   force full install check
 #   ./start_project_manager.sh update    update npm deps + rebuild Rust
@@ -16,6 +16,8 @@
 # Flags (any command):
 #   --open, --force-open   open browser even when the service is already running
 #   --restart              stop the target service port before starting (hermes/openclaw/all)
+#   --yes-deps             auto-confirm missing dependency installs (non-interactive friendly)
+#   --no-deps              never install dependencies; fail when a required tool is missing
 
 set -euo pipefail
 
@@ -26,9 +28,8 @@ MIN_NODE=18
 DEV_PORT=43187
 HERMES_PORT=9119
 OPENCLAW_PORT=18790
-OLLAMA_URL="${PROJECT_MANAGER_OLLAMA_URL:-http://192.168.1.6:11434/}"
-OPENWEBUI_URL="${PROJECT_MANAGER_OPENWEBUI_URL:-http://192.168.1.6:38457/}"
-COMFYUI_URL="${PROJECT_MANAGER_COMFYUI_URL:-http://192.168.1.6:30000/}"
+# Launcher profile: minimal | dev (dev merges config/samples/launcher.dev.json)
+: "${PM_LAUNCHER_PROFILE:=dev}"
 BOLD="\033[1m"
 GREEN="\033[32m"
 YELLOW="\033[33m"
@@ -39,7 +40,48 @@ RESET="\033[0m"
 
 FORCE_OPEN=0
 FORCE_RESTART=0
+PM_INSTALL_DEPS=""
 OPENED_URLS_SESSION=$'\n'
+
+ensure_plugin_mirror() {
+  local mirror_file="$SCRIPT_DIR/.project-manager/plugins.json"
+  if [[ -f "$mirror_file" ]]; then
+    return 0
+  fi
+  if dep_discover_node; then
+    node "$SCRIPT_DIR/scripts/init-plugin-catalog-mirror.mjs" || true
+  fi
+}
+
+plugin_should_autostart() {
+  local plugin_id="$1"
+  ensure_plugin_mirror
+  bash "$SCRIPT_DIR/scripts/plugin-state.sh" autostart "$plugin_id"
+}
+
+maybe_autostart_sidecar() {
+  local plugin_id="$1"
+  local label="$2"
+  local start_fn="$3"
+
+  if plugin_should_autostart "$plugin_id"; then
+    "$start_fn"
+    return $?
+  fi
+
+  info "$label autostart skipped (enable plugin + autostart in Integrations Hub > Coding Tools)."
+  return 0
+}
+
+sidecar_install_hint() {
+  local name="$1"
+  local npm_script="$2"
+  cat <<EOF
+${name} is not installed in this Project Manager scope.
+Install from Integrations Hub > Coding Tools > ${name} > Install,
+or run: npm run ${npm_script}
+EOF
+}
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -444,33 +486,6 @@ print_app_failure() {
   fi
 }
 
-open_auxiliary_app_pages() {
-  header "Auxiliary Software Pages"
-
-  if [[ "${PROJECT_MANAGER_SKIP_AUX_OPEN:-0}" == "1" ]]; then
-    warn "Auxiliary page auto-open skipped by PROJECT_MANAGER_SKIP_AUX_OPEN=1"
-    return 0
-  fi
-
-  local pages=(
-    "Hermes Agent Dashboard|http://127.0.0.1:${HERMES_PORT}"
-    "OpenClaw Dashboard|http://127.0.0.1:${OPENCLAW_PORT}/"
-    "Ollama API|$OLLAMA_URL"
-    "Open WebUI|$OPENWEBUI_URL"
-    "ComfyUI|$COMFYUI_URL"
-  )
-
-  local page name url
-  for page in "${pages[@]}"; do
-    name="${page%%|*}"
-    url="${page#*|}"
-    info "Opening $name: $(safe_url_for_display "$url")"
-    open_local_url "$url"
-  done
-
-  success "Auxiliary software pages handled"
-}
-
 read_openclaw_gateway_token() {
   local env_file="$SCRIPT_DIR/.project-manager/openclaw/state/.env"
   if [[ ! -f "$env_file" ]]; then
@@ -692,66 +707,29 @@ case "$OS" in
     ;;
 esac
 
+export PM_ROOT="$SCRIPT_DIR"
+export PLATFORM
+# shellcheck source=scripts/dependency-resolver.sh
+source "$SCRIPT_DIR/scripts/dependency-resolver.sh"
+# shellcheck source=scripts/pm-launcher/aux-pages.sh
+source "$SCRIPT_DIR/scripts/pm-launcher/aux-pages.sh"
+
 # ── Prerequisite checks ───────────────────────────────────────────────────────
 
 check_xcode_clt() {
-  if [[ "$PLATFORM" != "macOS" ]]; then return 0; fi
-  if ! xcode-select -p &>/dev/null; then
-    warn "Xcode Command Line Tools not found. Installing…"
-    xcode-select --install
-    echo "Please re-run this script after the Xcode CLT installation completes."
-    exit 0
-  fi
-  success "Xcode CLT found"
+  dep_ensure_xcode_clt
 }
 
 check_homebrew() {
-  if [[ "$PLATFORM" != "macOS" ]]; then return 0; fi
-  if ! require_cmd brew; then
-    warn "Homebrew not found. Installing…"
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    # Add brew to PATH for Apple Silicon
-    if [[ -f /opt/homebrew/bin/brew ]]; then
-      eval "$(/opt/homebrew/bin/brew shellenv)"
-    fi
-  fi
-  success "Homebrew found: $(brew --version | head -1)"
+  dep_ensure_brew
 }
 
 check_node() {
-  if require_cmd node; then
-    local version
-    version=$(node --version | sed 's/v//' | cut -d. -f1)
-    if (( version >= MIN_NODE )); then
-      success "Node.js found: $(node --version)"
-      return 0
-    fi
-    warn "Node.js $(node --version) is too old (need v${MIN_NODE}+). Upgrading…"
-  else
-    warn "Node.js not found. Installing…"
-  fi
-
-  if [[ "$PLATFORM" == "macOS" ]]; then
-    brew install node
-  else
-    curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
-    sudo apt-get install -y nodejs
-  fi
-  success "Node.js installed: $(node --version)"
+  dep_ensure_node
 }
 
 check_rust() {
-  if require_cmd rustc && require_cmd cargo; then
-    success "Rust found: $(rustc --version)"
-    return 0
-  fi
-
-  warn "Rust not found. Installing via rustup…"
-  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
-  # Source cargo env for the current shell
-  # shellcheck source=/dev/null
-  source "$HOME/.cargo/env"
-  success "Rust installed: $(rustc --version)"
+  dep_ensure_rust
 }
 
 check_linux_deps() {
@@ -784,17 +762,17 @@ check_linux_deps() {
 # ── npm helpers ───────────────────────────────────────────────────────────────
 
 npm_install() {
-  info "Installing npm dependencies…"
+  dep_ensure_pm_runtime || return 1
   cd "$SCRIPT_DIR"
-  npm install --prefer-offline --no-audit --no-fund 2>&1 | tail -3
-  success "npm dependencies ready"
+  dep_run_with_progress "Installing npm dependencies" \
+    npm install --prefer-offline --no-audit --no-fund
 }
 
 npm_update() {
-  info "Updating npm dependencies…"
+  dep_ensure_pm_runtime || return 1
   cd "$SCRIPT_DIR"
-  npm install --no-audit --no-fund 2>&1 | tail -3
-  success "npm dependencies updated"
+  dep_run_with_progress "Updating npm dependencies" \
+    npm install --no-audit --no-fund
 }
 
 # ── Rust build check ──────────────────────────────────────────────────────────
@@ -932,6 +910,11 @@ start_project_manager() {
   local dev_server_running=0
   local log_file="$SCRIPT_DIR/.project-manager/dev-logs/project-manager-desktop.log"
 
+  dep_ensure_pm_runtime || {
+    error "Cannot start Project Manager without Node.js and npm."
+    return 1
+  }
+
   if is_port_listening "$DEV_PORT"; then
     dev_server_running=1
   fi
@@ -956,7 +939,7 @@ start_project_manager() {
     existing_desktop_pid="$(running_pid_from_file "${log_file}.pid" || true)"
     if [[ -n "$existing_desktop_pid" ]]; then
       success "Project Manager desktop app already running (PID $existing_desktop_pid)"
-      wait_for_port "$DEV_PORT" "Project Manager web app" || true
+      wait_for_pm_ready "Project Manager web app" || true
       maybe_open_local_url "$pm_url" "$dev_server_running"
       print_app_success "Project Manager desktop app" "$DEV_PORT" "$pm_url" "$log_file"
       return 0
@@ -969,7 +952,7 @@ start_project_manager() {
       "Project Manager desktop app" \
       "$log_file" \
       npm run tauri:dev
-    wait_for_port "$DEV_PORT" "Project Manager web app" || true
+    wait_for_pm_ready "Project Manager web app" || true
     maybe_open_local_url "$pm_url" "$dev_server_running"
     print_app_success "Project Manager desktop app" "$DEV_PORT" "$pm_url" "$log_file"
     return 0
@@ -985,6 +968,11 @@ start_project_manager() {
 cmd_web() {
   header "Project Manager — Web Server (Next.js only)"
   local pm_url="http://localhost:${DEV_PORT}/project-progress-dashboard"
+
+  dep_ensure_pm_runtime || {
+    error "Cannot start the web server without Node.js and npm."
+    return 1
+  }
 
   if ! is_installed; then
     warn "First run detected — running install first…"
@@ -1026,12 +1014,10 @@ cmd_hermes() {
   fi
 
   if [[ ! -f "$SCRIPT_DIR/.project-manager/bin/hermes" ]]; then
-    warn "Hermes not installed. Installing in Project Manager scope…"
-    cd "$SCRIPT_DIR"
-    npm run hermes:install || {
-      print_app_failure "Hermes Agent Dashboard" "installer failed" "$log_file"
+    if ! dep_maybe_install_sidecar "Hermes Agent" "hermes:install" "$SCRIPT_DIR/.project-manager/bin/hermes"; then
+      error "$(sidecar_install_hint "Hermes Agent" "hermes:install")"
       return 1
-    }
+    fi
   fi
 
   if is_port_listening "$HERMES_PORT"; then
@@ -1063,12 +1049,17 @@ cmd_openclaw() {
   fi
 
   if [[ ! -f "$SCRIPT_DIR/.project-manager/bin/openclaw" ]]; then
-    warn "OpenClaw not installed. Installing in Project Manager scope…"
-    cd "$SCRIPT_DIR"
-    npm run openclaw:install || {
-      print_app_failure "OpenClaw Dashboard" "installer failed" "$log_file"
+    if ! dep_maybe_install_sidecar "OpenClaw" "openclaw:install" "$SCRIPT_DIR/.project-manager/bin/openclaw"; then
+      error "$(sidecar_install_hint "OpenClaw" "openclaw:install")"
       return 1
-    }
+    fi
+  fi
+
+  if ! dep_discover_node; then
+    if ! dep_install_node_interactive; then
+      error "Node.js is required for OpenClaw but was not found on PATH."
+      return 1
+    fi
   fi
 
   export OPENCLAW_GATEWAY_PORT="$OPENCLAW_PORT"
@@ -1120,7 +1111,7 @@ cmd_aux() {
 }
 
 cmd_all() {
-  header "Project Manager — Full Stack (PM + Hermes + OpenClaw + Aux Pages)"
+  header "Project Manager — Full Stack (PM + optional sidecars + Aux Pages)"
 
   if [[ "$FORCE_RESTART" == "1" ]]; then
     stop_listeners_on_port "$HERMES_PORT" "Hermes Dashboard"
@@ -1132,23 +1123,21 @@ cmd_all() {
   fi
 
   cmd_start_background
-  cmd_openclaw
-  cmd_hermes
+  maybe_autostart_sidecar "openclaw" "OpenClaw" cmd_openclaw
+  maybe_autostart_sidecar "hermes-agent" "Hermes Agent" cmd_hermes
   cmd_aux
 
   header "Launch Summary"
-  success "Project-scoped apps are ready (PM -> OpenClaw -> Hermes -> Aux)"
+  success "Project-scoped apps are ready (PM + optional sidecars + reachable aux pages)"
   echo "  Project Manager Desktop: started (Next.js dev port $DEV_PORT)"
-  echo "  Hermes Agent Dashboard:  http://127.0.0.1:${HERMES_PORT}"
-  echo "  OpenClaw Dashboard:      http://127.0.0.1:${OPENCLAW_PORT}/"
-  echo "  Ollama API:              $OLLAMA_URL"
-  echo "  Open WebUI:              $OPENWEBUI_URL"
-  echo "  ComfyUI:                 $COMFYUI_URL"
+  echo "  Hermes Agent Dashboard:  http://127.0.0.1:${HERMES_PORT} (when running + configured)"
+  echo "  OpenClaw Dashboard:      http://127.0.0.1:${OPENCLAW_PORT}/ (when running + configured)"
+  echo "  Launcher profile:        ${PM_LAUNCHER_PROFILE} (aux pages from config/samples/launcher.*.json)"
   echo "  Logs:                    .project-manager/dev-logs/"
 }
 
 cmd_core() {
-  header "Project Manager — Core Stack (PM + Hermes + OpenClaw)"
+  header "Project Manager — Core Stack (PM + optional sidecars)"
 
   if [[ "$FORCE_RESTART" == "1" ]]; then
     stop_listeners_on_port "$HERMES_PORT" "Hermes Dashboard"
@@ -1160,15 +1149,15 @@ cmd_core() {
   fi
 
   cmd_start_background
-  cmd_openclaw
-  cmd_hermes
+  maybe_autostart_sidecar "openclaw" "OpenClaw" cmd_openclaw
+  maybe_autostart_sidecar "hermes-agent" "Hermes Agent" cmd_hermes
 
   header "Launch Summary"
-  success "Core apps are ready (PM -> OpenClaw -> Hermes)"
+  success "Core apps are ready (PM + optional sidecars)"
   echo "  Project Manager Desktop: started (Next.js dev port $DEV_PORT)"
   echo "  Project Manager Web App: http://localhost:${DEV_PORT}/"
-  echo "  Hermes Agent Dashboard:  http://127.0.0.1:${HERMES_PORT}"
-  echo "  OpenClaw Dashboard:      http://127.0.0.1:${OPENCLAW_PORT}/"
+  echo "  Hermes Agent Dashboard:  http://127.0.0.1:${HERMES_PORT} (when autostart enabled + installed)"
+  echo "  OpenClaw Dashboard:      http://127.0.0.1:${OPENCLAW_PORT}/ (when autostart enabled + installed)"
   echo "  Logs:                    .project-manager/dev-logs/"
 }
 
@@ -1193,17 +1182,20 @@ cmd_stop() {
 # ── Interactive Menu ──────────────────────────────────────────────────────────
 
 show_menu() {
+  local menu_all menu_core
+  menu_all="$(launcher_profile_query menu.all 2>/dev/null || echo '啟動 PM + 已啟用 sidecar + 可連線的輔助頁面')"
+  menu_core="$(launcher_profile_query menu.core 2>/dev/null || echo '啟動 PM + 依 plugin 設定自動啟動 sidecar')"
   clear
   echo -e "${BLUE}══════════════════════════════════════════════════════════════${RESET}"
   echo -e "${BLUE}   Project Manager - 統一啟動選單 (Project Manager Menu) ${RESET}"
   echo -e "${BLUE}══════════════════════════════════════════════════════════════${RESET}"
-  echo -e " 1) 🚀 啟動全部 (PM + Hermes + OpenClaw + 輔助頁面)"
-  echo -e " 2) ⚡ 只開必要頁面 (PM Web + PM Desktop + Hermes + OpenClaw)"
+  echo -e " 1) 🚀 ${menu_all}"
+  echo -e " 2) ⚡ ${menu_core}"
   echo -e " 3) 🖥️  啟動 PM 桌面端 (Tauri App)"
   echo -e " 4) 🌐 啟動 PM 網頁端 (Next.js Only)"
   echo -e " 5) 🤖 啟動 Hermes Agent Dashboard (Port: $HERMES_PORT)"
   echo -e " 6) 🕹️  啟動 OpenClaw Dashboard (Port: $OPENCLAW_PORT)"
-  echo -e " 7) 🧩 開啟 Hermes / OpenClaw / Ollama / Open WebUI / ComfyUI 頁面"
+  echo -e " 7) 🧩 開啟已配置且可連線的輔助頁面 (profile: ${PM_LAUNCHER_PROFILE})"
   echo -e " ─── 管理功能 ───"
   echo -e " 8) 📥 執行完整安裝 (Full Install)"
   echo -e " 9) 🔄 更新相依性與 Rust 編譯 (Update)"
@@ -1268,9 +1260,17 @@ while [[ $# -gt 0 ]]; do
       FORCE_RESTART=1
       shift
       ;;
+    --yes-deps)
+      PM_INSTALL_DEPS=yes
+      shift
+      ;;
+    --no-deps)
+      PM_INSTALL_DEPS=no
+      shift
+      ;;
     -*)
       error "Unknown flag: $1"
-      echo "Flags: --force-open (alias --open), --restart"
+      echo "Flags: --force-open (alias --open), --restart, --yes-deps, --no-deps"
       exit 1
       ;;
     *)

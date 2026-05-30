@@ -66,7 +66,6 @@
     "tauri:icon": "tauri icon"
   },
   "dependencies": {
-    "@jason66/shared-bridge": "file:../shared-bridge",
     "@tanstack/react-table": "^8.20.5",
     "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-dialog": "^2.7.1",

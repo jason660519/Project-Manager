@@ -39,6 +39,7 @@ import type {
   CommandMapping,
 } from '../../../../../lib/types/channels';
 import { updatePlugin } from '../../../../../lib/storage/plugins';
+import { PROJECT_SCOPED_AUTOSTART_PLUGIN_IDS } from '../../../../../lib/project-manager-root';
 import { useI18n } from '../../../../../lib/i18n';
 import { StatusBadge } from './status-badge';
 import {
@@ -87,6 +88,7 @@ export interface IntegrationsDetailSheetProps {
   onInstallMarketplace?: (marketplaceId: string) => void;
   onUninstallPlugin?: (id: string) => void;
   onTogglePluginEnabled?: (id: string) => void;
+  onTogglePluginAutostart?: (id: string) => void;
   mcpStart?: (plugin: McpPlugin) => void;
   mcpStop?: (id: string) => void;
   mcpRestart?: (plugin: McpPlugin) => void;
@@ -135,12 +137,13 @@ export function IntegrationsDetailSheet({
   onInstallMarketplace,
   onUninstallPlugin,
   onTogglePluginEnabled,
+  onTogglePluginAutostart,
   mcpStart,
   mcpStop,
   mcpRestart,
   mcpViewLogs,
   onOpenPath,
-  runtimeRootPath = '/Volumes/KLEVV-4T-1/Project-Manager',
+  runtimeRootPath = '',
   onRunRuntimeCommand,
   onSkillUninstall,
   onSkillInstallUrl,
@@ -305,6 +308,13 @@ export function IntegrationsDetailSheet({
 
           {row.sourceKind === 'plugin-installed' && plugin && (
             <section className="border-t border-stone-200/12 pt-4 space-y-2">
+              {runtime &&
+                PROJECT_SCOPED_AUTOSTART_PLUGIN_IDS.has(plugin.id) &&
+                row.status === 'unavailable' && (
+                  <p className="border border-amber-500/30 bg-amber-950/30 px-3 py-2 text-[11px] text-amber-200">
+                    {t.plugins.sidecarNotInstalled}
+                  </p>
+                )}
               <div className="flex flex-wrap gap-2">
                 {onTogglePluginEnabled && (
                   <button
@@ -315,6 +325,17 @@ export function IntegrationsDetailSheet({
                     {plugin.enabled ? t.plugins.disable : t.plugins.enable}
                   </button>
                 )}
+                {onTogglePluginAutostart &&
+                  runtime &&
+                  PROJECT_SCOPED_AUTOSTART_PLUGIN_IDS.has(plugin.id) && (
+                    <button
+                      type="button"
+                      onClick={() => onTogglePluginAutostart(plugin.id)}
+                      className="border border-stone-200/20 px-2 py-1 text-xs text-stone-300 hover:bg-white/5"
+                    >
+                      {plugin.autostart ? t.plugins.autostartOff : t.plugins.autostartOn}
+                    </button>
+                  )}
                 {onUninstallPlugin && (
                   <button
                     type="button"
