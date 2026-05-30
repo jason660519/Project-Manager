@@ -4,7 +4,8 @@
   "private": true,
   "license": "SEE LICENSE IN LICENSE",
   "scripts": {
-    "dev": "next dev -p 43187",
+    "dev": "next dev --webpack -p 43187",
+    "dev:turbo": "next dev --turbo -p 43187",
     "prebuild": "npm run guard:legacy-surfaces && npm run docs:site:sync",
     "build": "next build",
     "start": "next start",
