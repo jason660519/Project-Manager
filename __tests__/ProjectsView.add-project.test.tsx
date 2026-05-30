@@ -419,6 +419,24 @@ describe('Add Project modal — Finder folder picker', () => {
     expect(screen.queryByText(/Skipped/i)).not.toBeInTheDocument();
   });
 
+  it('shows a recovery hint when the native dialog chunk is stale', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    pickProjectFoldersMock.mockRejectedValue(
+      new Error(
+        'Loading chunk _app-pages-browser_node_modules_tauri-apps_plugin-dialog_dist-js_index_js failed.',
+      ),
+    );
+
+    await openAddModal(user);
+    await user.click(screen.getByRole('button', { name: /choose from finder/i }));
+
+    expect(
+      await screen.findByText(/Native Finder picker assets changed while the desktop app was open/i),
+    ).toBeInTheDocument();
+  });
+
   it('imports folders even when every chosen path lacks a config file', async () => {
     const user = userEvent.setup();
     const { onAddProject } = renderModal();

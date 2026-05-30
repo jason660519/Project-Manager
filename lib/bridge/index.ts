@@ -718,7 +718,9 @@ export async function pickProjectFolders(options?: {
   title?: string;
 }): Promise<PickProjectFoldersResult> {
   if (!isTauri()) return { status: 'unsupported' };
-  const { open } = await import('@tauri-apps/plugin-dialog');
+  const { open } = await import(
+    /* webpackMode: "eager" */ '@tauri-apps/plugin-dialog'
+  );
   const selected = await open({
     directory: true,
     multiple: options?.multiple ?? true,

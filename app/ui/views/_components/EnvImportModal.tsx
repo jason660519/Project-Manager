@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, FileText, Loader2, RefreshCw, Upload, X } from 'lucide-react';
+import { AlertTriangle, FileText, FolderOpen, Loader2, RefreshCw, Upload, X } from 'lucide-react';
 import { parseEnvText } from '../../../../lib/keys/envParser';
 import { detectProviders, type DetectedKey } from '../../../../lib/keys/detectProviders';
 import { saveProviderSecret } from '../../../../lib/keys/keychain';
@@ -12,13 +12,23 @@ import { scanEnvFiles, type EnvFileInfo } from '../../../../lib/bridge';
 interface EnvImportModalProps {
   /** Optional project root — when provided, the modal offers a "Scan project" tab. */
   projectRoot?: string;
+  onRebindProjectRoot?: () => Promise<void>;
   onClose: () => void;
   onImported: (count: number) => void;
 }
 
 type Tab = 'paste' | 'scan';
 
-export function EnvImportModal({ projectRoot, onClose, onImported }: EnvImportModalProps) {
+function isMissingProjectRootError(message: string): boolean {
+  return /^Project root does not exist:/i.test(message);
+}
+
+export function EnvImportModal({
+  projectRoot,
+  onRebindProjectRoot,
+  onClose,
+  onImported,
+}: EnvImportModalProps) {
   const initialTab: Tab = projectRoot ? 'scan' : 'paste';
   const [tab, setTab] = useState<Tab>(initialTab);
   const [pasteText, setPasteText] = useState('');
@@ -26,6 +36,8 @@ export function EnvImportModal({ projectRoot, onClose, onImported }: EnvImportMo
   const [scanSelectedPath, setScanSelectedPath] = useState<string>('');
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState('');
+  const [missingProjectRoot, setMissingProjectRoot] = useState(false);
+  const [rebinding, setRebinding] = useState(false);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -37,6 +49,7 @@ export function EnvImportModal({ projectRoot, onClose, onImported }: EnvImportMo
     if (!projectRoot) return;
     setScanning(true);
     setScanError('');
+    setMissingProjectRoot(false);
     setScanFiles([]);
     setScanSelectedPath('');
     try {
@@ -48,11 +61,28 @@ export function EnvImportModal({ projectRoot, onClose, onImported }: EnvImportMo
         setScanError('No .env files found in this project.');
       }
     } catch (e) {
-      setScanError(e instanceof Error ? e.message : String(e));
+      const message = e instanceof Error ? e.message : String(e);
+      setMissingProjectRoot(isMissingProjectRootError(message));
+      setScanError(message);
     } finally {
       setScanning(false);
     }
   }, [projectRoot]);
+
+  const handleRebindProjectRoot = useCallback(async () => {
+    if (!onRebindProjectRoot) return;
+    setRebinding(true);
+    setError('');
+    try {
+      await onRebindProjectRoot();
+      setScanError('');
+      setMissingProjectRoot(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRebinding(false);
+    }
+  }, [onRebindProjectRoot]);
 
   useEffect(() => {
     if (!saving) {
@@ -184,7 +214,7 @@ export function EnvImportModal({ projectRoot, onClose, onImported }: EnvImportMo
 
 ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
-GITHUB_TOKEN=ghp_..."
+GITHUB_TOKEN=github_token_..."
                 rows={8}
                 className="block w-full resize-y bg-transparent font-mono text-[12px] text-stone-100 outline-none placeholder:text-stone-600"
               />
@@ -226,10 +256,39 @@ GITHUB_TOKEN=ghp_..."
                 </div>
               ) : scanError ? (
                 <div className="border border-stone-200/15 bg-stone-200/5 px-3 py-3">
-                  <p className="text-sm text-stone-300">{scanError}</p>
-                  <p className="mt-1 text-[11px] text-stone-500">
-                    Use Rescan after adding a top-level .env file, or switch to Paste / drop.
+                  <p className="text-sm text-stone-300">
+                    {missingProjectRoot
+                      ? 'This project folder is not available on this machine.'
+                      : scanError}
                   </p>
+                  <p className="mt-1 text-[11px] text-stone-500">
+                    {missingProjectRoot
+                      ? 'Rebind the project to its local folder, or switch to Paste / drop to import a file directly.'
+                      : 'Use Rescan after adding a top-level .env file, or switch to Paste / drop.'}
+                  </p>
+                  {missingProjectRoot && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleRebindProjectRoot()}
+                        disabled={!onRebindProjectRoot || rebinding}
+                        className="inline-flex items-center gap-1.5 border border-stone-200/22 px-3 py-1.5 text-[11px] uppercase tracking-[0.14em] text-stone-200 hover:bg-stone-200/8 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {rebinding ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <FolderOpen size={12} className="text-stone-400" />
+                        )}
+                        Rebind folder
+                      </button>
+                      <a
+                        href="/project-progress-dashboard#projects"
+                        className="inline-flex items-center border border-stone-200/15 px-3 py-1.5 text-[11px] uppercase tracking-[0.14em] text-stone-400 hover:border-stone-200/30 hover:text-stone-200"
+                      >
+                        Open projects
+                      </a>
+                    </div>
+                  )}
                 </div>
               ) : detected.length > 0 ? (
                 <div className="border border-emerald-300/25 bg-emerald-300/5 px-3 py-3">

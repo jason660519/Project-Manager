@@ -79,4 +79,30 @@ describe('EnvImportModal', () => {
     await userEvent.click(screen.getByRole('button', { name: /Rescan/ }));
     await waitFor(() => expect(scanEnvFilesMock).toHaveBeenCalledTimes(2));
   });
+
+  it('treats a missing project root as a rebindable local path problem', async () => {
+    const onRebindProjectRoot = vi.fn().mockResolvedValue(undefined);
+    scanEnvFilesMock.mockRejectedValue(new Error('Project root does not exist: /old-machine/repo'));
+
+    render(
+      <EnvImportModal
+        projectRoot="/old-machine/repo"
+        onRebindProjectRoot={onRebindProjectRoot}
+        onClose={vi.fn()}
+        onImported={vi.fn()}
+      />,
+    );
+
+    expect(
+      await screen.findByText('This project folder is not available on this machine.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Rebind the project to its local folder/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Open projects/ })).toHaveAttribute(
+      'href',
+      '/project-progress-dashboard#projects',
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /Rebind folder/ }));
+    await waitFor(() => expect(onRebindProjectRoot).toHaveBeenCalledTimes(1));
+  });
 });

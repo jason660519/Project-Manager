@@ -408,6 +408,14 @@ export function ProjectsView({
     }
   };
 
+  const formatFolderPickerError = (error: unknown): string => {
+    const raw = error instanceof Error ? error.message : String(error);
+    if (/Loading chunk .*plugin-dialog.*failed/i.test(raw)) {
+      return 'Native Finder picker assets changed while the desktop app was open. Reload Project Manager and try Choose from Finder again, or paste the project folder path below.';
+    }
+    return raw;
+  };
+
   /** Native Finder / Explorer folder picker — fill a field or import immediately. */
   const handlePickFolders = async (mode: 'import' | 'manual') => {
     if (!isTauri) {
@@ -430,8 +438,8 @@ export function ProjectsView({
 
       if (result.status === 'unsupported') {
         setAddError(
-        'Native Finder picker is desktop-only — paste a project folder path below to import from the dev server.',
-      );
+          'Native Finder picker is desktop-only — paste a project folder path below to import from the dev server.',
+        );
         return;
       }
       if (result.status === 'cancelled') return;
@@ -500,7 +508,7 @@ export function ProjectsView({
       }
     } catch (e) {
       console.error('[handlePickFolders]', e);
-      setAddError(e instanceof Error ? e.message : String(e));
+      setAddError(formatFolderPickerError(e));
     } finally {
       setPickingFolders(false);
       setAdding(false);

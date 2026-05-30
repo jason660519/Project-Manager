@@ -836,6 +836,31 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
     [isTauri],
   );
 
+  const handleRebindSelectedProjectRoot = useCallback(async () => {
+    if (!selectedProject) throw new Error('Select a project before rebinding its local folder.');
+    if (!isTauri) {
+      throw new Error('Folder rebinding requires the Project Manager desktop app.');
+    }
+
+    const { pickProjectFolders } = await import('../../lib/bridge');
+    const result = await pickProjectFolders({
+      multiple: false,
+      title: `Select local folder for ${selectedProject.config.project.name}`,
+    });
+    if (result.status === 'unsupported') {
+      throw new Error('Folder rebinding requires the Project Manager desktop app.');
+    }
+    if (result.status === 'cancelled' || result.paths.length === 0) return;
+
+    const { buildProjectEntryFromPath } = await import('../../lib/storage');
+    const entry = await buildProjectEntryFromPath(result.paths[0], {
+      isTauri,
+      existing: selectedProject,
+    });
+    setProjects((prev) => prev.map((p) => (p.id === selectedProject.id ? entry : p)));
+    setSelectedProjectId(entry.id);
+  }, [isTauri, selectedProject]);
+
   /**
    * Remove a project from PM's tracked list. Always removes the in-memory entry
    * (which then persists via the saveProjects effect); when `deleteConfigFile`
@@ -1309,8 +1334,9 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
       )}
       {currentView === 'keys' && (
         <KeysView
-          projectRoot={projectManagerRoot ?? selectedProject?.config.project.root}
+          projectRoot={selectedProject?.config.project.root ?? projectManagerRoot}
           initialSheet={keysSheet}
+          onRebindProjectRoot={handleRebindSelectedProjectRoot}
         />
       )}
       {currentView === 'settings' && <SettingsView />}

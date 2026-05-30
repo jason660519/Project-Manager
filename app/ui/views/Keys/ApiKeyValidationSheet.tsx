@@ -252,9 +252,14 @@ function parseProviderRowsFromText(text: string, usedIds: Set<string>): Provider
 interface ApiKeyValidationSheetProps {
   isTauri: boolean;
   projectRoot?: string;
+  onRebindProjectRoot?: () => Promise<void>;
 }
 
-export function ApiKeyValidationSheet({ isTauri: _isTauri, projectRoot }: ApiKeyValidationSheetProps) {
+export function ApiKeyValidationSheet({
+  isTauri: _isTauri,
+  projectRoot,
+  onRebindProjectRoot,
+}: ApiKeyValidationSheetProps) {
   const { t } = useI18n();
   const [secrets, setSecrets] = useState<Record<string, string>>({});
   const [metadata, setMetadata] = useState<ProviderMetadataMap>({});
@@ -471,6 +476,7 @@ export function ApiKeyValidationSheet({ isTauri: _isTauri, projectRoot }: ApiKey
       {showImport && (
         <EnvImportModal
           projectRoot={projectRoot}
+          onRebindProjectRoot={onRebindProjectRoot}
           onClose={() => setShowImport(false)}
           onImported={(count) => {
             refresh();
