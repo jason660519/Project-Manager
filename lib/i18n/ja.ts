@@ -78,7 +78,6 @@ export const ja: Translations = {
   },
   keysValidation: {
     intro: 'API キーを管理します。行をクリックして編集、検証、または削除できます。',
-    importFromEnv: '.env からインポート',
     loadingProviders: 'Provider を読み込み中…',
     table: {
       columns: {
@@ -111,26 +110,27 @@ export const ja: Translations = {
       },
       category: {
         all: 'すべてのカテゴリ',
-        ai: 'AI',
-        integration: '連携',
+        modelFactory: 'モデルメーカー',
+        modelChannel: 'モデルチャネル',
+        localModel: 'ローカルモデル',
+        integration: '連携サービス',
+      },
+      filters: {
+        provider: 'Provider フィルター',
+        category: 'カテゴリフィルター',
+        status: 'ステータスフィルター',
+        availableModels: '利用可能モデルフィルター',
+        allProviders: 'すべての Provider',
+        allModels: 'すべてのモデル',
       },
       controls: {
         title: 'API キー検証',
         searchPlaceholder: 'Provider、キー状態、モデルを検索',
-        hiddenColumns: '非表示列 ({count})',
         freezeColumns: '列を固定',
-        viewPreset: '表示プリセット',
-        presetPlaceholder: 'プリセット',
-        reset: 'リセット',
+        restoreDefaultProviders: 'デフォルト Provider に戻す',
+        restoreDefaultProvidersTitle: 'カスタム Provider 行を削除し、内蔵 Provider を表示して既定の行順に戻します。キーと検証状態は保持されます。',
         showHiddenRows: '非表示行を表示 ({count})',
-        export: 'エクスポート',
-        import: 'インポート',
-        addRow: '行を追加',
-      },
-      presets: {
-        full: 'フル',
-        validation: '検証',
-        links: 'リンク',
+        addRow: 'Provider を追加',
       },
       actions: {
         moveRowUp: '行を上へ移動',

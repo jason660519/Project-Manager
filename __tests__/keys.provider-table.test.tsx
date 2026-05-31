@@ -41,12 +41,10 @@ function renderTable(props: Partial<React.ComponentProps<typeof KeysProviderTabl
       rows={[rowFixture()]}
       onRowClick={vi.fn()}
       onAddRow={vi.fn()}
-      onMoveRow={vi.fn()}
-      onDeleteRow={vi.fn()}
+      onRestoreDefaultProviders={vi.fn()}
       onPatchCustomProvider={vi.fn()}
       onRefreshModels={vi.fn()}
-      isRefreshingModels={false}
-      onImportRows={vi.fn()}
+      refreshingProviderIds={new Set()}
       onShowAllRows={vi.fn()}
       copy={en.keysValidation.table}
       {...props}
@@ -59,15 +57,18 @@ describe('KeysProviderTable', () => {
     window.localStorage.clear();
   });
 
-  it('renders official provider links immediately after the provider column', () => {
+  it('renders provider links as compact icons inside the provider cell', () => {
     const row = rowFixture();
     renderTable({ rows: [row] });
 
     expect(screen.getAllByText('Provider').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('API Key').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Usage').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Docs').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('columnheader', { name: 'API Key' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Usage' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Docs' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Models' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Model list' })).not.toBeInTheDocument();
 
+    expect(screen.getByLabelText('Model list: Catalogue')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Official API key page' })).toHaveAttribute(
       'href',
       row.provider.apiKeyUrl,
@@ -80,6 +81,7 @@ describe('KeysProviderTable', () => {
       'href',
       row.provider.developerDocsUrl,
     );
+    expect(screen.getByLabelText('Models: 1')).toHaveTextContent('1');
   });
 
   it('renders localized link labels when a different locale copy is provided', () => {
@@ -103,45 +105,81 @@ describe('KeysProviderTable', () => {
     expect(onRowClick).not.toHaveBeenCalled();
   });
 
-  it('renders sheet-standard controls for search, filters, presets, import, export, and row creation', () => {
+  it('renders the compact provider toolbar and header filters', () => {
     renderTable({ hiddenBuiltInCount: 2 });
 
     expect(screen.getByPlaceholderText('Search provider, key state, models')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('All categories')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('All status')).toBeInTheDocument();
-    expect(screen.getByText('Hidden (0)')).toBeInTheDocument();
-    expect(screen.getByText('Freeze cols')).toBeInTheDocument();
-    expect(screen.getByLabelText('View preset')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Export/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Import/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Add Row/i })).toBeInTheDocument();
+    expect(screen.getByLabelText('Freeze cols')).toHaveValue(1);
+    expect(screen.getByRole('button', { name: /Restore default providers/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Add provider/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Show hidden rows \(2\)/i })).toBeInTheDocument();
+
+    expect(screen.getByLabelText('Provider filter')).toHaveValue('all');
+    expect(screen.getByLabelText('Category filter')).toHaveValue('all');
+    expect(screen.getByLabelText('Status filter')).toHaveValue('all');
+    expect(screen.getByLabelText('Available models filter')).toHaveValue('all');
+    expect(screen.getByRole('option', { name: 'Model makers' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Model channels' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Local models' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Integration' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Export/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Import/i })).not.toBeInTheDocument();
+  });
+
+  it('freezes the first N visible columns from the numeric freeze control', () => {
+    renderTable();
+
+    const freezeInput = screen.getByLabelText('Freeze cols');
+    fireEvent.change(freezeInput, { target: { value: '2' } });
+
+    expect(freezeInput).toHaveValue(2);
+  });
+
+  it('filters providers by the product-facing provider category', () => {
+    renderTable({
+      rows: [
+        rowFixture({}, { id: 'openai', label: 'OpenAI', category: 'ai' }),
+        rowFixture({}, { id: 'openrouter', label: 'OpenRouter', category: 'ai' }),
+        rowFixture({}, { id: 'ollama-local', label: 'Ollama (Local)', category: 'ai' }),
+        rowFixture({}, { id: 'github', label: 'GitHub Personal Access Token', category: 'integration' }),
+      ],
+    });
+
+    fireEvent.change(screen.getByLabelText('Category filter'), {
+      target: { value: 'model_channel' },
+    });
+
+    const renderedRows = Array.from(document.querySelectorAll('tbody tr'));
+    expect(renderedRows.some((row) => row.textContent?.includes('OpenRouter'))).toBe(true);
+    expect(renderedRows.some((row) => row.textContent?.includes('OpenAI'))).toBe(false);
+    expect(renderedRows.some((row) => row.textContent?.includes('Ollama (Local)'))).toBe(false);
+    expect(renderedRows.some((row) => row.textContent?.includes('GitHub Personal Access Token'))).toBe(false);
+  });
+
+  it('filters providers by selected available model from the column header', () => {
+    renderTable({
+      rows: [
+        rowFixture({ models: ['gpt-4o'] }, { id: 'openai', label: 'OpenAI' }),
+        rowFixture({ models: ['claude-sonnet-4-5'] }, { id: 'anthropic', label: 'Anthropic' }),
+      ],
+    });
+
+    fireEvent.change(screen.getByLabelText('Available models filter'), {
+      target: { value: 'claude-sonnet-4-5' },
+    });
+
+    const renderedRows = Array.from(document.querySelectorAll('tbody tr'));
+    expect(renderedRows.some((row) => row.textContent?.includes('Anthropic'))).toBe(true);
+    expect(renderedRows.some((row) => row.textContent?.includes('OpenAI'))).toBe(false);
   });
 
   it('fires the add-row callback from the toolbar', () => {
     const onAddRow = vi.fn();
     renderTable({ onAddRow });
 
-    fireEvent.click(screen.getByRole('button', { name: /Add Row/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Add provider/i }));
 
     expect(onAddRow).toHaveBeenCalledTimes(1);
-  });
-
-  it('moves and deletes rows without triggering row selection', () => {
-    const onMoveRow = vi.fn();
-    const onDeleteRow = vi.fn();
-    const onRowClick = vi.fn();
-    const row = rowFixture();
-    renderTable({ rows: [row], onMoveRow, onDeleteRow, onRowClick });
-
-    fireEvent.click(screen.getByTitle('Move row up'));
-    fireEvent.click(screen.getByTitle('Move row down'));
-    fireEvent.click(screen.getByRole('button', { name: /Delete/i }));
-
-    expect(onMoveRow).toHaveBeenNthCalledWith(1, row.provider.id, 'up');
-    expect(onMoveRow).toHaveBeenNthCalledWith(2, row.provider.id, 'down');
-    expect(onDeleteRow).toHaveBeenCalledWith(row.provider.id);
-    expect(onRowClick).not.toHaveBeenCalled();
   });
 
   it('refreshes one provider model list without triggering row selection', () => {
@@ -150,10 +188,23 @@ describe('KeysProviderTable', () => {
     const row = rowFixture({ hasKey: true, status: 'verified', canRefreshModels: true });
     renderTable({ rows: [row], onRefreshModels, onRowClick });
 
-    fireEvent.click(screen.getByTitle('Refresh Models list'));
+    fireEvent.click(screen.getByLabelText('Re-verify OpenAI and refresh available models'));
 
     expect(onRefreshModels).toHaveBeenCalledWith(row.provider);
     expect(onRowClick).not.toHaveBeenCalled();
+  });
+
+  it('disables only the provider currently refreshing from the status column', () => {
+    renderTable({
+      rows: [
+        rowFixture({ hasKey: true, status: 'verified', canRefreshModels: true }, { id: 'openai', label: 'OpenAI' }),
+        rowFixture({ hasKey: true, status: 'verified', canRefreshModels: true }, { id: 'anthropic', label: 'Anthropic' }),
+      ],
+      refreshingProviderIds: new Set(['openai']),
+    });
+
+    expect(screen.getByLabelText('Re-verify OpenAI and refresh available models')).toBeDisabled();
+    expect(screen.getByLabelText('Re-verify Anthropic and refresh available models')).not.toBeDisabled();
   });
 
   it('renders editable fields for custom provider rows', () => {
@@ -173,14 +224,19 @@ describe('KeysProviderTable', () => {
     fireEvent.change(screen.getByDisplayValue('Custom Provider 1'), {
       target: { value: 'Updated Provider' },
     });
-    fireEvent.change(screen.getByDisplayValue('https://keys.example.com'), {
-      target: { value: 'https://keys.example.com/new' },
-    });
 
     expect(onPatchCustomProvider).toHaveBeenCalledWith(row.provider.id, { label: 'Updated Provider' });
-    expect(onPatchCustomProvider).toHaveBeenCalledWith(row.provider.id, {
-      apiKeyUrl: 'https://keys.example.com/new',
-      docUrl: 'https://keys.example.com/new',
-    });
+    expect(screen.getByRole('link', { name: 'Official API key page' })).toHaveAttribute(
+      'href',
+      'https://keys.example.com',
+    );
+    expect(screen.getByRole('link', { name: 'Usage / balance' })).toHaveAttribute(
+      'href',
+      'https://usage.example.com',
+    );
+    expect(screen.getByRole('link', { name: 'Developer docs' })).toHaveAttribute(
+      'href',
+      'https://docs.example.com',
+    );
   });
 });

@@ -80,7 +80,6 @@ export interface Translations {
   };
   keysValidation: {
     intro: string;
-    importFromEnv: string;
     loadingProviders: string;
     table: {
       columns: {
@@ -113,26 +112,27 @@ export interface Translations {
       };
       category: {
         all: string;
-        ai: string;
+        modelFactory: string;
+        modelChannel: string;
+        localModel: string;
         integration: string;
+      };
+      filters: {
+        provider: string;
+        category: string;
+        status: string;
+        availableModels: string;
+        allProviders: string;
+        allModels: string;
       };
       controls: {
         title: string;
         searchPlaceholder: string;
-        hiddenColumns: string;
         freezeColumns: string;
-        viewPreset: string;
-        presetPlaceholder: string;
-        reset: string;
+        restoreDefaultProviders: string;
+        restoreDefaultProvidersTitle: string;
         showHiddenRows: string;
-        export: string;
-        import: string;
         addRow: string;
-      };
-      presets: {
-        full: string;
-        validation: string;
-        links: string;
       };
       actions: {
         moveRowUp: string;

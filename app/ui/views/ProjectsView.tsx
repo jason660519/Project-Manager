@@ -1,7 +1,15 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import {
+  createColumnHelper,
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type SortingState,
+} from '@tanstack/react-table';
 import {
   AlertTriangle,
   BarChart3,
@@ -164,7 +172,9 @@ export function ProjectsView({
   const [addError, setAddError] = useState('');
   const [reportText, setReportText] = useState('');
   const [reportCopied, setReportCopied] = useState(false);
-  const [isTauri, setIsTauri] = useState(false);
+  const [isTauri, setIsTauri] = useState(
+    () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window,
+  );
 
   // Delete confirmation modal state.
   const [deleteTarget, setDeleteTarget] = useState<ProjectEntry | null>(null);
@@ -175,6 +185,7 @@ export function ProjectsView({
   const [syncDone, setSyncDone] = useState(false);
   const [repoEditProjectId, setRepoEditProjectId] = useState<string | null>(null);
   const [repoUrlDraft, setRepoUrlDraft] = useState('');
+  const repoUrlDraftRef = useRef('');
   const [repoUrlBusyId, setRepoUrlBusyId] = useState<string | null>(null);
   const [repoUrlErrors, setRepoUrlErrors] = useState<Record<string, string>>({});
   const [postImportScanQueue, setPostImportScanQueue] = useState<ProjectEntry[] | null>(null);
@@ -199,8 +210,13 @@ export function ProjectsView({
    * errors. (Provider order itself is honoured by the scanner.)
    */
   const [anyProviderKeyPresent, setAnyProviderKeyPresent] = useState<boolean | null>(null);
-  const projectRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const anyProviderKeyPresentRef = useRef<boolean | null>(null);
+  const projectRowRefs = useRef<Record<string, HTMLElement | null>>({});
   const router = useRouter();
+
+  useEffect(() => {
+    anyProviderKeyPresentRef.current = anyProviderKeyPresent;
+  }, [anyProviderKeyPresent]);
 
   useEffect(() => {
     setIsTauri(typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window);
@@ -304,6 +320,7 @@ export function ProjectsView({
   const beginRepoUrlEdit = (project: ProjectEntry) => {
     setRepoEditProjectId(project.id);
     setRepoUrlDraft(project.config.project.githubUrl ?? '');
+    repoUrlDraftRef.current = project.config.project.githubUrl ?? '';
     setRepoUrlErrors((prev) => {
       if (!(project.id in prev)) return prev;
       const next = { ...prev };
@@ -662,7 +679,7 @@ export function ProjectsView({
    * besides Delete after the row simplification.
    */
   const handleInitializeOne = async (project: ProjectEntry) => {
-    if (anyProviderKeyPresent === false) {
+    if (anyProviderKeyPresentRef.current === false) {
       setInitErrors((prev) => ({ ...prev, [project.id]: 'NO_PROVIDER_CONFIGURED' }));
       return;
     }
@@ -858,6 +875,312 @@ export function ProjectsView({
   const showKeyPreflight =
     anyProviderKeyPresent === false && projectsThatNeedKey.length > 0;
 
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const columnHelper = useMemo(() => createColumnHelper<ProjectEntry>(), []);
+
+  const columns = useMemo(
+    () => [
+      columnHelper.display({
+        id: 'col-include-dashboard',
+        header: 'Include',
+        size: 96,
+        cell: ({ row }) => {
+          const project = row.original;
+          const checked = selectedDashboardProjectIds.includes(project.id);
+          return (
+            <div className="flex justify-center">
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={(e) => onToggleDashboardProject(project.id, e.target.checked)}
+                onClick={(e) => e.stopPropagation()}
+                className="h-4 w-4 cursor-pointer accent-emerald-400"
+                title="Include this project in Dashboard"
+                aria-label={`Include ${project.config.project.name} in Dashboard`}
+              />
+            </div>
+          );
+        },
+      }),
+      columnHelper.accessor((project) => project.config.project.name, {
+        id: 'col-project-name',
+        header: 'Project',
+        size: 240,
+        cell: ({ row, getValue }) => {
+          const project = row.original;
+          const setupStatus = getProjectSetupStatus(project);
+          const isDashboardSelected = selectedDashboardProjectIds.includes(project.id);
+          return (
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="truncate font-medium text-stone-100">{getValue()}</span>
+                {isDashboardSelected && (
+                  <span className="border border-cyan-200/30 bg-cyan-500/10 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.16em] text-cyan-200">
+                    Dashboard
+                  </span>
+                )}
+                {setupStatus !== 'ready' && (
+                  <span
+                    className={`border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.16em] ${
+                      setupStatus === 'needs_scan'
+                        ? 'border-amber-200/35 text-amber-200'
+                        : 'border-stone-200/25 text-stone-400'
+                    }`}
+                  >
+                    {setupStatusLabel(setupStatus)}
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 truncate font-mono text-[11px] text-stone-500" title={project.configPath}>
+                {project.configPath}
+              </p>
+            </div>
+          );
+        },
+      }),
+      columnHelper.accessor((project) => project.config.project.root, {
+        id: 'col-local-path',
+        header: 'Local Path',
+        size: 280,
+        cell: ({ row, getValue }) => {
+          const isGithub = row.original.configPath?.startsWith('https://github.com/') ?? false;
+          const value = isGithub ? '' : getValue();
+          return value ? (
+            <span className="block max-w-[360px] truncate font-mono text-xs text-stone-300" title={value}>
+              {value}
+            </span>
+          ) : (
+            <span className="text-xs text-stone-500">-</span>
+          );
+        },
+      }),
+      columnHelper.display({
+        id: 'col-github-url',
+        header: 'GitHub Repo URL',
+        size: 320,
+        cell: ({ row }) => {
+          const project = row.original;
+          const repoUrl = project.config.project.githubUrl?.trim() ?? '';
+          const isEditing = repoEditProjectId === project.id;
+          const repoUrlBusy = repoUrlBusyId === project.id;
+          const canDetect = isTauri && !project.config.project.root.startsWith('https://');
+
+          if (isEditing) {
+            return (
+              <div className="flex min-w-[280px] flex-wrap items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                <input
+                  defaultValue={repoUrlDraft}
+                  onChange={(e) => {
+                    repoUrlDraftRef.current = e.target.value;
+                    setRepoUrlDraft(e.target.value);
+                  }}
+                  placeholder="https://github.com/owner/repo"
+                  className="min-w-[220px] flex-1 border border-stone-200/20 bg-[rgb(var(--pm-input))] px-2 py-1 font-mono text-[11px] text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/30"
+                />
+                <button
+                  type="button"
+                  disabled={repoUrlBusy}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void saveProjectRepoUrl(project, repoUrlDraftRef.current);
+                  }}
+                  className="inline-flex h-7 items-center gap-1 border border-emerald-300/35 bg-emerald-500/15 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-emerald-100 hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {repoUrlBusy ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                  Save
+                </button>
+                <button
+                  type="button"
+                  disabled={repoUrlBusy}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setRepoEditProjectId(null);
+                    setRepoUrlDraft('');
+                    repoUrlDraftRef.current = '';
+                  }}
+                  className="inline-flex h-7 items-center gap-1 border border-stone-200/20 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-stone-300 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <X size={12} />
+                  Cancel
+                </button>
+              </div>
+            );
+          }
+
+          return (
+            <div className="flex min-w-[260px] items-center gap-2" onClick={(e) => e.stopPropagation()}>
+              <Github size={12} className={repoUrl ? 'shrink-0 text-emerald-300' : 'shrink-0 text-amber-300'} />
+              <span
+                className={`min-w-0 flex-1 truncate font-mono text-xs ${
+                  repoUrl ? 'text-stone-300' : 'text-amber-200'
+                }`}
+                title={repoUrl || 'No GitHub repository URL configured'}
+              >
+                {repoUrl || 'No GitHub URL'}
+              </span>
+              {!repoUrl && canDetect && (
+                <button
+                  type="button"
+                  disabled={repoUrlBusy}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void detectAndSaveProjectRepoUrl(project);
+                  }}
+                  className="inline-flex h-7 items-center gap-1 border border-cyan-300/35 bg-cyan-500/15 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-cyan-100 hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {repoUrlBusy ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                  Detect
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={repoUrlBusy}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  beginRepoUrlEdit(project);
+                }}
+                className="inline-flex h-7 items-center gap-1 border border-stone-200/20 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-stone-300 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {repoUrl ? 'Edit URL' : 'Add URL'}
+              </button>
+            </div>
+          );
+        },
+      }),
+      columnHelper.accessor((project) => project.config.features.length, {
+        id: 'col-feature-count',
+        header: 'Features',
+        size: 100,
+        cell: ({ getValue }) => (
+          <span className="font-mono text-xs text-stone-200">{getValue()}</span>
+        ),
+      }),
+      columnHelper.display({
+        id: 'col-initialized',
+        header: 'Init Status',
+        size: 132,
+        cell: ({ row }) => {
+          const project = row.original;
+          const isGithub = project.configPath?.startsWith('https://github.com/') ?? false;
+          const isReady = getProjectSetupStatus(project) === 'ready';
+          if (isReady) {
+            return (
+              <span
+                title="Project is initialized; dashboard reads .project-manager/config.json from disk"
+                className="inline-flex h-7 items-center gap-1 border border-emerald-400/50 bg-emerald-600/30 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-emerald-100"
+              >
+                <Check size={12} />
+                Initialized
+              </span>
+            );
+          }
+          return (
+            <span className="inline-flex h-7 items-center border border-amber-300/35 bg-amber-500/15 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-amber-100">
+              {isGithub ? 'Imported' : 'No'}
+            </span>
+          );
+        },
+      }),
+      columnHelper.display({
+        id: 'col-reinit',
+        header: 'Re-init',
+        size: 140,
+        cell: ({ row }) => {
+          const project = row.original;
+          const isGithub = project.configPath?.startsWith('https://github.com/') ?? false;
+          const isReady = getProjectSetupStatus(project) === 'ready';
+          const isInitializing = initializingIds.has(project.id);
+          const disabled =
+            isGithub ||
+            !isTauri ||
+            isInitializing ||
+            batchScanning;
+          const label = isReady ? 'Re-init' : 'Initialize';
+          return (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isGithub) return;
+                if (!isTauri) return;
+                void handleInitializeOne(project);
+              }}
+              disabled={disabled}
+              title={
+                isGithub
+                  ? 'GitHub-imported projects use the GitHub sync path.'
+                  : !isTauri
+                    ? 'Initialize requires the Project Manager desktop app.'
+                    : 'Run AI scan and refresh .project-manager/config.json'
+              }
+              className={`inline-flex h-7 items-center gap-1 border px-2 text-[10px] font-medium uppercase tracking-[0.08em] disabled:cursor-not-allowed disabled:opacity-40 ${
+                isReady
+                  ? 'border-cyan-300/35 bg-cyan-500/15 text-cyan-100 hover:bg-cyan-500/30'
+                  : 'border-amber-300/40 bg-amber-500/20 text-amber-100 hover:bg-amber-500/35'
+              }`}
+            >
+              {isInitializing ? (
+                <>
+                  <Loader2 size={12} className="animate-spin" />
+                  Running
+                </>
+              ) : isReady ? (
+                <>
+                  <RefreshCw size={12} />
+                  {label}
+                </>
+              ) : (
+                <>
+                  <Bot size={12} />
+                  {label}
+                </>
+              )}
+            </button>
+          );
+        },
+      }),
+      columnHelper.display({
+        id: 'col-delete',
+        header: 'Delete',
+        size: 104,
+        cell: ({ row }) => (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              openDeleteConfirm(row.original);
+            }}
+            title="Remove project"
+            className="inline-flex h-7 items-center gap-1 border border-red-300/25 bg-red-500/10 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-red-200 hover:bg-red-500/20"
+          >
+            <Trash2 size={12} />
+            Delete
+          </button>
+        ),
+      }),
+    ],
+    [
+      batchScanning,
+      columnHelper,
+      initializingIds,
+      isTauri,
+      onToggleDashboardProject,
+      repoEditProjectId,
+      repoUrlBusyId,
+      selectedDashboardProjectIds,
+    ],
+  );
+
+  const table = useReactTable({
+    data: projects,
+    columns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    enableSortingRemoval: true,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+
   return (
     <div className="space-y-6">
       {showKeyPreflight && (
@@ -906,7 +1229,7 @@ export function ProjectsView({
         />
       )}
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">
             Projects
@@ -918,7 +1241,7 @@ export function ProjectsView({
             Dashboard scope: {selectedDashboardProjectIds.length} selected
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 sm:justify-end">
           {!isTauri && onSyncFromDesktop && (
             <button
               disabled={syncing}
@@ -959,377 +1282,204 @@ export function ProjectsView({
         </div>
       </div>
 
-      {/* Project List */}
-      <div className="space-y-3">
-        {projects.length === 0 && (
-          <div className="border border-dashed border-stone-200/20 bg-[rgb(var(--pm-panel))]/40 px-6 py-10 text-center">
-            <p className="text-sm text-stone-300">No projects yet</p>
-            <p className="mt-1 text-xs text-stone-500">
-              Add a local folder or GitHub repo to start tracking progress.
-            </p>
-          </div>
-        )}
-        {projects.map((project) => {
-          const { features } = project.config;
-          const isSelected = project.id === selectedProjectId;
-          const isDashboardSelected = selectedDashboardProjectIds.includes(project.id);
-          const isInitializing = initializingIds.has(project.id);
-          const initError = initErrors[project.id];
-          const initTraceEntries = initTrace[project.id] ?? [];
-          const isGithub = project.configPath?.startsWith('https://github.com/') ?? false;
-          const setupStatus = getProjectSetupStatus(project);
-          const isReady = setupStatus === 'ready';
-          const repoUrl = project.config.project.githubUrl?.trim() ?? '';
-          const isEditingRepoUrl = repoEditProjectId === project.id;
-          const repoUrlBusy = repoUrlBusyId === project.id;
-          const repoUrlError = repoUrlErrors[project.id];
-          // GitHub repos have their own feature-sync path — the Initialize
-          // button doesn't apply to them. Local projects always show the
-          // button, but it's disabled in the browser dev shell because
-          // writing the config to disk requires the Tauri bridge.
-          const showInitialize = !isGithub;
-
-          return (
-            <div
-              key={project.id}
-              ref={(node) => {
-                projectRowRefs.current[project.id] = node;
-              }}
-              className={`group border bg-[rgb(var(--pm-panel))]/72 transition-colors ${
-                isSelected
-                  ? 'border-emerald-200/35'
-                  : 'border-stone-200/18 hover:border-stone-200/30'
-              }`}
-            >
-              <div
-                className="flex cursor-pointer flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start sm:justify-between"
-                onClick={() => onSelectProject(project.id)}
-              >
-                <div className="flex min-w-0 flex-1 items-start gap-3">
-                  <input
-                    type="checkbox"
-                    checked={isDashboardSelected}
-                    onChange={(e) => onToggleDashboardProject(project.id, e.target.checked)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-emerald-400"
-                    title="Include this project in Dashboard"
-                  />
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-stone-100">
-                        {project.config.project.name}
-                      </span>
-                      {isDashboardSelected && (
-                        <span className="border border-cyan-200/30 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.16em] text-cyan-200">
-                          Dashboard
-                        </span>
-                      )}
-                      {setupStatus !== 'ready' && (
-                        <span
-                          className={`border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.16em] ${
-                            setupStatus === 'needs_scan'
-                              ? 'border-amber-200/35 text-amber-200'
-                              : 'border-stone-200/25 text-stone-400'
-                          }`}
-                        >
-                          {setupStatusLabel(setupStatus)}
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-0.5 break-all font-mono text-xs text-stone-500">
-                      {project.configPath}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex w-full shrink-0 flex-wrap items-center gap-2 text-xs text-stone-400 sm:w-auto sm:justify-end">
-                  <span>{features.length} features</span>
-                  {/* Two actions only: Initialize/Initialized toggle + Delete. */}
-                  <div className="flex flex-wrap items-center gap-1">
-                    {showInitialize &&
-                      (isReady ? (
-                        <>
-                          {/* Initialized = healthy state indicator. Keep visible even after adding re-init. */}
-                          <span
-                            title="Project is initialized — dashboard reads .project-manager/config.json from disk"
-                            className="flex h-7 items-center gap-1 border border-emerald-400/50 bg-emerald-600/30 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-emerald-100"
-                          >
-                            <Check size={12} />
-                            Initialized
-                          </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (!isTauri) return;
-                              if (anyProviderKeyPresent === false) {
-                                openKeysView();
-                                return;
-                              }
-                              void handleInitializeOne(project);
-                            }}
-                            disabled={
-                              !isTauri ||
-                              isInitializing ||
-                              batchScanning ||
-                              anyProviderKeyPresent === null
-                            }
-                            title={
-                              !isTauri
-                                ? 'Re-initialize requires the Project Manager desktop app.'
-                                : anyProviderKeyPresent === false
-                                  ? 'No AI provider configured — click to open Keys'
-                                  : 'Re-run AI scan and refresh .project-manager/config.json'
-                            }
-                            className="flex h-7 items-center gap-1 border border-cyan-300/35 bg-cyan-500/15 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-cyan-100 hover:bg-cyan-500/30 disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            {isInitializing ? (
-                              <>
-                                <Loader2 size={12} className="animate-spin" />
-                                Re-initializing…
-                              </>
-                            ) : (
-                              <>
-                                <RefreshCw size={12} />
-                                Re-init
-                              </>
-                            )}
-                          </button>
-                        </>
-                      ) : (
-                        // Initialize = call-to-action, amber to match the
-                        // "NEEDS SETUP" chip so the visual link is obvious.
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!isTauri) return;
-                            if (anyProviderKeyPresent === false) {
-                              openKeysView();
-                              return;
-                            }
-                            void handleInitializeOne(project);
-                          }}
-                          disabled={
-                            !isTauri ||
-                            isInitializing ||
-                            batchScanning ||
-                            anyProviderKeyPresent === null
-                          }
-                          title={
-                            !isTauri
-                              ? 'Initialize requires the Project Manager desktop app — run ./start_project_manager.sh (without "web") to enable filesystem access.'
-                              : anyProviderKeyPresent === false
-                                ? 'No AI provider configured — click to open Keys'
-                                : 'AI-scan the project structure and write .project-manager/config.json'
-                          }
-                          className="flex h-7 items-center gap-1 border border-amber-300/40 bg-amber-500/20 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-amber-100 hover:bg-amber-500/35 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          {isInitializing ? (
-                            <>
-                              <Loader2 size={12} className="animate-spin" />
-                              Initializing…
-                            </>
-                          ) : (
-                            <>
-                              <Bot size={12} />
-                              Initialize
-                            </>
-                          )}
-                        </button>
-                      ))}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openDeleteConfirm(project);
-                      }}
-                      title="Remove project"
-                      className="flex h-7 w-7 items-center justify-center text-stone-400 hover:bg-red-500/15 hover:text-red-300"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div
-                className="flex flex-wrap items-center gap-2 border-t border-stone-200/10 bg-black/10 px-4 py-2 text-[11px]"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Github size={12} className={repoUrl ? 'text-emerald-300' : 'text-amber-300'} />
-                <span className="shrink-0 uppercase tracking-[0.12em] text-stone-500">
-                  GitHub
-                </span>
-                {isEditingRepoUrl ? (
-                  <>
-                    <input
-                      value={repoUrlDraft}
-                      onChange={(e) => setRepoUrlDraft(e.target.value)}
-                      placeholder="https://github.com/owner/repo"
-                      className="min-w-[220px] flex-1 border border-stone-200/20 bg-[rgb(var(--pm-input))] px-2 py-1 font-mono text-[11px] text-stone-100 outline-none focus:ring-2 focus:ring-emerald-300/30"
-                    />
-                    <button
-                      type="button"
-                      disabled={repoUrlBusy}
-                      onClick={() => void saveProjectRepoUrl(project, repoUrlDraft)}
-                      className="inline-flex h-7 items-center gap-1 border border-emerald-300/35 bg-emerald-500/15 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-emerald-100 hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {repoUrlBusy ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-                      Save
-                    </button>
-                    <button
-                      type="button"
-                      disabled={repoUrlBusy}
-                      onClick={() => {
-                        setRepoEditProjectId(null);
-                        setRepoUrlDraft('');
-                      }}
-                      className="inline-flex h-7 items-center gap-1 border border-stone-200/20 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-stone-300 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <X size={12} />
-                      Cancel
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <span
-                      className={`min-w-0 flex-1 break-all font-mono ${
-                        repoUrl ? 'text-stone-300' : 'text-amber-200'
-                      }`}
-                    >
-                      {repoUrl || 'No GitHub repository URL configured'}
-                    </span>
-                    {!repoUrl && isTauri && !project.config.project.root.startsWith('https://') && (
-                      <button
-                        type="button"
-                        disabled={repoUrlBusy}
-                        onClick={() => void detectAndSaveProjectRepoUrl(project)}
-                        className="inline-flex h-7 items-center gap-1 border border-cyan-300/35 bg-cyan-500/15 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-cyan-100 hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        {repoUrlBusy ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-                        Detect
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      disabled={repoUrlBusy}
-                      onClick={() => beginRepoUrlEdit(project)}
-                      className="inline-flex h-7 items-center gap-1 border border-stone-200/20 px-2 text-[10px] font-medium uppercase tracking-[0.08em] text-stone-300 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {repoUrl ? 'Edit URL' : 'Add URL'}
-                    </button>
-                  </>
-                )}
-                {repoUrlError && (
-                  <span className="basis-full text-[11px] text-red-200">
-                    GitHub URL error: {repoUrlError}
-                  </span>
-                )}
-              </div>
-              {initTraceEntries.length > 0 && (
-                <div
-                  className="border-t border-stone-200/10 bg-black/15 px-4 py-3"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      {isInitializing ? (
-                        <Loader2 size={13} className="animate-spin text-cyan-200" />
-                      ) : initError ? (
-                        <AlertTriangle size={13} className="text-red-200" />
-                      ) : (
-                        <Check size={13} className="text-emerald-200" />
-                      )}
-                      <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-stone-300">
-                        Initialization Trace
-                      </span>
-                    </div>
-                    <span className="text-[10px] uppercase tracking-[0.12em] text-stone-500">
-                      {initTraceEntries.length} events
-                    </span>
-                  </div>
-                  <ol className="max-h-56 space-y-1 overflow-auto">
-                    {initTraceEntries.slice(-12).map((entry) => (
-                      <li
-                        key={entry.id}
-                        className="grid grid-cols-[72px_minmax(0,1fr)] gap-2 text-[11px] leading-5"
-                      >
-                        <span
-                          className={`inline-flex h-5 items-center justify-center border px-1.5 text-[9px] font-medium uppercase tracking-[0.08em] ${
-                            traceStatusClasses[entry.status]
-                          }`}
-                        >
-                          {entry.status}
-                        </span>
-                        <span className="min-w-0 text-stone-300">
-                          <span>{entry.label}</span>
-                          {(entry.provider || entry.modelId) && (
-                            <span className="ml-2 font-mono text-stone-500">
-                              {entry.provider
-                                ? formatProviderAttempt({
-                                    provider: entry.provider,
-                                    modelId: entry.modelId,
-                                  })
-                                : entry.modelId}
-                            </span>
-                          )}
-                          {entry.detail && (
-                            <span className="block break-words text-[10px] text-stone-500">
-                              {entry.detail}
-                            </span>
-                          )}
-                        </span>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              )}
-              {initError && (
-                <div className="flex flex-wrap items-start gap-2 border-t border-violet-500/25 bg-violet-900/15 px-4 py-2 text-[11px] text-violet-200">
-                  <AlertTriangle size={12} className="mt-0.5 shrink-0" />
-                  <span className="min-w-0 flex-1 break-words">
-                    Initialize failed: {formatScanError(initError)}
-                  </span>
-                  {initError === 'NO_PROVIDER_CONFIGURED' ? (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openKeysView();
-                      }}
-                      className="shrink-0 border border-amber-200/40 bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-amber-50 hover:bg-amber-500/30"
-                    >
-                      Open Keys
-                    </button>
-                  ) : (
-                    showInitialize &&
-                    isTauri && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void handleInitializeOne(project);
-                        }}
-                        disabled={isInitializing || anyProviderKeyPresent === false}
-                        className="shrink-0 border border-violet-200/35 bg-violet-500/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-violet-100 hover:bg-violet-500/30 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Retry
-                      </button>
-                    )
-                  )}
-                  <button
-                    onClick={() =>
-                      setInitErrors((prev) => {
-                        const next = { ...prev };
-                        delete next[project.id];
-                        return next;
-                      })
-                    }
-                    className="shrink-0 text-violet-300 hover:text-violet-100"
+      {/* Projects table */}
+      <div className="min-h-0 overflow-auto border border-stone-200/12 bg-[rgb(var(--pm-panel))]/72">
+        <table className="w-full min-w-[1320px] border-collapse text-left text-sm">
+          <thead className="sticky top-0 z-20 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <th
+                    key={header.id}
+                    onClick={header.column.getCanSort() ? header.column.getToggleSortingHandler() : undefined}
+                    className={`px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400 ${
+                      header.column.getCanSort() ? 'cursor-pointer select-none hover:text-stone-200' : ''
+                    }`}
+                    style={{
+                      width: header.column.columnDef.size,
+                      minWidth: header.column.columnDef.size,
+                    }}
                   >
-                    <X size={11} />
-                  </button>
-                </div>
-              )}
-            </div>
-          );
-        })}
+                    <span className="inline-flex items-center gap-1">
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                      {header.column.getCanSort() && (
+                        <span className="text-[10px] text-stone-500">
+                          {header.column.getIsSorted() === 'asc'
+                            ? '↑'
+                            : header.column.getIsSorted() === 'desc'
+                              ? '↓'
+                              : '↕'}
+                        </span>
+                      )}
+                    </span>
+                  </th>
+                ))}
+              </tr>
+            ))}
+          </thead>
+          <tbody>
+            {table.getRowModel().rows.map((row) => {
+              const project = row.original;
+              const isSelected = project.id === selectedProjectId;
+              const isInitializing = initializingIds.has(project.id);
+              const initError = initErrors[project.id];
+              const initTraceEntries = initTrace[project.id] ?? [];
+              const repoUrlError = repoUrlErrors[project.id];
+              const hasDetail = Boolean(repoUrlError || initTraceEntries.length > 0 || initError);
+              const showRetry = !(project.configPath?.startsWith('https://github.com/') ?? false);
+
+              return (
+                <Fragment key={row.id}>
+                  <tr
+                    ref={(node) => {
+                      projectRowRefs.current[project.id] = node;
+                    }}
+                    onClick={() => onSelectProject(project.id)}
+                    className={`cursor-pointer border-b border-stone-200/10 transition-colors hover:bg-white/[0.045] ${
+                      isSelected ? 'bg-emerald-950/20' : ''
+                    }`}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} className="px-3 py-3 align-middle text-sm text-stone-300">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
+                  {hasDetail && (
+                    <tr key={`${row.id}-details`} className="border-b border-stone-200/10 bg-black/15">
+                      <td colSpan={table.getVisibleLeafColumns().length} className="px-4 py-3">
+                        <div className="space-y-3">
+                          {repoUrlError && (
+                            <div className="flex items-start gap-2 text-[11px] text-red-200">
+                              <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                              <span className="min-w-0 break-words">GitHub URL error: {repoUrlError}</span>
+                            </div>
+                          )}
+                          {initTraceEntries.length > 0 && (
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  {isInitializing ? (
+                                    <Loader2 size={13} className="animate-spin text-cyan-200" />
+                                  ) : initError ? (
+                                    <AlertTriangle size={13} className="text-red-200" />
+                                  ) : (
+                                    <Check size={13} className="text-emerald-200" />
+                                  )}
+                                  <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-stone-300">
+                                    Initialization Trace
+                                  </span>
+                                </div>
+                                <span className="text-[10px] uppercase tracking-[0.12em] text-stone-500">
+                                  {initTraceEntries.length} events
+                                </span>
+                              </div>
+                              <ol className="max-h-56 space-y-1 overflow-auto">
+                                {initTraceEntries.slice(-12).map((entry) => (
+                                  <li
+                                    key={entry.id}
+                                    className="grid grid-cols-[72px_minmax(0,1fr)] gap-2 text-[11px] leading-5"
+                                  >
+                                    <span
+                                      className={`inline-flex h-5 items-center justify-center border px-1.5 text-[9px] font-medium uppercase tracking-[0.08em] ${
+                                        traceStatusClasses[entry.status]
+                                      }`}
+                                    >
+                                      {entry.status}
+                                    </span>
+                                    <span className="min-w-0 text-stone-300">
+                                      <span>{entry.label}</span>
+                                      {(entry.provider || entry.modelId) && (
+                                        <span className="ml-2 font-mono text-stone-500">
+                                          {entry.provider
+                                            ? formatProviderAttempt({
+                                                provider: entry.provider,
+                                                modelId: entry.modelId,
+                                              })
+                                            : entry.modelId}
+                                        </span>
+                                      )}
+                                      {entry.detail && (
+                                        <span className="block break-words text-[10px] text-stone-500">
+                                          {entry.detail}
+                                        </span>
+                                      )}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ol>
+                            </div>
+                          )}
+                          {initError && (
+                            <div className="flex flex-wrap items-start gap-2 text-[11px] text-violet-200">
+                              <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                              <span className="min-w-0 flex-1 break-words">
+                                Initialize failed: {formatScanError(initError)}
+                              </span>
+                              {initError === 'NO_PROVIDER_CONFIGURED' ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openKeysView();
+                                  }}
+                                  className="shrink-0 border border-amber-200/40 bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-amber-50 hover:bg-amber-500/30"
+                                >
+                                  Open Keys
+                                </button>
+                              ) : (
+                                showRetry &&
+                                isTauri && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      void handleInitializeOne(project);
+                                    }}
+                                    disabled={isInitializing || anyProviderKeyPresent === false}
+                                    className="shrink-0 border border-violet-200/35 bg-violet-500/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-violet-100 hover:bg-violet-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    Retry
+                                  </button>
+                                )
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setInitErrors((prev) => {
+                                    const next = { ...prev };
+                                    delete next[project.id];
+                                    return next;
+                                  });
+                                }}
+                                className="shrink-0 text-violet-300 hover:text-violet-100"
+                              >
+                                <X size={11} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+            {projects.length === 0 && (
+              <tr>
+                <td
+                  colSpan={table.getVisibleLeafColumns().length}
+                  className="px-6 py-10 text-center"
+                >
+                  <p className="text-sm text-stone-300">No projects yet</p>
+                  <p className="mt-1 text-xs text-stone-500">
+                    Add a local folder or GitHub repo to start tracking progress.
+                  </p>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
       {/* Weekly Report */}

@@ -23,6 +23,7 @@ vi.mock('../lib/bridge', () => ({
 
 describe('EnvImportModal', () => {
   beforeEach(() => {
+    window.localStorage.clear();
     saveProviderSecretMock.mockReset();
     revalidateStoredKeyMock.mockReset();
     scanEnvFilesMock.mockReset();
@@ -61,7 +62,7 @@ describe('EnvImportModal', () => {
 
     expect(await screen.findByText('OPENAI_API_KEY')).toBeInTheDocument();
     expect(screen.getByText('/repo')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Rescan/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Rescan \.env/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Scan PM root/ })).toBeInTheDocument();
     expect(screen.getByText(/Detected \.env credentials for 2 providers/)).toBeInTheDocument();
     expect(screen.getByText(/Available providers: OpenAI, Kimi \(Moonshot\)/)).toBeInTheDocument();
@@ -74,10 +75,10 @@ describe('EnvImportModal', () => {
 
     expect(await screen.findByText('No .env files found in the Project Manager root.')).toBeInTheDocument();
     expect(screen.getByText('/empty')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Rescan/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Rescan \.env/ })).toBeInTheDocument();
     expect(screen.queryByText(/No matching keys detected yet/)).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: /Rescan/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Rescan \.env/ }));
     await waitFor(() => expect(scanEnvFilesMock).toHaveBeenCalledTimes(2));
   });
 
@@ -97,5 +98,39 @@ describe('EnvImportModal', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/Start Project Manager from its repo folder/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Rebind folder/ })).not.toBeInTheDocument();
+  });
+
+  it('lets users disable providers from .env detection', async () => {
+    render(<EnvImportModal onClose={vi.fn()} onImported={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /Providers/ }));
+    await userEvent.click(screen.getByLabelText('OpenAI'));
+    await userEvent.click(screen.getByRole('button', { name: /Paste \/ drop/ }));
+    await userEvent.type(
+      screen.getByPlaceholderText(/Paste \.env content here/),
+      `OPENAI_API_KEY=sk-${'b'.repeat(40)}\nKIMI_API_KEY=sk-${'c'.repeat(40)}`,
+    );
+
+    expect(screen.queryByText('OPENAI_API_KEY')).not.toBeInTheDocument();
+    expect(screen.getByText('KIMI_API_KEY')).toBeInTheDocument();
+    expect(screen.getByText(/Detected \(1\)/)).toBeInTheDocument();
+  });
+
+  it('uses custom env var aliases and default selection preferences', async () => {
+    render(<EnvImportModal onClose={vi.fn()} onImported={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /Providers/ }));
+    await userEvent.clear(screen.getByLabelText('OpenAI env names'));
+    await userEvent.type(screen.getByLabelText('OpenAI env names'), 'MY_OPENAI_KEY');
+    await userEvent.click(screen.getByLabelText('OpenAI selected by default'));
+    await userEvent.click(screen.getByRole('button', { name: /Paste \/ drop/ }));
+    await userEvent.type(
+      screen.getByPlaceholderText(/Paste \.env content here/),
+      `MY_OPENAI_KEY=sk-${'b'.repeat(40)}`,
+    );
+
+    expect(screen.getByText('MY_OPENAI_KEY')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /OpenAI/ })).not.toBeChecked();
+    expect(screen.getByText('0 of 1 selected')).toBeInTheDocument();
   });
 });

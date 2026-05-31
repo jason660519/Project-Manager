@@ -77,7 +77,6 @@ export const zhHant: Translations = {
   },
   keysValidation: {
     intro: '管理你的 API 金鑰。點擊任一列可編輯、驗證或撤銷。',
-    importFromEnv: '從 .env 匯入',
     loadingProviders: '載入 Provider 中…',
     table: {
       columns: {
@@ -110,26 +109,27 @@ export const zhHant: Translations = {
       },
       category: {
         all: '全部分類',
-        ai: 'AI',
-        integration: '整合',
+        modelFactory: '模型原廠',
+        modelChannel: '模型通路',
+        localModel: '本機模型',
+        integration: '整合服務',
+      },
+      filters: {
+        provider: 'Provider 篩選',
+        category: '分類篩選',
+        status: '狀態篩選',
+        availableModels: '可用模型篩選',
+        allProviders: '全部 Provider',
+        allModels: '全部模型',
       },
       controls: {
         title: 'API 金鑰驗證',
         searchPlaceholder: '搜尋 Provider、金鑰狀態、模型',
-        hiddenColumns: '隱藏欄位 ({count})',
         freezeColumns: '凍結欄位',
-        viewPreset: '檢視預設',
-        presetPlaceholder: '預設',
-        reset: '重設',
+        restoreDefaultProviders: '恢復預設 Provider',
+        restoreDefaultProvidersTitle: '移除自訂 Provider 列、顯示內建 Provider，並恢復預設列順序。金鑰與驗證狀態會保留。',
         showHiddenRows: '顯示隱藏列 ({count})',
-        export: '匯出',
-        import: '匯入',
-        addRow: '新增列',
-      },
-      presets: {
-        full: '完整',
-        validation: '驗證',
-        links: '連結',
+        addRow: '新增 Provider',
       },
       actions: {
         moveRowUp: '上移列',

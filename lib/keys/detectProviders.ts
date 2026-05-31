@@ -25,12 +25,12 @@ export interface DetectedKey {
  *     (people use proxies / sandbox tokens that don't match the canonical
  *     pattern).
  */
-export function detectProviders(entries: ParsedEnvEntry[]): DetectedKey[] {
+export function detectProviders(entries: ParsedEnvEntry[], providers: ProviderSpec[] = PROVIDERS): DetectedKey[] {
   const lookup = new Map<string, ParsedEnvEntry>();
   for (const e of entries) lookup.set(e.key, e);
 
   const out: DetectedKey[] = [];
-  for (const provider of PROVIDERS) {
+  for (const provider of providers) {
     let match: ParsedEnvEntry | undefined;
     let matchedName: string | undefined;
     for (const candidate of provider.envVarNames) {

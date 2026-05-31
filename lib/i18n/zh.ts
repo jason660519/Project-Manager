@@ -77,7 +77,6 @@ export const zh: Translations = {
   },
   keysValidation: {
     intro: '管理你的 API 密钥。点击任一行可编辑、验证或撤销。',
-    importFromEnv: '从 .env 导入',
     loadingProviders: '正在加载 Provider…',
     table: {
       columns: {
@@ -110,26 +109,27 @@ export const zh: Translations = {
       },
       category: {
         all: '全部分类',
-        ai: 'AI',
-        integration: '集成',
+        modelFactory: '模型原厂',
+        modelChannel: '模型通路',
+        localModel: '本机模型',
+        integration: '集成服务',
+      },
+      filters: {
+        provider: 'Provider 筛选',
+        category: '分类筛选',
+        status: '状态筛选',
+        availableModels: '可用模型筛选',
+        allProviders: '全部 Provider',
+        allModels: '全部模型',
       },
       controls: {
         title: 'API 密钥验证',
         searchPlaceholder: '搜索 Provider、密钥状态、模型',
-        hiddenColumns: '隐藏列 ({count})',
         freezeColumns: '冻结列',
-        viewPreset: '视图预设',
-        presetPlaceholder: '预设',
-        reset: '重置',
+        restoreDefaultProviders: '恢复默认 Provider',
+        restoreDefaultProvidersTitle: '移除自定义 Provider 行、显示内建 Provider，并恢复默认行顺序。密钥与验证状态会保留。',
         showHiddenRows: '显示隐藏行 ({count})',
-        export: '导出',
-        import: '导入',
-        addRow: '新增行',
-      },
-      presets: {
-        full: '完整',
-        validation: '验证',
-        links: '链接',
+        addRow: '新增 Provider',
       },
       actions: {
         moveRowUp: '上移行',

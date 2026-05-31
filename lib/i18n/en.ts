@@ -77,7 +77,6 @@ export const en: Translations = {
   },
   keysValidation: {
     intro: 'Manage your API keys. Click a row to edit, validate, or revoke.',
-    importFromEnv: 'Import from .env',
     loadingProviders: 'Loading providers…',
     table: {
       columns: {
@@ -110,26 +109,27 @@ export const en: Translations = {
       },
       category: {
         all: 'All categories',
-        ai: 'AI',
+        modelFactory: 'Model makers',
+        modelChannel: 'Model channels',
+        localModel: 'Local models',
         integration: 'Integration',
+      },
+      filters: {
+        provider: 'Provider filter',
+        category: 'Category filter',
+        status: 'Status filter',
+        availableModels: 'Available models filter',
+        allProviders: 'All providers',
+        allModels: 'All models',
       },
       controls: {
         title: 'API Key Validation',
         searchPlaceholder: 'Search provider, key state, models',
-        hiddenColumns: 'Hidden ({count})',
         freezeColumns: 'Freeze cols',
-        viewPreset: 'View preset',
-        presetPlaceholder: 'Preset',
-        reset: 'Reset',
+        restoreDefaultProviders: 'Restore default providers',
+        restoreDefaultProvidersTitle: 'Remove custom provider rows, show built-in providers, and restore the default row order. Keys and validation metadata are preserved.',
         showHiddenRows: 'Show hidden rows ({count})',
-        export: 'Export',
-        import: 'Import',
-        addRow: 'Add Row',
-      },
-      presets: {
-        full: 'Full',
-        validation: 'Validation',
-        links: 'Links',
+        addRow: 'Add provider',
       },
       actions: {
         moveRowUp: 'Move row up',

@@ -35,4 +35,19 @@ describe('detectProviders', () => {
     const entries = parseEnvText('SOME_OTHER_VAR=value');
     expect(detectProviders(entries)).toEqual([]);
   });
+
+  it('supports caller-provided provider lists for import profiles', () => {
+    const entries = parseEnvText(`MY_OPENAI_KEY=sk-${'b'.repeat(40)}\nOPENAI_API_KEY=sk-${'c'.repeat(40)}`);
+    const openai = detectProviders(parseEnvText(`OPENAI_API_KEY=sk-${'c'.repeat(40)}`))
+      .find((d) => d.provider.id === 'openai')?.provider;
+    expect(openai).toBeDefined();
+
+    const detected = detectProviders(entries, [
+      { ...openai!, envVarNames: ['MY_OPENAI_KEY'] },
+    ]);
+
+    expect(detected).toHaveLength(1);
+    expect(detected[0].provider.id).toBe('openai');
+    expect(detected[0].envKey).toBe('MY_OPENAI_KEY');
+  });
 });

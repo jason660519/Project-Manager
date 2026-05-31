@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, FileText, Loader2, RefreshCw, Upload, X } from 'lucide-react';
 import { parseEnvText } from '../../../../lib/keys/envParser';
 import { detectProviders, type DetectedKey } from '../../../../lib/keys/detectProviders';
+import { PROVIDERS, type ProviderSpec } from '../../../../lib/keys/registry';
 import { saveProviderSecret } from '../../../../lib/keys/keychain';
 import { revalidateStoredKey } from '../../../../lib/keys/validation';
 import { formatValidationFailure } from '../../../../lib/keys/providerMetadata';
@@ -16,7 +17,64 @@ interface EnvImportModalProps {
   onImported: (count: number) => void;
 }
 
-type Tab = 'paste' | 'scan';
+type Tab = 'paste' | 'scan' | 'providers';
+type EnvImportProfile = Record<string, EnvImportProviderSetting>;
+
+interface EnvImportProviderSetting {
+  enabled: boolean;
+  defaultSelected: boolean;
+  envVarNames: string[];
+}
+
+const ENV_IMPORT_PROFILE_STORAGE_KEY = 'projectManager.keys.envImport.providerProfile.v1';
+
+function defaultProviderSetting(provider: ProviderSpec): EnvImportProviderSetting {
+  return {
+    enabled: provider.supportedMethods.includes('envImport'),
+    defaultSelected: true,
+    envVarNames: provider.envVarNames,
+  };
+}
+
+function parseEnvVarNames(value: string): string[] {
+  return Array.from(new Set(value
+    .split(/[,\s]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)));
+}
+
+function readStoredProfile(): EnvImportProfile {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(ENV_IMPORT_PROFILE_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, Partial<EnvImportProviderSetting>>;
+    const next: EnvImportProfile = {};
+    for (const provider of PROVIDERS) {
+      const setting = parsed[provider.id];
+      if (!setting) continue;
+      next[provider.id] = {
+        ...defaultProviderSetting(provider),
+        enabled: typeof setting.enabled === 'boolean' ? setting.enabled : defaultProviderSetting(provider).enabled,
+        defaultSelected: typeof setting.defaultSelected === 'boolean' ? setting.defaultSelected : true,
+        envVarNames: Array.isArray(setting.envVarNames)
+          ? setting.envVarNames.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+          : provider.envVarNames,
+      };
+    }
+    return next;
+  } catch {
+    return {};
+  }
+}
+
+function buildDetectionProviders(profile: EnvImportProfile): ProviderSpec[] {
+  return PROVIDERS.flatMap((provider) => {
+    const setting = profile[provider.id] ?? defaultProviderSetting(provider);
+    if (!setting.enabled || setting.envVarNames.length === 0) return [];
+    return [{ ...provider, envVarNames: setting.envVarNames }];
+  });
+}
 
 function isMissingProjectRootError(message: string): boolean {
   return /^Project root does not exist:/i.test(message);
@@ -41,6 +99,28 @@ export function EnvImportModal({
   const [activeValidation, setActiveValidation] = useState<{ index: number; total: number; label: string } | null>(null);
   const [error, setError] = useState('');
   const [importResult, setImportResult] = useState<{ ok: string[]; fail: string[] } | null>(null);
+  const [providerProfile, setProviderProfile] = useState<EnvImportProfile>(() => readStoredProfile());
+
+  useEffect(() => {
+    window.localStorage.setItem(ENV_IMPORT_PROFILE_STORAGE_KEY, JSON.stringify(providerProfile));
+  }, [providerProfile]);
+
+  const updateProviderSetting = useCallback((
+    provider: ProviderSpec,
+    patch: Partial<EnvImportProviderSetting>,
+  ) => {
+    setProviderProfile((prev) => ({
+      ...prev,
+      [provider.id]: {
+        ...(prev[provider.id] ?? defaultProviderSetting(provider)),
+        ...patch,
+      },
+    }));
+  }, []);
+
+  const resetProviderProfile = useCallback(() => {
+    setProviderProfile({});
+  }, []);
 
   const runProjectScan = useCallback(async () => {
     if (!projectRoot) return;
@@ -91,15 +171,18 @@ export function EnvImportModal({
 
   const detected: DetectedKey[] = useMemo(() => {
     if (!sourceText.trim()) return [];
-    return detectProviders(parseEnvText(sourceText));
-  }, [sourceText]);
+    return detectProviders(parseEnvText(sourceText), buildDetectionProviders(providerProfile));
+  }, [providerProfile, sourceText]);
 
   // Default-check every detected entry whenever the source changes.
   useEffect(() => {
     const next: Record<string, boolean> = {};
-    for (const d of detected) next[d.provider.id] = d.status !== 'empty';
+    for (const d of detected) {
+      const setting = providerProfile[d.provider.id] ?? defaultProviderSetting(d.provider);
+      next[d.provider.id] = setting.defaultSelected && d.status !== 'empty';
+    }
     setSelected(next);
-  }, [detected]);
+  }, [detected, providerProfile]);
 
   const handleDrop = useCallback((ev: React.DragEvent<HTMLDivElement>) => {
     ev.preventDefault();
@@ -146,6 +229,10 @@ export function EnvImportModal({
     if (names.length <= 6) return names.join(', ');
     return `${names.slice(0, 6).join(', ')} +${names.length - 6} more`;
   }, [detected]);
+  const detectionProviderCount = useMemo(
+    () => buildDetectionProviders(providerProfile).length,
+    [providerProfile],
+  );
 
   return (
     <div
@@ -180,10 +267,20 @@ export function EnvImportModal({
           <TabButton active={tab === 'paste'} onClick={() => setTab('paste')}>
             Paste / drop
           </TabButton>
+          <TabButton active={tab === 'providers'} onClick={() => setTab('providers')}>
+            Providers
+          </TabButton>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
-          {tab === 'paste' ? (
+          {tab === 'providers' ? (
+            <ProviderProfileEditor
+              profile={providerProfile}
+              enabledCount={detectionProviderCount}
+              onUpdate={updateProviderSetting}
+              onReset={resetProviderProfile}
+            />
+          ) : tab === 'paste' ? (
             <div
               onDrop={handleDrop}
               onDragOver={(e) => e.preventDefault()}
@@ -208,6 +305,9 @@ GITHUB_TOKEN=github_token_..."
                   <div className="text-[11px] uppercase tracking-[0.14em] text-stone-500">
                     Project Manager scan
                   </div>
+                  <div className="mt-1 text-[11px] text-stone-500">
+                    {detectionProviderCount} providers enabled for .env detection
+                  </div>
                   {projectRoot && (
                     <div
                       className="mt-1 truncate font-mono text-[11px] text-stone-500"
@@ -228,7 +328,7 @@ GITHUB_TOKEN=github_token_..."
                   ) : (
                     <RefreshCw size={12} />
                   )}
-                  Rescan
+                  Rescan .env
                 </button>
               </div>
 
@@ -246,7 +346,7 @@ GITHUB_TOKEN=github_token_..."
                   <p className="mt-1 text-[11px] text-stone-500">
                     {missingProjectRoot
                       ? 'Start Project Manager from its repo folder, or switch to Paste / drop to import a file directly.'
-                      : 'Use Rescan after adding a top-level .env file to the Project Manager root, or switch to Paste / drop.'}
+                      : 'Use Rescan .env after adding a top-level .env file to the Project Manager root, or switch to Paste / drop.'}
                   </p>
                 </div>
               ) : detected.length > 0 ? (
@@ -304,7 +404,7 @@ GITHUB_TOKEN=github_token_..."
             </div>
           )}
 
-          {(tab === 'paste' || detected.length > 0) && (
+          {((tab === 'paste' || tab === 'scan') && (tab === 'paste' || detected.length > 0)) && (
             <DetectionPreview
               detected={detected}
               selected={selected}
@@ -314,48 +414,64 @@ GITHUB_TOKEN=github_token_..."
         </div>
 
         <footer className="flex items-center gap-3 border-t border-stone-200/12 px-5 py-3">
-          <div className="min-w-0 flex-1">
-            {error && <span className="text-[11px] text-red-400">{error}</span>}
-            {saving && (
-              <span className="inline-flex items-center gap-2 text-[11px] text-amber-100">
-                <Loader2 size={12} className="animate-spin" />
-                {activeValidation
-                  ? `Validating ${activeValidation.index}/${activeValidation.total}: ${activeValidation.label}`
-                  : 'Preparing validation'}
-                <span className="font-mono text-stone-500">{elapsedSeconds}s</span>
+          {tab === 'providers' ? (
+            <>
+              <span className="flex-1 text-[11px] text-stone-500">
+                Provider import profile is saved automatically on this machine.
               </span>
-            )}
-            {importResult && !error && !saving && (
-              <span className="block truncate text-[11px] text-stone-400">
-                {importResult.ok.length > 0 ? `Validated: ${importResult.ok.join(', ')}` : ''}
-                {importResult.fail.length > 0
-                  ? `${importResult.ok.length > 0 ? ' · ' : ''}Failed: ${importResult.fail.join('; ')}`
-                  : ''}
+              <button
+                onClick={() => setTab(projectRoot ? 'scan' : 'paste')}
+                className="border border-stone-200/22 px-4 py-1.5 text-sm text-stone-300 hover:bg-stone-200/8"
+              >
+                Done
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="min-w-0 flex-1">
+                {error && <span className="text-[11px] text-red-400">{error}</span>}
+                {saving && (
+                  <span className="inline-flex items-center gap-2 text-[11px] text-amber-100">
+                    <Loader2 size={12} className="animate-spin" />
+                    {activeValidation
+                      ? `Validating ${activeValidation.index}/${activeValidation.total}: ${activeValidation.label}`
+                      : 'Preparing validation'}
+                    <span className="font-mono text-stone-500">{elapsedSeconds}s</span>
+                  </span>
+                )}
+                {importResult && !error && !saving && (
+                  <span className="block truncate text-[11px] text-stone-400">
+                    {importResult.ok.length > 0 ? `Validated: ${importResult.ok.join(', ')}` : ''}
+                    {importResult.fail.length > 0
+                      ? `${importResult.ok.length > 0 ? ' · ' : ''}Failed: ${importResult.fail.join('; ')}`
+                      : ''}
+                  </span>
+                )}
+              </div>
+              <span className="ml-auto text-[11px] text-stone-500">
+                {selectedCount} of {detected.length} selected
               </span>
-            )}
-          </div>
-          <span className="ml-auto text-[11px] text-stone-500">
-            {selectedCount} of {detected.length} selected
-          </span>
-          <button
-            onClick={onClose}
-            className="border border-stone-200/22 px-4 py-1.5 text-sm text-stone-300 hover:bg-stone-200/8"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => void handleImport()}
-            disabled={selectedCount === 0 || saving}
-            className="inline-flex min-w-[190px] items-center justify-center gap-2 bg-stone-100 px-4 py-1.5 text-sm font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {saving ? (
-              <>
-                <Loader2 size={14} className="animate-spin" /> Validating {elapsedSeconds}s
-              </>
-            ) : (
-              `Import & validate ${selectedCount}`
-            )}
-          </button>
+              <button
+                onClick={onClose}
+                className="border border-stone-200/22 px-4 py-1.5 text-sm text-stone-300 hover:bg-stone-200/8"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void handleImport()}
+                disabled={selectedCount === 0 || saving}
+                className="inline-flex min-w-[190px] items-center justify-center gap-2 bg-stone-100 px-4 py-1.5 text-sm font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" /> Validating {elapsedSeconds}s
+                  </>
+                ) : (
+                  `Import & validate ${selectedCount}`
+                )}
+              </button>
+            </>
+          )}
         </footer>
       </div>
     </div>
@@ -382,6 +498,85 @@ function TabButton({
     >
       {children}
     </button>
+  );
+}
+
+function ProviderProfileEditor({
+  profile,
+  enabledCount,
+  onUpdate,
+  onReset,
+}: {
+  profile: EnvImportProfile;
+  enabledCount: number;
+  onUpdate: (provider: ProviderSpec, patch: Partial<EnvImportProviderSetting>) => void;
+  onReset: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.14em] text-stone-500">
+            Import provider profile
+          </div>
+          <p className="mt-1 max-w-xl text-sm text-stone-300">
+            {enabledCount} providers are enabled for .env detection. Choose which registry providers participate, whether matches are checked by default, and which env variable names PM should recognise.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onReset}
+          className="border border-stone-200/22 px-3 py-1.5 text-[11px] uppercase tracking-[0.14em] text-stone-200 hover:bg-stone-200/8"
+        >
+          Restore defaults
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        {PROVIDERS.map((provider) => {
+          const setting = profile[provider.id] ?? defaultProviderSetting(provider);
+          const envText = setting.envVarNames.join(', ');
+          return (
+            <div key={provider.id} className="border border-stone-200/15 px-3 py-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="inline-flex items-center gap-2 text-sm font-medium text-stone-100">
+                  <input
+                    type="checkbox"
+                    checked={setting.enabled}
+                    onChange={(event) => onUpdate(provider, { enabled: event.target.checked })}
+                    className="accent-emerald-400"
+                  />
+                  {provider.label}
+                </label>
+                <label className="ml-auto inline-flex items-center gap-2 text-[11px] text-stone-400">
+                  <input
+                    type="checkbox"
+                    aria-label={`${provider.label} selected by default`}
+                    checked={setting.defaultSelected}
+                    onChange={(event) => onUpdate(provider, { defaultSelected: event.target.checked })}
+                    className="accent-emerald-400"
+                  />
+                  Selected by default
+                </label>
+              </div>
+              <label className="mt-3 block">
+                <span className="text-[10px] uppercase tracking-[0.14em] text-stone-500">
+                  Env names
+                </span>
+                <input
+                  value={envText}
+                  aria-label={`${provider.label} env names`}
+                  onChange={(event) => onUpdate(provider, {
+                    envVarNames: parseEnvVarNames(event.target.value),
+                  })}
+                  className="mt-1 w-full border border-stone-200/18 bg-[rgb(var(--pm-input))] px-2 py-1.5 font-mono text-[11px] text-stone-200 outline-none focus:ring-1 focus:ring-emerald-400/50"
+                />
+              </label>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

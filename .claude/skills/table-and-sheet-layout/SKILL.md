@@ -80,44 +80,11 @@ Reference migrations: `app/ui/views/ProjectFilesView.tsx`, `app/ui/views/KeysVie
 
 Images are reference aids for human review and AI orientation. They do not replace the written checklist below; every required behavior still needs code, tests, and browser verification.
 
-### Settings table sheet reference
+### basic table sheet requirements:
 
-![Settings table sheet reference](./assets/settings-table-sheet-reference.jpg)
 
-Use this as the reference shape for a settings-oriented table sheet:
+### Data-heavy dashboard table sheet requirements:
 
-- Header shows page title, short description, and current runtime/storage state.
-- Sheet content is a structured setting table, not a decorative card grid.
-- Each row has clear `Setting`, `Value`, `State`, and `Action` responsibilities.
-- Actions are scoped to settings and local preferences; do not add fake `Add Row`, data export, KPI, or lifecycle controls.
-- Bottom sheet tabs remain fixed at the bottom and represent settings groups.
-- If settings rows become comparable data with multiple rows/columns, apply the table-backed requirements: resize, category filters where applicable, and contained horizontal scroll.
-
-### Data-heavy dashboard table sheet reference
-
-![Dashboard data table sheet reference](./assets/dashboard-data-table-sheet-reference.jpg)
-
-Use this as the reference shape for data-heavy and dashboard table sheets:
-
-- Header shows page title, active project/data scope, and meaningful page-level actions.
-- KPI/context strip summarizes operational state before the table.
-- Toolbar controls are table-scoped: search, alignment/view controls, hidden columns, presets, reset, export, and row creation only when meaningful.
-- Main pane is a dense spreadsheet-like grid with compact rows, semantic badges, editable cells, document columns, and explicit empty/filter states.
-- Horizontal and vertical scrolling stay inside the workstation frame; bottom sheet tabs remain visible.
-- Bottom sheets map to user workflow or lifecycle phases and show meaningful row/state badges.
-
----
-
-## Required Table + Sheet Baseline
-
-Before building or rewriting a table + sheet page, classify the page. Do not copy every Project Progress Dashboard control into every screen.
-
-| Page type | Required intent |
-|---|---|
-| Settings table sheet | Structured setting rows, explicit state, clear actions, sheet navigation. Use table infrastructure when it has comparable rows/columns. |
-| Data table sheet | Searchable, sortable, filterable, configurable dense rows. This is the default for operational datasets. |
-| Dashboard table sheet | Data table sheet plus KPI/context summary and workflow-level actions. |
-| Read-only sheet | Explicitly documented exception. Keep layout consistent, but skip edit/export controls that would be fake. |
 
 ### All table + sheet workstation pages
 

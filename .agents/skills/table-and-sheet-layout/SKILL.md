@@ -143,6 +143,7 @@ Before building or rewriting a table + sheet page, classify the page. Do not cop
 ### Horizontally scrolling tables
 
 - Provide a `Freeze cols` control that lets users pin at least the identity/action-critical columns needed to keep rows understandable while scrolling.
+- Prefer the spreadsheet-style numeric `Freeze cols` control used by Integration Hub and dashboard sheets: freeze the first N visible columns, with `0` meaning no frozen columns. Use checkbox-style pinning only when non-contiguous pinning is a deliberate product requirement.
 - Store frozen column ids by canonical `col-` id and normalize them against the current column set.
 - Frozen columns use sticky positioning with computed left offsets, readable z-index layering, and an opaque/tokenized background.
 - Frozen cells must not be clipped by the same element that owns horizontal scrolling; follow the overflow rules below.
@@ -154,12 +155,32 @@ Before building or rewriting a table + sheet page, classify the page. Do not cop
 - Filtering controls belong in the table toolbar or header filter UI, near the data they affect.
 - Sorting and filtering remain stable after column resize, freeze, sheet changes, and responsive layout changes.
 
+### Toolbar semantics
+
+Before adding or keeping a toolbar control, name the exact object it mutates:
+
+- **View controls** mutate only table presentation: search text, filters, sorting, visible columns, column widths, frozen columns, row density, and view presets. These belong in the table toolbar or column header filter UI.
+- **Dataset controls** mutate the rows owned by this table: add row, restore built-in rows, show hidden rows, reorder rows, or delete a custom row. These belong in the table toolbar only when the table owns that row data and the label says exactly what changes.
+- **Credential, bridge, filesystem, network, or destructive controls** do not belong in a generic table toolbar. Put them in the row detail sheet, a settings/danger-zone panel, or a modal that shows scope and consequence.
+- **Row health refresh controls** that re-check a row's status belong beside the status badge when they affect one row. Use per-row loading state; do not disable every row from one row refresh.
+
+Do not add Import/Export just because another table has them. `Export` is valid only when the exported file is a user-meaningful artifact for the same dataset and can be described without ambiguity. `Import` is valid only when the imported file is a documented, previewable schema for the same dataset; never use a generic `Import` label when the user could confuse provider definitions, API keys, project files, or model lists.
+
+Use specific verbs for provider/registry tables:
+
+- `Restore default providers` means restore provider row membership/order/visibility only. It must preserve API keys, validation metadata, model cache, and other credential state.
+- `Add provider` is clearer than `Add Row` when the row represents a provider entity.
+- `Clear key` / `Clear all keys` must stay outside the table toolbar unless the whole page is a dedicated danger-zone workflow with explicit confirmation and per-item failure reporting.
+
 ### Data-heavy table sheets
 
 - Include table-scoped search. Do not rely only on the global topbar search.
 - Support column visibility controls such as `Hidden (n)` for non-essential columns.
 - Support view presets for useful combinations of widths, hidden columns, frozen columns, sort, and filters.
 - Provide a table-view `Reset` action that restores layout preferences without mutating domain data.
+- Collapse repeated reference URLs such as API key pages, usage pages, and docs into small icon-only links inside the primary identity cell when they are secondary actions; do not spend separate table columns on low-frequency external links.
+- Collapse simple row summary counts such as provider model counts into compact numeric badges inside the primary identity cell when the number is supporting context rather than a sortable analysis column.
+- Collapse duplicated row status hints into icon indicators under the primary identity cell when the same meaning is already conveyed by nearby identity/action affordances.
 - Consider row density, alignment, and visible row/column count controls when the table behaves like a spreadsheet.
 - Add `Export` only when the page owns exportable data. Add `Add Row` only when the page owns editable rows.
 
@@ -631,13 +652,20 @@ Run this checklist before implementation. It decides which parts of the baseline
 - [ ] Dashboard table sheets show compact KPI/context summary when they summarize operational state.
 - [ ] Active project/data scope is visible for project-scoped tables.
 - [ ] `Export` exists only when data export is meaningful.
-- [ ] `Add Row` exists only when the page owns editable rows.
+- [ ] `Import` exists only when the page owns a documented, previewable import schema for the same dataset.
+- [ ] `Add Row` exists only when the page owns editable rows; prefer domain labels such as `Add provider` when clearer.
 - [ ] `Reset` clearly resets view preferences, not domain data, unless explicitly labelled otherwise.
+- [ ] Restore/default actions name the domain object they restore and preserve unrelated secrets/cache/metadata.
+- [ ] Credential, filesystem, network, and destructive actions are not placed in a generic table toolbar.
+- [ ] Row health refresh actions sit near the status indicator and use per-row loading state.
 
 ### 7. Cell interaction
 
 - [ ] Interactive cells call `e.stopPropagation()` when rows have click behavior.
 - [ ] Buttons, links, selects, checkboxes, menus, and resize handles have visible focus states.
+- [ ] Secondary external links are icon-only with accessible labels/tooltips when embedded under the row identity.
+- [ ] Supporting row counts are compact numeric badges under the row identity when they are not needed as standalone sortable columns.
+- [ ] Repeated status hints are not duplicated as standalone columns and identity-adjacent icons.
 - [ ] Risky/destructive actions are explicit and show scope/consequence.
 - [ ] Document/path cells show stable labels, with raw paths in tooltip/context metadata only.
 
@@ -665,7 +693,8 @@ Run this checklist before implementation. It decides which parts of the baseline
 - [ ] Data-heavy tables include table-scoped search
 - [ ] Data-heavy tables support hidden columns, view presets, and view reset when applicable
 - [ ] Dashboard tables show active project/data scope and KPI/context summary when applicable
-- [ ] `Add Row` and `Export` are present only when the page owns editable/exportable data
+- [ ] `Add Row`, `Import`, and `Export` are present only when the page owns editable/importable/exportable data with clear user value
+- [ ] Generic table toolbars do not contain credential clearing, filesystem, bridge, network, or other destructive controls
 - [ ] Numeric columns store `number | null`, units in header
 - [ ] Action buttons call `e.stopPropagation()`
 - [ ] Cells > 30 lines extracted to `*Cell.tsx`
