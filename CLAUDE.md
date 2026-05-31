@@ -36,7 +36,7 @@ Source (Word/Excel/MD/Folder)
 ## Key Conventions
 
 - **Design system**: read `DESIGN.md` + `docs/design/shared-ai-desktop-style.md` before any UI change.
-- **Table/sheet views**: any `app/ui/views/` page with a table or tabs MUST use `WorkstationFrame` + `BottomSheetTabs`. Tab strips at panel **bottom** (Excel-style). See `docs/engineering/table-standards.md`.
+- **Table/sheet views**: read `/Users/Company-AI-App-Standards/docs/patterns/table-governance.md` first, then follow `docs/engineering/table-standards.md` and the `table-and-sheet-layout` skill. Any `app/ui/views/` page with a table or tabs MUST use `WorkstationFrame` + `BottomSheetTabs`; tab strips sit at the panel **bottom** (Excel-style).
 - **Feature folders**: canonical path `.project-manager/features/<ID>/`. Artifacts: `README.md`, `feature-spec.md`, `tdd-spec.md`, `debug-retro.md`, `test-scenarios.md`, `dev-log.md`, `notes.md`.
 - **Static export**: `app/api/` only runs under `next dev`. Anything shipped belongs in Rust.
 - **Bridge discipline**: never call `invoke()` directly from a component — always via `lib/bridge/index.ts`.

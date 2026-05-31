@@ -1,41 +1,66 @@
 # Project Manager Table Standards
 
 > Status: Active  
-> Last updated: 2026-05-26  
+> Last updated: 2026-05-31  
 > Audience: AI engineers and frontend maintainers
 
 ## Purpose
 
-This document is the implementation contract for Project Manager tables.  
-Use it when creating or extending table-heavy views so current and future pages stay consistent with the Project Progress Dashboard behavior.
+This document is the repo-local implementation contract for Project Manager tables.  
+Use it when creating or extending table-heavy views so current and future pages follow the company Table + Sheet baseline while staying consistent with Project Manager workstation behavior.
 
 ## Source Of Truth
 
-1. `DESIGN.md` and `docs/design/shared-ai-desktop-style.md`
-2. `.claude/skills/table-and-sheet-layout/SKILL.md`
-3. Reusable layout components (use these — do not inline equivalents):
+1. `/Users/Company-AI-App-Standards/docs/patterns/table-governance.md`
+2. `DESIGN.md` and `docs/design/shared-ai-desktop-style.md`
+3. `.claude/skills/table-and-sheet-layout/SKILL.md`
+4. `.agents/skills/table-and-sheet-layout/SKILL.md`
+5. Reusable layout components (use these — do not inline equivalents):
    - `components/layout/WorkstationFrame.tsx`
    - `components/sheets/BottomSheetTabs.tsx`
-4. Table implementations:
+6. Table implementations:
    - `app/project-progress-dashboard/_components/PhaseTable.tsx`
    - `app/project-progress-dashboard/_lib/columns.tsx`
    - `app/project-progress-dashboard/_lib/pathLinks.tsx`
    - `components/table/TableCore.tsx`
 
+When the company table-governance baseline and this repo-local contract appear to conflict, follow the company baseline unless Project Manager documents a deliberate exception in `DESIGN.md`, a feature note, or an ADR.
+
 ## Mandatory Rules
 
-### 1) Data and Sorting
+### 1) Classification and Baseline Features
+
+- Classify every table surface as `Simple Table`, `Basic Table Sheet`, `Large Data Sheet`, or `Read-only Exception`.
+- Unless explicitly classified as `Simple Table` or `Read-only Exception`, treat the surface as a `Basic Table Sheet`.
+- Basic Table Sheets and Large Data Sheets follow the company Basic Table Sheet Functional Requirements:
+  - table-scoped search
+  - first data column `col-id`
+  - default filters for `Provider`, `Category`, `Status`, and `Company` columns
+  - `Freeze cols`
+  - column width resize
+  - row height resize
+  - auto-saved table view preferences
+  - hide/show columns and rows
+  - column sort arrows
+  - reorderable sheet tabs
+  - accessibility, localization, recovery, and performance requirements
+- If a feature ships the baseline in phases, document which items are deferred and where recovery/reset remains available.
+
+### 2) Data and Sorting
 
 - Numeric fields must remain numeric in state/config (`number | null`).
 - Do not persist units (`%`, `ms`, etc.) in cell values.
 - Render units in headers or display layers only.
+- Persist table preference state by canonical row IDs, sheet IDs, and `col-*` column IDs. Never persist translated labels or array indexes.
 
-### 2) Row and Action Behavior
+### 3) Row and Action Behavior
 
 - If a row has `onClick`, every interactive child control must call `e.stopPropagation()`.
 - Action buttons must remain explicit (`Dispatch`, `Delete`, `Hide`, etc.), not icon-only by default.
+- Dataset actions such as `Add Project`, `Export`, `Re-init`, `Delete`, and `Sync` must be visually separated from view controls such as search, filters, freeze, hidden items, density, and reset.
+- Add `Export` only when the table owns a user-meaningful exportable dataset and the exported scope is unambiguous.
 
-### 3) Document Link Cells
+### 4) Document Link Cells
 
 - Path columns must show fixed labels for canonical artifacts.
 - Keep absolute/raw paths in tooltip/context only.
@@ -51,7 +76,7 @@ Canonical labels for dashboard document columns:
 - `test-scenarios.md`
 - `dev-log.md`
 
-### 4) Visual and Layout
+### 5) Visual and Layout
 
 - Use PM token palette (stone/emerald family) and avoid one-off colors.
 - Provide explicit empty state rows in every table body.

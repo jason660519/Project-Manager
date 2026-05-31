@@ -76,127 +76,67 @@ Reference migrations: `app/ui/views/ProjectFilesView.tsx`, `app/ui/views/KeysVie
 
 ---
 
-## Visual References
+## Governance Baseline
 
-Images are reference aids for human review and AI orientation. They do not replace the written checklist below; every required behavior still needs code, tests, and browser verification.
+Read `/Users/Company-AI-App-Standards/docs/patterns/table-governance.md` before designing or changing a table/sheet surface. That company document is the baseline contract for search, ID columns, filters, freeze columns, resize, hidden rows/columns, sorting, sheet reorder, accessibility, localization, recovery, and performance.
 
-### Settings table sheet reference
+This skill adds Project Manager-specific implementation rules. When this skill and the company baseline appear to conflict, follow the company baseline unless Project Manager has a documented local override in `docs/engineering/table-standards.md`, `DESIGN.md`, or an ADR.
 
-![Settings table sheet reference](./assets/settings-table-sheet-reference.jpg)
+## Table + Sheet Classification
 
-Use this as the reference shape for a settings-oriented table sheet:
+Before building or rewriting a table + sheet page, classify it in feature notes, PR text, or an app-local doc:
 
-- Header shows page title, short description, and current runtime/storage state.
-- Sheet content is a structured setting table, not a decorative card grid.
-- Each row has clear `Setting`, `Value`, `State`, and `Action` responsibilities.
-- Actions are scoped to settings and local preferences; do not add fake `Add Row`, data export, KPI, or lifecycle controls.
-- Bottom sheet tabs remain fixed at the bottom and represent settings groups.
-- If settings rows become comparable data with multiple rows/columns, apply the table-backed requirements: resize, category filters where applicable, and contained horizontal scroll.
+| Level | Use when | Project Manager expectation |
+|---|---|---|
+| Simple Table | Fewer than 20 rows, no horizontal overflow, no repeated operational use | Stable `col-id`, meaningful sorting, empty/error states, explicit row actions. |
+| Basic Table Sheet | Default for operational datasets | Full company Basic Table Sheet requirements plus this skill's workstation contract. |
+| Large Data Sheet | 1000+ rows or many wide columns | Basic Table Sheet plus virtualization/performance validation. |
+| Read-only Exception | Static reference table where customization would not help | Document skipped requirements and keep layout accessible. |
 
-### Data-heavy dashboard table sheet reference
+Do not copy every Project Progress Dashboard control into every screen. The classification decides the required scope.
 
-![Dashboard data table sheet reference](./assets/dashboard-data-table-sheet-reference.jpg)
+## Required Basic Table Sheet Contract
 
-Use this as the reference shape for data-heavy and dashboard table sheets:
+For Project Manager, every Basic Table Sheet and Large Data Sheet must implement or explicitly document a phased exception for the following company-standard controls:
 
-- Header shows page title, active project/data scope, and meaningful page-level actions.
-- KPI/context strip summarizes operational state before the table.
-- Toolbar controls are table-scoped: search, alignment/view controls, hidden columns, presets, reset, export, and row creation only when meaningful.
-- Main pane is a dense spreadsheet-like grid with compact rows, semantic badges, editable cells, document columns, and explicit empty/filter states.
-- Horizontal and vertical scrolling stay inside the workstation frame; bottom sheet tabs remain visible.
-- Bottom sheets map to user workflow or lifecycle phases and show meaningful row/state badges.
+- Table-scoped search in the table toolbar, before filters and view controls.
+- First data column with stable unique row IDs and column definition id `col-id`.
+- Default filters for columns whose header, key, or field name contains `Provider`, `Category`, `Status`, or `Company`.
+- `Freeze cols` numeric control for horizontally scrolling tables, with sticky frozen columns and persisted canonical `col-*` IDs.
+- User-resizable column widths with min/max bounds, persisted by canonical column ID.
+- User-resizable row heights for dense operational sheets, with persisted row height state where row identity is stable.
+- Auto-save for table view preferences: widths, heights, hidden columns, hidden rows, frozen columns, filters, sorting, and sheet order.
+- Column context menu: sort, filter, resize, freeze, hide, restore hidden columns, reset view.
+- Row context menu: open/details, resize row, hide row, restore hidden rows, row-specific actions.
+- Column sort arrows: default double arrow, up arrow ascending, down arrow descending; action/checkbox/menu columns are not sortable.
+- Reorderable sheet tabs for workbook-style multi-sheet views, unless the feature documents why a sheet is structurally locked.
+- Explicit empty, filtered-empty, loading, error, and malformed-preference recovery states.
+- Keyboard access, screen-reader labels, visible focus, locale-independent IDs, and non-color-only state indicators.
 
----
+Use the company performance target for dense sheets: rendering 1000 rows x 20 columns under 200 ms after data is loaded, or classify and document why the table is smaller.
 
-## Required Table + Sheet Baseline
-
-Before building or rewriting a table + sheet page, classify the page. Do not copy every Project Progress Dashboard control into every screen.
-
-| Page type | Required intent |
-|---|---|
-| Settings table sheet | Structured setting rows, explicit state, clear actions, sheet navigation. Use table infrastructure when it has comparable rows/columns. |
-| Data table sheet | Searchable, sortable, filterable, configurable dense rows. This is the default for operational datasets. |
-| Dashboard table sheet | Data table sheet plus KPI/context summary and workflow-level actions. |
-| Read-only sheet | Explicitly documented exception. Keep layout consistent, but skip edit/export controls that would be fake. |
-
-### All table + sheet workstation pages
+## Project Manager Workstation Rules
 
 - Use `WorkstationFrame`; do not inline an equivalent frame.
 - Use `BottomSheetTabs` for multi-sheet pages; tabs sit in the bottom slot.
 - Keep header, toolbar, table/content pane, and bottom tabs in their correct slots.
 - Keep bottom tabs visible and reachable on desktop and narrow viewports.
 - Avoid page-level horizontal overflow. Tables may own their own horizontal scroll.
-- Document any exception to full table infrastructure in feature notes or an ADR.
+- Do not add Import/Export just because another table has them. `Export` is valid only when the exported file is a user-meaningful artifact for the same dataset and can be described without ambiguity.
+- `Add Row` is valid only when the table owns editable row data. Prefer domain verbs such as `Add provider`, `Add project`, or `Restore default providers`.
+- Credential, bridge, filesystem, network, or destructive controls do not belong in generic view-control groups. Put them in row detail panels, settings/danger-zone panels, or explicit confirmation modals.
 
-### Table-backed sheet pages
+Recommended table toolbar order:
 
-- Every manually assigned column id uses the `col-` prefix.
-- Every visible table column exposes a clear header drag handle for user-resizable widths.
-- Column width state persists by canonical `col-` id, not by display label or column index.
-- Persisted widths normalize on read: drop unknown columns, clamp invalid widths, and apply defaults for newly-added columns.
-- Multi-sheet pages enable `BottomSheetTabs` reorder support (`reorderable`) and provide a stable `orderStorageKey`.
-- Persist only canonical sheet ids. Never persist translated labels, array indexes, or route-derived display text as order state.
-- Add focused regression coverage for default sheet order, user reorder persistence, and invalid stored-order fallback.
-- Empty, filtered-empty, loading, and error states are explicit.
-- Interactive cells stop row-click propagation.
+```text
+Search | Filters | Freeze cols | Hidden cols | Hidden rows | Density | Reset view | Dataset actions
+```
 
-### Horizontally scrolling tables
+Dataset actions such as Add Project, Import, Export, Delete, Sync, or Re-init must be visually separated from view controls.
 
-- Provide a `Freeze cols` control that lets users pin at least the identity/action-critical columns needed to keep rows understandable while scrolling.
-- Prefer the spreadsheet-style numeric `Freeze cols` control used by Integration Hub and dashboard sheets: freeze the first N visible columns, with `0` meaning no frozen columns. Use checkbox-style pinning only when non-contiguous pinning is a deliberate product requirement.
-- Store frozen column ids by canonical `col-` id and normalize them against the current column set.
-- Frozen columns use sticky positioning with computed left offsets, readable z-index layering, and an opaque/tokenized background.
-- Frozen cells must not be clipped by the same element that owns horizontal scrolling; follow the overflow rules below.
+## Reorderable Bottom Sheets
 
-### Category-like columns
-
-- Every category-like field supports sorting and category filtering: examples include `category`, `status`, `phase`, `type`, `provider`, `source`, `scope`, `permission`, and `runtime`.
-- Category filters use the raw semantic value as state and render labels/badges only in the display layer.
-- Filtering controls belong in the table toolbar or header filter UI, near the data they affect.
-- Sorting and filtering remain stable after column resize, freeze, sheet changes, and responsive layout changes.
-
-### Toolbar semantics
-
-Before adding or keeping a toolbar control, name the exact object it mutates:
-
-- **View controls** mutate only table presentation: search text, filters, sorting, visible columns, column widths, frozen columns, row density, and view presets. These belong in the table toolbar or column header filter UI.
-- **Dataset controls** mutate the rows owned by this table: add row, restore built-in rows, show hidden rows, reorder rows, or delete a custom row. These belong in the table toolbar only when the table owns that row data and the label says exactly what changes.
-- **Credential, bridge, filesystem, network, or destructive controls** do not belong in a generic table toolbar. Put them in the row detail sheet, a settings/danger-zone panel, or a modal that shows scope and consequence.
-- **Row health refresh controls** that re-check a row's status belong beside the status badge when they affect one row. Use per-row loading state; do not disable every row from one row refresh.
-
-Do not add Import/Export just because another table has them. `Export` is valid only when the exported file is a user-meaningful artifact for the same dataset and can be described without ambiguity. `Import` is valid only when the imported file is a documented, previewable schema for the same dataset; never use a generic `Import` label when the user could confuse provider definitions, API keys, project files, or model lists.
-
-Use specific verbs for provider/registry tables:
-
-- `Restore default providers` means restore provider row membership/order/visibility only. It must preserve API keys, validation metadata, model cache, and other credential state.
-- `Add provider` is clearer than `Add Row` when the row represents a provider entity.
-- `Clear key` / `Clear all keys` must stay outside the table toolbar unless the whole page is a dedicated danger-zone workflow with explicit confirmation and per-item failure reporting.
-
-### Data-heavy table sheets
-
-- Include table-scoped search. Do not rely only on the global topbar search.
-- Support column visibility controls such as `Hidden (n)` for non-essential columns.
-- Support view presets for useful combinations of widths, hidden columns, frozen columns, sort, and filters.
-- Provide a table-view `Reset` action that restores layout preferences without mutating domain data.
-- Collapse repeated reference URLs such as API key pages, usage pages, and docs into small icon-only links inside the primary identity cell when they are secondary actions; do not spend separate table columns on low-frequency external links.
-- Collapse simple row summary counts such as provider model counts into compact numeric badges inside the primary identity cell when the number is supporting context rather than a sortable analysis column.
-- Collapse duplicated row status hints into icon indicators under the primary identity cell when the same meaning is already conveyed by nearby identity/action affordances.
-- Consider row density, alignment, and visible row/column count controls when the table behaves like a spreadsheet.
-- Add `Export` only when the page owns exportable data. Add `Add Row` only when the page owns editable rows.
-
-### Dashboard table sheets
-
-- Show a compact KPI/context strip when the page summarizes operational state.
-- Show the active project/data scope near the title.
-- Make sheet taxonomy follow the user's workflow or lifecycle, not implementation names.
-- Use sheet badges for meaningful row counts or state counts.
-- Agent, cron, run, or execution panels are required only when the page monitors execution.
-
-These are not polish items. Treat them as table infrastructure for new table + sheet pages and for major rewrites of existing table + sheet pages, with the page classification deciding which tier applies.
-
-### Reorderable bottom sheets
-
-Table + sheet pages with more than one sheet must support user sheet reordering. Keep two concepts separate:
+Table + sheet pages with more than one sheet should support user sheet reordering. Keep two concepts separate:
 
 - **Canonical ids** — stable tab keys used by routes, URL hashes, types, tests, and feature logic.
 - **Display order** — a per-user UI preference that may be persisted locally.
@@ -204,13 +144,14 @@ Table + sheet pages with more than one sheet must support user sheet reordering.
 Rules:
 
 1. Never encode user display order into domain data or feature schema.
-2. Persist only a list of canonical ids, then normalize it on read: remove unknown ids, remove duplicates, append any newly-added sheets in default order.
+2. Persist only a list of canonical ids, then normalize it on read: remove unknown ids, remove duplicates, append newly-added sheets in default order.
 3. Keep URL hash validation and type unions based on canonical ids, not the stored display order.
-4. In Next.js/SSR routes, do not read `localStorage` in the `useState` initializer for the first render. Start with the default order so server and client HTML match, then read persisted order in `useEffect` after mount.
+4. In Next.js/SSR routes, do not read `localStorage` in the `useState` initializer for the first render. Start with default order, then read persisted order in `useEffect` after mount.
 5. Add focused tests for default order, reorder persistence, and invalid stored-order fallback.
-6. For drag reordering, do not rely on native HTML5 `draggable` on `<button>` tabs; it can look wired but fail in real pointer use. Prefer pointer/mouse handling where pressing a tab and entering another tab immediately reorders the display list. Store the currently dragged id in a ref as well as state, because `pointerenter` can fire before React has committed the `pointerdown` state update.
-7. Drag microinteractions should be restrained: slight lift, scale, tilt, shadow, and target ring are enough. If the user expects the sheet to follow the pointer, render a separate fixed-position drag ghost that tracks pointer coordinates while the original tab stays in the strip as a dimmed placeholder. Use short transform transitions and include `motion-reduce` fallbacks so reduced-motion users do not get animated movement.
-8. Prefer a shared tab component. If a view needs a dedicated tab strip for special styling/i18n, document the exception and keep its contract equivalent to `BottomSheetTabs`.
+6. Provide an accessible keyboard path such as Move left / Move right menu actions.
+7. For drag reordering, prefer pointer/mouse handling where pressing a tab and entering another tab reorders the display list. Do not rely only on native HTML5 `draggable` on `<button>` tabs.
+8. Drag microinteractions should be restrained and support `motion-reduce`.
+9. Prefer `BottomSheetTabs`. If a view needs a dedicated tab strip for special styling/i18n, document the exception and keep its contract equivalent.
 
 Project Progress Dashboard lesson: its tab contract has historically touched multiple files. Before changing dashboard sheet behavior, check:
 

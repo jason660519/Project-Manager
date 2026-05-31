@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This project follows Company AI App Standards v0.1.
+This project follows Company AI App Standards v0.2.
 
 ## Required Reading
 
@@ -28,6 +28,8 @@ Project Manager-specific implementation rules live in:
 - `./docs/file-naming-standards.md`
 - `./docs/design/shared-ai-desktop-style.md`
 - `./docs/architecture/`
+- `./.claude/skills/table-and-sheet-layout/SKILL.md`
+- `./.agents/skills/table-and-sheet-layout/SKILL.md`
 
 If Project Manager must deviate from company standards, create an ADR under `docs/architecture/`.
 
