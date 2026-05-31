@@ -15,6 +15,9 @@ import {
   xmuxWebviewDestroy,
   xmuxWebviewNavigate,
   xmuxWebviewEval,
+  xmuxWebviewOpenDevtools,
+  xmuxWebviewCloseDevtools,
+  xmuxWebviewIsDevtoolsOpen,
   xmuxWebviewReload,
   xmuxWebviewSelectElement,
   xmuxWebviewSetBounds,
@@ -762,6 +765,21 @@ export async function clearNativeCookies(itemId: string): Promise<void> {
 export async function evalNativeBrowserScript(itemId: string, script: string): Promise<void> {
   const session = requireNativeSession(itemId);
   await xmuxWebviewEval(session.label, script);
+}
+
+export async function openNativeBrowserDevtools(itemId: string): Promise<void> {
+  const session = requireNativeSession(itemId);
+  await xmuxWebviewOpenDevtools(session.label);
+}
+
+export async function closeNativeBrowserDevtools(itemId: string): Promise<void> {
+  const session = requireNativeSession(itemId);
+  await xmuxWebviewCloseDevtools(session.label);
+}
+
+export async function isNativeBrowserDevtoolsOpen(itemId: string): Promise<boolean> {
+  const session = requireNativeSession(itemId);
+  return xmuxWebviewIsDevtoolsOpen(session.label);
 }
 
 export async function getNativeConsoleEntries(itemId: string): Promise<string> {

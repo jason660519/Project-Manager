@@ -207,6 +207,24 @@ export async function xmuxWebviewEval(label: string, script: string): Promise<vo
   return invoke<void>('xmux_webview_eval', { label, script });
 }
 
+/** Open the OS-native Web Inspector (Chrome F12-equivalent) for the native webview. */
+export async function xmuxWebviewOpenDevtools(label: string): Promise<void> {
+  if (!isTauri()) throw new Error('xmuxWebviewOpenDevtools requires Tauri runtime');
+  return invoke<void>('xmux_webview_open_devtools', { label });
+}
+
+/** Close the OS-native Web Inspector for the native webview. */
+export async function xmuxWebviewCloseDevtools(label: string): Promise<void> {
+  if (!isTauri()) throw new Error('xmuxWebviewCloseDevtools requires Tauri runtime');
+  return invoke<void>('xmux_webview_close_devtools', { label });
+}
+
+/** Whether the OS-native Web Inspector is currently open for the native webview. */
+export async function xmuxWebviewIsDevtoolsOpen(label: string): Promise<boolean> {
+  if (!isTauri()) throw new Error('xmuxWebviewIsDevtoolsOpen requires Tauri runtime');
+  return invoke<boolean>('xmux_webview_is_devtools_open', { label });
+}
+
 export async function xmuxWebviewConsoleEntries(label: string): Promise<string> {
   if (!isTauri()) throw new Error('xmuxWebviewConsoleEntries requires Tauri runtime');
   return invoke<string>('xmux_webview_console_entries', { label });

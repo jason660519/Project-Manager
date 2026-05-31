@@ -12,8 +12,6 @@ import { usePhasePreferences } from './_lib/usePhasePreferences';
 import { computePhaseCounts, type PhaseRow } from './_lib/phaseRows';
 import { SheetTabs } from './_components/SheetTabs';
 import { SharedStatsCards } from './_components/SharedStatsCards';
-import { AgentOpsPanel } from './_components/AgentOpsPanel';
-import { CronControlPanel } from './_components/CronControlPanel';
 import { ExportProgressDialog } from './_components/ExportProgressDialog';
 import { PhaseTabContent } from './_components/PhaseTabContent';
 import { IssuesTab } from './_components/IssuesTab';
@@ -94,11 +92,11 @@ function readInitialTab(): TabId {
 }
 
 export function ProjectProgressClient({
-  project, projectRoot, features, adapters, engineerRoles, cronJobs, activeRuns,
+  project, projectRoot, features, adapters, engineerRoles, activeRuns,
   runHistory = [], projects, selectedProjectId, selectedDashboardProjectIds,
   dashboardProjectNames, dashboardProjects, onSelectProject, onToggleDashboardProject,
   onAddProject, onUpdateProject, onRemoveProject, onSyncFromDesktop,
-  onCronJobsChange, onFeaturePatch, onFeaturePromptSave, onRunCronJob,
+  onFeaturePatch, onFeaturePromptSave,
   onRunStart, onRunLog, onRunEnd,
 }: ProjectProgressClientProps) {
   const [activeTab, setActiveTab] = useState<TabId>(() => readInitialTab());
@@ -207,17 +205,6 @@ export function ProjectProgressClient({
         }
       >
         <div className="flex h-full min-h-0 flex-col gap-4 overflow-auto p-4">
-          {isPhaseTab && activePhase === 'development' && (
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-              <AgentOpsPanel adapters={adapters} activeRuns={activeRuns} />
-              <CronControlPanel
-                cronJobs={cronJobs}
-                onCronJobsChange={onCronJobsChange}
-                onRunJob={onRunCronJob}
-              />
-            </div>
-          )}
-
           <div className="min-h-0 flex-1">
             {activeTab === 'projects' ? (
               <ProjectsView

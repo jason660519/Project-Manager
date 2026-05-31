@@ -147,6 +147,33 @@ pub async fn xmux_webview_eval(
     webview.eval(script).map_err(|e| e.to_string())
 }
 
+/// Open the OS-native Web Inspector (WKWebView on macOS, WebView2 DevTools on
+/// Windows) for an xmux browser pane — the closest equivalent to Chrome's F12
+/// DevTools (Elements / Console / Network / Sources). The inspector opens in a
+/// separate native window; embedding it inside the React side panel is not
+/// supported by WKWebView/WebView2.
+#[tauri::command]
+pub async fn xmux_webview_open_devtools(app: AppHandle, label: String) -> Result<(), String> {
+    // `open_devtools` is compiled into tauri because the `devtools` feature is
+    // enabled in Cargo.toml (it ships the inspector in release builds too).
+    let webview = get_child(&app, &label)?;
+    webview.open_devtools();
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn xmux_webview_close_devtools(app: AppHandle, label: String) -> Result<(), String> {
+    let webview = get_child(&app, &label)?;
+    webview.close_devtools();
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn xmux_webview_is_devtools_open(app: AppHandle, label: String) -> Result<bool, String> {
+    let webview = get_child(&app, &label)?;
+    Ok(webview.is_devtools_open())
+}
+
 fn console_capture_script() -> String {
     r#"
 (function () {

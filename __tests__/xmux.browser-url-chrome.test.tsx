@@ -234,7 +234,7 @@ describe('xmux browser URL chrome', () => {
     expect(setSlotHidden).not.toHaveBeenCalledWith('browser-focus-test');
   });
 
-  it('supports Go button submit after editing the URL field', async () => {
+  it('submits via Enter after editing the URL field', async () => {
     const user = userEvent.setup();
     const onNavigate = vi.fn();
 
@@ -250,10 +250,25 @@ describe('xmux browser URL chrome', () => {
     const input = screen.getByLabelText('Browser URL');
     await user.clear(input);
     await user.type(input, 'localhost:43187/xmux');
-    await user.click(screen.getByRole('button', { name: 'Go' }));
+    await user.keyboard('{Enter}');
 
     expect(onNavigate).toHaveBeenCalledWith('http://localhost:43187/xmux');
     expect(screen.getByLabelText('Browser URL')).toHaveValue('http://localhost:43187/xmux');
+  });
+
+  it('does not render Go, Console, or CSS Inspector controls', () => {
+    render(
+      <BrowserContent
+        itemId="browser-removed-controls-test"
+        url="https://github.com/jason660519/Project-Manager"
+        homepageUrl="https://github.com/jason660519/Project-Manager"
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Go' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Show browser console')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Show CSS Inspector')).not.toBeInTheDocument();
   });
 
   it.each([
@@ -365,7 +380,7 @@ describe('xmux browser URL chrome', () => {
     expect(clearNativeBrowsingData).toHaveBeenCalledWith('browser-maintenance-test');
   });
 
-  it('toggles Select Element, Console, and CSS Inspector controls', async () => {
+  it('toggles Select Element mode with an active highlight and dispatches captured context', async () => {
     const user = userEvent.setup();
     const writeText = vi.fn(async () => {});
     Object.defineProperty(navigator, 'clipboard', {
@@ -393,6 +408,7 @@ describe('xmux browser URL chrome', () => {
       expect(selectNativeBrowserElement).toHaveBeenCalledWith('browser-inspector-test');
       expect(selectButton).toHaveAttribute('aria-pressed', 'true');
       expect(selectButton.className).toContain('text-blue-200');
+      expect(selectButton.className).toContain('ring-blue-400/70');
     });
 
     await user.click(selectButton);
@@ -448,36 +464,6 @@ describe('xmux browser URL chrome', () => {
     expect(dragStore.get(XMUX_SELECTED_ELEMENT_MIME)).toContain('[xmux element: bottom · button]');
     expect(dragStore.get('text/plain')).toContain('selector: body > button');
     expect(dragStore.get('application/json')).toContain('"elementTag": "button"');
-
-    await user.click(screen.getByLabelText('Show browser console'));
-    expect(screen.getByText('Console')).toBeInTheDocument();
-    await waitFor(() => {
-      expect(getNativeConsoleEntries).toHaveBeenCalledWith('browser-inspector-test');
-      expect(screen.getByText('POST https://collector.github.com/github/collect 503 (Service Unavailable)')).toBeInTheDocument();
-      expect(screen.queryByText(/Console capture is ready/)).not.toBeInTheDocument();
-    });
-
-    await user.type(screen.getByLabelText('Filter console logs'), 'hydration');
-    expect(screen.getByText('hydration warning')).toBeInTheDocument();
-    expect(screen.queryByText('POST https://collector.github.com/github/collect 503 (Service Unavailable)')).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Clear' }));
-    await waitFor(() => {
-      expect(clearNativeConsoleEntries).toHaveBeenCalledWith('browser-inspector-test');
-    });
-
-    await user.click(screen.getByLabelText('Show CSS Inspector'));
-    expect(screen.getByText('CSS Inspector')).toBeInTheDocument();
-    expect(screen.getByText('button.primary.rounded')).toBeInTheDocument();
-    expect(screen.getByText('Box Model')).toBeInTheDocument();
-    expect(screen.getByText('Content')).toBeInTheDocument();
-    expect(screen.getByText('W 94')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'CSS' }));
-    expect(screen.getByText('primary')).toBeInTheDocument();
-    expect(screen.getByText('background-color')).toBeInTheDocument();
-    expect(screen.getByText('rgb(31, 111, 235)')).toBeInTheDocument();
-    expect(screen.queryByText(/Computed style capture is staged/)).not.toBeInTheDocument();
     window.removeEventListener('pm:xmux-selected-element', selectedListener);
   });
 

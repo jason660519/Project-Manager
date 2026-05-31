@@ -185,7 +185,7 @@ describe('xmux registry integration', () => {
     expect(screen.getByLabelText('Browser URL')).toBeInTheDocument();
     expect(input).toHaveValue('example.com/docs');
 
-    await user.click(screen.getByRole('button', { name: 'Go' }));
+    await user.keyboard('{Enter}');
 
     expect(screen.getByLabelText('Browser URL')).toHaveValue('http://example.com/docs');
     expect(screen.getByRole('button', { name: 'example.com' })).toBeInTheDocument();

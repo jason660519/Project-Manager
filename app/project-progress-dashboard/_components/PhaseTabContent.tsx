@@ -6,7 +6,6 @@ import { useI18n } from '../../../lib/i18n';
 import type { CustomProjectProgressRow, PhaseTablePrefs } from '../types';
 import { buildPhaseRows, type PhaseRow } from '../_lib/phaseRows';
 import { columnsForPhase } from '../_lib/columns';
-import { summarizeStatuses } from '../_lib/aggregations';
 import {
   E2E_TEST_CATEGORY_IDS,
   e2eCategorySearchTokens,
@@ -55,11 +54,6 @@ export function PhaseTabContent({
     () => buildPhaseRows(features, phase, prefs.customRows, { defaultProjectName: projectName }),
     [features, phase, prefs.customRows, projectName],
   );
-
-  // Status summary for the top-of-tab strip (development tab uses it).
-  const summary = useMemo(() => summarizeStatuses(
-    allRows.map((r) => r.feature ?? syntheticFeature(r)),
-  ), [allRows]);
 
   const categoryList = useMemo(() => {
     const set = new Set<string>();
@@ -205,15 +199,6 @@ export function PhaseTabContent({
 
   return (
     <div className="flex flex-col gap-2">
-      {phase === 'development' && (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <SummaryCard label="Completed"    value={summary.completed} />
-          <SummaryCard label="In Progress"  value={summary.in_progress} />
-          <SummaryCard label="Not Started"  value={summary.not_started} />
-          <SummaryCard label="On Hold"      value={summary.on_hold} />
-        </div>
-      )}
-
       <PhaseTableToolbar
         prefs={prefs}
         patch={patch}
@@ -259,35 +244,4 @@ export function PhaseTabContent({
       />
     </div>
   );
-}
-
-function SummaryCard({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded border border-stone-200/15 bg-[rgb(var(--pm-card))]/70 px-2 py-1">
-      <p className="text-[10px] uppercase tracking-[0.1em] text-stone-400">{label}</p>
-      <p className="text-sm font-semibold text-stone-100">{value}</p>
-    </div>
-  );
-}
-
-/** Minimal Feature shim built from a custom PhaseRow so aggregations work. */
-function syntheticFeature(row: PhaseRow): Feature {
-  return {
-    id: row.id,
-    name: row.name,
-    category: row.category,
-    status: row.status,
-    progress: row.progress,
-    points: row.points,
-    paths: {},
-    testCoverage: row.testCoverage,
-    testStatus: row.testStatus,
-    deployStatus: row.deployStatus,
-    deployEnv: row.deployEnv,
-    deployDate: row.deployDate,
-    uptimePercent: row.uptimePercent,
-    errorRate: row.errorRate,
-    avgResponseTime: row.avgResponseTime,
-    lastIncident: row.lastIncident,
-  };
 }

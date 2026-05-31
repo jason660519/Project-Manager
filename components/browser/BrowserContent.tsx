@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Braces,
+  Bug,
   Camera,
   Chrome,
   Clipboard,
-  Code2,
   Cookie,
   Copy,
   Crosshair,
@@ -18,7 +18,6 @@ import {
   MoreHorizontal,
   Plus,
   RotateCcw,
-  TerminalSquare,
 } from 'lucide-react';
 import { deriveBrowserLabel } from '../terminal/blockLayout';
 import { openExternalUrl } from '../../lib/bridge';
@@ -30,13 +29,14 @@ import {
 import { BrowserSlot } from './BrowserSlot';
 import {
   backendKind,
-  clearNativeConsoleEntries,
   clearNativeBrowsingData,
   clearNativeCookies,
   evalNativeBrowserScript,
   getEmbedFailure,
-  getNativeConsoleEntries,
   getNativeCurrentUrl,
+  openNativeBrowserDevtools,
+  closeNativeBrowserDevtools,
+  isNativeBrowserDevtoolsOpen,
   retryNativeEmbed,
   reloadNativeBrowser,
   selectNativeBrowserElement,
@@ -50,24 +50,6 @@ type BrowserStatus = {
   tone: 'info' | 'success' | 'warning' | 'error';
   message: string;
 } | null;
-
-type BrowserConsoleLevel = 'debug' | 'log' | 'info' | 'warn' | 'error';
-
-type BrowserConsoleEntry = {
-  id: string;
-  timestamp: string;
-  kind: 'console' | 'exception' | 'rejection' | 'network';
-  level: BrowserConsoleLevel;
-  message: string;
-  args: string[];
-  url: string;
-  line: number | null;
-  column: number | null;
-  status: number | null;
-  method: string | null;
-};
-
-type CssInspectorTab = 'design' | 'css';
 
 type DomTreeNode = {
   tag?: string;
@@ -161,42 +143,6 @@ function parseCssInspectorPayload(payload: unknown): CssInspectorPayload | null 
   return payload as CssInspectorPayload;
 }
 
-function parseConsoleEntries(raw: string): BrowserConsoleEntry[] {
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    const entries = typeof parsed === 'string' ? JSON.parse(parsed) as unknown : parsed;
-    if (!Array.isArray(entries)) return [];
-    return entries.flatMap((entry): BrowserConsoleEntry[] => {
-      if (!entry || typeof entry !== 'object') return [];
-      const value = entry as Record<string, unknown>;
-      const level = typeof value.level === 'string' ? value.level : 'log';
-      const kind = typeof value.kind === 'string' ? value.kind : 'console';
-      return [{
-        id: typeof value.id === 'string' ? value.id : `${value.timestamp ?? Date.now()}-${Math.random()}`,
-        timestamp: typeof value.timestamp === 'string' ? value.timestamp : new Date().toISOString(),
-        kind: kind === 'exception' || kind === 'rejection' || kind === 'network' ? kind : 'console',
-        level: level === 'debug' || level === 'info' || level === 'warn' || level === 'error' ? level : 'log',
-        message: typeof value.message === 'string' ? value.message : '',
-        args: Array.isArray(value.args) ? value.args.map((arg) => String(arg)) : [],
-        url: typeof value.url === 'string' ? value.url : '',
-        line: typeof value.line === 'number' ? value.line : null,
-        column: typeof value.column === 'number' ? value.column : null,
-        status: typeof value.status === 'number' ? value.status : null,
-        method: typeof value.method === 'string' ? value.method : null,
-      }];
-    });
-  } catch {
-    return [];
-  }
-}
-
-function consoleLevelClass(level: BrowserConsoleLevel): string {
-  if (level === 'error') return 'border-red-500/25 bg-red-950/25 text-red-100';
-  if (level === 'warn') return 'border-amber-500/25 bg-amber-950/25 text-amber-100';
-  if (level === 'info') return 'border-sky-500/20 bg-sky-950/20 text-sky-100';
-  return 'border-stone-800 bg-stone-950/30 text-stone-200';
-}
-
 function IconButton({
   active = false,
   activeClassName,
@@ -249,13 +195,7 @@ export function BrowserContent({
   const [zoomPercent, setZoomPercent] = useState(100);
   const [status, setStatus] = useState<BrowserStatus>(null);
   const [selectMode, setSelectMode] = useState(false);
-  const [consoleOpen, setConsoleOpen] = useState(false);
-  const [consoleEntries, setConsoleEntries] = useState<BrowserConsoleEntry[]>([]);
-  const [consoleFilter, setConsoleFilter] = useState('');
-  const [consoleError, setConsoleError] = useState<string | null>(null);
-  const [cssInspectorOpen, setCssInspectorOpen] = useState(false);
-  const [cssInspectorTab, setCssInspectorTab] = useState<CssInspectorTab>('design');
-  const [cssInspectorPayload, setCssInspectorPayload] = useState<CssInspectorPayload | null>(null);
+  const [devtoolsOpen, setDevtoolsOpen] = useState(false);
   const [selectedDragContext, setSelectedDragContext] = useState<{
     snippet: string;
     payload: CssInspectorPayload;
@@ -269,7 +209,26 @@ export function BrowserContent({
 
   const embedFailure = getEmbedFailure(itemId);
   const inTauri = backendKind() === 'tauri';
-  const nativeActive = sessionKind(itemId) === 'tauri';
+  // `sessionKind` reads non-reactive module state, and the native webview session
+  // is created in BrowserSlot's mount effect *after* this component first renders.
+  // Poll it into React state so controls (Select Element, DevTools, blocked hint)
+  // reactively flip to "native" once the session is ready, instead of staying
+  // stale-false and only showing the "requires native browser" warning.
+  const [nativeActive, setNativeActive] = useState(() => sessionKind(itemId) === 'tauri');
+
+  useEffect(() => {
+    let cancelled = false;
+    const sync = () => {
+      if (cancelled) return;
+      setNativeActive(sessionKind(itemId) === 'tauri');
+    };
+    sync();
+    const interval = window.setInterval(sync, 400);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [itemId]);
 
   const showBlockedHint = useMemo(() => {
     if (nativeActive) return false;
@@ -288,48 +247,6 @@ export function BrowserContent({
     },
     [],
   );
-
-  useEffect(() => {
-    if (!consoleOpen) return;
-    if (!nativeActive) {
-      setConsoleError('Console requires the Tauri native Xmux browser. Browser preview cannot read remote page logs.');
-      setConsoleEntries([]);
-      return;
-    }
-
-    let cancelled = false;
-    const refresh = () => {
-      void getNativeConsoleEntries(itemId)
-        .then((raw) => {
-          if (cancelled) return;
-          setConsoleEntries(parseConsoleEntries(raw));
-          setConsoleError(null);
-        })
-        .catch((err) => {
-          if (cancelled) return;
-          const message = err instanceof Error ? err.message : String(err);
-          setConsoleError(message);
-        });
-    };
-
-    refresh();
-    const interval = window.setInterval(refresh, 1200);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [consoleOpen, itemId, nativeActive]);
-
-  useEffect(() => {
-    const handleSelectedElement = (event: Event) => {
-      const payload = parseCssInspectorPayload((event as CustomEvent<unknown>).detail);
-      if (payload) {
-        setCssInspectorPayload(payload);
-      }
-    };
-    window.addEventListener('pm:xmux-selected-element', handleSelectedElement);
-    return () => window.removeEventListener('pm:xmux-selected-element', handleSelectedElement);
-  }, []);
 
   const navigate = () => {
     const next = normalizeUrl(draftUrl);
@@ -416,21 +333,36 @@ export function BrowserContent({
     [itemId, runNativeAction],
   );
 
-  const clearConsole = useCallback(() => {
+  const toggleDevtools = useCallback(() => {
     if (!nativeActive) {
-      nativeUnavailable('Clear Console');
+      nativeUnavailable('DevTools');
       return;
     }
-    void clearNativeConsoleEntries(itemId)
+    const shouldOpen = !devtoolsOpen;
+    const action = shouldOpen
+      ? openNativeBrowserDevtools(itemId)
+      : closeNativeBrowserDevtools(itemId);
+    void action
       .then(() => {
-        setConsoleEntries([]);
-        setConsoleError(null);
+        setDevtoolsOpen(shouldOpen);
+        setStatus(
+          shouldOpen
+            ? {
+                tone: 'success',
+                message:
+                  'Opened native DevTools (Elements / Console / Network / Sources). Drag its edge or use the inspector dock buttons to resize / detach into its own window.',
+              }
+            : { tone: 'info', message: 'Closed native DevTools.' },
+        );
       })
       .catch((err) => {
         const message = err instanceof Error ? err.message : String(err);
-        setConsoleError(message);
+        setStatus({
+          tone: 'error',
+          message: `${shouldOpen ? 'Open' : 'Close'} DevTools failed: ${message}`,
+        });
       });
-  }, [itemId, nativeActive, nativeUnavailable]);
+  }, [devtoolsOpen, itemId, nativeActive, nativeUnavailable]);
 
   const exitSelectElementMode = useCallback(
     (message?: string) => {
@@ -470,7 +402,6 @@ export function BrowserContent({
         });
         return;
       }
-      setCssInspectorPayload(inspectorPayload);
       const snippet = formatXmuxSelectedElementSnippet(inspectorPayload);
       setSelectedDragContext({ snippet, payload: inspectorPayload });
       const text = JSON.stringify(payload, null, 2);
@@ -539,6 +470,38 @@ export function BrowserContent({
   }, [exitSelectElementMode, selectMode]);
 
   useEffect(() => {
+    if (!isActive) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'F12') return;
+      event.preventDefault();
+      toggleDevtools();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isActive, toggleDevtools]);
+
+  useEffect(() => {
+    if (!nativeActive) {
+      setDevtoolsOpen(false);
+      return;
+    }
+    let cancelled = false;
+    const sync = () => {
+      void isNativeBrowserDevtoolsOpen(itemId)
+        .then((open) => {
+          if (!cancelled) setDevtoolsOpen(open);
+        })
+        .catch(() => {});
+    };
+    sync();
+    const interval = window.setInterval(sync, 1500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [itemId, nativeActive]);
+
+  useEffect(() => {
     if (!selectMode) return;
     const onPointerDown = (event: PointerEvent) => {
       const pane = browserPaneRef.current;
@@ -590,7 +553,7 @@ export function BrowserContent({
         />
         <IconButton
           active={selectMode}
-          activeClassName="border-blue-400/70 bg-blue-500/20 text-blue-200"
+          activeClassName="border-blue-400 bg-blue-500/30 text-blue-200 ring-1 ring-inset ring-blue-400/70"
           onClick={startSelectElement}
           title={selectMode ? 'Exit Select Element mode' : 'Select Element'}
           ariaLabel="Select Element mode"
@@ -598,28 +561,13 @@ export function BrowserContent({
           <Crosshair size={12} />
         </IconButton>
         <IconButton
-          active={consoleOpen}
-          onClick={() => setConsoleOpen((value) => !value)}
-          title={consoleOpen ? 'Hide Console' : 'Console'}
-          ariaLabel={consoleOpen ? 'Hide browser console' : 'Show browser console'}
+          active={devtoolsOpen}
+          onClick={toggleDevtools}
+          title={devtoolsOpen ? 'Close DevTools (F12)' : 'Open DevTools (F12) — Elements / Console / Network / Sources'}
+          ariaLabel={devtoolsOpen ? 'Close native browser DevTools' : 'Open native browser DevTools'}
         >
-          <TerminalSquare size={12} />
+          <Bug size={12} />
         </IconButton>
-        <IconButton
-          active={cssInspectorOpen}
-          onClick={() => setCssInspectorOpen((value) => !value)}
-          title="Show CSS Inspector"
-          ariaLabel="Show CSS Inspector"
-        >
-          <Code2 size={12} />
-        </IconButton>
-        <button
-          type="button"
-          onClick={navigate}
-          className="shrink-0 border border-stone-700 px-2 py-1 text-stone-300 hover:border-stone-500 hover:text-stone-100"
-        >
-          Go
-        </button>
         <button
           type="button"
           onClick={openExternally}
@@ -746,38 +694,6 @@ export function BrowserContent({
             isActive={isActive}
           />
         </div>
-        {consoleOpen || cssInspectorOpen ? (
-          <BrowserSidePanel>
-            {consoleOpen ? (
-              <BrowserSideSection
-                title="Console"
-                icon={<TerminalSquare size={13} />}
-                onClose={() => setConsoleOpen(false)}
-              >
-                <BrowserConsole
-                  entries={consoleEntries}
-                  error={consoleError}
-                  filter={consoleFilter}
-                  onFilterChange={setConsoleFilter}
-                  onClear={clearConsole}
-                />
-              </BrowserSideSection>
-            ) : null}
-            {cssInspectorOpen ? (
-              <BrowserSideSection
-                title="CSS Inspector"
-                icon={<Clipboard size={13} />}
-                onClose={() => setCssInspectorOpen(false)}
-              >
-                <CssInspector
-                  payload={cssInspectorPayload}
-                  activeTab={cssInspectorTab}
-                  onTabChange={setCssInspectorTab}
-                />
-              </BrowserSideSection>
-            ) : null}
-          </BrowserSidePanel>
-        ) : null}
       </div>
     </div>
   );
@@ -827,353 +743,6 @@ function SelectedElementDragChip({
   );
 }
 
-function BrowserConsole({
-  entries,
-  error,
-  filter,
-  onFilterChange,
-  onClear,
-}: {
-  entries: BrowserConsoleEntry[];
-  error: string | null;
-  filter: string;
-  onFilterChange: (value: string) => void;
-  onClear: () => void;
-}) {
-  const normalizedFilter = filter.trim().toLowerCase();
-  const visibleEntries = normalizedFilter
-    ? entries.filter((entry) =>
-        [
-          entry.level,
-          entry.kind,
-          entry.message,
-          entry.url,
-          entry.method ?? '',
-          entry.status ? String(entry.status) : '',
-        ].join(' ').toLowerCase().includes(normalizedFilter),
-      )
-    : entries;
-
-  return (
-    <div className="flex min-h-[220px] flex-col gap-2">
-      <div className="flex items-center gap-2">
-        <input
-          value={filter}
-          onChange={(event) => onFilterChange(event.target.value)}
-          placeholder="Filter"
-          className="min-w-0 flex-1 border border-stone-800 bg-stone-950 px-2 py-1 text-[11px] text-stone-200 outline-none focus:border-sky-500/60"
-          aria-label="Filter console logs"
-        />
-        <button
-          type="button"
-          onClick={onClear}
-          className="shrink-0 border border-stone-700 px-2 py-1 text-stone-300 hover:border-stone-500 hover:text-stone-100"
-        >
-          Clear
-        </button>
-      </div>
-      <div className="text-[10px] text-stone-500">
-        {visibleEntries.length} of {entries.length} logs
-      </div>
-      {error ? (
-        <div className="border border-amber-500/25 bg-amber-950/25 px-2 py-1.5 text-amber-100">
-          {error}
-        </div>
-      ) : null}
-      <div className="min-h-0 flex-1 overflow-auto border border-stone-900 bg-black/25">
-        {visibleEntries.length === 0 ? (
-          <div className="px-2 py-3 text-stone-500">
-            No console logs captured yet. New console, JavaScript error, fetch, and XHR failure entries will appear here.
-          </div>
-        ) : (
-          <div className="divide-y divide-stone-900">
-            {visibleEntries.map((entry) => (
-              <ConsoleEntryRow key={entry.id} entry={entry} />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ConsoleEntryRow({ entry }: { entry: BrowserConsoleEntry }) {
-  const source = entry.url
-    ? `${entry.url}${entry.line ? `:${entry.line}${entry.column ? `:${entry.column}` : ''}` : ''}`
-    : '';
-  return (
-    <div className={`border-l-2 px-2 py-1.5 ${consoleLevelClass(entry.level)}`}>
-      <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.08em] text-stone-500">
-        <span className="font-semibold">{entry.level}</span>
-        <span>{entry.kind}</span>
-        {entry.method ? <span>{entry.method}</span> : null}
-        {entry.status ? <span>{entry.status}</span> : null}
-        <time className="ml-auto normal-case tracking-normal">
-          {new Date(entry.timestamp).toLocaleTimeString()}
-        </time>
-      </div>
-      <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-[11px] leading-4">
-        {entry.message || entry.args.join(' ')}
-      </pre>
-      {source ? (
-        <div className="mt-1 truncate font-mono text-[10px] text-stone-500" title={source}>
-          {source}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function CssInspector({
-  payload,
-  activeTab,
-  onTabChange,
-}: {
-  payload: CssInspectorPayload | null;
-  activeTab: CssInspectorTab;
-  onTabChange: (tab: CssInspectorTab) => void;
-}) {
-  if (!payload) {
-    return (
-      <div className="space-y-2 text-stone-500">
-        <p>Select an element in the browser pane to inspect its DOM position, box model, classes, and computed styles.</p>
-        <p>Use the crosshair Select Element control, then click a page component.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex min-h-[260px] flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-1">
-        <span className="border border-sky-500/25 bg-sky-950/30 px-1.5 py-0.5 font-mono text-[10px] text-sky-100">
-          {payload.positionTag ?? 'selected'}
-        </span>
-        <span className="border border-stone-700 bg-stone-900 px-1.5 py-0.5 font-mono text-[10px] text-stone-200">
-          {payload.elementTag ?? payload.domTree?.tag ?? 'element'}
-        </span>
-      </div>
-      {payload.selector || payload.cssPath ? (
-        <div className="truncate font-mono text-[10px] text-stone-500" title={payload.selector ?? payload.cssPath}>
-          {payload.selector ?? payload.cssPath}
-        </div>
-      ) : null}
-      <div>
-        <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-stone-500">Components</div>
-        <div className="max-h-44 overflow-auto border border-stone-900 bg-black/20 p-1">
-          {payload.domTree ? <DomTreeView node={payload.domTree} selected /> : <div className="px-1 py-2 text-stone-500">No DOM tree captured.</div>}
-        </div>
-      </div>
-      <div className="flex gap-1 border-b border-stone-800">
-        <InspectorTabButton active={activeTab === 'design'} onClick={() => onTabChange('design')}>
-          Design
-        </InspectorTabButton>
-        <InspectorTabButton active={activeTab === 'css'} onClick={() => onTabChange('css')}>
-          CSS
-        </InspectorTabButton>
-      </div>
-      {activeTab === 'design' ? <CssInspectorDesign payload={payload} /> : <CssInspectorCss payload={payload} />}
-    </div>
-  );
-}
-
-function InspectorTabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        'px-2 py-1 text-[11px] font-semibold',
-        active ? 'bg-stone-700 text-stone-100' : 'text-stone-500 hover:text-stone-200',
-      ].join(' ')}
-    >
-      {children}
-    </button>
-  );
-}
-
-function DomTreeView({
-  node,
-  depth = 0,
-  selected = false,
-}: {
-  node: DomTreeNode;
-  depth?: number;
-  selected?: boolean;
-}) {
-  const className = node.className ? `.${node.className.split(/\s+/).filter(Boolean).slice(0, 3).join('.')}` : '';
-  const label = `${node.tag ?? 'element'}${node.id ? `#${node.id}` : ''}${className}`;
-  const children = Array.isArray(node.children) ? node.children.slice(0, 20) : [];
-  return (
-    <div>
-      <div
-        className={[
-          'truncate px-1 py-0.5 font-mono text-[10px]',
-          selected ? 'bg-sky-500/20 text-sky-100' : 'text-stone-300',
-        ].join(' ')}
-        style={{ paddingLeft: `${depth * 10 + 4}px` }}
-        title={label}
-      >
-        {label}
-      </div>
-      {children.map((child, index) => (
-        <DomTreeView key={`${child.tag ?? 'node'}-${index}`} node={child} depth={depth + 1} />
-      ))}
-    </div>
-  );
-}
-
-function CssInspectorDesign({ payload }: { payload: CssInspectorPayload }) {
-  const summary = payload.computedStyleSummary ?? {};
-  return (
-    <div className="space-y-3">
-      <InspectorSection title="Position">
-        <ValueGrid
-          rows={[
-            ['X', formatNumber(payload.boxModel?.rect?.x)],
-            ['Y', formatNumber(payload.boxModel?.rect?.y)],
-            ['W', formatNumber(payload.boxModel?.rect?.width)],
-            ['H', formatNumber(payload.boxModel?.rect?.height)],
-            ['Position', summary.position],
-            ['Z', summary.zIndex],
-          ]}
-        />
-      </InspectorSection>
-      <InspectorSection title="Layout">
-        <ValueGrid
-          rows={[
-            ['Display', summary.display],
-            ['Box', summary.boxSizing],
-            ['Flex', summary.flex],
-            ['Align', summary.alignItems],
-            ['Justify', summary.justifyContent],
-            ['Overflow', summary.overflow],
-          ]}
-        />
-      </InspectorSection>
-      <InspectorSection title="Box Model">
-        <BoxModelView payload={payload} />
-      </InspectorSection>
-      <InspectorSection title="Typography">
-        <ValueGrid
-          rows={[
-            ['Font', summary.fontFamily],
-            ['Size', summary.fontSize],
-            ['Weight', summary.fontWeight],
-            ['Line', summary.lineHeight],
-            ['Color', summary.color],
-            ['Letter', summary.letterSpacing],
-          ]}
-        />
-      </InspectorSection>
-    </div>
-  );
-}
-
-function CssInspectorCss({ payload }: { payload: CssInspectorPayload }) {
-  const computedEntries = Object.entries(payload.computedStyle ?? {}).sort(([a], [b]) => a.localeCompare(b));
-  return (
-    <div className="space-y-3">
-      <InspectorSection title="Class List">
-        {payload.classList && payload.classList.length > 0 ? (
-          <div className="flex flex-wrap gap-1">
-            {payload.classList.map((name) => (
-              <span key={name} className="border border-stone-800 bg-stone-950 px-1.5 py-0.5 font-mono text-[10px] text-stone-300">
-                {name}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <div className="text-stone-500">No classes.</div>
-        )}
-      </InspectorSection>
-      <InspectorSection title="Computed Styles">
-        <div className="max-h-64 overflow-auto border border-stone-900 bg-black/20">
-          {computedEntries.length === 0 ? (
-            <div className="px-2 py-2 text-stone-500">No computed styles captured.</div>
-          ) : (
-            computedEntries.map(([name, value]) => (
-              <div key={name} className="grid grid-cols-[minmax(0,0.45fr)_minmax(0,0.55fr)] gap-2 border-b border-stone-900 px-2 py-1 font-mono text-[10px]">
-                <span className="truncate text-sky-200" title={name}>{name}</span>
-                <span className="truncate text-stone-300" title={value}>{value}</span>
-              </div>
-            ))
-          )}
-        </div>
-      </InspectorSection>
-      <InspectorSection title="Outer HTML">
-        <pre className="max-h-36 overflow-auto whitespace-pre-wrap break-words border border-stone-900 bg-black/20 p-2 font-mono text-[10px] text-stone-300">
-          {payload.outerHTML ?? 'No outerHTML captured.'}
-        </pre>
-      </InspectorSection>
-    </div>
-  );
-}
-
-function InspectorSection({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section>
-      <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-stone-500">{title}</div>
-      {children}
-    </section>
-  );
-}
-
-function ValueGrid({ rows }: { rows: Array<[string, unknown]> }) {
-  return (
-    <div className="grid grid-cols-2 gap-1">
-      {rows.map(([label, value]) => (
-        <div key={label} className="min-w-0 border border-stone-900 bg-black/20 px-2 py-1">
-          <div className="text-[10px] text-stone-500">{label}</div>
-          <div className="truncate font-mono text-[11px] text-stone-200" title={String(value ?? '')}>
-            {String(value || '-')}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function BoxModelView({ payload }: { payload: CssInspectorPayload }) {
-  const box = payload.boxModel;
-  if (!box) return <div className="text-stone-500">No box model captured.</div>;
-  return (
-    <div className="space-y-1 font-mono text-[10px]">
-      <BoxSideRow label="Margin" side={box.margin} />
-      <BoxSideRow label="Border" side={box.border} />
-      <BoxSideRow label="Padding" side={box.padding} />
-      <div className="grid grid-cols-3 gap-1">
-        <span className="border border-stone-900 bg-black/20 px-2 py-1 text-stone-500">Content</span>
-        <span className="border border-stone-900 bg-black/20 px-2 py-1 text-stone-200">W {formatNumber(box.content?.width)}</span>
-        <span className="border border-stone-900 bg-black/20 px-2 py-1 text-stone-200">H {formatNumber(box.content?.height)}</span>
-      </div>
-    </div>
-  );
-}
-
-function BoxSideRow({ label, side }: { label: string; side?: BoxSide }) {
-  return (
-    <div className="grid grid-cols-5 gap-1">
-      <span className="border border-stone-900 bg-black/20 px-2 py-1 text-stone-500">{label}</span>
-      <span className="border border-stone-900 bg-black/20 px-2 py-1 text-stone-200">T {formatNumber(side?.top)}</span>
-      <span className="border border-stone-900 bg-black/20 px-2 py-1 text-stone-200">R {formatNumber(side?.right)}</span>
-      <span className="border border-stone-900 bg-black/20 px-2 py-1 text-stone-200">B {formatNumber(side?.bottom)}</span>
-      <span className="border border-stone-900 bg-black/20 px-2 py-1 text-stone-200">L {formatNumber(side?.left)}</span>
-    </div>
-  );
-}
-
-function formatNumber(value: unknown): string {
-  return typeof value === 'number' && Number.isFinite(value) ? String(Math.round(value * 100) / 100) : '-';
-}
-
 function MenuButton({
   icon,
   label,
@@ -1195,40 +764,3 @@ function MenuButton({
   );
 }
 
-function BrowserSidePanel({ children }: { children: ReactNode }) {
-  return (
-    <aside className="relative z-[100] flex w-[320px] shrink-0 flex-col overflow-auto border-l border-stone-800 bg-stone-950/95 text-[11px] text-stone-400">
-      {children}
-    </aside>
-  );
-}
-
-function BrowserSideSection({
-  title,
-  icon,
-  onClose,
-  children,
-}: {
-  title: string;
-  icon: ReactNode;
-  onClose: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <section className="shrink-0 border-b border-stone-800">
-      <div className="flex h-7 items-center gap-2 border-b border-stone-800 px-2 text-stone-200">
-        {icon}
-        <span className="font-semibold">{title}</span>
-        <button
-          type="button"
-          onClick={onClose}
-          className="ml-auto text-stone-500 hover:text-stone-200"
-          aria-label={`Close ${title}`}
-        >
-          Hide
-        </button>
-      </div>
-      <div className="px-2 py-2">{children}</div>
-    </section>
-  );
-}
