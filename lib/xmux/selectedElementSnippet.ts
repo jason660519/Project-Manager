@@ -12,6 +12,10 @@ export interface XmuxSelectedElementSnippetPayload {
 }
 
 export const XMUX_SELECTED_ELEMENT_MIME = 'application/x-project-manager-xmux-selected-element';
+const MAX_STRING_LENGTH = 1800;
+const MAX_OBJECT_DEPTH = 5;
+const MAX_ARRAY_ITEMS = 24;
+const MAX_OBJECT_KEYS = 48;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -43,6 +47,36 @@ function deriveElementTag(payload: XmuxSelectedElementSnippetPayload): string {
   return 'element';
 }
 
+function truncateString(value: string): string {
+  if (value.length <= MAX_STRING_LENGTH) return value;
+  return `${value.slice(0, MAX_STRING_LENGTH)}\n... [truncated ${value.length - MAX_STRING_LENGTH} chars]`;
+}
+
+function compactValue(value: unknown, depth = 0): unknown {
+  if (typeof value === 'string') return truncateString(value);
+  if (typeof value !== 'object' || value === null) return value;
+  if (depth >= MAX_OBJECT_DEPTH) {
+    if (Array.isArray(value)) return `[array truncated at depth ${MAX_OBJECT_DEPTH}]`;
+    return '[object truncated]';
+  }
+  if (Array.isArray(value)) {
+    const items = value.slice(0, MAX_ARRAY_ITEMS).map((item) => compactValue(item, depth + 1));
+    if (value.length > MAX_ARRAY_ITEMS) {
+      items.push(`[${value.length - MAX_ARRAY_ITEMS} more items]`);
+    }
+    return items;
+  }
+  const entries = Object.entries(value);
+  const out: Record<string, unknown> = {};
+  for (const [key, entryValue] of entries.slice(0, MAX_OBJECT_KEYS)) {
+    out[key] = compactValue(entryValue, depth + 1);
+  }
+  if (entries.length > MAX_OBJECT_KEYS) {
+    out.__truncatedKeys = entries.length - MAX_OBJECT_KEYS;
+  }
+  return out;
+}
+
 export function formatXmuxSelectedElementSnippet(payload: XmuxSelectedElementSnippetPayload): string {
   const positionTag = payload.positionTag ?? 'selected';
   const elementTag = deriveElementTag(payload);
@@ -57,10 +91,13 @@ export function formatXmuxSelectedElementSnippet(payload: XmuxSelectedElementSni
     elementTag: payload.elementTag,
     selector: selector || undefined,
     url: payload.url,
-    element: payload.element,
-    domTree: payload.domTree,
-    ancestry: payload.ancestry,
-    outerHTML: payload.outerHTML,
+    classList: payload.classList,
+    computedStyleSummary: payload.computedStyleSummary,
+    boxModel: payload.boxModel,
+    element: compactValue(payload.element),
+    domTree: compactValue(payload.domTree),
+    ancestry: compactValue(payload.ancestry),
+    outerHTML: compactValue(payload.outerHTML),
   };
   const header = `[xmux element: ${positionTag} · ${elementTag}]`;
   const lines = selector ? [header, `selector: ${selector}`] : [header];

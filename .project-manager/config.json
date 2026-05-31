@@ -1028,14 +1028,15 @@
       "phase": "development",
       "points": 3,
       "locatedSection": "/xmux",
-      "notes": "Removed pane-toolbar AI Assistant tab; Select Element sends DOM payload to docked Assistant; Console mirrors native webview logs; CSS Inspector now renders selected DOM tree, Design tab, CSS tab, box model, class list, and computed styles.",
+      "notes": "Select Element Tauri E2E coverage is in place; Xmux browser Console frontend is hidden while backend capture/bridge dependencies are retained.",
       "createdAt": "2026-05-27T07:06:00.000Z",
-      "updatedAt": "2026-05-27T10:25:00.000Z",
+      "updatedAt": "2026-05-31T23:03:40+10:00",
       "readmePath": ".project-manager/features/F34/README.md",
       "paths": {
         "featureFolder": ".project-manager/features/F34/",
         "spec": ".project-manager/features/F34/feature-spec.md",
         "tdd": ".project-manager/features/F34/tdd-spec.md",
+        "debugRetro": ".project-manager/features/F34/debug-retro.md",
         "testScenarios": ".project-manager/features/F34/test-scenarios.md",
         "developmentLogSummaryFolder": ".project-manager/features/F34/",
         "implementation": "app/ui/views/XmuxView.tsx",
@@ -1265,6 +1266,6 @@
     "root": "/Volumes/KLEVV-4T-1/Project-Manager"
   },
   "schemaVersion": 8,
-  "updatedAt": "2026-05-30T05:25:00.000Z",
+  "updatedAt": "2026-05-31T17:40:00.000+10:00",
   "updatedBy": "Codex"
 }

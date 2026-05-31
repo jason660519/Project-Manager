@@ -49,13 +49,15 @@ Acceptance:
 
 ### US-04: Console visibility
 
+Status: hidden as of 2026-05-31. Backend capture/bridge commands are retained, but the browser chrome Console entry must not be exposed until the drawer has a passing Tauri-native reliability check.
+
 **As a** developer  
 **I want** Console/Hide Console in the browser chrome  
 **So that** I can see logs and page errors for the active browser pane.
 
 Acceptance:
 
-- Console icon toggles a compact console drawer for the active browser item.
+- While hidden, no Console icon, menu option, drawer, filter, or clear control is reachable from the Xmux browser UI.
 - Tauri/native mode captures `console.debug/log/info/warn/error`, runtime errors, unhandled promise rejections, failed `fetch`, and failed `XMLHttpRequest` entries from the active child webview.
 - Console rows show level, kind, message, source URL, line/column when available, timestamp, HTTP method, and HTTP status where applicable.
 - Console supports filtering and clearing the active pane's captured buffer.

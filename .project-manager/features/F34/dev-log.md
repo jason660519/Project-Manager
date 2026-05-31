@@ -171,3 +171,88 @@ User asked to start implementation after first creating or updating the dashboar
 - `npm run test -- __tests__/xmux.browser-url-chrome.test.tsx` — pass, 10 tests.
 - `cargo check --manifest-path src-tauri/Cargo.toml` — pass.
 - `npm run typecheck` — pass.
+
+## 2026-05-31 AEST — Desktop Select Element callback fixed and debug retro retained
+
+### User feedback
+
+- Web app Select Element became normal, but desktop app still had the same symptoms.
+- Reported symptoms included missing pressed/highlight feedback, selected DOM information not appearing in the left AI Assistants input, and select mode feeling one-shot after one selection.
+
+### Root cause
+
+The desktop path used Tauri native child webviews, not the browser iframe fallback. `xmux_webview_select_element` used `eval_with_callback` with an injected Promise that only resolved after a future click. The native callback did not function as a durable event channel for that later click, so the host received an empty or unusable payload and the assistant insertion path had nothing useful to render.
+
+### Fix
+
+- Replaced the delayed Promise callback with an injected click listener that reports through a private Tauri IPC resolve command.
+- Validated browser label and nonce in native state before returning the payload to the waiting command.
+- Added nonce/waiter cleanup for superseded selection, eval failure, timeout, destroy, and destroy-all paths.
+- Compacted selected DOM payloads before inserting into the assistant input.
+- Opened the docked AI Assistant when selected-element context arrives.
+- Rewrote same-port loopback iframe preview URLs to the current origin for browser fallback parity.
+
+### Experience retention
+
+- Added `debug-retro.md` with symptoms, reproduction paths, root cause, final fix, verification evidence, retention storage standard, and quarterly review mechanism.
+- Rebuilt `test-scenarios.md` as a scenario matrix mapping real user paths to unit/integration coverage and future browser/Tauri E2E candidates.
+- Registered `paths.debugRetro` and refreshed F34 metadata in `.project-manager/config.json`.
+
+### Verification
+
+- `npm run test -- --run __tests__/BrowserRegistry.iframe-preview.test.ts __tests__/xmux.selectedElementSnippet.test.ts __tests__/chat.input.test.tsx __tests__/chat.panel.test.tsx __tests__/xmux.browser-url-chrome.test.tsx` — pass, 5 files / 46 tests.
+- `npm run typecheck` — pass.
+- `cargo check --manifest-path src-tauri/Cargo.toml` — pass.
+- `git diff --check` — pass.
+- Browser smoke on `http://localhost:43187/xmux` — pass.
+- Desktop app after restart/rebuild — user confirmed Select Element is finally normal.
+
+## 2026-05-31 AEST — F34-S05/F34-S06/F34-S16 Tauri-native E2E harness
+
+### Request
+
+User asked to upgrade F34-S05, F34-S06, and F34-S16 into Tauri-native E2E coverage because those scenarios best prevent the web-normal/desktop-broken regression class.
+
+### Implementation
+
+- Added `npm run e2e:tauri:f34-select`.
+- Added a Tauri-only self-test route at `/e2e/tauri/f34-select-element`.
+- Added a fixture route at `/e2e/fixtures/f34-select-element`.
+- The runner launches `tauri dev` with a config override so the desktop window opens directly to the self-test route.
+- The self-test creates a native xmux child webview, primes a fixture selector queue, arms `xmuxWebviewSelectElement` twice in the same pane, validates selected DOM payloads, formats snippets, appends them to a simulated AI Assistant input, and writes a JSON report under `.project-manager/e2e-reports/`.
+
+### Scenario coverage
+
+- F34-S05: first native selection must return selector, DOM tree, and assistant snippet content.
+- F34-S06: second consecutive native selection must return a fresh selector, proving stale native callback state did not block repeat use.
+- F34-S16: suite must run inside Tauri (`__TAURI_INTERNALS__`) and exercise native xmux webview commands.
+
+### Verification
+
+- `npm run e2e:tauri:f34-select` — pass. Report covered F34-S05 (`button#first-target`), F34-S06 (`button#second-target`), and F34-S16 (`runtime: tauri`).
+
+## 2026-05-31 AEST — Xmux Browser Console frontend hidden after dependency scan
+
+### Request
+
+User asked to scan all dependencies for the Xmux browser Console feature, then delete it if unused and broken or hide frontend entry points if backend dependencies still exist.
+
+### Dependency scan result
+
+- Frontend dependencies: `components/browser/BrowserContent.tsx` owns Console state, parser, drawer UI, filter, and clear action.
+- Registry dependencies: `components/browser/BrowserRegistry.ts` exposes `getNativeConsoleEntries` and `clearNativeConsoleEntries`.
+- Bridge dependencies: `lib/bridge/index.ts` exposes `xmuxWebviewConsoleEntries` and `xmuxWebviewClearConsole`.
+- Native dependencies: `src-tauri/src/xmux_webview.rs` installs console capture hooks and exposes `xmux_webview_console_entries` / `xmux_webview_clear_console`; `src-tauri/src/lib.rs` registers those commands.
+- Test/spec dependencies: `__tests__/xmux.browser-url-chrome.test.tsx`, `__tests__/BrowserRegistry.iframe-preview.test.ts`, F34 spec/TDD/scenario docs reference the feature.
+
+### Decision
+
+The feature is not safe to delete because native/bridge/registry code still depends on the console capture path. The user-facing entry is hidden instead.
+
+### Implementation
+
+- Added `XMUX_BROWSER_CONSOLE_HIDDEN` in `BrowserContent.tsx` with a maintenance comment listing retained dependencies.
+- Hid the Console toolbar button and blocked the Console side panel from rendering.
+- Prevented hidden Console state from polling `getNativeConsoleEntries`.
+- Updated `xmux.browser-url-chrome.test.tsx` to assert the Console entry is absent and native console read/clear are not called from UI.
+- Updated `test-scenarios.md` so F34-S13 is marked hidden with backend retained.

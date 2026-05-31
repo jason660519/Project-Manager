@@ -259,7 +259,7 @@ describe('xmux browser URL chrome', () => {
     expect(screen.getByLabelText('Browser URL')).toHaveValue('http://localhost:43187/xmux');
   });
 
-  it('renders Console, CSS Inspector, and DevTools controls without the legacy Go button', () => {
+  it('hides the disabled Console entry while keeping CSS Inspector and DevTools controls', () => {
     render(
       <BrowserContent
         itemId="browser-removed-controls-test"
@@ -270,7 +270,8 @@ describe('xmux browser URL chrome', () => {
     );
 
     expect(screen.queryByRole('button', { name: 'Go' })).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Show browser console')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Show browser console')).not.toBeInTheDocument();
+    expect(screen.queryByText('Console')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Show CSS Inspector')).toBeInTheDocument();
     expect(screen.getByLabelText('Open native browser DevTools')).toBeInTheDocument();
   });
@@ -469,21 +470,10 @@ describe('xmux browser URL chrome', () => {
     expect(dragStore.get('text/plain')).toContain('selector: body > button');
     expect(dragStore.get('application/json')).toContain('"elementTag": "button"');
 
-    await user.click(screen.getByLabelText('Show browser console'));
-    expect(screen.getByText('Console')).toBeInTheDocument();
-    await waitFor(() => {
-      expect(getNativeConsoleEntries).toHaveBeenCalledWith('browser-inspector-test');
-      expect(screen.getByText('POST https://collector.github.com/github/collect 503 (Service Unavailable)')).toBeInTheDocument();
-    });
-
-    await user.type(screen.getByLabelText('Filter console logs'), 'hydration');
-    expect(screen.getByText('hydration warning')).toBeInTheDocument();
-    expect(screen.queryByText('POST https://collector.github.com/github/collect 503 (Service Unavailable)')).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Clear' }));
-    await waitFor(() => {
-      expect(clearNativeConsoleEntries).toHaveBeenCalledWith('browser-inspector-test');
-    });
+    expect(screen.queryByLabelText('Show browser console')).not.toBeInTheDocument();
+    expect(screen.queryByText('Console')).not.toBeInTheDocument();
+    expect(getNativeConsoleEntries).not.toHaveBeenCalled();
+    expect(clearNativeConsoleEntries).not.toHaveBeenCalled();
 
     await user.click(screen.getByLabelText('Show CSS Inspector'));
     expect(screen.getByText('CSS Inspector')).toBeInTheDocument();

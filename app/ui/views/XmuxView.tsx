@@ -605,6 +605,14 @@ function InteropConsole({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [assistantOpen]);
 
+  useEffect(() => {
+    const handleSelectedElement = () => {
+      setAssistantOpen(true);
+    };
+    window.addEventListener('pm:xmux-selected-element', handleSelectedElement);
+    return () => window.removeEventListener('pm:xmux-selected-element', handleSelectedElement);
+  }, []);
+
   return (
     <section
       ref={rootRef}

@@ -71,6 +71,13 @@ type BrowserConsoleEntry = {
   method: string | null;
 };
 
+// HIDDEN 2026-05-31: Xmux Browser Console UI is disabled because the feature is
+// not reliable enough as a user-facing drawer. Keep native console plumbing for
+// current dependents: BrowserContent parser/state, BrowserRegistry
+// getNativeConsoleEntries/clearNativeConsoleEntries, lib/bridge xmux console
+// wrappers, src-tauri xmux_webview console capture commands, and F34 docs/tests.
+const XMUX_BROWSER_CONSOLE_HIDDEN = true;
+
 type CssInspectorTab = 'design' | 'css';
 
 type DomTreeNode = {
@@ -305,6 +312,7 @@ export function BrowserContent({
   }, [nativeActive, inTauri, url]);
 
   const hintIsNativeFallback = inTauri && !nativeActive;
+  const browserConsoleOpen = !XMUX_BROWSER_CONSOLE_HIDDEN && consoleOpen;
 
   const nativeUnavailable = useCallback(
     (action: string) => {
@@ -317,7 +325,7 @@ export function BrowserContent({
   );
 
   useEffect(() => {
-    if (!consoleOpen) return;
+    if (!browserConsoleOpen) return;
     if (!nativeActive) {
       setConsoleError('Console requires the Tauri native Xmux browser. Browser preview cannot read remote page logs.');
       setConsoleEntries([]);
@@ -345,7 +353,7 @@ export function BrowserContent({
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [consoleOpen, itemId, nativeActive]);
+  }, [browserConsoleOpen, itemId, nativeActive]);
 
   useEffect(() => {
     const handleSelectedElement = (event: Event) => {
@@ -705,14 +713,16 @@ export function BrowserContent({
         >
           <Crosshair size={12} />
         </IconButton>
-        <IconButton
-          active={consoleOpen}
-          onClick={() => setConsoleOpen((value) => !value)}
-          title={consoleOpen ? 'Hide Console' : 'Console'}
-          ariaLabel={consoleOpen ? 'Hide browser console' : 'Show browser console'}
-        >
-          <TerminalSquare size={12} />
-        </IconButton>
+        {!XMUX_BROWSER_CONSOLE_HIDDEN ? (
+          <IconButton
+            active={consoleOpen}
+            onClick={() => setConsoleOpen((value) => !value)}
+            title={consoleOpen ? 'Hide Console' : 'Console'}
+            ariaLabel={consoleOpen ? 'Hide browser console' : 'Show browser console'}
+          >
+            <TerminalSquare size={12} />
+          </IconButton>
+        ) : null}
         <IconButton
           active={cssInspectorOpen}
           onClick={() => setCssInspectorOpen((value) => !value)}
@@ -855,9 +865,9 @@ export function BrowserContent({
             isActive={isActive}
           />
         </div>
-        {consoleOpen || cssInspectorOpen ? (
+        {browserConsoleOpen || cssInspectorOpen ? (
           <BrowserSidePanel>
-            {consoleOpen ? (
+            {browserConsoleOpen ? (
               <BrowserSideSection
                 title="Console"
                 icon={<TerminalSquare size={13} />}

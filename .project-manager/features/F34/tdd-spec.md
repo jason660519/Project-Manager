@@ -32,18 +32,22 @@
 | E1 | Click Select Element icon | Select mode toggles active and icon has active state |
 | E2 | Browser mode + Select Element | Visible unsupported/native-required status |
 | E3 | Tauri mode + Select Element | Native select-element command returns payload |
-| E4 | Click Console icon | Console drawer opens and requests native console entries |
+| E4 | Console hidden gate | Console icon is absent and native console entries are not requested from UI |
 | E5 | Click CSS icon before selection | CSS Inspector drawer opens with empty state |
 | E6 | Select element, then click CSS icon | CSS Inspector shows selected DOM tree and Design tab |
 
 ## Suite F: Native console mirror
 
-1. Opening Console calls `getNativeConsoleEntries(itemId)`.
-2. Returned console entries render level/kind metadata and the message body.
-3. Failed network entries such as `POST ... 503` render in the Console drawer.
-4. Filter input narrows visible entries.
-5. Clear button calls `clearNativeConsoleEntries(itemId)` and empties the local list.
-6. Placeholder copy (`Console capture is ready...`) must not render.
+Status: hidden as of 2026-05-31. Keep backend coverage expectations here for future re-enable, but current UI tests must prove no Console entry is exposed.
+
+1. Console toolbar entry must not render while `XMUX_BROWSER_CONSOLE_HIDDEN` is true.
+2. Hidden Console state must not call `getNativeConsoleEntries(itemId)` from UI.
+3. Hidden Console state must not expose filter or clear controls.
+4. Backend wrappers `getNativeConsoleEntries` and `clearNativeConsoleEntries` remain available for dependent code.
+5. If the UI is re-enabled, opening Console must call `getNativeConsoleEntries(itemId)`.
+6. If the UI is re-enabled, returned entries must render level/kind metadata and the message body.
+7. If the UI is re-enabled, failed network entries such as `POST ... 503` must render in the Console drawer.
+8. If the UI is re-enabled, filter input narrows visible entries and Clear calls `clearNativeConsoleEntries(itemId)`.
 
 ## Suite G: CSS Inspector selected element view
 

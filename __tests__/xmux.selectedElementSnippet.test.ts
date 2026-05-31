@@ -87,4 +87,27 @@ describe('xmux selected element snippet', () => {
     expect(snippet).toContain('"element"');
     expect(snippet).toContain('"ancestry"');
   });
+
+  it('bounds large DOM payloads before inserting them into chat input', () => {
+    const payload = {
+      positionTag: 'center',
+      elementTag: 'section',
+      selector: 'main > section',
+      outerHTML: `<section>${'x'.repeat(3000)}</section>`,
+      domTree: {
+        tag: 'section',
+        children: Array.from({ length: 40 }, (_, index) => ({
+          tag: 'div',
+          text: `row ${index}`,
+          children: [{ tag: 'span', text: 'deep child' }],
+        })),
+      },
+    };
+
+    const snippet = formatXmuxSelectedElementSnippet(payload);
+
+    expect(snippet).toContain('[xmux element: center · section]');
+    expect(snippet).toContain('truncated');
+    expect(snippet.length).toBeLessThan(9000);
+  });
 });

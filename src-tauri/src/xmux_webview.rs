@@ -3,8 +3,9 @@
 //! Uses `Window::add_child` so the native view only covers the browser slot
 //! rectangle — not a separate `WebviewWindow` that stacks above all React chrome.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::oneshot;
 use tokio::time::{timeout, Duration};
 
@@ -13,7 +14,40 @@ use tauri::{
 };
 use tauri::webview::WebviewBuilder;
 
-pub struct XmuxWebviewState(pub Mutex<HashSet<String>>);
+#[derive(Default)]
+pub struct XmuxWebviewRegistry {
+    labels: HashSet<String>,
+    select_waiters: HashMap<String, SelectWaiter>,
+}
+
+pub struct XmuxWebviewState(pub Mutex<XmuxWebviewRegistry>);
+
+struct SelectWaiter {
+    nonce: String,
+    sender: oneshot::Sender<String>,
+}
+
+fn next_select_nonce() -> String {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos().to_string())
+        .unwrap_or_else(|_| "0".to_string())
+}
+
+fn resolve_select_payload(state: &State<'_, XmuxWebviewState>, label: &str, nonce: &str, payload: String) {
+    if let Ok(mut guard) = state.0.lock() {
+        let nonce_matches = guard
+            .select_waiters
+            .get(label)
+            .map(|waiter| waiter.nonce == nonce)
+            .unwrap_or(false);
+        if nonce_matches {
+            if let Some(waiter) = guard.select_waiters.remove(label) {
+                let _ = waiter.sender.send(payload);
+            }
+        }
+    }
+}
 
 fn host_window(app: &AppHandle) -> Result<tauri::Window, String> {
     if let Some(main) = app.get_webview("main") {
@@ -74,7 +108,7 @@ pub async fn xmux_webview_create(
         .map_err(|e| format!("xmux_webview_create failed: {e}"))?;
 
     if let Ok(mut guard) = state.0.lock() {
-        guard.insert(label);
+        guard.labels.insert(label);
     }
     Ok(())
 }
@@ -388,25 +422,33 @@ window.__pmXmuxConsoleCapture?.clear?.();
         .map_err(|e| e.to_string())
 }
 
-fn select_element_script() -> String {
-    r#"
+fn select_element_script(label: &str, nonce: &str) -> Result<String, String> {
+    let label_json = serde_json::to_string(label).map_err(|e| e.to_string())?;
+    let nonce_json = serde_json::to_string(nonce).map_err(|e| e.to_string())?;
+    Ok(r#"
 new Promise((resolve) => {
   const KEY = '__pmXmuxSelectElement';
+  const RESULT_KEY = '__pmXmuxSelectElementResult';
+  const LABEL = __LABEL_JSON__;
+  const NONCE = __NONCE_JSON__;
   if (window[KEY] && typeof window[KEY].cleanup === 'function') {
     window[KEY].cleanup();
   }
+  window[RESULT_KEY] = '';
 
   const style = document.createElement('style');
   style.textContent = '* { cursor: crosshair !important; } [data-pm-xmux-hover="true"] { outline: 2px solid Highlight !important; outline-offset: 2px !important; }';
   document.documentElement.appendChild(style);
 
   let hovered = null;
-  const textOf = (node) => (node.innerText || node.textContent || '').replace(/\s+/g, ' ').trim();
+  const MAX_TEXT = 1200;
+  const MAX_HTML = 2000;
+  const MAX_CHILDREN = 24;
+  const textOf = (node) => (node.innerText || node.textContent || '').replace(/\s+/g, ' ').trim().slice(0, MAX_TEXT);
+  const truncate = (value, max) => typeof value === 'string' && value.length > max
+    ? value.slice(0, max) + '\n... [truncated ' + (value.length - max) + ' chars]'
+    : value;
   const attrsOf = (node) => Object.fromEntries(Array.from(node.attributes || []).map((attr) => [attr.name, attr.value]));
-  const computedStyleOf = (node) => {
-    const style = getComputedStyle(node);
-    return Object.fromEntries(Array.from(style).map((name) => [name, style.getPropertyValue(name)]));
-  };
   const computedStyleSummaryOf = (node) => {
     const style = getComputedStyle(node);
     return {
@@ -491,8 +533,9 @@ new Promise((resolve) => {
     }
     return parts.join(' > ');
   };
-  const serializeNode = (node) => {
+  const serializeNode = (node, depth = 0) => {
     if (!(node instanceof Element)) return null;
+    const children = Array.from(node.children || []);
     return {
       tag: node.tagName.toLowerCase(),
       id: node.id || '',
@@ -501,7 +544,10 @@ new Promise((resolve) => {
       ariaLabel: node.getAttribute('aria-label') || '',
       text: textOf(node),
       attributes: attrsOf(node),
-      children: Array.from(node.children || []).map(serializeNode).filter(Boolean)
+      children: depth >= 3
+        ? []
+        : children.slice(0, MAX_CHILDREN).map((child) => serializeNode(child, depth + 1)).filter(Boolean),
+      truncatedChildren: children.length > MAX_CHILDREN ? children.length - MAX_CHILDREN : 0
     };
   };
   const ancestryOf = (node) => {
@@ -540,9 +586,18 @@ new Promise((resolve) => {
     document.removeEventListener('keydown', onKeyDown, true);
     delete window[KEY];
   };
-  const cancel = () => {
+  const finish = (payload) => {
+    const payloadText = JSON.stringify(payload);
+    window[RESULT_KEY] = payloadText;
     cleanup();
-    resolve(JSON.stringify({ cancelled: true }));
+    const invoke = window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke;
+    if (typeof invoke === 'function') {
+      invoke('xmux_webview_resolve_select_element', { label: LABEL, nonce: NONCE, payload: payloadText }).catch(() => {});
+    }
+    resolve(payloadText);
+  };
+  const cancel = () => {
+    finish({ cancelled: true });
   };
   const onKeyDown = (event) => {
     if (event.key === 'Escape') {
@@ -555,22 +610,9 @@ new Promise((resolve) => {
     hovered = event.target;
     if (hovered instanceof Element) hovered.setAttribute('data-pm-xmux-hover', 'true');
   };
-  const onClick = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const el = event.target;
-    if (!(el instanceof Element)) {
-      cleanup();
-      resolve(JSON.stringify({ error: 'Clicked target was not an element.' }));
-      return;
-    }
-    if (el === document.documentElement || el === document.body) {
-      cleanup();
-      resolve(JSON.stringify({ cancelled: true, reason: 'blank-area' }));
-      return;
-    }
+  const payloadFor = (el) => {
     const rect = el.getBoundingClientRect();
-    const payload = {
+    return {
       source: 'Project Manager Xmux Select Element',
       url: location.href,
       capturedAt: new Date().toISOString(),
@@ -579,7 +621,6 @@ new Promise((resolve) => {
       positionTag: positionTagFor(rect),
       elementTag: el.tagName.toLowerCase(),
       classList: Array.from(el.classList || []),
-      computedStyle: computedStyleOf(el),
       computedStyleSummary: computedStyleSummaryOf(el),
       boxModel: boxModelOf(el),
       element: {
@@ -594,41 +635,120 @@ new Promise((resolve) => {
       },
       ancestry: ancestryOf(el),
       domTree: serializeNode(el),
-      outerHTML: el.outerHTML
+      outerHTML: truncate(el.outerHTML, MAX_HTML)
     };
-    cleanup();
-    resolve(JSON.stringify(payload));
+  };
+  const selectForTesting = (selector) => {
+    if (window.__pmXmuxE2ESelectElement !== true) return;
+    const el = document.querySelector(selector);
+    if (!(el instanceof Element)) {
+      finish({ error: 'Testing selector did not match an element.' });
+      return;
+    }
+    finish(payloadFor(el));
+  };
+  const onClick = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    const el = event.target;
+    if (!(el instanceof Element)) {
+      finish({ error: 'Clicked target was not an element.' });
+      return;
+    }
+    if (el === document.documentElement || el === document.body) {
+      finish({ cancelled: true, reason: 'blank-area' });
+      return;
+    }
+    finish(payloadFor(el));
   };
 
-  window[KEY] = { cleanup, cancel };
+  window[KEY] = { cleanup, cancel, selectForTesting };
   document.addEventListener('mouseover', onHover, true);
   document.addEventListener('click', onClick, true);
   document.addEventListener('keydown', onKeyDown, true);
+  let testSelectorAttempts = 0;
+  const maybeSelectForTesting = () => {
+    if (window.__pmXmuxE2ESelectElement !== true) return;
+    const testSelector = Array.isArray(window.__pmXmuxE2ESelectElementSelectors) && window.__pmXmuxE2ESelectElementSelectors.length > 0
+      ? window.__pmXmuxE2ESelectElementSelectors.shift()
+      : window.__pmXmuxE2ESelectElementSelector;
+    if (typeof testSelector === 'string' && testSelector.trim().length > 0) {
+      window.__pmXmuxE2ESelectElementSelector = '';
+      selectForTesting(testSelector);
+      return;
+    }
+    testSelectorAttempts += 1;
+    if (testSelectorAttempts < 40) window.setTimeout(maybeSelectForTesting, 50);
+  };
+  maybeSelectForTesting();
 })
 "#
-    .to_string()
+    .replace("__LABEL_JSON__", &label_json)
+    .replace("__NONCE_JSON__", &nonce_json))
 }
 
 #[tauri::command]
-pub async fn xmux_webview_select_element(app: AppHandle, label: String) -> Result<String, String> {
+pub async fn xmux_webview_select_element(
+    app: AppHandle,
+    state: State<'_, XmuxWebviewState>,
+    label: String,
+) -> Result<String, String> {
     let webview = get_child(&app, &label)?;
+    let nonce = next_select_nonce();
     let (tx, rx) = oneshot::channel::<String>();
-    let sender = Arc::new(Mutex::new(Some(tx)));
-    let sender_clone = sender.clone();
+    {
+        let mut guard = state.0.lock().map_err(|e| e.to_string())?;
+        if let Some(waiter) = guard.select_waiters.remove(&label) {
+            let _ = waiter
+                .sender
+                .send(r#"{"cancelled":true,"reason":"superseded"}"#.to_string());
+        }
+        guard.select_waiters.insert(
+            label.clone(),
+            SelectWaiter {
+                nonce: nonce.clone(),
+                sender: tx,
+            },
+        );
+    }
+
     webview
-        .eval_with_callback(select_element_script(), move |value| {
-            if let Ok(mut guard) = sender_clone.lock() {
-                if let Some(tx) = guard.take() {
-                    let _ = tx.send(value);
-                }
-            }
-        })
+        .eval(select_element_script(&label, &nonce)?)
         .map_err(|e| e.to_string())?;
 
-    timeout(Duration::from_secs(60), rx)
-        .await
-        .map_err(|_| "Select Element timed out before a page element was clicked.".to_string())?
-        .map_err(|_| "Select Element callback was cancelled.".to_string())
+    let result = match timeout(Duration::from_secs(60), rx).await {
+        Ok(Ok(payload)) => Ok(payload),
+        Ok(Err(_)) => Err("Select Element callback was cancelled.".to_string()),
+        Err(_) => Err("Select Element timed out before a page element was clicked.".to_string()),
+    };
+
+    if result.is_err() {
+        let _ = webview.eval("window.__pmXmuxSelectElement?.cancel?.();".to_string());
+        if let Ok(mut guard) = state.0.lock() {
+            if guard
+                .select_waiters
+                .get(&label)
+                .map(|waiter| waiter.nonce.as_str() == nonce.as_str())
+                .unwrap_or(false)
+            {
+                guard.select_waiters.remove(&label);
+            }
+        }
+    }
+
+    result
+}
+
+#[tauri::command]
+pub async fn xmux_webview_resolve_select_element(
+    state: State<'_, XmuxWebviewState>,
+    label: String,
+    nonce: String,
+    payload: String,
+) -> Result<(), String> {
+    resolve_select_payload(&state, &label, &nonce, payload);
+    Ok(())
 }
 
 #[tauri::command]
@@ -680,7 +800,12 @@ pub async fn xmux_webview_destroy(
         webview.close().map_err(|e| e.to_string())?;
     }
     if let Ok(mut guard) = state.0.lock() {
-        guard.remove(&label);
+        guard.labels.remove(&label);
+        if let Some(waiter) = guard.select_waiters.remove(&label) {
+            let _ = waiter
+                .sender
+                .send(r#"{"cancelled":true,"reason":"destroy"}"#.to_string());
+        }
     }
     Ok(())
 }
@@ -695,6 +820,7 @@ pub async fn xmux_webview_destroy_all(
         .0
         .lock()
         .map_err(|e| e.to_string())?
+        .labels
         .iter()
         .cloned()
         .collect();
@@ -705,7 +831,12 @@ pub async fn xmux_webview_destroy_all(
         }
     }
     if let Ok(mut guard) = state.0.lock() {
-        guard.clear();
+        guard.labels.clear();
+        for (_, waiter) in guard.select_waiters.drain() {
+            let _ = waiter
+                .sender
+                .send(r#"{"cancelled":true,"reason":"destroy-all"}"#.to_string());
+        }
     }
     for (label, webview) in app.webviews() {
         if label.starts_with("xmux-browser-") {

@@ -5161,7 +5161,7 @@ pub fn run() {
         .manage(mcp_registry)
         .manage(telegram_registry)
         .manage(xmux_webview::XmuxWebviewState(std::sync::Mutex::new(
-            std::collections::HashSet::new(),
+            xmux_webview::XmuxWebviewRegistry::default(),
         )))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_pty::init())
@@ -5267,6 +5267,7 @@ pub fn run() {
             xmux_webview::xmux_webview_console_entries,
             xmux_webview::xmux_webview_clear_console,
             xmux_webview::xmux_webview_select_element,
+            xmux_webview::xmux_webview_resolve_select_element,
             xmux_webview::xmux_webview_set_zoom,
             xmux_webview::xmux_webview_clear_browsing_data,
             xmux_webview::xmux_webview_clear_cookies,

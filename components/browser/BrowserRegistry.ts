@@ -101,10 +101,33 @@ function createIframeSession(url: string): IframeSession {
   const iframe = document.createElement('iframe');
   iframe.title = 'xmux browser pane';
   iframe.style.cssText = 'flex:1;min-height:0;border:0;background:white;width:100%;';
-  iframe.src = url;
+  iframe.src = iframePreviewUrl(url);
   hostDiv.appendChild(iframe);
 
   return { kind: 'iframe', hostDiv, iframe, url };
+}
+
+function isLoopbackHost(hostname: string): boolean {
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0' || hostname === '::1';
+}
+
+function iframePreviewUrl(url: string): string {
+  if (typeof window === 'undefined') return url;
+  try {
+    const target = new URL(url, window.location.href);
+    const current = new URL(window.location.href);
+    const sameLoopbackApp =
+      isLoopbackHost(target.hostname) &&
+      isLoopbackHost(current.hostname) &&
+      target.port === current.port;
+    if (!sameLoopbackApp) return url;
+    target.protocol = current.protocol;
+    target.hostname = current.hostname;
+    target.port = current.port;
+    return target.toString();
+  } catch {
+    return url;
+  }
 }
 
 function createTauriSession(itemId: string, url: string): TauriSession {
@@ -482,8 +505,11 @@ export function attach(itemId: string, slot: HTMLElement, initialUrl: string): v
     session = ensureNativeSession(itemId, initialUrl) ?? session;
   }
   session.url = initialUrl;
-  if (session.kind === 'iframe' && session.iframe.src !== initialUrl) {
-    session.iframe.src = initialUrl;
+  if (session.kind === 'iframe') {
+    const previewUrl = iframePreviewUrl(initialUrl);
+    if (session.iframe.src !== previewUrl) {
+      session.iframe.src = previewUrl;
+    }
   }
   if (session.hostDiv.parentElement !== slot) {
     slot.appendChild(session.hostDiv);
@@ -597,8 +623,9 @@ export function navigate(itemId: string, url: string): void {
   if (!session) return;
   session.url = url;
   if (session.kind === 'iframe') {
-    if (session.iframe.src !== url) {
-      session.iframe.src = url;
+    const previewUrl = iframePreviewUrl(url);
+    if (session.iframe.src !== previewUrl) {
+      session.iframe.src = previewUrl;
     }
     return;
   }

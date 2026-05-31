@@ -2,7 +2,7 @@
 
 ## Summary
 
-Dock the existing AI Assistant chat surface under the Xmux Workspaces area and extend the Xmux browser chrome with operator tools for reload, URL copy, zoom, browsing-data cleanup, screenshot workflows, element selection, console visibility, and CSS inspection.
+Dock the existing AI Assistant chat surface under the Xmux Workspaces area and extend the Xmux browser chrome with operator tools for reload, URL copy, zoom, browsing-data cleanup, screenshot workflows, element selection, and CSS inspection. The Xmux browser Console backend is retained, but its frontend entry is hidden as of 2026-05-31 pending a reliability pass.
 
 ## Scope
 
@@ -21,5 +21,6 @@ Xmux becomes a workspace control surface where the user can inspect a site, copy
 
 - Spec: `feature-spec.md`
 - TDD spec: `tdd-spec.md`
+- Debug retro: `debug-retro.md`
 - Test scenarios: `test-scenarios.md`
 - Dev log: `dev-log.md`
