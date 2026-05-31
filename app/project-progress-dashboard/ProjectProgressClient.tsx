@@ -81,14 +81,14 @@ function isFeaturePhaseTab(tab: TabId): tab is FeaturePhase {
   return (PHASE_IDS_ARRAY as string[]).includes(tab);
 }
 
-function readInitialTab(): TabId {
-  if (typeof window === 'undefined') return 'projects';
+function readHashTab(): TabId | null {
+  if (typeof window === 'undefined') return null;
   const hash = window.location.hash.slice(1);
   const tab = resolveHashToTab(hash);
   if (tab && hash.toLowerCase() === 'testing') {
     window.location.replace(`#${tab}`);
   }
-  return tab ?? 'projects';
+  return tab;
 }
 
 export function ProjectProgressClient({
@@ -99,7 +99,7 @@ export function ProjectProgressClient({
   onFeaturePatch, onFeaturePromptSave,
   onRunStart, onRunLog, onRunEnd,
 }: ProjectProgressClientProps) {
-  const [activeTab, setActiveTab] = useState<TabId>(() => readInitialTab());
+  const [activeTab, setActiveTab] = useState<TabId>('projects');
   const [exportOpen, setExportOpen] = useState(false);
   const [dispatchRow, setDispatchRow] = useState<PhaseRow | null>(null);
   const [dispatchIssue, setDispatchIssue] = useState<{ title: string } | null>(null);
@@ -107,18 +107,17 @@ export function ProjectProgressClient({
   const isPhaseTab = isFeaturePhaseTab(activeTab);
   const activePhase = isPhaseTab ? activeTab : 'development';
 
-  // Sync URL hash both ways.
+  // Sync URL hash after mount so the server and first client render match.
   useEffect(() => {
-    const onHash = () => {
-      const hash = window.location.hash.slice(1);
-      const tab = resolveHashToTab(hash);
+    const syncHashTab = () => {
+      const tab = readHashTab();
       if (tab) {
         setActiveTab(tab);
-        if (hash.toLowerCase() === 'testing') window.location.replace(`#${tab}`);
       }
     };
-    window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
+    syncHashTab();
+    window.addEventListener('hashchange', syncHashTab);
+    return () => window.removeEventListener('hashchange', syncHashTab);
   }, []);
 
   // Per-phase preferences (custom rows, widths, etc).

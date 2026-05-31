@@ -15,6 +15,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
+import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProjectEntry, ProjectManagerConfig } from '../lib/types';
 
@@ -78,6 +79,26 @@ beforeEach(() => {
 });
 
 describe('Projects list — GitHub repository URL editing', () => {
+  it('keeps the first Tauri render identical to server output for hydration', () => {
+    const html = renderToString(
+      <ProjectsView
+        projects={[]}
+        selectedProjectId=""
+        selectedDashboardProjectIds={[]}
+        onSelectProject={() => {}}
+        onToggleDashboardProject={() => {}}
+        onAddProject={() => {}}
+        onUpdateProject={() => {}}
+        onRemoveProject={() => {}}
+        onSyncFromDesktop={async () => {}}
+        runHistory={[]}
+      />,
+    );
+
+    expect(html).toContain('Sync from Desktop');
+    expect(html).toContain('Weekly Report');
+  });
+
   it('saves a normalized GitHub URL to local project config', async () => {
     const onUpdateProject = vi.fn();
     const user = userEvent.setup();

@@ -113,6 +113,8 @@ vi.mock('../components/browser/BrowserRegistry', async () => {
     ...actual,
     backendKind: vi.fn(() => 'tauri'),
     sessionKind: vi.fn(() => 'tauri'),
+    cancelBrowserElementSelection: (itemId: string) =>
+      evalNativeBrowserScript(itemId, 'window.__pmXmuxSelectElement?.cancel?.();'),
     clearNativeBrowsingData: (itemId: string) => clearNativeBrowsingData(itemId),
     clearNativeConsoleEntries: (itemId: string) => clearNativeConsoleEntries(itemId),
     clearNativeCookies: (itemId: string) => clearNativeCookies(itemId),
@@ -120,6 +122,7 @@ vi.mock('../components/browser/BrowserRegistry', async () => {
     getNativeConsoleEntries: (itemId: string) => getNativeConsoleEntries(itemId),
     getNativeCurrentUrl: (itemId: string) => getNativeCurrentUrl(itemId),
     reloadNativeBrowser: (itemId: string) => reloadNativeBrowser(itemId),
+    selectBrowserElement: (itemId: string) => selectNativeBrowserElement(itemId),
     selectNativeBrowserElement: (itemId: string) => selectNativeBrowserElement(itemId),
     setNativeBrowserZoom: (itemId: string, scaleFactor: number) => setNativeBrowserZoom(itemId, scaleFactor),
     setSlotHidden: (...args: unknown[]) => setSlotHidden(...args),
@@ -256,7 +259,7 @@ describe('xmux browser URL chrome', () => {
     expect(screen.getByLabelText('Browser URL')).toHaveValue('http://localhost:43187/xmux');
   });
 
-  it('does not render Go, Console, or CSS Inspector controls', () => {
+  it('renders Console, CSS Inspector, and DevTools controls without the legacy Go button', () => {
     render(
       <BrowserContent
         itemId="browser-removed-controls-test"
@@ -267,8 +270,9 @@ describe('xmux browser URL chrome', () => {
     );
 
     expect(screen.queryByRole('button', { name: 'Go' })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Show browser console')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Show CSS Inspector')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Show browser console')).toBeInTheDocument();
+    expect(screen.getByLabelText('Show CSS Inspector')).toBeInTheDocument();
+    expect(screen.getByLabelText('Open native browser DevTools')).toBeInTheDocument();
   });
 
   it.each([
@@ -447,8 +451,8 @@ describe('xmux browser URL chrome', () => {
     await waitFor(() => {
       expect(writeText).toHaveBeenCalledWith(expect.stringContaining('"positionTag": "bottom"'));
       expect(selectedListener).toHaveBeenCalled();
-      expect(screen.getByText(/Selected element captured/)).toBeInTheDocument();
-      expect(selectButton).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.getByText(/Select Element mode remains active/)).toBeInTheDocument();
+      expect(selectButton).toHaveAttribute('aria-pressed', 'true');
     });
     const dragContext = screen.getByLabelText('Drag selected element context');
     const dragStore = new Map<string, string>();
@@ -464,6 +468,34 @@ describe('xmux browser URL chrome', () => {
     expect(dragStore.get(XMUX_SELECTED_ELEMENT_MIME)).toContain('[xmux element: bottom · button]');
     expect(dragStore.get('text/plain')).toContain('selector: body > button');
     expect(dragStore.get('application/json')).toContain('"elementTag": "button"');
+
+    await user.click(screen.getByLabelText('Show browser console'));
+    expect(screen.getByText('Console')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(getNativeConsoleEntries).toHaveBeenCalledWith('browser-inspector-test');
+      expect(screen.getByText('POST https://collector.github.com/github/collect 503 (Service Unavailable)')).toBeInTheDocument();
+    });
+
+    await user.type(screen.getByLabelText('Filter console logs'), 'hydration');
+    expect(screen.getByText('hydration warning')).toBeInTheDocument();
+    expect(screen.queryByText('POST https://collector.github.com/github/collect 503 (Service Unavailable)')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Clear' }));
+    await waitFor(() => {
+      expect(clearNativeConsoleEntries).toHaveBeenCalledWith('browser-inspector-test');
+    });
+
+    await user.click(screen.getByLabelText('Show CSS Inspector'));
+    expect(screen.getByText('CSS Inspector')).toBeInTheDocument();
+    expect(screen.getByText('button.primary.rounded')).toBeInTheDocument();
+    expect(screen.getByText('Box Model')).toBeInTheDocument();
+    expect(screen.getByText('Content')).toBeInTheDocument();
+    expect(screen.getByText('W 94')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'CSS' }));
+    expect(screen.getByText('primary')).toBeInTheDocument();
+    expect(screen.getByText('background-color')).toBeInTheDocument();
+    expect(screen.getByText('rgb(31, 111, 235)')).toBeInTheDocument();
     window.removeEventListener('pm:xmux-selected-element', selectedListener);
   });
 
@@ -498,6 +530,40 @@ describe('xmux browser URL chrome', () => {
     });
     expect(writeText).not.toHaveBeenCalled();
     expect(selectedListener).not.toHaveBeenCalled();
+    window.removeEventListener('pm:xmux-selected-element', selectedListener);
+  });
+
+  it('dispatches selected element context before clipboard completion', async () => {
+    const user = userEvent.setup();
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn(() => new Promise<void>(() => {})) },
+    });
+    const selectedListener = vi.fn();
+    window.addEventListener('pm:xmux-selected-element', selectedListener);
+
+    render(
+      <BrowserContent
+        itemId="browser-slow-clipboard-select-test"
+        url="https://example.com"
+        homepageUrl="https://example.com"
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    const selectButton = screen.getByLabelText('Select Element mode');
+    await user.click(selectButton);
+    await waitFor(() => expect(selectButton).toHaveAttribute('aria-pressed', 'true'));
+
+    finishSelectElement(defaultSelectElementPayload());
+
+    await waitFor(() => {
+      expect(selectedListener).toHaveBeenCalled();
+      expect(screen.getByText(/Select Element mode remains active/)).toBeInTheDocument();
+      expect(screen.getByLabelText('Drag selected element context')).toHaveTextContent('bottom · button');
+      expect(selectButton).toHaveAttribute('aria-pressed', 'true');
+    });
+
     window.removeEventListener('pm:xmux-selected-element', selectedListener);
   });
 
@@ -547,11 +613,11 @@ describe('xmux browser URL chrome', () => {
     await waitFor(() => expect(selectButton).toHaveAttribute('aria-pressed', 'true'));
     finishSelectElement(defaultSelectElementPayload());
     await waitFor(() => {
-      expect(selectButton).toHaveAttribute('aria-pressed', 'false');
+      expect(selectButton).toHaveAttribute('aria-pressed', 'true');
       expect(screen.getByLabelText('Drag selected element context')).toHaveTextContent('bottom · button');
     });
+    await waitFor(() => expect(selectNativeBrowserElement).toHaveBeenCalledTimes(2));
 
-    await user.click(selectButton);
     await waitFor(() => expect(selectButton).toHaveAttribute('aria-pressed', 'true'));
     finishSelectElement(
       JSON.stringify({
@@ -563,9 +629,38 @@ describe('xmux browser URL chrome', () => {
     );
 
     await waitFor(() => {
-      expect(selectButton).toHaveAttribute('aria-pressed', 'false');
+      expect(selectButton).toHaveAttribute('aria-pressed', 'true');
       expect(screen.getByLabelText('Drag selected element context')).toHaveTextContent('top · input');
       expect(screen.queryByText('bottom · button')).not.toBeInTheDocument();
+    });
+    await user.click(selectButton);
+    await waitFor(() => expect(selectButton).toHaveAttribute('aria-pressed', 'false'));
+  });
+
+  it('keeps captured context visible if automatic Select Element re-arm fails', async () => {
+    const user = userEvent.setup();
+    render(
+      <BrowserContent
+        itemId="browser-rearm-failure-test"
+        url="https://example.com"
+        homepageUrl="https://example.com"
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    const selectButton = screen.getByLabelText('Select Element mode');
+    await user.click(selectButton);
+    await waitFor(() => expect(selectButton).toHaveAttribute('aria-pressed', 'true'));
+    finishSelectElement(defaultSelectElementPayload());
+    await waitFor(() => expect(selectNativeBrowserElement).toHaveBeenCalledTimes(2));
+
+    rejectSelectElement?.(new Error('native callback busy'));
+    rejectSelectElement = null;
+
+    await waitFor(() => {
+      expect(selectButton).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByLabelText('Drag selected element context')).toHaveTextContent('bottom · button');
+      expect(screen.getByText(/could not re-arm automatically/)).toBeInTheDocument();
     });
   });
 });

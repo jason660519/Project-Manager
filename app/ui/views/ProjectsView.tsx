@@ -208,9 +208,7 @@ export function ProjectsView({
   const [addError, setAddError] = useState('');
   const [reportText, setReportText] = useState('');
   const [reportCopied, setReportCopied] = useState(false);
-  const [isTauri, setIsTauri] = useState(
-    () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window,
-  );
+  const [isTauri, setIsTauri] = useState(false);
 
   // Delete confirmation modal state.
   const [deleteTarget, setDeleteTarget] = useState<ProjectEntry | null>(null);

@@ -734,6 +734,281 @@ function requireNativeSession(itemId: string): TauriSession {
   return session;
 }
 
+function requireIframeSession(itemId: string): IframeSession {
+  const session = sessions.get(itemId);
+  if (!session) {
+    throw new Error('Browser session is not ready yet.');
+  }
+  if (session.kind !== 'iframe') {
+    throw new Error('This browser action requires the iframe browser preview.');
+  }
+  return session;
+}
+
+function iframeWindow(session: IframeSession): Window {
+  const win = session.iframe.contentWindow;
+  if (!win) {
+    throw new Error('Browser preview iframe is not ready yet.');
+  }
+  return win;
+}
+
+function iframeDocument(session: IframeSession): Document {
+  const doc = session.iframe.contentDocument;
+  if (!doc?.documentElement) {
+    throw new Error('Browser preview document is not ready yet.');
+  }
+  return doc;
+}
+
+function waitForIframeDocument(session: IframeSession, timeoutMs = 5000): Promise<Document> {
+  const startedAt = Date.now();
+  return new Promise((resolve, reject) => {
+    const check = () => {
+      try {
+        const doc = iframeDocument(session);
+        const href = session.iframe.contentWindow?.location.href ?? '';
+        const ready = doc.readyState === 'interactive' || doc.readyState === 'complete';
+        const notInitialBlank = href !== 'about:blank' || session.url === 'about:blank';
+        if (ready && notInitialBlank) {
+          resolve(doc);
+          return;
+        }
+      } catch (err) {
+        reject(err);
+        return;
+      }
+      if (Date.now() - startedAt > timeoutMs) {
+        reject(new Error('Browser preview document did not finish loading in time.'));
+        return;
+      }
+      window.setTimeout(check, 50);
+    };
+    check();
+  });
+}
+
+async function selectIframeBrowserElement(itemId: string): Promise<string> {
+  const session = requireIframeSession(itemId);
+  const doc = await waitForIframeDocument(session);
+  const win = iframeWindow(session);
+  const key = '__pmXmuxSelectElement';
+  const previous = (win as unknown as Record<string, { cleanup?: () => void }>)[key];
+  previous?.cleanup?.();
+
+  return new Promise((resolve) => {
+    const style = doc.createElement('style');
+    style.textContent =
+      '* { cursor: crosshair !important; } [data-pm-xmux-hover="true"] { outline: 2px solid Highlight !important; outline-offset: 2px !important; }';
+    doc.documentElement.appendChild(style);
+
+    let hovered: Element | null = null;
+    const ElementCtor = (doc.defaultView as unknown as { Element?: typeof Element } | null)?.Element;
+    const isFrameElement = (value: unknown): value is Element =>
+      Boolean(ElementCtor && value instanceof ElementCtor);
+    const cssApi = (win as unknown as { CSS?: { escape?: (value: string) => string } }).CSS;
+    const escapeCss = (value: string) => cssApi?.escape ? cssApi.escape(value) : value.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+    const textOf = (node: Element) => (node.textContent || '').replace(/\s+/g, ' ').trim();
+    const attrsOf = (node: Element) =>
+      Object.fromEntries(Array.from(node.attributes || []).map((attr) => [attr.name, attr.value]));
+    const computedStyleOf = (node: Element) => {
+      const style = win.getComputedStyle(node);
+      return Object.fromEntries(Array.from(style).map((name) => [name, style.getPropertyValue(name)]));
+    };
+    const computedStyleSummaryOf = (node: Element) => {
+      const style = win.getComputedStyle(node);
+      return {
+        display: style.display,
+        position: style.position,
+        zIndex: style.zIndex,
+        boxSizing: style.boxSizing,
+        width: style.width,
+        height: style.height,
+        margin: style.margin,
+        padding: style.padding,
+        border: style.border,
+        borderRadius: style.borderRadius,
+        backgroundColor: style.backgroundColor,
+        color: style.color,
+        fontFamily: style.fontFamily,
+        fontSize: style.fontSize,
+        fontWeight: style.fontWeight,
+        lineHeight: style.lineHeight,
+        letterSpacing: style.letterSpacing,
+        opacity: style.opacity,
+        overflow: style.overflow,
+        flex: style.flex,
+        gridTemplateColumns: style.gridTemplateColumns,
+        alignItems: style.alignItems,
+        justifyContent: style.justifyContent,
+      };
+    };
+    const boxModelOf = (node: Element) => {
+      const rect = node.getBoundingClientRect();
+      const style = win.getComputedStyle(node);
+      const number = (name: string) => Number.parseFloat(style.getPropertyValue(name)) || 0;
+      const margin = { top: number('margin-top'), right: number('margin-right'), bottom: number('margin-bottom'), left: number('margin-left') };
+      const border = { top: number('border-top-width'), right: number('border-right-width'), bottom: number('border-bottom-width'), left: number('border-left-width') };
+      const padding = { top: number('padding-top'), right: number('padding-right'), bottom: number('padding-bottom'), left: number('padding-left') };
+      return {
+        rect: { x: rect.x, y: rect.y, top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left, width: rect.width, height: rect.height },
+        margin,
+        border,
+        padding,
+        content: {
+          width: Math.max(0, rect.width - border.left - border.right - padding.left - padding.right),
+          height: Math.max(0, rect.height - border.top - border.bottom - padding.top - padding.bottom),
+        },
+      };
+    };
+    const selectorFor = (node: Element) => {
+      const parts: string[] = [];
+      let current: Element | null = node;
+      while (current && current.nodeType === Node.ELEMENT_NODE) {
+        let part = current.tagName.toLowerCase();
+        if (current.id) {
+          part += `#${escapeCss(current.id)}`;
+          parts.unshift(part);
+          break;
+        }
+        const classes = Array.from(current.classList || []).map((name) => `.${escapeCss(name)}`).join('');
+        part += classes;
+        const parentEl: Element | null = current.parentElement;
+        if (parentEl) {
+          const currentTag = current.tagName;
+          const siblings = Array.from(parentEl.children).filter((child) => child.tagName === currentTag);
+          if (siblings.length > 1) part += `:nth-of-type(${siblings.indexOf(current) + 1})`;
+        }
+        parts.unshift(part);
+        current = parentEl;
+      }
+      return parts.join(' > ');
+    };
+    const serializeNode = (node: Element): Record<string, unknown> => ({
+      tag: node.tagName.toLowerCase(),
+      id: node.id || '',
+      className: typeof node.className === 'string' ? node.className : '',
+      role: node.getAttribute('role') || '',
+      ariaLabel: node.getAttribute('aria-label') || '',
+      text: textOf(node),
+      attributes: attrsOf(node),
+      children: Array.from(node.children || []).map(serializeNode),
+    });
+    const ancestryOf = (node: Element) => {
+      const out: Array<Record<string, string>> = [];
+      let current: Element | null = node;
+      while (current && current.nodeType === Node.ELEMENT_NODE) {
+        out.push({
+          tag: current.tagName.toLowerCase(),
+          id: current.id || '',
+          className: typeof current.className === 'string' ? current.className : '',
+          role: current.getAttribute('role') || '',
+          ariaLabel: current.getAttribute('aria-label') || '',
+        });
+        current = current.parentElement;
+      }
+      return out;
+    };
+    const positionTagFor = (rect: DOMRect) => {
+      const y = rect.top + rect.height / 2;
+      const x = rect.left + rect.width / 2;
+      const vertical = y < win.innerHeight / 3 ? 'top' : y > win.innerHeight * 2 / 3 ? 'bottom' : 'middle';
+      const horizontal = x < win.innerWidth / 3 ? 'left' : x > win.innerWidth * 2 / 3 ? 'right' : 'center';
+      if (vertical === 'middle') return horizontal;
+      if (horizontal === 'center') return vertical;
+      return `${vertical}-${horizontal}`;
+    };
+    const clearHover = () => {
+      hovered?.removeAttribute('data-pm-xmux-hover');
+      hovered = null;
+    };
+    const cleanup = () => {
+      clearHover();
+      style.remove();
+      doc.removeEventListener('mouseover', onHover, true);
+      doc.removeEventListener('click', onClick, true);
+      doc.removeEventListener('keydown', onKeyDown, true);
+      delete (win as unknown as Record<string, unknown>)[key];
+    };
+    const cancel = () => {
+      cleanup();
+      resolve(JSON.stringify({ cancelled: true }));
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        cancel();
+      }
+    };
+    const onHover = (event: MouseEvent) => {
+      clearHover();
+      hovered = isFrameElement(event.target) ? event.target : null;
+      hovered?.setAttribute('data-pm-xmux-hover', 'true');
+    };
+    const onClick = (event: MouseEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const el = event.target;
+      if (!isFrameElement(el)) {
+        cleanup();
+        resolve(JSON.stringify({ error: 'Clicked target was not an element.' }));
+        return;
+      }
+      if (el === doc.documentElement || el === doc.body) {
+        cleanup();
+        resolve(JSON.stringify({ cancelled: true, reason: 'blank-area' }));
+        return;
+      }
+      const rect = el.getBoundingClientRect();
+      const payload = {
+        source: 'Project Manager Xmux Select Element',
+        url: win.location.href,
+        capturedAt: new Date().toISOString(),
+        selector: selectorFor(el),
+        cssPath: selectorFor(el),
+        positionTag: positionTagFor(rect),
+        elementTag: el.tagName.toLowerCase(),
+        classList: Array.from(el.classList || []),
+        computedStyle: computedStyleOf(el),
+        computedStyleSummary: computedStyleSummaryOf(el),
+        boxModel: boxModelOf(el),
+        element: {
+          tag: el.tagName.toLowerCase(),
+          id: el.id || '',
+          className: typeof el.className === 'string' ? el.className : '',
+          role: el.getAttribute('role') || '',
+          ariaLabel: el.getAttribute('aria-label') || '',
+          text: textOf(el),
+          attributes: attrsOf(el),
+          rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+        },
+        ancestry: ancestryOf(el),
+        domTree: serializeNode(el),
+        outerHTML: el.outerHTML,
+      };
+      cleanup();
+      resolve(JSON.stringify(payload));
+    };
+
+    (win as unknown as Record<string, { cleanup: () => void; cancel: () => void }>)[key] = { cleanup, cancel };
+    doc.addEventListener('mouseover', onHover, true);
+    doc.addEventListener('click', onClick, true);
+    doc.addEventListener('keydown', onKeyDown, true);
+  });
+}
+
+export async function cancelBrowserElementSelection(itemId: string): Promise<void> {
+  const session = sessions.get(itemId);
+  if (!session) return;
+  if (session.kind === 'tauri') {
+    await xmuxWebviewEval(session.label, 'window.__pmXmuxSelectElement?.cancel?.();');
+    return;
+  }
+  const win = iframeWindow(session);
+  const state = (win as unknown as Record<string, { cancel?: () => void }>).__pmXmuxSelectElement;
+  state?.cancel?.();
+}
+
 export async function getNativeCurrentUrl(itemId: string): Promise<string> {
   const session = requireNativeSession(itemId);
   const nativeUrl = await xmuxWebviewCurrentUrl(session.label);
@@ -795,6 +1070,20 @@ export async function clearNativeConsoleEntries(itemId: string): Promise<void> {
 export async function selectNativeBrowserElement(itemId: string): Promise<string> {
   const session = requireNativeSession(itemId);
   return xmuxWebviewSelectElement(session.label);
+}
+
+export async function selectBrowserElement(itemId: string): Promise<string> {
+  const session = sessions.get(itemId);
+  if (!session) {
+    throw new Error('Browser session is not ready yet.');
+  }
+  if (session.kind === 'tauri') {
+    if (!session.created) {
+      throw new Error('Native browser is still loading. Try again after the page appears.');
+    }
+    return xmuxWebviewSelectElement(session.label);
+  }
+  return selectIframeBrowserElement(itemId);
 }
 
 export function backendKind(): 'tauri' | 'iframe' {
