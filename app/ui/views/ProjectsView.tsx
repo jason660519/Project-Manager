@@ -8,19 +8,25 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   useReactTable,
+  type ColumnSizingState,
   type SortingState,
+  type VisibilityState,
 } from '@tanstack/react-table';
 import {
   AlertTriangle,
   BarChart3,
   Bot,
   Check,
+  EyeOff,
   FolderOpen,
   Github,
   KeyRound,
   Loader2,
   Plus,
   RefreshCw,
+  RotateCcw,
+  Search,
+  Snowflake,
   Trash2,
   X,
 } from 'lucide-react';
@@ -64,6 +70,36 @@ interface ProjectsViewProps {
   onRemoveProject: (id: string, deleteConfigFile: boolean) => Promise<void> | void;
   onSyncFromDesktop?: () => Promise<void>;
   runHistory: CompletedRun[];
+}
+
+const PROJECTS_TABLE_PREFS_KEY = 'projectManager.progressDashboard.projectsTable.v2';
+
+interface ProjectsTablePrefs {
+  columnSizing?: ColumnSizingState;
+  columnVisibility?: VisibilityState;
+  freezeCols?: number;
+  rowHeight?: number;
+  hiddenRowIds?: string[];
+}
+
+function readProjectsTablePrefs(): ProjectsTablePrefs {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(PROJECTS_TABLE_PREFS_KEY);
+    return raw ? (JSON.parse(raw) as ProjectsTablePrefs) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeProjectsTablePrefs(prefs: ProjectsTablePrefs): void {
+  try {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(PROJECTS_TABLE_PREFS_KEY, JSON.stringify(prefs));
+    }
+  } catch {
+    /* preference save is non-blocking */
+  }
 }
 
 function isMissingConfigError(message: string): boolean {
@@ -876,7 +912,39 @@ export function ProjectsView({
     anyProviderKeyPresent === false && projectsThatNeedKey.length > 0;
 
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [projectSearch, setProjectSearch] = useState('');
+  const [projectStatusFilter, setProjectStatusFilter] = useState<'all' | 'ready' | 'needs_scan' | 'scaffold'>('all');
+  const [showProjectHiddenRows, setShowProjectHiddenRows] = useState(false);
+  const [showProjectHiddenCols, setShowProjectHiddenCols] = useState(false);
+  const [showProjectHiddenRowsMenu, setShowProjectHiddenRowsMenu] = useState(false);
+  const [projectsTablePrefs, setProjectsTablePrefs] = useState<ProjectsTablePrefs>(() => ({
+    freezeCols: 0,
+    rowHeight: 52,
+  }));
+  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const columnHelper = useMemo(() => createColumnHelper<ProjectEntry>(), []);
+
+  useEffect(() => {
+    const stored = readProjectsTablePrefs();
+    setProjectsTablePrefs({
+      freezeCols: Math.max(0, Math.min(5, stored.freezeCols ?? 0)),
+      rowHeight: Math.max(36, Math.min(160, stored.rowHeight ?? 52)),
+      hiddenRowIds: Array.isArray(stored.hiddenRowIds) ? stored.hiddenRowIds : [],
+    });
+    setColumnSizing(stored.columnSizing ?? {});
+    setColumnVisibility(stored.columnVisibility ?? {});
+  }, []);
+
+  useEffect(() => {
+    writeProjectsTablePrefs({
+      columnSizing,
+      columnVisibility,
+      freezeCols: projectsTablePrefs.freezeCols,
+      rowHeight: projectsTablePrefs.rowHeight,
+      hiddenRowIds: projectsTablePrefs.hiddenRowIds,
+    });
+  }, [columnSizing, columnVisibility, projectsTablePrefs.freezeCols, projectsTablePrefs.hiddenRowIds, projectsTablePrefs.rowHeight]);
 
   const columns = useMemo(
     () => [
@@ -884,6 +952,7 @@ export function ProjectsView({
         id: 'col-include-dashboard',
         header: 'Include',
         size: 96,
+        enableSorting: false,
         cell: ({ row }) => {
           const project = row.original;
           const checked = selectedDashboardProjectIds.includes(project.id);
@@ -901,6 +970,16 @@ export function ProjectsView({
             </div>
           );
         },
+      }),
+      columnHelper.accessor((project) => project.id, {
+        id: 'col-id',
+        header: 'ID',
+        size: 140,
+        cell: ({ getValue }) => (
+          <span className="block max-w-[160px] truncate font-mono text-[11px] text-stone-300" title={getValue()}>
+            {getValue()}
+          </span>
+        ),
       }),
       columnHelper.accessor((project) => project.config.project.name, {
         id: 'col-project-name',
@@ -1171,15 +1250,70 @@ export function ProjectsView({
     ],
   );
 
+  const filteredProjects = useMemo(() => {
+    const q = projectSearch.trim().toLowerCase();
+    const hidden = new Set(projectsTablePrefs.hiddenRowIds ?? []);
+    return projects.filter((project) => {
+      if (!showProjectHiddenRows && hidden.has(project.id)) return false;
+      const setupStatus = getProjectSetupStatus(project);
+      if (projectStatusFilter !== 'all' && setupStatus !== projectStatusFilter) return false;
+      if (!q) return true;
+      const hay = [
+        project.id,
+        project.config.project.name,
+        project.config.project.root,
+        project.config.project.githubUrl ?? '',
+        project.configPath,
+        setupStatusLabel(setupStatus),
+        String(project.config.features.length),
+      ].join(' ').toLowerCase();
+      return hay.includes(q);
+    });
+  }, [projectSearch, projectStatusFilter, projects, projectsTablePrefs.hiddenRowIds, showProjectHiddenRows]);
+
+  const hiddenProjectRows = useMemo(() => {
+    const hidden = new Set(projectsTablePrefs.hiddenRowIds ?? []);
+    return projects
+      .filter((project) => hidden.has(project.id))
+      .map((project) => ({ id: project.id, label: `${project.id} · ${project.config.project.name}` }));
+  }, [projects, projectsTablePrefs.hiddenRowIds]);
+
   const table = useReactTable({
-    data: projects,
+    data: filteredProjects,
     columns,
-    state: { sorting },
+    state: { sorting, columnSizing, columnVisibility },
     onSortingChange: setSorting,
+    onColumnSizingChange: setColumnSizing,
+    onColumnVisibilityChange: setColumnVisibility,
     enableSortingRemoval: true,
+    columnResizeMode: 'onChange',
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
+
+  const visibleProjectColumns = table.getVisibleLeafColumns();
+  const projectLeftOffsets = useMemo(() => {
+    let acc = 0;
+    return visibleProjectColumns.map((column) => {
+      const left = acc;
+      acc += column.getSize();
+      return left;
+    });
+  }, [visibleProjectColumns]);
+  const frozenProjectCols = Math.max(0, Math.min(visibleProjectColumns.length, projectsTablePrefs.freezeCols ?? 0));
+  const resetProjectsTableView = () => {
+    setProjectSearch('');
+    setProjectStatusFilter('all');
+    setSorting([]);
+    setColumnSizing({});
+    setColumnVisibility({});
+    setProjectsTablePrefs({ freezeCols: 0, rowHeight: 52, hiddenRowIds: [] });
+    try {
+      window.localStorage.removeItem(PROJECTS_TABLE_PREFS_KEY);
+    } catch {
+      /* noop */
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -1282,6 +1416,154 @@ export function ProjectsView({
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2 border border-stone-200/12 bg-[rgb(var(--pm-card))]/50 px-3 py-2">
+        <div className="relative min-w-[220px] max-w-sm flex-1">
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-stone-400" />
+          <input
+            value={projectSearch}
+            onChange={(e) => setProjectSearch(e.target.value)}
+            placeholder="Search projects..."
+            className="h-8 w-full border border-stone-200/15 bg-[rgb(var(--pm-rail))]/80 pl-8 pr-3 text-xs text-stone-100 placeholder:text-stone-500 outline-none focus:border-emerald-300/40"
+          />
+        </div>
+        <select
+          aria-label="Init Status filter"
+          value={projectStatusFilter}
+          onChange={(e) => setProjectStatusFilter(e.target.value as typeof projectStatusFilter)}
+          className="h-8 border border-stone-200/15 bg-[rgb(var(--pm-rail))]/80 px-2 text-xs text-stone-100 outline-none"
+        >
+          <option value="all">All statuses</option>
+          <option value="ready">Ready</option>
+          <option value="needs_scan">Needs scan</option>
+          <option value="scaffold">Scaffold</option>
+        </select>
+        <div className="flex items-center gap-1 border-l border-stone-200/15 pl-2">
+          <Snowflake size={12} className="text-cyan-300" />
+          <label className="text-[10px] text-stone-400">Freeze cols</label>
+          <input
+            type="number"
+            min={0}
+            max={5}
+            value={projectsTablePrefs.freezeCols ?? 0}
+            onChange={(e) => setProjectsTablePrefs((prev) => ({ ...prev, freezeCols: Math.max(0, Math.min(5, Number(e.target.value) || 0)) }))}
+            className="h-6 w-10 border border-stone-200/15 bg-[rgb(var(--pm-rail))]/80 px-1 text-center text-xs text-stone-100"
+          />
+          <label className="text-[10px] text-stone-400">Row h</label>
+          <input
+            type="number"
+            min={36}
+            max={160}
+            value={projectsTablePrefs.rowHeight ?? 52}
+            onChange={(e) => setProjectsTablePrefs((prev) => ({ ...prev, rowHeight: Math.max(36, Math.min(160, Number(e.target.value) || 52)) }))}
+            className="h-6 w-12 border border-stone-200/15 bg-[rgb(var(--pm-rail))]/80 px-1 text-center text-xs text-stone-100"
+          />
+        </div>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowProjectHiddenCols((value) => !value)}
+            className="inline-flex h-8 items-center gap-1 border border-stone-200/15 px-2 text-xs text-stone-300 hover:text-stone-100"
+          >
+            <EyeOff size={12} /> Hidden cols ({table.getAllLeafColumns().filter((column) => !column.getIsVisible()).length})
+          </button>
+          {showProjectHiddenCols && (
+            <div className="absolute right-0 top-9 z-40 w-64 border border-stone-200/20 bg-[rgb(var(--pm-rail))] p-2 shadow-xl">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-[10px] uppercase tracking-[0.12em] text-stone-400">Column visibility</p>
+                <button
+                  type="button"
+                  onClick={() => setColumnVisibility({})}
+                  className="text-[10px] text-cyan-200 hover:text-cyan-100"
+                >
+                  Show all
+                </button>
+              </div>
+              {table.getAllLeafColumns().map((column) => (
+                <button
+                  key={column.id}
+                  type="button"
+                  disabled={column.id === 'col-id'}
+                  onClick={() => column.toggleVisibility(!column.getIsVisible())}
+                  className="flex w-full items-center justify-between gap-2 px-2 py-1 text-left text-[11px] text-stone-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:text-stone-500"
+                >
+                  <span className="truncate">{String(column.columnDef.header ?? column.id)}</span>
+                  <span className="text-[10px] text-stone-500">{column.getIsVisible() ? 'Shown' : 'Hidden'}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowProjectHiddenRowsMenu((value) => !value)}
+            className={`inline-flex h-8 items-center gap-1 border px-2 text-xs ${
+              hiddenProjectRows.length > 0
+                ? 'border-cyan-200/35 bg-cyan-500/10 text-cyan-100'
+                : 'border-stone-200/15 text-stone-300 hover:text-stone-100'
+            }`}
+          >
+            <EyeOff size={12} /> Hidden rows ({hiddenProjectRows.length})
+          </button>
+          {showProjectHiddenRowsMenu && (
+            <div className="absolute right-0 top-9 z-40 w-72 border border-stone-200/20 bg-[rgb(var(--pm-rail))] p-2 shadow-xl">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-[10px] uppercase tracking-[0.12em] text-stone-400">Hidden rows</p>
+                {hiddenProjectRows.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setProjectsTablePrefs((prev) => ({ ...prev, hiddenRowIds: [] }))}
+                    className="text-[10px] text-cyan-200 hover:text-cyan-100"
+                  >
+                    Show all
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowProjectHiddenRows((value) => !value)}
+                className="mb-2 block w-full border border-stone-200/15 px-2 py-1.5 text-left text-[11px] text-stone-200 hover:bg-white/10"
+              >
+                {showProjectHiddenRows ? 'Hide hidden rows from table' : 'Show hidden rows in table'}
+              </button>
+              {hiddenProjectRows.length === 0 ? (
+                <p className="px-2 py-1 text-[11px] text-stone-500">No hidden rows.</p>
+              ) : (
+                <div className="max-h-60 overflow-auto">
+                  {hiddenProjectRows.map((row) => (
+                    <div key={row.id} className="flex items-center justify-between gap-2 py-1">
+                      <span className="min-w-0 truncate text-[11px] text-stone-200" title={row.label}>
+                        {row.label}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setProjectsTablePrefs((prev) => ({
+                          ...prev,
+                          hiddenRowIds: (prev.hiddenRowIds ?? []).filter((id) => id !== row.id),
+                        }))}
+                        className="border border-cyan-200/30 px-1.5 py-0.5 text-[10px] text-cyan-100 hover:bg-cyan-500/10"
+                      >
+                        Show
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={resetProjectsTableView}
+          className="inline-flex h-8 items-center gap-1 border border-stone-200/15 px-2 text-xs text-stone-300 hover:text-stone-100"
+        >
+          <RotateCcw size={12} /> Reset view
+        </button>
+        <span className="ml-auto text-[10px] text-stone-500">
+          {filteredProjects.length} shown
+        </span>
+      </div>
+
       {/* Projects table */}
       <div className="min-h-0 overflow-auto border border-stone-200/12 bg-[rgb(var(--pm-panel))]/72">
         <table className="w-full min-w-[1320px] border-collapse text-left text-sm">
@@ -1292,15 +1574,33 @@ export function ProjectsView({
                   <th
                     key={header.id}
                     onClick={header.column.getCanSort() ? header.column.getToggleSortingHandler() : undefined}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      const raw = window.prompt('Resize column width in px. Enter 0 to hide this column.', String(header.column.getSize()));
+                      if (raw == null) return;
+                      const value = Number(raw);
+                      if (!Number.isFinite(value)) return;
+                      if (value === 0) {
+                        if (header.column.id !== 'col-id') header.column.toggleVisibility(false);
+                        return;
+                      }
+                      setColumnSizing((prev) => ({ ...prev, [header.column.id]: Math.max(56, Math.min(640, value)) }));
+                    }}
                     className={`px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400 ${
                       header.column.getCanSort() ? 'cursor-pointer select-none hover:text-stone-200' : ''
                     }`}
                     style={{
-                      width: header.column.columnDef.size,
-                      minWidth: header.column.columnDef.size,
+                      width: header.getSize(),
+                      minWidth: header.getSize(),
+                      position: visibleProjectColumns.findIndex((column) => column.id === header.column.id) < frozenProjectCols ? 'sticky' : undefined,
+                      left: visibleProjectColumns.findIndex((column) => column.id === header.column.id) < frozenProjectCols
+                        ? projectLeftOffsets[visibleProjectColumns.findIndex((column) => column.id === header.column.id)]
+                        : undefined,
+                      zIndex: visibleProjectColumns.findIndex((column) => column.id === header.column.id) < frozenProjectCols ? 30 : undefined,
+                      background: 'rgb(var(--pm-panel))',
                     }}
                   >
-                    <span className="inline-flex items-center gap-1">
+                    <span className="inline-flex items-center gap-1 pr-2">
                       {flexRender(header.column.columnDef.header, header.getContext())}
                       {header.column.getCanSort() && (
                         <span className="text-[10px] text-stone-500">
@@ -1308,10 +1608,18 @@ export function ProjectsView({
                             ? '↑'
                             : header.column.getIsSorted() === 'desc'
                               ? '↓'
-                              : '↕'}
+                          : '↕'}
                         </span>
                       )}
                     </span>
+                    {header.column.getCanResize() && (
+                      <span
+                        onMouseDown={header.getResizeHandler()}
+                        onTouchStart={header.getResizeHandler()}
+                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-emerald-300/60"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    )}
                   </th>
                 ))}
               </tr>
@@ -1335,15 +1643,40 @@ export function ProjectsView({
                       projectRowRefs.current[project.id] = node;
                     }}
                     onClick={() => onSelectProject(project.id)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setProjectsTablePrefs((prev) => ({
+                        ...prev,
+                        hiddenRowIds: (prev.hiddenRowIds ?? []).includes(project.id)
+                          ? (prev.hiddenRowIds ?? []).filter((id) => id !== project.id)
+                          : Array.from(new Set([...(prev.hiddenRowIds ?? []), project.id])),
+                      }));
+                    }}
                     className={`cursor-pointer border-b border-stone-200/10 transition-colors hover:bg-white/[0.045] ${
                       isSelected ? 'bg-emerald-950/20' : ''
                     }`}
                   >
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-3 py-3 align-middle text-sm text-stone-300">
+                    {row.getVisibleCells().map((cell) => {
+                      const visibleIndex = visibleProjectColumns.findIndex((column) => column.id === cell.column.id);
+                      const isFrozen = visibleIndex >= 0 && visibleIndex < frozenProjectCols;
+                      return (
+                      <td
+                        key={cell.id}
+                        className="px-3 py-3 align-middle text-sm text-stone-300"
+                        style={{
+                          width: cell.column.getSize(),
+                          minWidth: cell.column.getSize(),
+                          height: projectsTablePrefs.rowHeight,
+                          position: isFrozen ? 'sticky' : undefined,
+                          left: isFrozen ? projectLeftOffsets[visibleIndex] : undefined,
+                          zIndex: isFrozen ? 10 : undefined,
+                          background: isFrozen ? 'rgb(var(--pm-panel))' : undefined,
+                        }}
+                      >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
-                    ))}
+                      );
+                    })}
                   </tr>
                   {hasDetail && (
                     <tr key={`${row.id}-details`} className="border-b border-stone-200/10 bg-black/15">

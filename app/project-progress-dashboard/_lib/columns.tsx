@@ -743,7 +743,7 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
       ),
     },
     {
-      id: 'unitInteg',
+      id: 'unitIntegrationTest',
       header: 'Unit/Integ Test',
       accessor: (r) => r.unitIntegrationTestPath ?? '',
       cell: (r, h) => (
@@ -878,13 +878,13 @@ export function createDeploymentColumns(projectNameLabel?: string): ColumnDef[] 
         onCommit={(v) => patchRow(r, { deployStatus: v as DeployStatus }, h)}
       />
     )},
-    { id: 'env', header: 'Environment', accessor: (r) => r.deployEnv ?? '', cell: (r, h) => (
+    { id: 'deployEnv', header: 'Environment', accessor: (r) => r.deployEnv ?? '', cell: (r, h) => (
       <EditableText
         value={r.deployEnv}
         onCommit={(v) => patchRow(r, { deployEnv: v || undefined }, h)}
       />
     )},
-    { id: 'date', header: 'Deploy Date', accessor: (r) => r.deployDate ?? '', cell: (r, h) => (
+    { id: 'deployDate', header: 'Deploy Date', accessor: (r) => r.deployDate ?? '', cell: (r, h) => (
       <EditableText
         value={r.deployDate}
         kind="date"
@@ -918,10 +918,10 @@ function opsNumericCell(
 export function createOperationsColumns(projectNameLabel?: string): ColumnDef[] {
   return [
     ...commonIdNameCols('operations', projectNameLabel),
-    { id: 'uptime',   header: 'Uptime %',      accessor: (r) => r.uptimePercent   ?? -1, cell: opsNumericCell('uptimePercent') },
-    { id: 'error',    header: 'Error %',       accessor: (r) => r.errorRate       ?? -1, cell: opsNumericCell('errorRate') },
-    { id: 'rt',       header: 'Response (ms)', accessor: (r) => r.avgResponseTime ?? -1, cell: opsNumericCell('avgResponseTime') },
-    { id: 'incident', header: 'Last Incident', accessor: (r) => r.lastIncident    ?? '', cell: (r, h) => (
+    { id: 'uptime',          header: 'Uptime %',      accessor: (r) => r.uptimePercent   ?? -1, cell: opsNumericCell('uptimePercent') },
+    { id: 'errorRate',       header: 'Error %',       accessor: (r) => r.errorRate       ?? -1, cell: opsNumericCell('errorRate') },
+    { id: 'avgResponseTime', header: 'Response (ms)', accessor: (r) => r.avgResponseTime ?? -1, cell: opsNumericCell('avgResponseTime') },
+    { id: 'lastIncident',    header: 'Last Incident', accessor: (r) => r.lastIncident    ?? '', cell: (r, h) => (
       <EditableText
         value={r.lastIncident}
         onCommit={(v) => patchRow(r, { lastIncident: v || undefined }, h)}

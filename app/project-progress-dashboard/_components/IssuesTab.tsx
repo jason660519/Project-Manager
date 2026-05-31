@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type Dispatch, type MouseEvent, type ReactNode, type SetStateAction } from 'react';
 import {
   AlertCircle,
   CheckCircle,
+  EyeOff,
   ExternalLink,
   GitPullRequest,
   KeyRound,
@@ -11,7 +12,9 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  RotateCcw,
   Search,
+  Snowflake,
   X,
 } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -83,7 +86,21 @@ interface RepoSyncState {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const CACHE_PREFIX = 'pm-issues-';
+const ISSUES_TABLE_PREFS_KEY = 'projectManager.progressDashboard.issuesTable.v2';
 const GITHUB_PROVIDER = PROVIDERS.find((provider) => provider.id === 'github') ?? null;
+const ISSUE_COLUMN_DEFS = [
+  { id: 'col-select', label: 'Sel', width: 44, sortable: false },
+  { id: 'col-id', label: 'ID', width: 88, sortable: true },
+  { id: 'col-project', label: 'Project', width: 132, sortable: true },
+  { id: 'col-title', label: 'Title', width: 320, sortable: true },
+  { id: 'col-status', label: 'Status', width: 88, sortable: true },
+  { id: 'col-labels', label: 'Labels', width: 180, sortable: false },
+  { id: 'col-updated', label: 'Updated', width: 108, sortable: true },
+  { id: 'col-actions', label: 'Action', width: 92, sortable: false },
+] as const;
+
+type IssueColumnId = (typeof ISSUE_COLUMN_DEFS)[number]['id'];
+type IssueSort = { columnId: IssueColumnId; direction: 'asc' | 'desc' } | null;
 
 function isTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -224,6 +241,17 @@ export function IssuesTab({
   const [commentsError, setCommentsError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [oauthOpen, setOauthOpen] = useState(false);
+  const [issueSort, setIssueSort] = useState<IssueSort>(null);
+  const [issueFreezeCols, setIssueFreezeCols] = useState(0);
+  const [issueRowHeight, setIssueRowHeight] = useState(40);
+  const [issueColumnWidths, setIssueColumnWidths] = useState<Record<IssueColumnId, number>>(() => (
+    Object.fromEntries(ISSUE_COLUMN_DEFS.map((column) => [column.id, column.width])) as Record<IssueColumnId, number>
+  ));
+  const [hiddenIssueColumnIds, setHiddenIssueColumnIds] = useState<IssueColumnId[]>([]);
+  const [showIssueHiddenCols, setShowIssueHiddenCols] = useState(false);
+  const [hiddenIssueRowKeys, setHiddenIssueRowKeys] = useState<string[]>([]);
+  const [showIssueHiddenRows, setShowIssueHiddenRows] = useState(false);
+  const [showIssueHiddenRowsMenu, setShowIssueHiddenRowsMenu] = useState(false);
 
   const initialized = useRef(false);
   // Stable ref so auto-sync effects can call the latest onSync without
@@ -261,6 +289,50 @@ export function IssuesTab({
       repoName: fallbackSegments.slice(-2).join('/'),
     }];
   }, [selectedProjects, effectiveRepoUrl, projectName]);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(ISSUES_TABLE_PREFS_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<{
+        sort: IssueSort;
+        freezeCols: number;
+        rowHeight: number;
+        widths: Record<IssueColumnId, number>;
+        hidden: IssueColumnId[];
+        hiddenRows: string[];
+      }>;
+      setIssueSort(parsed.sort ?? null);
+      setIssueFreezeCols(Math.max(0, Math.min(5, parsed.freezeCols ?? 0)));
+      setIssueRowHeight(Math.max(32, Math.min(160, parsed.rowHeight ?? 40)));
+      if (parsed.widths) {
+        setIssueColumnWidths((prev) => ({ ...prev, ...parsed.widths }));
+      }
+      if (Array.isArray(parsed.hidden)) {
+        setHiddenIssueColumnIds(parsed.hidden.filter((id) => id !== 'col-id'));
+      }
+      if (Array.isArray(parsed.hiddenRows)) {
+        setHiddenIssueRowKeys(parsed.hiddenRows.filter((id): id is string => typeof id === 'string'));
+      }
+    } catch {
+      /* malformed prefs are ignored */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(ISSUES_TABLE_PREFS_KEY, JSON.stringify({
+        sort: issueSort,
+        freezeCols: issueFreezeCols,
+        rowHeight: issueRowHeight,
+        widths: issueColumnWidths,
+        hidden: hiddenIssueColumnIds,
+        hiddenRows: hiddenIssueRowKeys,
+      }));
+    } catch {
+      /* preference save is non-blocking */
+    }
+  }, [hiddenIssueColumnIds, hiddenIssueRowKeys, issueColumnWidths, issueFreezeCols, issueRowHeight, issueSort]);
 
   // On mount: load from cache, check token.
   useEffect(() => {
@@ -411,7 +483,11 @@ export function IssuesTab({
   // Filtered issues
   const filteredIssues = useMemo(() => {
     let result = issues;
+    const hiddenRows = new Set(hiddenIssueRowKeys);
 
+    if (!showIssueHiddenRows) {
+      result = result.filter((i) => !hiddenRows.has(`${i.repoUrl}#${i.number}`));
+    }
     if (filter.state !== 'all') {
       result = result.filter((i) => i.state === filter.state);
     }
@@ -428,8 +504,25 @@ export function IssuesTab({
       );
     }
 
-    return result;
-  }, [issues, filter]);
+    if (!issueSort) return result;
+    return [...result].sort((a, b) => {
+      const read = (issue: DetailIssue): string | number => {
+        switch (issueSort.columnId) {
+          case 'col-id': return issue.number;
+          case 'col-project': return issue.projectName;
+          case 'col-title': return issue.title;
+          case 'col-status': return issue.state;
+          case 'col-updated': return new Date(issue.updatedAt).getTime();
+          default: return '';
+        }
+      };
+      const av = read(a);
+      const bv = read(b);
+      const direction = issueSort.direction === 'asc' ? 1 : -1;
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * direction;
+      return String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: 'base' }) * direction;
+    });
+  }, [issues, filter, hiddenIssueRowKeys, issueSort, showIssueHiddenRows]);
 
   const allLabels = useMemo(() => extractAllLabels(issues), [issues]);
   const openCount = useMemo(() => issues.filter((issue) => issue.state === 'open').length, [issues]);
@@ -449,6 +542,15 @@ export function IssuesTab({
     () => issues.filter((issue) => selectedIssueKeys.includes(`${issue.repoUrl}#${issue.number}`)),
     [issues, selectedIssueKeys],
   );
+  const hiddenIssueRows = useMemo(() => {
+    const hidden = new Set(hiddenIssueRowKeys);
+    return issues
+      .filter((issue) => hidden.has(`${issue.repoUrl}#${issue.number}`))
+      .map((issue) => ({
+        key: `${issue.repoUrl}#${issue.number}`,
+        label: `#${issue.number} · ${issue.title}`,
+      }));
+  }, [hiddenIssueRowKeys, issues]);
   const allVisibleSelected = filteredIssues.length > 0
     && filteredIssues.every((issue) => selectedIssueKeys.includes(`${issue.repoUrl}#${issue.number}`));
 
@@ -937,6 +1039,132 @@ export function IssuesTab({
           <option value="closed">Closed only</option>
         </select>
 
+        <div className="flex items-center gap-1 border-l border-stone-200/15 pl-2">
+          <Snowflake size={12} className="text-cyan-300" />
+          <label className="text-[10px] text-stone-400">Freeze cols</label>
+          <input
+            type="number"
+            min={0}
+            max={5}
+            value={issueFreezeCols}
+            onChange={(e) => setIssueFreezeCols(Math.max(0, Math.min(5, Number(e.target.value) || 0)))}
+            className="h-6 w-10 border border-stone-200/15 bg-transparent px-1 text-center text-xs text-stone-100"
+          />
+          <label className="text-[10px] text-stone-400">Row h</label>
+          <input
+            type="number"
+            min={32}
+            max={160}
+            value={issueRowHeight}
+            onChange={(e) => setIssueRowHeight(Math.max(32, Math.min(160, Number(e.target.value) || 40)))}
+            className="h-6 w-12 border border-stone-200/15 bg-transparent px-1 text-center text-xs text-stone-100"
+          />
+        </div>
+
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowIssueHiddenCols((value) => !value)}
+            className="inline-flex items-center gap-1 rounded border border-stone-200/15 px-2 py-1.5 text-[10px] text-stone-300 hover:text-stone-100"
+          >
+            <EyeOff size={12} /> Hidden cols ({hiddenIssueColumnIds.length})
+          </button>
+          {showIssueHiddenCols && (
+            <div className="absolute right-0 top-8 z-40 w-56 border border-stone-200/20 bg-[rgb(var(--pm-rail))] p-2 shadow-xl">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-[10px] uppercase tracking-[0.12em] text-stone-400">Columns</p>
+                <button type="button" onClick={() => setHiddenIssueColumnIds([])} className="text-[10px] text-cyan-200 hover:text-cyan-100">Show all</button>
+              </div>
+              {ISSUE_COLUMN_DEFS.map((column) => {
+                const hidden = hiddenIssueColumnIds.includes(column.id);
+                return (
+                  <button
+                    key={column.id}
+                    type="button"
+                    disabled={column.id === 'col-id'}
+                    onClick={() => setHiddenIssueColumnIds((prev) => (
+                      hidden ? prev.filter((id) => id !== column.id) : [...prev, column.id]
+                    ))}
+                    className="flex w-full items-center justify-between gap-2 px-2 py-1 text-left text-[11px] text-stone-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:text-stone-500"
+                  >
+                    <span>{column.label}</span>
+                    <span className="text-[10px] text-stone-500">{hidden ? 'Hidden' : 'Shown'}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowIssueHiddenRowsMenu((value) => !value)}
+            className={clsx(
+              'inline-flex items-center gap-1 rounded border px-2 py-1.5 text-[10px]',
+              hiddenIssueRows.length > 0
+                ? 'border-cyan-200/35 bg-cyan-500/10 text-cyan-100'
+                : 'border-stone-200/15 text-stone-300 hover:text-stone-100',
+            )}
+          >
+            <EyeOff size={12} /> Hidden rows ({hiddenIssueRows.length})
+          </button>
+          {showIssueHiddenRowsMenu && (
+            <div className="absolute right-0 top-8 z-40 w-72 border border-stone-200/20 bg-[rgb(var(--pm-rail))] p-2 shadow-xl">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-[10px] uppercase tracking-[0.12em] text-stone-400">Hidden rows</p>
+                {hiddenIssueRows.length > 0 && (
+                  <button type="button" onClick={() => setHiddenIssueRowKeys([])} className="text-[10px] text-cyan-200 hover:text-cyan-100">Show all</button>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowIssueHiddenRows((value) => !value)}
+                className="mb-2 block w-full rounded border border-stone-200/15 px-2 py-1.5 text-left text-[11px] text-stone-200 hover:bg-white/10"
+              >
+                {showIssueHiddenRows ? 'Hide hidden rows from table' : 'Show hidden rows in table'}
+              </button>
+              {hiddenIssueRows.length === 0 ? (
+                <p className="px-2 py-1 text-[11px] text-stone-500">No hidden rows.</p>
+              ) : (
+                <div className="max-h-60 overflow-auto">
+                  {hiddenIssueRows.map((row) => (
+                    <div key={row.key} className="flex items-center justify-between gap-2 py-1">
+                      <span className="min-w-0 truncate text-[11px] text-stone-200" title={row.label}>
+                        {row.label}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setHiddenIssueRowKeys((prev) => prev.filter((key) => key !== row.key))}
+                        className="rounded border border-cyan-200/30 px-1.5 py-0.5 text-[10px] text-cyan-100 hover:bg-cyan-500/10"
+                      >
+                        Show
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setFilter({ state: 'all', label: null, search: '' });
+            setIssueSort(null);
+            setIssueFreezeCols(0);
+            setIssueRowHeight(40);
+            setIssueColumnWidths(Object.fromEntries(ISSUE_COLUMN_DEFS.map((column) => [column.id, column.width])) as Record<IssueColumnId, number>);
+            setHiddenIssueColumnIds([]);
+            setHiddenIssueRowKeys([]);
+            try { window.localStorage.removeItem(ISSUES_TABLE_PREFS_KEY); } catch {}
+          }}
+          className="inline-flex items-center gap-1 rounded border border-stone-200/15 px-2 py-1.5 text-[10px] text-stone-300 hover:text-stone-100"
+        >
+          <RotateCcw size={12} /> Reset view
+        </button>
+
         <button
           type="button"
           onClick={toggleAllVisible}
@@ -1060,18 +1288,60 @@ export function IssuesTab({
         {/* Issues table */}
         <div className={clsx('min-w-0', detailIssue ? 'w-full xl:flex-1' : 'w-full')}>
           {issues.length === 0 && !loading ? (
-            <div className="flex flex-col items-center justify-center rounded border border-dashed border-stone-200/15 py-12">
-              <GitPullRequest className="h-8 w-8 text-stone-400 mb-2" />
-              <p className="text-sm text-stone-400">
-                {hasToken === false
-                  ? 'Authorize GitHub to sync issues'
-                  : 'No issues synced yet. Click "Sync Issues from GitHub" to begin.'}
-              </p>
+            <div className="space-y-3">
+              <div className="flex flex-col items-center justify-center rounded border border-dashed border-stone-200/15 py-8">
+                <GitPullRequest className="h-8 w-8 text-stone-400 mb-2" />
+                <p className="text-sm text-stone-400">
+                  {hasToken === false
+                    ? 'Authorize GitHub to sync issues'
+                    : 'No issues synced yet. Click "Sync Issues from GitHub" to begin.'}
+                </p>
+              </div>
+              <IssuesTable
+                issues={[]}
+                selectedIssueKey={null}
+                onRowClick={handleRowClick}
+                onDispatch={handleDispatch}
+                selectedIssueKeys={selectedIssueKeys}
+                onToggleSelect={toggleIssueSelection}
+                dispatchDisabled={dispatching}
+                sort={issueSort}
+                onSortChange={setIssueSort}
+                freezeCols={issueFreezeCols}
+                rowHeight={issueRowHeight}
+                columnWidths={issueColumnWidths}
+                onColumnWidthsChange={setIssueColumnWidths}
+                hiddenColumnIds={hiddenIssueColumnIds}
+                onHiddenColumnIdsChange={setHiddenIssueColumnIds}
+                hiddenRowKeys={hiddenIssueRowKeys}
+                onHiddenRowKeysChange={setHiddenIssueRowKeys}
+              />
             </div>
           ) : filteredIssues.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded border border-dashed border-stone-200/15 py-8">
-              <Search className="h-6 w-6 text-stone-400 mb-2" />
-              <p className="text-sm text-stone-400">No issues match the current filters.</p>
+            <div className="space-y-3">
+              <div className="flex flex-col items-center justify-center rounded border border-dashed border-stone-200/15 py-8">
+                <Search className="h-6 w-6 text-stone-400 mb-2" />
+                <p className="text-sm text-stone-400">No issues match the current filters.</p>
+              </div>
+              <IssuesTable
+                issues={[]}
+                selectedIssueKey={null}
+                onRowClick={handleRowClick}
+                onDispatch={handleDispatch}
+                selectedIssueKeys={selectedIssueKeys}
+                onToggleSelect={toggleIssueSelection}
+                dispatchDisabled={dispatching}
+                sort={issueSort}
+                onSortChange={setIssueSort}
+                freezeCols={issueFreezeCols}
+                rowHeight={issueRowHeight}
+                columnWidths={issueColumnWidths}
+                onColumnWidthsChange={setIssueColumnWidths}
+                hiddenColumnIds={hiddenIssueColumnIds}
+                onHiddenColumnIdsChange={setHiddenIssueColumnIds}
+                hiddenRowKeys={hiddenIssueRowKeys}
+                onHiddenRowKeysChange={setHiddenIssueRowKeys}
+              />
             </div>
           ) : (
             <IssuesTable
@@ -1082,6 +1352,16 @@ export function IssuesTab({
               selectedIssueKeys={selectedIssueKeys}
               onToggleSelect={toggleIssueSelection}
               dispatchDisabled={dispatching}
+              sort={issueSort}
+              onSortChange={setIssueSort}
+              freezeCols={issueFreezeCols}
+              rowHeight={issueRowHeight}
+              columnWidths={issueColumnWidths}
+              onColumnWidthsChange={setIssueColumnWidths}
+              hiddenColumnIds={hiddenIssueColumnIds}
+              onHiddenColumnIdsChange={setHiddenIssueColumnIds}
+              hiddenRowKeys={hiddenIssueRowKeys}
+              onHiddenRowKeysChange={setHiddenIssueRowKeys}
             />
           )}
         </div>
@@ -1313,6 +1593,16 @@ interface IssuesTableProps {
   onDispatch: (issue: DetailIssue) => void;
   onToggleSelect: (issue: DetailIssue) => void;
   dispatchDisabled: boolean;
+  sort: IssueSort;
+  onSortChange: (sort: IssueSort) => void;
+  freezeCols: number;
+  rowHeight: number;
+  columnWidths: Record<IssueColumnId, number>;
+  onColumnWidthsChange: Dispatch<SetStateAction<Record<IssueColumnId, number>>>;
+  hiddenColumnIds: IssueColumnId[];
+  onHiddenColumnIdsChange: Dispatch<SetStateAction<IssueColumnId[]>>;
+  hiddenRowKeys: string[];
+  onHiddenRowKeysChange: Dispatch<SetStateAction<string[]>>;
 }
 
 function IssuesTable({
@@ -1323,20 +1613,138 @@ function IssuesTable({
   onDispatch,
   onToggleSelect,
   dispatchDisabled,
+  sort,
+  onSortChange,
+  freezeCols,
+  rowHeight,
+  columnWidths,
+  onColumnWidthsChange,
+  hiddenColumnIds,
+  onHiddenColumnIdsChange,
+  hiddenRowKeys,
+  onHiddenRowKeysChange,
 }: IssuesTableProps) {
+  const visibleColumns = ISSUE_COLUMN_DEFS.filter((column) => !hiddenColumnIds.includes(column.id) || column.id === 'col-id');
+  const leftOffsets = visibleColumns.reduce<Record<IssueColumnId, number>>((acc, column, index) => {
+    const previous = visibleColumns[index - 1];
+    acc[column.id] = previous ? acc[previous.id] + (columnWidths[previous.id] ?? previous.width) : 0;
+    return acc;
+  }, {} as Record<IssueColumnId, number>);
+  const frozenCount = Math.max(0, Math.min(visibleColumns.length, freezeCols));
+  const toggleSort = (column: (typeof ISSUE_COLUMN_DEFS)[number]) => {
+    if (!column.sortable) return;
+    if (!sort || sort.columnId !== column.id) {
+      onSortChange({ columnId: column.id, direction: 'asc' });
+      return;
+    }
+    if (sort.direction === 'asc') {
+      onSortChange({ columnId: column.id, direction: 'desc' });
+      return;
+    }
+    onSortChange(null);
+  };
+  const renderCell = (columnId: IssueColumnId, issue: DetailIssue) => {
+    switch (columnId) {
+      case 'col-select':
+        return (
+          <input
+            type="checkbox"
+            aria-label={`Select issue #${issue.number}`}
+            checked={selectedIssueKeys.includes(`${issue.repoUrl}#${issue.number}`)}
+            onChange={(e) => {
+              e.stopPropagation();
+              onToggleSelect(issue);
+            }}
+          />
+        );
+      case 'col-id':
+        return <span className="font-mono text-stone-300">#{issue.number}</span>;
+      case 'col-project':
+        return <span className="text-[11px] text-stone-400">{issue.projectName}</span>;
+      case 'col-title':
+        return <span className="block max-w-xs truncate text-stone-100">{issue.title}</span>;
+      case 'col-status':
+        return <StatusBadge state={issue.state} />;
+      case 'col-labels':
+        return (
+          <div className="flex flex-wrap gap-1">
+            {issue.labels.slice(0, 3).map((label) => (
+              <span
+                key={label}
+                className="rounded-full bg-stone-200/10 px-1.5 py-0.5 text-[9px] text-stone-300"
+              >
+                {label}
+              </span>
+            ))}
+            {issue.labels.length > 3 && (
+              <span className="text-[9px] text-stone-400">+{issue.labels.length - 3}</span>
+            )}
+          </div>
+        );
+      case 'col-updated':
+        return <span className="text-[11px] text-stone-400">{relativeTime(issue.updatedAt)}</span>;
+      case 'col-actions':
+        return (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDispatch(issue);
+            }}
+            disabled={dispatchDisabled}
+            className="rounded bg-sky-600/25 px-2 py-1 text-[10px] text-sky-100 hover:bg-sky-600/40 disabled:opacity-50"
+          >
+            Dispatch
+          </button>
+        );
+      default:
+        return null;
+    }
+  };
   return (
     <div className="relative max-h-[55vh] overflow-auto border border-stone-200/15 bg-[rgb(var(--pm-rail))]/70">
-      <table className="min-w-[820px] w-full border-collapse text-left">
+      <table
+        className="w-full border-collapse text-left"
+        style={{ minWidth: visibleColumns.reduce((sum, column) => sum + (columnWidths[column.id] ?? column.width), 0) }}
+      >
         <thead className="sticky top-0 z-10 bg-[rgb(var(--pm-rail))]">
           <tr>
-            <TH className="w-10">Sel</TH>
-            <TH className="w-16">#</TH>
-            <TH className="w-32">Project</TH>
-            <TH>Title</TH>
-            <TH className="w-20">State</TH>
-            <TH className="w-40">Labels</TH>
-            <TH className="w-24">Updated</TH>
-            <TH className="w-20">Action</TH>
+            {visibleColumns.map((column, index) => {
+              const isFrozen = index < frozenCount;
+              const sorted = sort?.columnId === column.id ? sort.direction : null;
+              return (
+                <TH
+                  key={column.id}
+                  className="relative"
+                  style={{
+                    width: columnWidths[column.id] ?? column.width,
+                    minWidth: columnWidths[column.id] ?? column.width,
+                    position: isFrozen ? 'sticky' : undefined,
+                    left: isFrozen ? leftOffsets[column.id] : undefined,
+                    zIndex: isFrozen ? 30 : undefined,
+                    background: 'rgb(var(--pm-rail))',
+                  }}
+                  onClick={() => toggleSort(column)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    const raw = window.prompt('Resize column width in px. Enter 0 to hide this column.', String(columnWidths[column.id] ?? column.width));
+                    if (raw == null) return;
+                    const value = Number(raw);
+                    if (!Number.isFinite(value)) return;
+                    if (value === 0) {
+                      if (column.id !== 'col-id') onHiddenColumnIdsChange((prev) => Array.from(new Set([...prev, column.id])));
+                      return;
+                    }
+                    onColumnWidthsChange((prev) => ({ ...prev, [column.id]: Math.max(56, Math.min(640, value)) }));
+                  }}
+                >
+                  <span className={clsx('inline-flex items-center gap-1', column.sortable && 'cursor-pointer hover:text-stone-200')}>
+                    {column.label}
+                    {column.sortable && <span className="text-[10px] text-stone-500">{sorted === 'asc' ? '↑' : sorted === 'desc' ? '↓' : '↕'}</span>}
+                  </span>
+                </TH>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
@@ -1344,76 +1752,83 @@ function IssuesTable({
             <tr
               key={`${issue.repoUrl}#${issue.number}`}
               onClick={() => onRowClick(issue)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                const key = `${issue.repoUrl}#${issue.number}`;
+                onHiddenRowKeysChange((prev) => (
+                  prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]
+                ));
+              }}
               className={clsx(
                 'border-t border-stone-200/10 cursor-pointer transition-colors',
+                hiddenRowKeys.includes(`${issue.repoUrl}#${issue.number}`) && 'opacity-60',
                 selectedIssueKey === `${issue.repoUrl}#${issue.number}`
                   ? 'bg-sky-600/15'
                   : 'hover:bg-white/5',
               )}
             >
-              <TD>
-                <input
-                  type="checkbox"
-                  aria-label={`Select issue #${issue.number}`}
-                  checked={selectedIssueKeys.includes(`${issue.repoUrl}#${issue.number}`)}
-                  onChange={(e) => {
-                    e.stopPropagation();
-                    onToggleSelect(issue);
-                  }}
-                />
-              </TD>
-              <TD className="font-mono text-stone-300">#{issue.number}</TD>
-              <TD className="text-[11px] text-stone-400">{issue.projectName}</TD>
-              <TD className="max-w-xs truncate text-stone-100">{issue.title}</TD>
-              <TD><StatusBadge state={issue.state} /></TD>
-              <TD>
-                <div className="flex flex-wrap gap-1">
-                  {issue.labels.slice(0, 3).map((label) => (
-                    <span
-                      key={label}
-                      className="rounded-full bg-stone-200/10 px-1.5 py-0.5 text-[9px] text-stone-300"
-                    >
-                      {label}
-                    </span>
-                  ))}
-                  {issue.labels.length > 3 && (
-                    <span className="text-[9px] text-stone-400">+{issue.labels.length - 3}</span>
-                  )}
-                </div>
-              </TD>
-              <TD className="text-[11px] text-stone-400">{relativeTime(issue.updatedAt)}</TD>
-              <TD>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDispatch(issue);
-                  }}
-                  disabled={dispatchDisabled}
-                  className="rounded bg-sky-600/25 px-2 py-1 text-[10px] text-sky-100 hover:bg-sky-600/40 disabled:opacity-50"
-                >
-                  Dispatch
-                </button>
-              </TD>
+              {visibleColumns.map((column, index) => {
+                const isFrozen = index < frozenCount;
+                return (
+                  <TD
+                    key={column.id}
+                    style={{
+                      width: columnWidths[column.id] ?? column.width,
+                      minWidth: columnWidths[column.id] ?? column.width,
+                      height: rowHeight,
+                      position: isFrozen ? 'sticky' : undefined,
+                      left: isFrozen ? leftOffsets[column.id] : undefined,
+                      zIndex: isFrozen ? 10 : undefined,
+                      background: isFrozen ? 'rgb(var(--pm-rail))' : undefined,
+                    }}
+                  >
+                    {renderCell(column.id, issue)}
+                  </TD>
+                );
+              })}
             </tr>
           ))}
+          {issues.length === 0 && (
+            <tr>
+              <td colSpan={visibleColumns.length} className="px-4 py-8 text-center text-xs text-stone-500">
+                No rows match the current search or filters.
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
   );
 }
 
-function TH({ className, children }: { className?: string; children: React.ReactNode }) {
+function TH({
+  className,
+  children,
+  style,
+  onClick,
+  onContextMenu,
+}: {
+  className?: string;
+  children: ReactNode;
+  style?: CSSProperties;
+  onClick?: () => void;
+  onContextMenu?: (event: MouseEvent) => void;
+}) {
   return (
-    <th className={clsx('px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-stone-400', className)}>
+    <th
+      className={clsx('px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-stone-400', className)}
+      style={style}
+      onClick={onClick}
+      onContextMenu={onContextMenu}
+    >
       {children}
     </th>
   );
 }
 
-function TD({ className, children }: { className?: string; children: React.ReactNode }) {
+function TD({ className, children, style }: { className?: string; children: ReactNode; style?: CSSProperties }) {
   return (
-    <td className={clsx('px-3 py-2 text-xs', className)}>
+    <td className={clsx('px-3 py-2 text-xs', className)} style={style}>
       {children}
     </td>
   );

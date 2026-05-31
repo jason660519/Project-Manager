@@ -10,16 +10,79 @@ const LEGACY_E2E_PHASE_KEY = 'testing';
 
 /** Phase-specific defaults. Column counts must match the column factories. */
 export const DEFAULT_WIDTHS_BY_PHASE: Record<FeaturePhase, number[]> = {
-  // 19 cols: project, id, SP, category, name, progress, status, locatedSection,
-  //          spec, tdd, unitInteg, e2eFolder, tddProgress, tddReport, devLog,
-  //          engineer, ide, notes, actions
-  development: [120, 60, 50, 110, 220, 140, 110, 110, 150, 150, 150, 150, 130, 150, 150, 130, 110, 180, 200],
+  development: [120, 60, 50, 110, 220, 140, 110, 110, 110, 150, 150, 150, 150, 130, 150, 150, 150, 130, 180, 200],
   e2e_testing: [120, 60, 110, 220, 110, 110, 110, 140, 100],
   deployment:  [120, 60, 110, 220, 110, 120, 120, 140, 140],
   operations:  [120, 60, 110, 220, 110, 100, 100, 100, 200],
 };
 
 export const DEFAULT_HEADER_HEIGHT = 40;
+export const DEFAULT_ROW_HEIGHT = 40;
+const MIN_COL_WIDTH = 56;
+const MAX_COL_WIDTH = 640;
+const MIN_ROW_HEIGHT = 28;
+const MAX_ROW_HEIGHT = 160;
+
+function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
+  const numberValue = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numberValue)) return fallback;
+  return Math.max(min, Math.min(max, numberValue));
+}
+
+function normalizeWidths(value: unknown, defaults: number[]): number[] {
+  if (!Array.isArray(value)) return defaults;
+  if (value.length !== defaults.length) return defaults;
+  return value.map((width, index) => clampNumber(width, MIN_COL_WIDTH, MAX_COL_WIDTH, defaults[index] ?? MIN_COL_WIDTH));
+}
+
+function normalizeAlignments(value: unknown, defaults: PhaseTablePrefs['columnAlignments']): PhaseTablePrefs['columnAlignments'] {
+  if (!Array.isArray(value) || value.length !== defaults.length) return defaults;
+  return value.map((alignment, index) => (
+    alignment === 'center' || alignment === 'right' || alignment === 'left'
+      ? alignment
+      : defaults[index] ?? 'left'
+  ));
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+const COLUMN_ID_MIGRATION: Record<string, string> = {
+  'col-project': 'project',
+  'col-id': 'id',
+  'col-points': 'points',
+  'col-category': 'category',
+  'col-name': 'name',
+  'col-progress': 'progress',
+  'col-status': 'status',
+  'col-checklist': 'checklist',
+  'col-section': 'section',
+  'col-spec': 'spec',
+  'col-tdd': 'tdd',
+  'col-unit-integ': 'unitIntegrationTest',
+  'col-e2e-folder': 'e2eFolder',
+  'col-tdd-progress': 'tddProgress',
+  'col-tdd-report': 'tddReport',
+  'col-debug-retro': 'debugRetro',
+  'col-test-scenarios': 'testScenarios',
+  'col-dev-log': 'devLog',
+  'col-notes': 'notes',
+  'col-actions': 'actions',
+  'col-coverage': 'coverage',
+  'col-test-status': 'testStatus',
+  'col-deploy-status': 'deployStatus',
+  'col-env': 'deployEnv',
+  'col-date': 'deployDate',
+  'col-uptime': 'uptime',
+  'col-error': 'errorRate',
+  'col-rt': 'avgResponseTime',
+  'col-incident': 'lastIncident',
+};
+
+function migrateColumnId(columnId: string): string {
+  return COLUMN_ID_MIGRATION[columnId] ?? columnId;
+}
 
 function buildDefaults(phase: FeaturePhase): PhaseTablePrefs {
   const widths = DEFAULT_WIDTHS_BY_PHASE[phase];
@@ -27,9 +90,12 @@ function buildDefaults(phase: FeaturePhase): PhaseTablePrefs {
     colWidths: widths,
     columnAlignments: widths.map(() => 'left'),
     headerHeight: DEFAULT_HEADER_HEIGHT,
+    rowHeight: DEFAULT_ROW_HEIGHT,
     freezeRowCount: 0,
     frozenDataColCount: 0,
+    hiddenColumnIds: [],
     hiddenRowKeys: [],
+    sorting: [],
     widthPresets: [],
     customRows: [],
   };
@@ -84,13 +150,22 @@ function readPrefs(phase: FeaturePhase): PhaseTablePrefs {
     return {
       ...defaults,
       ...parsed,
-      colWidths: Array.isArray(parsed.colWidths) && parsed.colWidths.length === defaults.colWidths.length
-        ? parsed.colWidths
-        : defaults.colWidths,
-      columnAlignments: Array.isArray(parsed.columnAlignments) && parsed.columnAlignments.length === defaults.colWidths.length
-        ? parsed.columnAlignments
-        : defaults.columnAlignments,
-      hiddenRowKeys: Array.isArray(parsed.hiddenRowKeys) ? parsed.hiddenRowKeys : [],
+      colWidths: normalizeWidths(parsed.colWidths, defaults.colWidths),
+      columnAlignments: normalizeAlignments(parsed.columnAlignments, defaults.columnAlignments),
+      rowHeight: clampNumber(parsed.rowHeight, MIN_ROW_HEIGHT, MAX_ROW_HEIGHT, DEFAULT_ROW_HEIGHT),
+      freezeRowCount: clampNumber(parsed.freezeRowCount, 0, 5, 0),
+      frozenDataColCount: clampNumber(parsed.frozenDataColCount, 0, 5, 0),
+      hiddenColumnIds: normalizeStringArray(parsed.hiddenColumnIds)
+        .map(migrateColumnId)
+        .filter((id) => id !== 'id'),
+      hiddenRowKeys: normalizeStringArray(parsed.hiddenRowKeys),
+      sorting: Array.isArray(parsed.sorting)
+        ? parsed.sorting.filter((item): item is PhaseTablePrefs['sorting'][number] => (
+          item
+          && typeof item.columnId === 'string'
+          && (item.direction === 'asc' || item.direction === 'desc')
+        )).map((item) => ({ ...item, columnId: migrateColumnId(item.columnId) }))
+        : [],
       widthPresets: Array.isArray(parsed.widthPresets) ? parsed.widthPresets : [],
       customRows: Array.isArray(parsed.customRows) ? parsed.customRows : [],
     };

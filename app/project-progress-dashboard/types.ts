@@ -43,14 +43,23 @@ export interface PhaseTablePrefs {
   colWidths: number[];
   columnAlignments: ColumnAlignment[];
   headerHeight: number;
+  rowHeight: number;
   freezeRowCount: number;
   frozenDataColCount: number;
+  hiddenColumnIds: string[];
   hiddenRowKeys: string[];
+  sorting: PhaseTableSort[];
   widthPresets: WidthPreset[];
   customRows: CustomProjectProgressRow[];
 }
 
 export type ColumnAlignment = 'left' | 'center' | 'right';
+export type SortDirection = 'asc' | 'desc';
+
+export interface PhaseTableSort {
+  columnId: string;
+  direction: SortDirection;
+}
 
 export interface WidthPreset {
   id: string;

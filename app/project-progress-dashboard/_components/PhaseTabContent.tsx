@@ -71,6 +71,12 @@ export function PhaseTabContent({
   }, [allRows, phase]);
 
   const hiddenSet = useMemo(() => new Set(prefs.hiddenRowKeys), [prefs.hiddenRowKeys]);
+  const hiddenRowItems = useMemo(
+    () => allRows
+      .filter((row) => hiddenSet.has(row.rowKey))
+      .map((row) => ({ key: row.rowKey, label: `${row.id} · ${row.name}` })),
+    [allRows, hiddenSet],
+  );
 
   // Apply search + category + hidden filter.
   const filteredRows = useMemo(() => {
@@ -87,11 +93,33 @@ export function PhaseTabContent({
     });
   }, [allRows, selectedCategories, hiddenSet, showHiddenRows, searchQuery, phase]);
 
+  const visibleRows = useMemo(() => {
+    const activeSort = prefs.sorting[0];
+    if (!activeSort) return filteredRows;
+    const column = columns.find((item) => item.id === activeSort.columnId);
+    if (!column?.accessor) return filteredRows;
+    const direction = activeSort.direction === 'asc' ? 1 : -1;
+    return [...filteredRows].sort((a, b) => {
+      const av = column.accessor?.(a);
+      const bv = column.accessor?.(b);
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * direction;
+      return String(av ?? '').localeCompare(String(bv ?? ''), undefined, { numeric: true, sensitivity: 'base' }) * direction;
+    });
+  }, [columns, filteredRows, prefs.sorting]);
+
   const onToggleHideRow = useCallback((rowKey: string) => {
     const current = prefs.hiddenRowKeys;
     const next = current.includes(rowKey) ? current.filter((k) => k !== rowKey) : [...current, rowKey];
     patch({ hiddenRowKeys: next });
   }, [prefs.hiddenRowKeys, patch]);
+
+  const onRestoreHiddenRow = useCallback((rowKey: string) => {
+    patch({ hiddenRowKeys: prefs.hiddenRowKeys.filter((key) => key !== rowKey) });
+  }, [patch, prefs.hiddenRowKeys]);
+
+  const onRestoreAllHiddenRows = useCallback(() => {
+    patch({ hiddenRowKeys: [] });
+  }, [patch]);
 
   const onAdd = useCallback((row: CustomProjectProgressRow) => {
     patch({ customRows: [...prefs.customRows, row] });
@@ -196,11 +224,14 @@ export function PhaseTabContent({
         showHiddenRows={showHiddenRows}
         onShowHiddenRowsChange={setShowHiddenRows}
         hiddenRowsCount={hiddenSet.size}
+        hiddenRowItems={hiddenRowItems}
+        onRestoreHiddenRow={onRestoreHiddenRow}
+        onRestoreAllHiddenRows={onRestoreAllHiddenRows}
         onAddRow={() => setAddRowOpen(true)}
       />
 
       <PhaseTable
-        rows={filteredRows}
+        rows={visibleRows}
         columns={columns}
         prefs={prefs}
         patch={patch}
