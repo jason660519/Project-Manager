@@ -24,6 +24,7 @@ import {
   MoreVertical,
   Plus,
   RotateCcw,
+  Rows3,
   Snowflake,
   X,
 } from 'lucide-react';
@@ -552,21 +553,20 @@ export function AiSdkProviderSheet({
             }
           />
 
-          {/* Density */}
-          <div className="flex h-8 items-center border border-stone-200/18" role="group" aria-label={copy.controls.density}>
-            {DENSITIES.map((d) => (
-              <button
-                key={d}
-                type="button"
-                aria-pressed={density === d}
-                onClick={() => setDensity(d)}
-                className={`h-full px-2 text-[11px] ${
-                  density === d ? 'bg-emerald-100/10 text-emerald-100' : 'text-stone-300 hover:bg-white/[0.04]'
-                }`}
-              >
-                {copy.density[d]}
-              </button>
-            ))}
+          {/* Density (single dropdown) */}
+          <div className="flex h-8 items-center gap-1 border border-stone-200/18 px-2 text-xs text-stone-200">
+            <Rows3 size={13} className="text-stone-400" />
+            <select
+              value={density}
+              aria-label={copy.controls.density}
+              title={copy.controls.density}
+              onChange={(e) => setDensity(e.target.value as RowDensity)}
+              className="h-6 bg-transparent text-xs text-stone-200 outline-none focus:ring-1 focus:ring-emerald-400/50"
+            >
+              {DENSITIES.map((d) => (
+                <option key={d} value={d} className="bg-stone-900">{copy.density[d]}</option>
+              ))}
+            </select>
           </div>
 
           <button

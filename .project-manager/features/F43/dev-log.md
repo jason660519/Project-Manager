@@ -109,8 +109,8 @@ full contract. New / changed:
 - `AiSdkProviderSheet.tsx` reworked: **column context menu** (sort asc/desc/reset,
   type filter, resize column, freeze through, hide, restore, reset view), **row
   context menu** (view details, resize row, hide row, restore rows), **Hidden
-  cols (n) / Hidden rows (n)** recovery menus, **density** (Compact/Comfortable/
-  Expanded) + per-row resize, default ⇅ / ↑ / ↓ sort markers + `aria-sort`,
+  cols (n) / Hidden rows (n)** recovery menus, **density dropdown** (Compact/
+  Comfortable/Expanded) + per-row resize, default ⇅ / ↑ / ↓ sort markers + `aria-sort`,
   **active filter chips + Clear filters**, **Reset view**, debounced search +
   clear. Toolbar follows the company order (Search | Filters | Freeze | Hidden
   cols | Hidden rows | Density | Reset view | Dataset actions, separated).
