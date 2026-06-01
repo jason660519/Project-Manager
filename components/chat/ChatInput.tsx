@@ -1,6 +1,6 @@
 'use client';
 
-import { FileText, Send, X } from 'lucide-react';
+import { FileText, Send, Square, X } from 'lucide-react';
 import { KeyboardEvent, useEffect, useRef, useState } from 'react';
 import {
   appendXmuxSnippetToInput,
@@ -34,6 +34,7 @@ interface ChatInputProps {
   loadingLabel: string;
   loading: boolean;
   onSend: (message: string, files?: AttachedFile[]) => void;
+  onCancel?: () => void;
   /** External ref for focus delegation (e.g. keyboard shortcuts) */
   externalRef?: React.RefObject<HTMLTextAreaElement | null>;
   /** Children rendered to the left of the textarea (e.g. quick actions) */
@@ -93,6 +94,7 @@ export function ChatInput({
   loadingLabel,
   loading,
   onSend,
+  onCancel,
   externalRef,
   beforeArea,
   afterArea,
@@ -105,6 +107,7 @@ export function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sentRef = useRef(false);
+  const composingRef = useRef(false);
   const valueRef = useRef(value);
   const canSend = (value.trim().length > 0 || files.length > 0) && !loading;
 
@@ -191,7 +194,13 @@ export function ChatInput({
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Escape' && loading && onCancel) {
+      event.preventDefault();
+      onCancel();
+      return;
+    }
     if (event.key !== 'Enter' || event.shiftKey) return;
+    if (event.nativeEvent.isComposing || composingRef.current) return;
     event.preventDefault();
     submit();
   };
@@ -312,6 +321,12 @@ export function ChatInput({
             setValue(event.target.value);
           }}
           onKeyDown={handleKeyDown}
+          onCompositionStart={() => {
+            composingRef.current = true;
+          }}
+          onCompositionEnd={() => {
+            composingRef.current = false;
+          }}
           onDragOver={handleDragOver}
           onDrop={handleDrop}
           placeholder={placeholder}
@@ -334,15 +349,24 @@ export function ChatInput({
           <FileText size={13} />
         </button>
 
-        {/* Send */}
+        {/* Send / stop */}
         <button
           type="button"
-          onClick={submit}
-          disabled={!canSend}
-          className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg border border-amber-200/25 bg-amber-500/10 text-amber-100 transition-colors hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-40"
+          onClick={loading && onCancel ? onCancel : submit}
+          disabled={loading ? !onCancel : !canSend}
+          aria-label={loading && onCancel ? 'Stop response' : 'Send message'}
+          title={loading && onCancel ? 'Stop response (Esc)' : 'Send message'}
+          className={[
+            'flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg border transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+            loading && onCancel
+              ? 'border-red-200/25 bg-red-500/10 text-red-100 hover:bg-red-500/15'
+              : 'border-amber-200/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15',
+          ].join(' ')}
         >
-          {loading ? (
+          {loading && !onCancel ? (
             <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-amber-200/40 border-t-amber-100" />
+          ) : loading ? (
+            <Square size={12} />
           ) : (
             <Send size={13} />
           )}

@@ -583,6 +583,10 @@ function fallbackFeature(context: ChatContext): Feature {
   );
 }
 
+function isAbortError(error: unknown, signal?: AbortSignal): boolean {
+  return signal?.aborted === true || (error instanceof Error && error.name === 'AbortError');
+}
+
 function buildAgentPrompt(content: string, context: ChatContext): string {
   const project = context.selectedProject;
   const selectedFeature = context.selectedFeature;
@@ -649,6 +653,7 @@ async function callChatApi(
   context: ChatContext,
   onStream?: (chunk: string) => void,
   chatSettingsOverride?: { provider: string; model: string; systemPrompt: string },
+  abortSignal?: AbortSignal,
 ): Promise<string> {
   // Build messages array WITHOUT system prompt (passed separately via systemPrompt field)
   const systemPrompt = chatSettingsOverride?.systemPrompt || buildSystemPrompt(context);
@@ -701,6 +706,7 @@ async function callChatApi(
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(chatPayload),
+      signal: abortSignal,
     });
 
     if (!res.ok) {
@@ -716,6 +722,7 @@ async function callChatApi(
     let buffer = '';
 
     while (true) {
+      if (abortSignal?.aborted) throw new DOMException('Chat request aborted', 'AbortError');
       const { done, value } = await reader.read();
       if (done) break;
 
@@ -756,6 +763,7 @@ async function callChatApi(
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(chatPayload),
+    signal: abortSignal,
   });
 
   if (!res.ok) {
@@ -857,6 +865,7 @@ async function callAgentApi(
   context: ChatContext,
   callbacks: AgentStreamCallbacks,
   chatSettingsOverride?: { provider: string; model: string; systemPrompt: string },
+  abortSignal?: AbortSignal,
 ): Promise<AgentStreamResult> {
   const systemPrompt = chatSettingsOverride?.systemPrompt || buildSystemPrompt(context);
   
@@ -927,6 +936,7 @@ async function callAgentApi(
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(payload),
+    signal: abortSignal,
   });
 
   if (!res.ok) {
@@ -943,6 +953,7 @@ async function callAgentApi(
   const toolCalls: AgentStreamResult['toolCalls'] = [];
 
   while (true) {
+    if (abortSignal?.aborted) throw new DOMException('Chat request aborted', 'AbortError');
     const { done, value } = await reader.read();
     if (done) break;
 
@@ -1041,6 +1052,7 @@ export async function sendChatMessage(
           onText: request.onStream,
         },
         request.chatSettings,
+        request.abortSignal,
       );
       
       // If we got a meaningful response, return it
@@ -1050,7 +1062,8 @@ export async function sendChatMessage(
           toolCalls: result.toolCalls.length > 0 ? result.toolCalls : undefined,
         };
       }
-    } catch {
+    } catch (error) {
+      if (isAbortError(error, request.abortSignal)) throw error;
       // Fall through to agent dispatch or simple chat
     }
   }
@@ -1077,9 +1090,11 @@ export async function sendChatMessage(
           request.context,
           request.onStream,
           request.chatSettings,
+          request.abortSignal,
         );
         return { content: apiContent };
-      } catch {
+      } catch (error) {
+        if (isAbortError(error, request.abortSignal)) throw error;
         return { content: result.message || 'Agent 指令準備失敗。', error: true };
       }
     }
@@ -1098,9 +1113,11 @@ export async function sendChatMessage(
           request.context,
           request.onStream,
           request.chatSettings,
+          request.abortSignal,
         );
         return { content: apiContent };
-      } catch {
+      } catch (error) {
+        if (isAbortError(error, request.abortSignal)) throw error;
         return { content: agentOutput, error: true };
       }
     }
@@ -1115,9 +1132,11 @@ export async function sendChatMessage(
       request.context,
       request.onStream,
       request.chatSettings,
+      request.abortSignal,
     );
     return { content };
   } catch (e) {
+    if (isAbortError(e, request.abortSignal)) throw e;
     const err = e as Error;
     if (
       err.message.includes('ANTHROPIC_API_KEY') ||

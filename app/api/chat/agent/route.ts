@@ -61,6 +61,7 @@ async function streamAnthropic(
   apiKey: string, model: string, sys: string, messages: ChatApiMessage[],
   send: (data: Record<string, unknown>) => void,
   tools = false, context?: ToolContext,
+  signal?: AbortSignal,
 ): Promise<void> {
   const body: Record<string, unknown> = {
     model,
@@ -94,6 +95,7 @@ async function streamAnthropic(
       'content-type': 'application/json',
     },
     body: JSON.stringify(body),
+    signal,
   });
 
   if (!res.ok) throw new Error(`Anthropic ${res.status}: ${(await res.text()).slice(0, 200)}`);
@@ -207,6 +209,7 @@ async function streamAnthropic(
           'content-type': 'application/json',
         },
         body: JSON.stringify(followUpBody),
+        signal,
       });
 
       if (followUp.ok) {
@@ -243,6 +246,7 @@ async function streamOpenAI(
   apiKey: string, model: string, sys: string, messages: ChatApiMessage[],
   send: (data: Record<string, unknown>) => void,
   tools = false, context?: ToolContext,
+  signal?: AbortSignal,
 ): Promise<void> {
   const body: Record<string, unknown> = {
     model,
@@ -263,6 +267,7 @@ async function streamOpenAI(
     method: 'POST',
     headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
     body: JSON.stringify(body),
+    signal,
   });
 
   if (!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0, 200)}`);
@@ -350,6 +355,7 @@ async function streamOpenAI(
         method: 'POST',
         headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
         body: JSON.stringify({ model, max_tokens: 8192, stream: true, messages: followMessages }),
+        signal,
       });
 
       if (fr.ok) {
@@ -387,6 +393,7 @@ async function streamOpenAICompat(
   model: string, sys: string, messages: ChatApiMessage[],
   send: (data: Record<string, unknown>) => void,
   tools = false, context?: ToolContext,
+  signal?: AbortSignal,
 ): Promise<void> {
   const body: Record<string, unknown> = {
     model,
@@ -407,6 +414,7 @@ async function streamOpenAICompat(
     method: 'POST',
     headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
     body: JSON.stringify(body),
+    signal,
   });
 
   if (!res.ok) throw new Error(`${provider} ${res.status}: ${(await res.text()).slice(0, 200)}`);
@@ -500,6 +508,7 @@ async function streamOpenAICompat(
         method: 'POST',
         headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
         body: JSON.stringify({ model, max_tokens: 8192, stream: true, messages: followMessages }),
+        signal,
       });
 
       if (fr.ok) {
@@ -536,6 +545,7 @@ async function streamGemini(
   sys: string,
   messages: ChatApiMessage[],
   send: (data: Record<string, unknown>) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   const contents: { role: string; parts: { text: string }[] }[] = [];
   for (const msg of messages) {
@@ -556,6 +566,7 @@ async function streamGemini(
         contents,
         generationConfig: { maxOutputTokens: 8192 },
       }),
+      signal,
     },
   );
 
@@ -598,22 +609,23 @@ async function streamWithProvider(
   tools: boolean, context: ToolContext | undefined,
   send: (data: Record<string, unknown>) => void,
   clientApiKey?: string,
+  signal?: AbortSignal,
 ): Promise<void> {
   const apiKey = resolveChatProviderApiKey(provider, clientApiKey);
   const providerSpec = getChatProviderSpec(provider);
 
   switch (providerSpec.apiKind) {
     case 'anthropic':
-      return streamAnthropic(apiKey, model, sys, messages, send, tools, context);
+      return streamAnthropic(apiKey, model, sys, messages, send, tools, context, signal);
 
     case 'gemini':
-      return streamGemini(apiKey, model, sys, messages, send);
+      return streamGemini(apiKey, model, sys, messages, send, signal);
 
     case 'openai-compatible':
       if (provider === 'openai') {
-        return streamOpenAI(apiKey, model, sys, messages, send, tools, context);
+        return streamOpenAI(apiKey, model, sys, messages, send, tools, context, signal);
       }
-      return streamOpenAICompat(provider, apiKey, openAiCompatibleBaseUrl(provider), model, sys, messages, send, tools, context);
+      return streamOpenAICompat(provider, apiKey, openAiCompatibleBaseUrl(provider), model, sys, messages, send, tools, context, signal);
 
     default:
       throw new Error(`Unsupported provider: ${provider}`);
@@ -657,7 +669,7 @@ export async function POST(request: NextRequest) {
               const model = body.model || getDefaultChatModel(provider);
               await streamWithProvider(provider, model, sys, body.messages,
                 useTools,  // All providers now support tools via streamOpenAICompat
-                context, send, body.apiKey);
+                context, send, body.apiKey, request.signal);
               break;
             } catch (e) {
               errors.push(`${provider}: ${(e as Error).message}`);

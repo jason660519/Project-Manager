@@ -4,7 +4,7 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-06-01T01:15:25.960Z",
+    "generatedAt": "2026-06-01T01:29:06.988Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
@@ -1774,7 +1774,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "warnings": [
         "Mentions secrets, tokens, or credentials"
       ],
-      "updatedAt": "2026-06-01T01:15:25.960Z"
+      "updatedAt": "2026-06-01T01:29:06.987Z"
     },
     {
       "id": "file-naming-standards",
@@ -1876,7 +1876,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "Mentions secrets, tokens, or credentials",
         "Mentions execution or command policy"
       ],
-      "updatedAt": "2026-06-01T00:33:36.074Z"
+      "updatedAt": "2026-06-01T01:29:06.987Z"
     },
     {
       "id": "guides/features/channels",
@@ -3392,7 +3392,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "project-process"
       ],
       "warnings": [],
-      "updatedAt": "2026-06-01T01:14:05.532Z"
+      "updatedAt": "2026-06-01T01:29:06.988Z"
     }
   ],
   "routes": [

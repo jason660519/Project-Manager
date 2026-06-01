@@ -13,6 +13,23 @@ describe('ChatInput', () => {
     expect(onSend).toHaveBeenCalledWith('hello', undefined);
   });
 
+  it('does not send while an IME composition is active', () => {
+    const onSend = vi.fn();
+    render(<ChatInput placeholder="Ask" sendLabel="Send" loadingLabel="Thinking" loading={false} onSend={onSend} />);
+    const input = screen.getByPlaceholderText('Ask');
+
+    fireEvent.change(input, { target: { value: '測' } });
+    fireEvent.compositionStart(input);
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(onSend).not.toHaveBeenCalled();
+
+    fireEvent.compositionEnd(input);
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(onSend).toHaveBeenCalledWith('測', undefined);
+  });
+
   it('does not send whitespace', async () => {
     const user = userEvent.setup();
     const onSend = vi.fn();

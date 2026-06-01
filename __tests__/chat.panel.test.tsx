@@ -133,7 +133,7 @@ describe('ChatPanel', () => {
     expect(sendChatMessageMock).not.toHaveBeenCalled();
   });
 
-  it('send button is disabled while loading', async () => {
+  it('send button becomes a stop control while loading', async () => {
     const user = userEvent.setup();
     let resolveResponse!: (value: { content: string }) => void;
     sendChatMessageMock.mockReturnValueOnce(new Promise((resolve) => {
@@ -147,10 +147,31 @@ describe('ChatPanel', () => {
     const sendBtn = buttons[buttons.length - 1];
     await user.click(sendBtn!);
 
-    // Only the send button should be disabled while loading
-    expect(sendBtn).toBeDisabled();
+    expect(sendBtn).toBeEnabled();
+    expect(sendBtn).toHaveAccessibleName(/stop response/i);
     resolveResponse({ content: 'Done' });
     await screen.findByText('Done');
+  });
+
+  it('passes an abort signal and stops the current response from the stop button', async () => {
+    const user = userEvent.setup();
+    sendChatMessageMock.mockImplementationOnce(({ abortSignal }) =>
+      new Promise((_, reject) => {
+        abortSignal?.addEventListener('abort', () => {
+          reject(new DOMException('Aborted', 'AbortError'));
+        });
+      }),
+    );
+    renderPanel(true);
+
+    fireEvent.change(screen.getByPlaceholderText(/ask me anything/i), { target: { value: 'status' } });
+    await user.click(screen.getByRole('button', { name: /send message/i }));
+    await user.click(screen.getByRole('button', { name: /stop response/i }));
+
+    await screen.findByText(/response stopped/i);
+    expect(sendChatMessageMock).toHaveBeenCalledWith(expect.objectContaining({
+      abortSignal: expect.any(AbortSignal),
+    }));
   });
 
   it('messages persist across collapse and expand', async () => {

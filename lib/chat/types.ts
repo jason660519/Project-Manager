@@ -34,6 +34,8 @@ export interface SendChatMessageRequest {
   history: ChatMessage[];
   context: ChatContext;
   navigate?: (href: string) => void;
+  /** Cancels the in-flight provider request and stream reader when the user stops generation. */
+  abortSignal?: AbortSignal;
   /** Optional streaming callback — called with each chunk of text as it arrives. */
   onStream?: (chunk: string) => void;
   /** Optional provider/model/systemPrompt override from chat settings. */

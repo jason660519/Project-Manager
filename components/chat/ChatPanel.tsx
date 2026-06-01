@@ -68,6 +68,7 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen, docked
   const scrollRef = useRef<HTMLDivElement>(null);
   const setInputValueRef = useRef<((v: string) => void) | undefined>(undefined);
   const inputApiRef = useRef<ChatInputApi | undefined>(undefined);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Load saved settings
   useEffect(() => {
@@ -141,6 +142,9 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen, docked
 
   const handleStreamSend = useCallback(async (content: string, files?: AttachedFile[]) => {
     if (loading) return;
+    abortControllerRef.current?.abort();
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
     // Augment message with file context
     let augmentedContent = content;
@@ -185,6 +189,7 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen, docked
         history: nextMessages,
         context,
         navigate: (href) => router.push(href),
+        abortSignal: abortController.signal,
         onStream: (chunk: string) => {
           accumulated += chunk;
           setMessages((prev) =>
@@ -216,14 +221,49 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen, docked
         const withoutPlaceholder = prev.filter((m) => m.id !== assistantId);
         return [...withoutPlaceholder, assistantMessage];
       });
-    } catch {
+    } catch (error) {
+      if ((error as Error).name === 'AbortError' || abortController.signal.aborted) {
+        const cancelledMessage = makeMessage('assistant', 'Response stopped. Partial output was preserved.', 'sent');
+        cancelledMessage.id = assistantId;
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? { ...m, content: m.content || cancelledMessage.content, status: 'sent' as const }
+              : m,
+          ),
+        );
+        return;
+      }
       setMessages((prev) =>
         prev.map((m) => (m.id === assistantId ? { ...m, content: t.chat.error, status: 'error' as const } : m)),
       );
     } finally {
+      if (abortControllerRef.current === abortController) {
+        abortControllerRef.current = null;
+      }
+      setThinkingActive(false);
       setLoading(false);
     }
   }, [loading, messages, context, router, chatSettings, t.chat.error]);
+
+  const handleCancelResponse = useCallback(() => {
+    abortControllerRef.current?.abort();
+  }, []);
+
+  useEffect(() => {
+    if (!loading) return;
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      handleCancelResponse();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleCancelResponse, loading]);
+
+  useEffect(() => () => {
+    abortControllerRef.current?.abort();
+  }, []);
 
   const handleSettingsChange = (s: { provider: string; model: string; systemPrompt: string }) => {
     setChatSettings(s);
@@ -344,6 +384,7 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen, docked
           loadingLabel={t.chat.loading}
           loading={loading}
           onSend={handleStreamSend}
+          onCancel={handleCancelResponse}
           onSetValueRef={setInputValueRef}
           onInputApiRef={inputApiRef}
           beforeArea={

@@ -76,6 +76,7 @@ async function* streamProvider(
   messages: ChatApiMessage[],
   systemPrompt?: string,
   clientApiKey?: string,
+  signal?: AbortSignal,
 ): AsyncGenerator<string> {
   const apiKey = resolveChatProviderApiKey(provider, clientApiKey);
   const providerSpec = getChatProviderSpec(provider);
@@ -97,6 +98,7 @@ async function* streamProvider(
           system: sys,
           messages: messages.filter((m) => m.role !== 'system'),
         }),
+        signal,
       });
       if (!res.ok) throw new Error(`Anthropic ${res.status}: ${(await res.text()).slice(0, 200)}`);
       const reader = res.body?.getReader();
@@ -121,6 +123,7 @@ async function* streamProvider(
             contents,
             generationConfig: { maxOutputTokens: 4096 },
           }),
+          signal,
         },
       );
       if (!res.ok) throw new Error(`Gemini ${res.status}: ${(await res.text()).slice(0, 200)}`);
@@ -146,6 +149,7 @@ async function* streamProvider(
           stream: true,
           messages: [{ role: 'system', content: sys }, ...messages],
         }),
+        signal,
       });
       if (!res.ok) throw new Error(`${provider} ${res.status}: ${(await res.text()).slice(0, 200)}`);
       const reader = res.body?.getReader();
@@ -218,7 +222,7 @@ export async function POST(request: NextRequest) {
   for (const provider of providersToTry) {
     const model = body.model || getDefaultChatModel(provider);
     try {
-      const gen = streamProvider(provider, model, body.messages, systemPrompt, body.apiKey);
+      const gen = streamProvider(provider, model, body.messages, systemPrompt, body.apiKey, request.signal);
       const iterator = gen[Symbol.asyncIterator]();
       const first = await iterator.next();
       async function* withFirst(): AsyncGenerator<string> {

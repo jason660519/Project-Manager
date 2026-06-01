@@ -1,6 +1,6 @@
 'use client';
 
-import { Bot, ChevronDown, Download, MessageSquareText, Mic, Send, Trash2 } from 'lucide-react';
+import { Bot, ChevronDown, Download, MessageSquareText, Mic, Send, Square, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -131,6 +131,7 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
   const { t } = useI18n();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const setInputValueRef = useRef<((value: string) => void) | undefined>(undefined);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Sessions state
   const [sessions, setSessions] = useState<StoredSession[]>([]);
@@ -167,10 +168,14 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
       if (e.key === 'Escape' && showHistory && typeof window !== 'undefined' && window.innerWidth < 1024) {
         setShowHistory(false);
       }
+      if (e.key === 'Escape' && loading) {
+        e.preventDefault();
+        abortControllerRef.current?.abort();
+      }
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showHistory]);
+  }, [loading, showHistory]);
 
   // Load persisted settings on mount
   useEffect(() => {
@@ -250,6 +255,9 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
 
   const handleSend = async (content: string, files?: { name: string; content: string; previewUrl?: string }[]) => {
     if (loading) return;
+    abortControllerRef.current?.abort();
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
     // Append file context to the message
     let augmentedContent = content;
@@ -286,6 +294,7 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
     const assistantId = `assistant-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const placeholder = makeMessage('assistant', '');
     placeholder.id = assistantId;
+    let accumulated = '';
 
     try {
       const { sendChatMessage } = await import('../../lib/chat/chatAgent');
@@ -306,12 +315,12 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
       // Add placeholder, then start streaming updates into it
       setMessages([...nextMessages, placeholder]);
 
-      let accumulated = '';
       const result = await sendChatMessage({
         content: augmentedContent,
         history: nextMessages,
         context: effectiveContext,
         navigate: (href) => router.push(href),
+        abortSignal: abortController.signal,
         chatSettings: chatSettings.provider !== 'auto' ? chatSettings : undefined,
         onStream: (chunk: string) => {
           accumulated += chunk;
@@ -355,15 +364,34 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
       const finalMessages = [...nextMessages, assistantMessage];
       setMessages(finalMessages);
       persistCurrentSession(finalMessages, sessionId);
-    } catch {
-      const errorMessage = makeMessage('assistant', 'Sorry, something went wrong. Please try again.', 'error');
+    } catch (error) {
+      const stopped = (error as Error).name === 'AbortError' || abortController.signal.aborted;
+      const errorMessage = makeMessage(
+        'assistant',
+        stopped
+          ? accumulated || 'Response stopped. Partial output was preserved.'
+          : 'Sorry, something went wrong. Please try again.',
+        stopped ? 'sent' : 'error',
+      );
       const finalMessages = [...nextMessages, errorMessage];
       setMessages(finalMessages);
       persistCurrentSession(finalMessages, sessionId);
     } finally {
+      if (abortControllerRef.current === abortController) {
+        abortControllerRef.current = null;
+      }
+      setThinkingActive(false);
       setLoading(false);
     }
   };
+
+  const handleCancelResponse = useCallback(() => {
+    abortControllerRef.current?.abort();
+  }, []);
+
+  useEffect(() => () => {
+    abortControllerRef.current?.abort();
+  }, []);
 
   const handleNewChat = () => {
     // Save current before starting new
@@ -588,12 +616,18 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
             {/* Send */}
             <button
               type="button"
-              onClick={handleTopSend}
-              className="flex items-center gap-1 rounded border border-amber-200/25 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-100 transition-colors hover:bg-amber-500/20"
-              title={t.chat.sendMessage}
+              onClick={loading ? handleCancelResponse : handleTopSend}
+              className={[
+                'flex items-center gap-1 rounded border px-2 py-1 text-[10px] transition-colors',
+                loading
+                  ? 'border-red-200/25 bg-red-500/10 text-red-100 hover:bg-red-500/20'
+                  : 'border-amber-200/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20',
+              ].join(' ')}
+              title={loading ? 'Stop response (Esc)' : t.chat.sendMessage}
+              aria-label={loading ? 'Stop response' : t.chat.sendMessage}
             >
-              <Send size={11} />
-              <span className="hidden sm:inline">{t.chat.sendMessage}</span>
+              {loading ? <Square size={11} /> : <Send size={11} />}
+              <span className="hidden sm:inline">{loading ? 'Stop' : t.chat.sendMessage}</span>
             </button>
           </div>
         </div>
@@ -641,6 +675,7 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
             loadingLabel={t.chat.loading}
             loading={loading}
             onSend={handleSend}
+            onCancel={handleCancelResponse}
             externalRef={inputRef}
             onSetValueRef={setInputValueRef}
             beforeArea={
