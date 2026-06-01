@@ -82,6 +82,34 @@ Read `/Users/Company-AI-App-Standards/docs/patterns/table-governance.md` before 
 
 This skill adds Project Manager-specific implementation rules. When this skill and the company baseline appear to conflict, follow the company baseline unless Project Manager has a documented local override in `docs/engineering/table-standards.md`, `DESIGN.md`, or an ADR.
 
+### Enforced — do these or the build goes red
+
+A company gate (`check-table-governance.mjs`, run via `standards:check` → `verify:baseline`)
+blocks any `useReactTable` file that skips the following. Treat them as hard requirements, not advice:
+
+1. **Classification banner (required).** Top of every table file, after `'use client';`:
+   ```ts
+   // @table-classification: simple | basic | large | readonly
+   // @table-reason: <why this classification is correct>
+   // @table-waivers: <controls> — <reason>   // only for basic/large with declared debt
+   ```
+   Do **not** self-grant `simple` to dodge controls — `simple` requires genuinely meeting §1
+   (under 20 rows, no horizontal overflow, no repeated operational use).
+2. **Reuse the primitive (default).** Build Basic/Large tables on `components/table/datasheet`
+   (`getFrozenColumnLayout`, `FreezeColsControl`, `DataTableShell`, `HiddenColsMenu`, `SortMarker`)
+   + `useArenaTablePrefs`. Reference compliant tables: `KeysProviderTable` (numeric freeze + header
+   filters), `CodingAgentCandidateTable` (full primitive). Bespoke = needs a `@table-waivers` reason.
+3. **Numeric Freeze cols only.** Use `<FreezeColsControl>` (a number input freezing the leftmost
+   N columns). The per-column checkbox "Freeze cols" dropdown is non-compliant (gate rule R4).
+4. **Provider/Status/Category/Company column ⇒ a filter** (or name it in `@table-waivers`).
+
+### Plan-time gate (before ExitPlanMode)
+
+When a plan introduces or rewrites a table, state its classification and list EACH mandatory
+control as **implemented** or **N-A because…**: table-scoped search, `col-id` UUID, category
+filters, numeric freeze, column resize+persist, hidden cols, sort arrows, reset, empty +
+filtered-empty. Skipping this enumeration is how non-compliant tables slip through.
+
 ## Table + Sheet Classification
 
 Before building or rewriting a table + sheet page, classify it in feature notes, PR text, or an app-local doc:

@@ -1,5 +1,10 @@
 'use client';
 
+// @table-classification: basic
+// @table-reason: Operational AI SDKs provider/model/param sheet (dynamic columns, horizontal
+//   overflow, repeated use). Compliant via useAiSdksTablePrefs (approved primitive) + numeric
+//   freeze, category filters, search, sort, resize+persist, hidden cols, row density.
+
 /**
  * One provider's editable parameter sheet — a wide TanStack v8 table:
  *   col-id (frozen) | col-provider | col-model | col-type | col-param-<key>…

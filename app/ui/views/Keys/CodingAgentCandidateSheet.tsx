@@ -127,18 +127,38 @@ export function CodingAgentCandidateSheet() {
     setCodingState((prev) => ({ rows: moveItem(prev.rows, fromIndex, toIndex) }));
   };
 
+  const importModels = (models: { provider: LlmProviderId; model: string }[]) => {
+    setCodingState((prev) => {
+      const existing = new Set(prev.rows.map((r) => `${r.provider}::${r.model}`));
+      const additions: CodingCandidateRow[] = [];
+      for (const m of models) {
+        const key = `${m.provider}::${m.model}`;
+        if (existing.has(key)) continue;
+        if (prev.rows.length + additions.length >= MAX_CODING_CANDIDATES) break;
+        existing.add(key);
+        additions.push({ provider: m.provider, model: m.model, note: '', enabled: true });
+      }
+      if (additions.length === 0) return prev;
+      return { rows: [...prev.rows, ...additions] };
+    });
+  };
+
   return (
-    <CodingAgentCandidateTable
-      copy={copy}
-      rows={rows}
-      providers={providers}
-      canAdd={providers.length > 0 && rows.length < MAX_CODING_CANDIDATES}
-      onAddRow={addRow}
-      onRemoveRow={removeRow}
-      onUpdateModel={updateModel}
-      onToggleEnabled={toggleEnabled}
-      onNoteChange={setNote}
-      onMoveRow={moveRow}
-    />
+    <div className="flex h-full min-h-0 flex-col gap-4">
+      <CodingAgentCandidateTable
+        copy={copy}
+        rows={rows}
+        providers={providers}
+        canAdd={providers.length > 0 && rows.length < MAX_CODING_CANDIDATES}
+        maxRows={MAX_CODING_CANDIDATES}
+        onAddRow={addRow}
+        onRemoveRow={removeRow}
+        onUpdateModel={updateModel}
+        onToggleEnabled={toggleEnabled}
+        onNoteChange={setNote}
+        onMoveRow={moveRow}
+        onImportModels={importModels}
+      />
+    </div>
   );
 }

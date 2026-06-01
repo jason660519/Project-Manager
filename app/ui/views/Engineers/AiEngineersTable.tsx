@@ -1,5 +1,11 @@
 'use client';
 
+// @table-classification: simple
+// @table-reason: Master-detail selection list of AI engineers (small fixed row set, no
+//   horizontal overflow, click-to-select navigation rather than operational data analysis).
+//   Per table-governance §1, Simple Tables need stable ids + row actions, not the full
+//   Basic Table Sheet control set.
+
 /**
  * AI Engineers sheet — one row per engineer role, identity / model focus.
  *

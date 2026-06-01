@@ -1,5 +1,12 @@
 'use client';
 
+// @table-classification: basic
+// @table-reason: Operational integrations table (toggle/test/method/type columns), sortable,
+//   resizable, hidden-cols, with method/type filters.
+// @table-waivers: search, freeze, shared-primitive — table-scoped search and numeric Freeze cols
+//   not yet implemented; uses bespoke columnSizing state rather than components/table/datasheet.
+//   Declared debt, tracked as follow-up.
+
 import { useMemo, useState } from 'react';
 import {
   createColumnHelper,

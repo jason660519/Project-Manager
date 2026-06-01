@@ -1,5 +1,12 @@
 'use client';
 
+// @table-classification: basic
+// @table-reason: Operational projects dashboard table (many columns, horizontal overflow,
+//   repeated use). Has search, status/category filters, numeric freeze, resize+persist, hidden
+//   cols, sort.
+// @table-waivers: shared-primitive — uses a bespoke localStorage prefs layer
+//   (readProjectsTablePrefs) predating components/table/datasheet; migration tracked as follow-up.
+
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {

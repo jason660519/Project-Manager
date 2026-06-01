@@ -1,5 +1,13 @@
 'use client';
 
+// @table-classification: basic
+// @table-reason: Core feature-catalog table (operational dataset, repeated use). Row actions and
+//   selection are owned here; surrounding search/filter/view controls are provided by the parent
+//   dashboard frame.
+// @table-waivers: search, freeze, resize, sort, hidden, shared-primitive — this primitive
+//   component renders rows only; full in-table control set + components/table/datasheet adoption
+//   tracked as follow-up debt.
+
 import React, { useMemo } from 'react';
 import {
   createColumnHelper,

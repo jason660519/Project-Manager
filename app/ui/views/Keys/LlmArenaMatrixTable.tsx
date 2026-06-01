@@ -1,5 +1,12 @@
 'use client';
 
+// @table-classification: basic
+// @table-reason: Operational LLM arena evaluation matrix (many columns, horizontal overflow,
+//   repeated runs). Uses useArenaTablePrefs + the shared numeric Freeze cols control.
+// @table-waivers: shell-not-migrated — keeps bespoke eval/run/result cells; thead/tbody render
+//   retained inline (full DataTableShell migration tracked as follow-up). All mandatory controls
+//   present: search, plane filter, numeric Freeze cols, resize+persist, hidden cols, sort, reset.
+
 import React, { useMemo, useRef, useState } from 'react';
 import {
   createColumnHelper,
@@ -36,6 +43,11 @@ import {
   validateImportedModels,
   type ArenaTablePreset,
 } from './ArenaTableViewControls';
+import {
+  applyFreezeColumnCount,
+  FreezeColsControl,
+  getFrozenColumnLayout,
+} from '../../../../components/table/datasheet';
 import {
   evaluationMeta,
   executionPlaneLabel,
@@ -664,35 +676,11 @@ export function LlmArenaMatrixTable({
     getSortedRowModel: getSortedRowModel(),
   });
 
-  const visibleColumns = table.getVisibleLeafColumns();
-  const frozenVisibleIds = frozenColumnIds.filter((id) => table.getColumn(id)?.getIsVisible());
-  const frozenLeftOffsets = new Map<string, number>();
-  let left = 0;
-  visibleColumns.forEach((column) => {
-    if (!frozenVisibleIds.includes(column.id)) return;
-    frozenLeftOffsets.set(column.id, left);
-    left += column.getSize();
-  });
-  const lastFrozenId = frozenVisibleIds[frozenVisibleIds.length - 1];
-  const hiddenCount = columnOptions.filter((option) => option.hideable && table.getColumn(option.id)?.getIsVisible() === false).length;
-
-  const cellStyle = (columnId: string): React.CSSProperties => {
-    const column = table.getColumn(columnId);
-    const isFrozen = frozenVisibleIds.includes(columnId);
-    return {
-      width: column?.getSize(),
-      minWidth: column?.getSize(),
-      maxWidth: column?.getSize(),
-      left: isFrozen ? frozenLeftOffsets.get(columnId) : undefined,
-      position: isFrozen ? 'sticky' : undefined,
-    };
-  };
-
-  const frozenClass = (columnId: string, header = false) => (
-    frozenVisibleIds.includes(columnId)
-      ? `${header ? 'z-30' : 'z-20'} bg-[rgb(var(--pm-rail))]/95 ${lastFrozenId === columnId ? 'shadow-[8px_0_14px_-12px_rgba(255,255,255,0.5)]' : ''}`
-      : ''
+  const { cellStyle, frozenClass, freezeCandidateIds, frozenColumnCount } = getFrozenColumnLayout(
+    table,
+    frozenColumnIds,
   );
+  const hiddenCount = columnOptions.filter((option) => option.hideable && table.getColumn(option.id)?.getIsVisible() === false).length;
 
   const handleExport = () => {
     const exportRows = table.getRowModel().rows.map(({ original }) => ({
@@ -770,30 +758,13 @@ export function LlmArenaMatrixTable({
               ))}
             </div>
           </details>
-          <details className="relative">
-            <summary className="flex h-8 cursor-pointer list-none items-center gap-1 border border-stone-200/18 px-2 text-xs text-stone-200 hover:bg-white/[0.04]">
-              Freeze cols
-            </summary>
-            <div className="absolute right-0 z-40 mt-2 w-56 border border-stone-200/15 bg-stone-950 p-2 shadow-xl">
-              {columnOptions.filter((option) => option.freezable).map((option) => (
-                <label key={option.id} className="flex items-center gap-2 px-2 py-1 text-xs text-stone-300">
-                  <input
-                    type="checkbox"
-                    checked={frozenColumnIds.includes(option.id)}
-                    onChange={(event) => {
-                      setFrozenColumnIds((prev) => (
-                        event.target.checked
-                          ? [...prev, option.id]
-                          : prev.filter((id) => id !== option.id)
-                      ));
-                    }}
-                    className="accent-emerald-400"
-                  />
-                  {option.label}
-                </label>
-              ))}
-            </div>
-          </details>
+          <FreezeColsControl
+            id="llm-arena-freeze-cols"
+            count={frozenColumnCount}
+            max={freezeCandidateIds.length}
+            label="Freeze cols"
+            onChangeCount={(value) => applyFreezeColumnCount(setFrozenColumnIds, freezeCandidateIds, value)}
+          />
           <select
             aria-label="View preset"
             onChange={(event) => {

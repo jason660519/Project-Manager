@@ -1,5 +1,11 @@
 'use client';
 
+// @table-classification: basic
+// @table-reason: API Key Validation provider matrix — operational, horizontally scrolling,
+//   repeated use. Compliant: useArenaTablePrefs + numeric Freeze cols, per-header
+//   provider/category/status/model filters, search, sort arrows, resize+persist, hidden cols.
+//   This is the reference numeric-freeze implementation.
+
 /**
  * TanStack v8 table that lists every provider PM knows about, showing
  * at-a-glance: official provider links / configured / validated / model count

@@ -1,5 +1,11 @@
 'use client';
 
+// @table-classification: basic
+// @table-reason: Tools × capabilities matrix with dynamic capability columns that can overflow
+//   horizontally; a selection/navigation surface embedded under a parent WorkstationFrame.
+// @table-waivers: search, freeze, resize, sort, hidden, shared-primitive — currently a bare
+//   getCoreRowModel table; mandatory controls not yet implemented. Declared debt, follow-up.
+
 /**
  * Ability / Tools sheet — one row per engineer, capability assignment focus.
  *
