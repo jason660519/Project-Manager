@@ -106,12 +106,12 @@ describe('providerOrder — storage', () => {
       STORAGE_KEY,
       JSON.stringify([
         { provider: 'anthropic', enabled: true },
-        { provider: 'cohere', enabled: true },
+        { provider: 'nonexistent-provider', enabled: true },
       ]),
     );
     const order = await loadProviderOrder();
     const ids = order.map((e) => e.provider);
-    expect(ids).not.toContain('cohere');
+    expect(ids).not.toContain('nonexistent-provider');
     expect(ids).toContain('anthropic');
   });
 });

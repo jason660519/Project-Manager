@@ -95,7 +95,7 @@ describe('LLM provider registry', () => {
   });
 
   it('returns undefined for unknown ids via getLlmProvider', () => {
-    expect(getLlmProvider('cohere' as LlmProviderId)).toBeUndefined();
+    expect(getLlmProvider('nonexistent-provider' as LlmProviderId)).toBeUndefined();
   });
 
   it('returns a spec by id', () => {

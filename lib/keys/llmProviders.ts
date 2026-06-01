@@ -22,6 +22,10 @@ export type LlmProviderId =
   | 'together'
   | 'zhipu'
   | 'qwen'
+  | 'mistral'
+  | 'cohere'
+  | 'azure-openai'
+  | 'groq'
   | 'huggingface'
   | 'ollama-local'
   | 'ollama-cloud';
@@ -304,6 +308,116 @@ const PROVIDERS: LlmProviderSpec[] = [
     baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     defaultModel: 'qwen-plus',
     availableModels: ['qwen-image-2.0-pro', 'qwen-plus', 'qwen-max', 'qwen-turbo', 'qwen-long'],
+  },
+  {
+    id: 'mistral',
+    label: 'Mistral AI',
+    placeholder: '...',
+    keychainKey: 'mistral-api-key',
+    lsKey: `${LS_PREFIX}mistral`,
+    envVarNames: ['MISTRAL_API_KEY'],
+    docUrl: 'https://console.mistral.ai/api-keys',
+    apiKeyUrl: 'https://console.mistral.ai/api-keys',
+    usageUrl: 'https://console.mistral.ai/usage',
+    developerDocsUrl: 'https://docs.mistral.ai/api/',
+    apiKind: 'openai-compatible',
+    baseUrl: 'https://api.mistral.ai/v1',
+    defaultModel: 'mistral-large-latest',
+    tierModel: 'mistral-small-latest',
+    availableModels: [
+      'mistral-large-latest',
+      'mistral-medium-latest',
+      'mistral-small-latest',
+      'codestral-latest',
+      'pixtral-large-latest',
+      'open-mistral-nemo',
+      'ministral-8b-latest',
+      'ministral-3b-latest',
+    ],
+  },
+  {
+    // Cohere exposes an OpenAI-compatible surface under /compatibility/v1; the
+    // native API (/v2/chat) uses different param names, so the compat endpoint
+    // keeps it consistent with the rest of the registry.
+    id: 'cohere',
+    label: 'Cohere',
+    placeholder: '...',
+    keychainKey: 'cohere-api-key',
+    lsKey: `${LS_PREFIX}cohere`,
+    envVarNames: ['COHERE_API_KEY', 'CO_API_KEY'],
+    docUrl: 'https://dashboard.cohere.com/api-keys',
+    apiKeyUrl: 'https://dashboard.cohere.com/api-keys',
+    usageUrl: 'https://dashboard.cohere.com/billing',
+    developerDocsUrl: 'https://docs.cohere.com/docs/compatibility-api',
+    apiKind: 'openai-compatible',
+    baseUrl: 'https://api.cohere.ai/compatibility/v1',
+    defaultModel: 'command-a-03-2025',
+    tierModel: 'command-r-08-2024',
+    availableModels: [
+      'command-a-03-2025',
+      'command-r-plus-08-2024',
+      'command-r-08-2024',
+      'command-r7b-12-2024',
+      'command-r-plus',
+      'command-r',
+      'command-light',
+    ],
+  },
+  {
+    // Azure OpenAI keys a deployment per resource, so baseUrl is per-account:
+    // https://<resource>.openai.azure.com/openai/v1 . The value below is a
+    // template — set AZURE_OPENAI_BASE_URL (or edit in Settings) for real use.
+    id: 'azure-openai',
+    label: 'Azure OpenAI',
+    placeholder: '32-character resource key',
+    keychainKey: 'azure-openai-api-key',
+    lsKey: `${LS_PREFIX}azure-openai`,
+    envVarNames: ['AZURE_OPENAI_API_KEY', 'AZURE_OPENAI_KEY'],
+    docUrl: 'https://portal.azure.com/',
+    apiKeyUrl: 'https://portal.azure.com/',
+    usageUrl: 'https://portal.azure.com/',
+    developerDocsUrl: 'https://learn.microsoft.com/azure/ai-services/openai/reference',
+    apiKind: 'openai-compatible',
+    baseUrl: 'https://YOUR-RESOURCE.openai.azure.com/openai/v1',
+    defaultModel: 'gpt-4o',
+    tierModel: 'gpt-4o-mini',
+    availableModels: [
+      'gpt-4o',
+      'gpt-4o-mini',
+      'gpt-4.1',
+      'gpt-4-turbo',
+      'gpt-35-turbo',
+      'o1',
+      'o1-mini',
+      'o3-mini',
+    ],
+  },
+  {
+    id: 'groq',
+    label: 'Groq',
+    placeholder: 'gsk_...',
+    keychainKey: 'groq-api-key',
+    lsKey: `${LS_PREFIX}groq`,
+    envVarNames: ['GROQ_API_KEY'],
+    validatePattern: /^gsk_[A-Za-z0-9]{20,}$/,
+    docUrl: 'https://console.groq.com/keys',
+    apiKeyUrl: 'https://console.groq.com/keys',
+    usageUrl: 'https://console.groq.com/settings/usage',
+    developerDocsUrl: 'https://console.groq.com/docs/quickstart',
+    apiKind: 'openai-compatible',
+    baseUrl: 'https://api.groq.com/openai/v1',
+    defaultModel: 'llama-3.3-70b-versatile',
+    tierModel: 'llama-3.1-8b-instant',
+    availableModels: [
+      'llama-3.3-70b-versatile',
+      'llama-3.1-8b-instant',
+      'llama-3.1-70b-versatile',
+      'mixtral-8x7b-32768',
+      'gemma2-9b-it',
+      'deepseek-r1-distill-llama-70b',
+      'qwen-2.5-32b',
+      'llama-3.2-90b-vision-preview',
+    ],
   },
   {
     // Hugging Face Inference Providers gateway exposes a unified
