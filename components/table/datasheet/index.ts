@@ -15,3 +15,4 @@ export { FreezeColsControl } from './FreezeColsControl';
 export { SortMarker } from './SortMarker';
 export { DataTableShell } from './DataTableShell';
 export { HiddenColsMenu, type HideableColumnOption } from './HiddenColsMenu';
+export { useLiveRef } from './useLiveRef';

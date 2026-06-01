@@ -32,6 +32,7 @@ import {
   FreezeColsControl,
   getFrozenColumnLayout,
   HiddenColsMenu,
+  useLiveRef,
 } from '../../../../components/table/datasheet';
 
 interface ProviderLike {
@@ -133,6 +134,10 @@ export function CodingAgentCandidateTable({
     });
   }, [tableRows, searchText, providerFilter, activeFilter]);
 
+  // Volatile handlers read via a ref so `columns` need not depend on them —
+  // keeps the note <input> from remounting (losing focus) on each keystroke.
+  const liveRef = useLiveRef({ onToggleEnabled, onUpdateModel, onNoteChange, onMoveRow, onRemoveRow });
+
   const columns = useMemo(
     () => [
       col.accessor((item) => codingCandidateId(item.row.provider, item.row.model), {
@@ -166,7 +171,7 @@ export function CodingAgentCandidateTable({
             onClick={(e) => e.stopPropagation()}
             onChange={(e) => {
               e.stopPropagation();
-              onToggleEnabled(row.original.index, e.target.checked);
+              liveRef.current.onToggleEnabled(row.original.index, e.target.checked);
             }}
             className="h-4 w-4 cursor-pointer accent-emerald-400"
           />
@@ -182,7 +187,7 @@ export function CodingAgentCandidateTable({
             onClick={(e) => e.stopPropagation()}
             onChange={(e) => {
               const next = providers.find((p) => p.id === e.target.value);
-              onUpdateModel(
+              liveRef.current.onUpdateModel(
                 row.original.index,
                 e.target.value,
                 next?.defaultModel && next.availableModels.includes(next.defaultModel)
@@ -210,7 +215,7 @@ export function CodingAgentCandidateTable({
             <select
               value={row.original.row.model}
               onClick={(e) => e.stopPropagation()}
-              onChange={(e) => onUpdateModel(row.original.index, row.original.row.provider, e.target.value)}
+              onChange={(e) => liveRef.current.onUpdateModel(row.original.index, row.original.row.provider, e.target.value)}
               className="w-full border border-stone-200/20 bg-[rgb(var(--pm-input))] px-2 py-1 font-mono text-xs text-stone-200 outline-none focus:ring-1 focus:ring-emerald-400/50"
             >
               {available.map((m) => (
@@ -232,7 +237,7 @@ export function CodingAgentCandidateTable({
             value={row.original.row.note}
             placeholder={copy.notePlaceholder}
             onClick={(e) => e.stopPropagation()}
-            onChange={(e) => onNoteChange(row.original.index, e.target.value)}
+            onChange={(e) => liveRef.current.onNoteChange(row.original.index, e.target.value)}
             className="w-full border border-stone-200/20 bg-[rgb(var(--pm-input))] px-2 py-1 text-xs text-stone-200 outline-none placeholder:text-stone-500 focus:ring-1 focus:ring-emerald-400/50"
           />
         ),
@@ -253,7 +258,7 @@ export function CodingAgentCandidateTable({
                 disabled={index === 0}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onMoveRow(index, index - 1);
+                  liveRef.current.onMoveRow(index, index - 1);
                 }}
                 className="inline-flex h-7 w-7 items-center justify-center border border-stone-200/20 text-stone-300 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
               >
@@ -266,7 +271,7 @@ export function CodingAgentCandidateTable({
                 disabled={index === rows.length - 1}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onMoveRow(index, index + 1);
+                  liveRef.current.onMoveRow(index, index + 1);
                 }}
                 className="inline-flex h-7 w-7 items-center justify-center border border-stone-200/20 text-stone-300 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
               >
@@ -278,7 +283,7 @@ export function CodingAgentCandidateTable({
                 aria-label={copy.deleteRowTitle}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onRemoveRow(index);
+                  liveRef.current.onRemoveRow(index);
                 }}
                 className="inline-flex h-7 w-7 items-center justify-center border border-red-300/25 text-red-300 hover:bg-red-500/15"
               >
@@ -289,7 +294,9 @@ export function CodingAgentCandidateTable({
         },
       }),
     ],
-    [copy, providers, rows.length, onUpdateModel, onToggleEnabled, onNoteChange, onMoveRow, onRemoveRow],
+    // Volatile handlers are read via liveRef inside cells, so they are NOT deps —
+    // keeps `columns` stable across keystrokes so the note <input> keeps focus.
+    [copy, providers, rows.length],
   );
 
   const table = useReactTable({

@@ -43,6 +43,7 @@ import {
   applyFreezeColumnCount,
   FreezeColsControl,
   getFrozenColumnLayout,
+  useLiveRef,
 } from '../../../../components/table/datasheet';
 import {
   imageToImageModelDisplayName,
@@ -303,6 +304,22 @@ export function VlmArenaMatrixTable({
     });
   }, [tableRows, searchText, statusFilter, outputFilter, providerFilter]);
 
+  // Volatile handlers + image flag read via a ref so `columns` need not depend
+  // on them — see useLiveRef docs. Keeps the prompt <textarea> from remounting
+  // (and losing focus) on every keystroke.
+  const liveRef = useLiveRef({
+    onToggleEnabled,
+    onUpdateModel,
+    onStyleChange,
+    onOutputModeChange,
+    onPromptChange,
+    onRunSingleRow,
+    onOpenDetail,
+    onMoveModel,
+    onRemoveModel,
+    imageDataUrl,
+  });
+
   const columns = useMemo(
     () => [
       col.accessor((item) => item.row.no, {
@@ -319,7 +336,7 @@ export function VlmArenaMatrixTable({
           <input
             type="checkbox"
             checked={row.original.row.shouldTest}
-            onChange={(event) => onToggleEnabled(row.original.index, event.target.checked)}
+            onChange={(event) => liveRef.current.onToggleEnabled(row.original.index, event.target.checked)}
             onClick={(event) => event.stopPropagation()}
             className="h-3.5 w-3.5 accent-emerald-400"
           />
@@ -334,7 +351,7 @@ export function VlmArenaMatrixTable({
             value={row.original.row.provider}
             onChange={(event) => {
               const nextProvider = providers.find((p) => p.id === event.target.value);
-              onUpdateModel(row.original.index, event.target.value, nextProvider?.availableModels[0] || '');
+              liveRef.current.onUpdateModel(row.original.index, event.target.value, nextProvider?.availableModels[0] || '');
             }}
             disabled={row.original.row.runStatus === 'running'}
             onClick={(event) => event.stopPropagation()}
@@ -357,7 +374,7 @@ export function VlmArenaMatrixTable({
           return (
             <select
               value={row.original.row.model}
-              onChange={(event) => onUpdateModel(row.original.index, row.original.row.provider, event.target.value)}
+              onChange={(event) => liveRef.current.onUpdateModel(row.original.index, row.original.row.provider, event.target.value)}
               disabled={row.original.row.runStatus === 'running'}
               onClick={(event) => event.stopPropagation()}
               className="w-full bg-[rgb(var(--pm-input))] border border-stone-200/20 text-stone-200 text-xs py-1 px-2 outline-none font-mono focus:ring-1 focus:ring-emerald-400/50 disabled:opacity-50"
@@ -378,7 +395,7 @@ export function VlmArenaMatrixTable({
         cell: ({ row }) => (
           <select
             value={row.original.row.style}
-            onChange={(event) => onStyleChange(row.original.index, event.target.value as VlmImageToImageStyle)}
+            onChange={(event) => liveRef.current.onStyleChange(row.original.index, event.target.value as VlmImageToImageStyle)}
             onClick={(event) => event.stopPropagation()}
             className="w-full bg-[rgb(var(--pm-input))] border border-stone-200/20 text-stone-200 text-xs py-1 px-2 outline-none"
           >
@@ -395,7 +412,7 @@ export function VlmArenaMatrixTable({
         cell: ({ row }) => (
           <select
             value={row.original.row.outputMode}
-            onChange={(event) => onOutputModeChange(row.original.index, event.target.value as VlmImageToImageOutputMode)}
+            onChange={(event) => liveRef.current.onOutputModeChange(row.original.index, event.target.value as VlmImageToImageOutputMode)}
             onClick={(event) => event.stopPropagation()}
             className="w-full bg-[rgb(var(--pm-input))] border border-stone-200/20 text-stone-200 text-xs py-1 px-2 outline-none"
           >
@@ -412,7 +429,7 @@ export function VlmArenaMatrixTable({
         cell: ({ row }) => (
           <textarea
             value={row.original.row.prompt}
-            onChange={(event) => onPromptChange(row.original.index, event.target.value)}
+            onChange={(event) => liveRef.current.onPromptChange(row.original.index, event.target.value)}
             onClick={(event) => event.stopPropagation()}
             className="h-24 w-full resize-none bg-[rgb(var(--pm-input))] border border-stone-200/20 text-stone-200 text-xs p-2 font-mono outline-none focus:ring-1 focus:ring-emerald-400/50"
           />
@@ -427,9 +444,9 @@ export function VlmArenaMatrixTable({
           <button
             onClick={(event) => {
               event.stopPropagation();
-              onRunSingleRow(row.original.index);
+              liveRef.current.onRunSingleRow(row.original.index);
             }}
-            disabled={row.original.row.runStatus === 'running' || !imageDataUrl || !row.original.row.prompt.trim()}
+            disabled={row.original.row.runStatus === 'running' || !liveRef.current.imageDataUrl || !row.original.row.prompt.trim()}
             className="inline-flex h-7 items-center gap-1 rounded border border-emerald-200/25 bg-emerald-100/10 px-2 text-[11px] font-medium text-emerald-100 hover:bg-emerald-100/18 disabled:opacity-40"
             title={copy.runSingleTitle}
           >
@@ -526,7 +543,7 @@ export function VlmArenaMatrixTable({
           <button
             onClick={(event) => {
               event.stopPropagation();
-              onOpenDetail(row.original.index);
+              liveRef.current.onOpenDetail(row.original.index);
             }}
             className="inline-flex items-center gap-1 rounded border border-stone-300/20 bg-stone-200/5 px-2 py-1 text-[11px] text-stone-200 hover:bg-stone-200/10"
           >
@@ -545,7 +562,7 @@ export function VlmArenaMatrixTable({
             <button
               onClick={(event) => {
                 event.stopPropagation();
-                onMoveModel(row.original.index, row.original.index - 1);
+                liveRef.current.onMoveModel(row.original.index, row.original.index - 1);
               }}
               disabled={row.original.index === 0}
               className="inline-flex h-7 w-7 items-center justify-center rounded border border-stone-300/20 bg-stone-200/5 text-stone-200 hover:bg-stone-200/10 disabled:opacity-35"
@@ -556,7 +573,7 @@ export function VlmArenaMatrixTable({
             <button
               onClick={(event) => {
                 event.stopPropagation();
-                onMoveModel(row.original.index, row.original.index + 1);
+                liveRef.current.onMoveModel(row.original.index, row.original.index + 1);
               }}
               disabled={row.original.index >= rows.length - 1}
               className="inline-flex h-7 w-7 items-center justify-center rounded border border-stone-300/20 bg-stone-200/5 text-stone-200 hover:bg-stone-200/10 disabled:opacity-35"
@@ -567,7 +584,7 @@ export function VlmArenaMatrixTable({
             <button
               onClick={(event) => {
                 event.stopPropagation();
-                onOpenDetail(row.original.index);
+                liveRef.current.onOpenDetail(row.original.index);
               }}
               className="inline-flex h-7 w-7 items-center justify-center rounded border border-stone-300/20 bg-stone-200/5 text-stone-200 hover:bg-stone-200/10"
               title={copy.viewDetailTitle}
@@ -577,7 +594,7 @@ export function VlmArenaMatrixTable({
             <button
               onClick={(event) => {
                 event.stopPropagation();
-                onRemoveModel(row.original.index);
+                liveRef.current.onRemoveModel(row.original.index);
               }}
               className="inline-flex rounded border border-red-400/25 bg-red-500/10 px-2 py-1 text-[11px] text-red-200 hover:bg-red-500/20"
               title={copy.deleteRowTitle}
@@ -588,21 +605,10 @@ export function VlmArenaMatrixTable({
         ),
       }),
     ],
-    [
-      copy,
-      imageDataUrl,
-      onMoveModel,
-      onOpenDetail,
-      onOutputModeChange,
-      onPromptChange,
-      onRemoveModel,
-      onRunSingleRow,
-      onStyleChange,
-      onToggleEnabled,
-      onUpdateModel,
-      providers,
-      rows.length,
-    ],
+    // Volatile handlers + imageDataUrl are read via liveRef inside cells, so they
+    // are intentionally NOT deps — this keeps `columns` stable across keystrokes
+    // so the prompt <textarea> never remounts mid-typing.
+    [copy, providers, rows.length],
   );
 
   const table = useReactTable({

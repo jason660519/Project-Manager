@@ -102,6 +102,14 @@ blocks any `useReactTable` file that skips the following. Treat them as hard req
 3. **Numeric Freeze cols only.** Use `<FreezeColsControl>` (a number input freezing the leftmost
    N columns). The per-column checkbox "Freeze cols" dropdown is non-compliant (gate rule R4).
 4. **Provider/Status/Category/Company column ⇒ a filter** (or name it in `@table-waivers`).
+5. **Editable cell inputs must keep focus across keystrokes** (table-governance §8). A
+   `<input>`/`<textarea>` in a cell loses focus per keystroke if the `columns` `useMemo` deps
+   include handlers/state that change every render — TanStack `flexRender` renders cells via
+   `React.createElement`, so rebuilt columns remount the input. Fix with EITHER: (a) keep
+   `columns` deps to keystroke-stable values and read volatile handlers/state inside cells via
+   `useLiveRef` from `components/table/datasheet`; OR (b) a local-draft + commit-on-blur cell
+   component (e.g. `EditableParamCell`). Add a focus-retention regression test (focus → 3
+   `fireEvent.change` → assert same DOM node + still `document.activeElement`).
 
 ### Plan-time gate (before ExitPlanMode)
 

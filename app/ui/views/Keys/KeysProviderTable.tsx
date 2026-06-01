@@ -17,7 +17,7 @@
  * Add Row, delete/hide row, and row reorder.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   BookOpen,
@@ -370,11 +370,25 @@ function EditableTextCell({
   onCommit: (value: string) => void;
   placeholder?: string;
 }) {
+  // Local draft so typing does NOT re-render the parent table on every keystroke
+  // (which would rebuild `columns` and remount this input, dropping focus).
+  // Commit on blur / Enter; resync when the committed value changes externally.
+  const [draft, setDraft] = useState(value);
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+  const commit = () => {
+    if (draft !== value) onCommit(draft);
+  };
   return (
     <input
-      value={value}
+      value={draft}
       placeholder={placeholder}
-      onChange={(event) => onCommit(event.target.value)}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') (event.target as HTMLInputElement).blur();
+      }}
       onClick={(event) => event.stopPropagation()}
       className="w-full border border-stone-200/18 bg-[rgb(var(--pm-input))] px-2 py-1 text-xs text-stone-200 outline-none focus:ring-1 focus:ring-emerald-400/50"
     />

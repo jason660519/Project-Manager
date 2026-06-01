@@ -47,6 +47,7 @@ import {
   applyFreezeColumnCount,
   FreezeColsControl,
   getFrozenColumnLayout,
+  useLiveRef,
 } from '../../../../components/table/datasheet';
 import {
   evaluationMeta,
@@ -292,6 +293,30 @@ export function LlmArenaMatrixTable({
     });
   }, [rows, searchText, category, copy]);
 
+  // Volatile per-row state + handlers are read through a ref so the `columns`
+  // memo need not list them as deps. Rebuilding `columns` changes every cell
+  // function's identity, and TanStack `flexRender` renders cells via
+  // React.createElement — a new cell identity remounts the cell's <textarea>/
+  // <input>, dropping focus on every keystroke. Stable columns + ref reads keep
+  // focus while still rendering live values.
+  const liveRef = useLiveRef({
+    enabledByIndex,
+    evaluationByIndex,
+    noteByIndex,
+    promptOverrideByIndex,
+    runningIndexes,
+    userPrompt,
+    onToggleEnabled,
+    onEvaluationChange,
+    onNoteChange,
+    onRowPromptChange,
+    onRunSingleRow,
+    onRemoveModel,
+    onMoveModel,
+    onOpenDetail,
+    onUpdateModel,
+  });
+
   const columns = useMemo(
     () => [
       col.accessor((row) => row.index + 1, {
@@ -300,15 +325,15 @@ export function LlmArenaMatrixTable({
         size: LLM_DEFAULT_SIZING['col-no'],
         cell: ({ row }) => <span className="font-mono text-xs text-stone-300">{row.original.index + 1}</span>,
       }),
-      col.accessor((row) => enabledByIndex[row.index] !== false, {
+      col.accessor((row) => liveRef.current.enabledByIndex[row.index] !== false, {
         id: 'col-test',
         header: copy.columns.test,
         size: LLM_DEFAULT_SIZING['col-test'],
         cell: ({ row }) => (
           <input
             type="checkbox"
-            checked={enabledByIndex[row.original.index] !== false}
-            onChange={(event) => onToggleEnabled(row.original.index, event.target.checked)}
+            checked={liveRef.current.enabledByIndex[row.original.index] !== false}
+            onChange={(event) => liveRef.current.onToggleEnabled(row.original.index, event.target.checked)}
             onClick={(event) => event.stopPropagation()}
             className="h-3.5 w-3.5 accent-emerald-400"
           />
@@ -329,9 +354,9 @@ export function LlmArenaMatrixTable({
                   nextProvider?.defaultModel && nextProvider.availableModels.includes(nextProvider.defaultModel)
                     ? nextProvider.defaultModel
                     : nextProvider?.availableModels[0] || '';
-                onUpdateModel(index, event.target.value, nextModel);
+                liveRef.current.onUpdateModel(index, event.target.value, nextModel);
               }}
-              disabled={runningIndexes.has(index)}
+              disabled={liveRef.current.runningIndexes.has(index)}
               onClick={(event) => event.stopPropagation()}
               className="w-full bg-[rgb(var(--pm-input))] border border-stone-200/20 text-stone-200 text-xs py-1 px-2 outline-none focus:ring-1 focus:ring-emerald-400/50 disabled:opacity-50"
             >
@@ -354,8 +379,8 @@ export function LlmArenaMatrixTable({
           return (
             <select
               value={spec.model}
-              onChange={(event) => onUpdateModel(index, spec.provider, event.target.value)}
-              disabled={runningIndexes.has(index)}
+              onChange={(event) => liveRef.current.onUpdateModel(index, spec.provider, event.target.value)}
+              disabled={liveRef.current.runningIndexes.has(index)}
               onClick={(event) => event.stopPropagation()}
               className="w-full bg-[rgb(var(--pm-input))] border border-stone-200/20 text-stone-200 text-xs py-1 px-2 outline-none font-mono focus:ring-1 focus:ring-emerald-400/50 disabled:opacity-50"
             >
@@ -408,20 +433,25 @@ export function LlmArenaMatrixTable({
         header: copy.columns.run,
         size: LLM_DEFAULT_SIZING['col-run'],
         enableSorting: false,
-        cell: ({ row }) => (
-          <button
-            onClick={(event) => {
-              event.stopPropagation();
-              onRunSingleRow(row.original.index);
-            }}
-            disabled={runningIndexes.has(row.original.index) || !(promptOverrideByIndex[row.original.index] ?? userPrompt).trim()}
-            className="inline-flex h-7 items-center gap-1 rounded border border-emerald-200/25 bg-emerald-100/10 px-2 text-[11px] font-medium text-emerald-100 hover:bg-emerald-100/18 disabled:opacity-40"
-            title={copy.runSingleTitle}
-          >
-            {runningIndexes.has(row.original.index) ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
-            {copy.columns.run}
-          </button>
-        ),
+        cell: ({ row }) => {
+          const idx = row.original.index;
+          const { runningIndexes, promptOverrideByIndex, userPrompt, onRunSingleRow } = liveRef.current;
+          const isRowRunning = runningIndexes.has(idx);
+          return (
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                onRunSingleRow(idx);
+              }}
+              disabled={isRowRunning || !(promptOverrideByIndex[idx] ?? userPrompt).trim()}
+              className="inline-flex h-7 items-center gap-1 rounded border border-emerald-200/25 bg-emerald-100/10 px-2 text-[11px] font-medium text-emerald-100 hover:bg-emerald-100/18 disabled:opacity-40"
+              title={copy.runSingleTitle}
+            >
+              {isRowRunning ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
+              {copy.columns.run}
+            </button>
+          );
+        },
       }),
       col.accessor((row) => statusMeta(row.result, copy).text, {
         id: 'col-status',
@@ -432,12 +462,13 @@ export function LlmArenaMatrixTable({
           return <span className={`inline-flex rounded-sm px-2 py-0.5 text-[10px] font-semibold ${meta.className}`}>{meta.text}</span>;
         },
       }),
-      col.accessor((row) => promptOverrideByIndex[row.index] ?? userPrompt, {
+      col.accessor((row) => liveRef.current.promptOverrideByIndex[row.index] ?? liveRef.current.userPrompt, {
         id: 'col-prompt',
         header: copy.columns.testPrompt,
         size: LLM_DEFAULT_SIZING['col-prompt'],
         cell: ({ row }) => {
           const idx = row.original.index;
+          const { promptOverrideByIndex, userPrompt, onRowPromptChange } = liveRef.current;
           const value = promptOverrideByIndex[idx] ?? userPrompt;
           return (
             <textarea
@@ -475,12 +506,13 @@ export function LlmArenaMatrixTable({
           </div>
         ),
       }),
-      col.accessor((row) => evaluationByIndex[row.index] ?? 'pending', {
+      col.accessor((row) => liveRef.current.evaluationByIndex[row.index] ?? 'pending', {
         id: 'col-eval',
         header: copy.columns.evaluation,
         size: LLM_DEFAULT_SIZING['col-eval'],
         cell: ({ row }) => {
           const idx = row.original.index;
+          const { evaluationByIndex, noteByIndex, onEvaluationChange, onNoteChange } = liveRef.current;
           const level = evaluationByIndex[idx] ?? 'pending';
           const badge = evaluationMeta(level, copy);
           return (
@@ -577,7 +609,7 @@ export function LlmArenaMatrixTable({
           <button
             onClick={(event) => {
               event.stopPropagation();
-              onOpenDetail(row.original.index);
+              liveRef.current.onOpenDetail(row.original.index);
             }}
             className="inline-flex items-center gap-1 border border-stone-200/20 px-2 py-1 text-xs text-stone-300 hover:bg-white/[0.04]"
           >
@@ -596,7 +628,7 @@ export function LlmArenaMatrixTable({
             <button
               onClick={(event) => {
                 event.stopPropagation();
-                onMoveModel(row.original.index, row.original.index - 1);
+                liveRef.current.onMoveModel(row.original.index, row.original.index - 1);
               }}
               disabled={row.original.index === 0}
               className="inline-flex h-7 w-7 items-center justify-center rounded border border-stone-300/20 bg-stone-200/5 text-stone-200 hover:bg-stone-200/10 disabled:opacity-35"
@@ -607,7 +639,7 @@ export function LlmArenaMatrixTable({
             <button
               onClick={(event) => {
                 event.stopPropagation();
-                onMoveModel(row.original.index, row.original.index + 1);
+                liveRef.current.onMoveModel(row.original.index, row.original.index + 1);
               }}
               disabled={row.original.index >= selectedModels.length - 1}
               className="inline-flex h-7 w-7 items-center justify-center rounded border border-stone-300/20 bg-stone-200/5 text-stone-200 hover:bg-stone-200/10 disabled:opacity-35"
@@ -618,7 +650,7 @@ export function LlmArenaMatrixTable({
             <button
               onClick={(event) => {
                 event.stopPropagation();
-                onOpenDetail(row.original.index);
+                liveRef.current.onOpenDetail(row.original.index);
               }}
               className="inline-flex items-center gap-1 rounded border border-stone-300/20 bg-stone-200/5 px-2 py-1 text-[11px] text-stone-200 hover:bg-stone-200/10"
               title={copy.viewDetailTitle}
@@ -629,7 +661,7 @@ export function LlmArenaMatrixTable({
             <button
               onClick={(event) => {
                 event.stopPropagation();
-                onRemoveModel(row.original.index);
+                liveRef.current.onRemoveModel(row.original.index);
               }}
               className="inline-flex items-center gap-1 rounded border border-red-400/25 bg-red-500/10 px-2 py-1 text-[11px] text-red-200 hover:bg-red-500/20"
               title={copy.deleteRowTitle}
@@ -641,27 +673,11 @@ export function LlmArenaMatrixTable({
         ),
       }),
     ],
-    [
-      enabledByIndex,
-      commonCopy,
-      copy,
-      evaluationByIndex,
-      runningIndexes,
-      noteByIndex,
-      onEvaluationChange,
-      onMoveModel,
-      onNoteChange,
-      onOpenDetail,
-      onRemoveModel,
-      onRunSingleRow,
-      onRowPromptChange,
-      onToggleEnabled,
-      onUpdateModel,
-      promptOverrideByIndex,
-      providers,
-      selectedModels.length,
-      userPrompt,
-    ],
+    // Deps are intentionally limited to values that change OUTSIDE of typing
+    // (locale copy, provider list, row count). Volatile per-row state + handlers
+    // are read via liveRef inside the cells, so `columns` stays referentially
+    // stable across keystrokes and the inputs never remount.
+    [copy, commonCopy, providers, selectedModels.length],
   );
 
   const table = useReactTable({

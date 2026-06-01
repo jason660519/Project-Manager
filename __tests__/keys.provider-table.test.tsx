@@ -221,9 +221,11 @@ describe('KeysProviderTable', () => {
     );
     renderTable({ rows: [row], onPatchCustomProvider });
 
-    fireEvent.change(screen.getByDisplayValue('Custom Provider 1'), {
-      target: { value: 'Updated Provider' },
-    });
+    // EditableTextCell holds a local draft and commits on blur (not per keystroke)
+    // so the table does not re-render mid-typing and the input keeps focus.
+    const labelInput = screen.getByDisplayValue('Custom Provider 1');
+    fireEvent.change(labelInput, { target: { value: 'Updated Provider' } });
+    fireEvent.blur(labelInput);
 
     expect(onPatchCustomProvider).toHaveBeenCalledWith(row.provider.id, { label: 'Updated Provider' });
     expect(screen.getByRole('link', { name: 'Official API key page' })).toHaveAttribute(
