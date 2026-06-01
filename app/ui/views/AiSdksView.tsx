@@ -330,6 +330,10 @@ export function AiSdksView({
           onSelect={handleTabSelect}
           reorderable
           orderStorageKey={AI_SDKS_SHEET_ORDER_STORAGE_KEY}
+          // 14 provider tabs overflow the strip; pm-scroll shows a persistent
+          // horizontal scrollbar so all sheets are reachable (macOS/WKWebView
+          // otherwise hides the overlay bar — looked like only ~8 existed).
+          className="pm-scroll"
         />
       }
     >
