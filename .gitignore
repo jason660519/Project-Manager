@@ -56,6 +56,7 @@ vendor/hermes-agent/
 #   the `context-save` skill. Keep private by default — if a team
 #   wants to share them, remove the line and commit explicitly.
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
 .context/sessions/
 
 # VitePress docs site build artifacts (built by GH Actions, not committed)
