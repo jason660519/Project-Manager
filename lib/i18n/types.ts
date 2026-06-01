@@ -34,11 +34,25 @@ export interface Translations {
     loadError: string;
     recoverDefaults: string;
     importMergePrompt: string;
+    importNewerVersion: string;
+    importUnrecognized: string;
+    /** "{count} entr(ies) skipped during import" — component substitutes {count}. */
+    importSkipped: string;
     status: { saving: string; saved: string; error: string };
     columns: { id: string; provider: string; model: string; type: string };
     controls: {
       searchPlaceholder: string;
+      searchClear: string;
       freezeColumns: string;
+      density: string;
+      resetView: string;
+      resetViewTitle: string;
+      /** "Hidden cols ({count})" — component substitutes {count}. */
+      hiddenColumns: string;
+      /** "Hidden rows ({count})" — component substitutes {count}. */
+      hiddenRows: string;
+      clearFilters: string;
+      restoreAll: string;
       addModel: string;
       addModelPlaceholder: string;
       addCategory: string;
@@ -50,8 +64,31 @@ export interface Translations {
       import: string;
       export: string;
     };
+    density: { compact: string; comfortable: string; expanded: string };
+    menu: {
+      column: string;
+      row: string;
+      sortAsc: string;
+      sortDesc: string;
+      resetSort: string;
+      filter: string;
+      resizeColumn: string;
+      /** window.prompt body for column width — substitutes {min}/{max}. */
+      resizeColumnPrompt: string;
+      freezeThrough: string;
+      hideColumn: string;
+      restoreColumns: string;
+      resetView: string;
+      viewDetails: string;
+      resizeRow: string;
+      /** window.prompt body for row height — substitutes {min}/{max}. */
+      resizeRowPrompt: string;
+      hideRow: string;
+      restoreRows: string;
+      none: string;
+    };
     filters: { type: string; allTypes: string };
-    empty: { noModels: string; noMatch: string };
+    empty: { noModels: string; noMatch: string; clearSearch: string };
     detail: { close: string; range: string; default: string; value: string; selectHint: string };
   };
   system: {

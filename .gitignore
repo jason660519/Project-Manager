@@ -61,3 +61,6 @@ vendor/hermes-agent/
 # VitePress docs site build artifacts (built by GH Actions, not committed)
 docs-site/.vitepress/dist/
 docs-site/.vitepress/cache/
+
+# Playwright MCP scratch dir (browser snapshots/console logs/screenshots)
+.playwright-mcp/

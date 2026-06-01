@@ -23,7 +23,7 @@ import { DEFAULT_MODEL_TYPES, getParamSpecs, type ParamValue } from '../../../li
 import {
   AI_SDKS_SCHEMA_VERSION,
   emptyAiSdksConfig,
-  normalizeStore,
+  normalizeStoreDetailed,
   readAiSdksStore,
   validateParam,
   writeAiSdksStore,
@@ -67,6 +67,9 @@ export function AiSdksView({
   const [store, setStore] = useState<AiSdksConfig>(emptyAiSdksConfig);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Non-fatal import feedback (refused file / skipped entries), dismissible and
+  // kept separate from loadError so it never offers the destructive recover action.
+  const [notice, setNotice] = useState<string | null>(null);
   const [readOnly, setReadOnly] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [activeTab, setActiveTab] = useState<AiSdksSheetSlug>(
@@ -75,14 +78,17 @@ export function AiSdksView({
   const skipSaveRef = useRef(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Initial load.
+  // Initial load (and reload if projectRoot changes). Re-arm the save-skip flag
+  // so the assignment from *this* load never triggers an immediate re-save.
   useEffect(() => {
     let cancelled = false;
+    skipSaveRef.current = true;
     (async () => {
       try {
         const next = await readAiSdksStore(projectRoot);
         if (!cancelled) setStore(next);
       } catch (err) {
+        // readAiSdksStore already prefixes with context (e.g. "Failed to read…").
         if (!cancelled) setLoadError(err instanceof Error ? err.message : String(err));
       } finally {
         if (!cancelled) setLoaded(true);
@@ -106,6 +112,7 @@ export function AiSdksView({
         await writeAiSdksStore(store, projectRoot);
         setSaveState('saved');
       } catch (err) {
+        // Header already flags "Save failed"; the banner carries the detail.
         setSaveState('error');
         setLoadError(err instanceof Error ? err.message : String(err));
       }
@@ -185,7 +192,17 @@ export function AiSdksView({
   const handleImportFile = async (file: File) => {
     try {
       const text = await file.text();
-      const incoming = normalizeStore(JSON.parse(text));
+      const { store: incoming, report } = normalizeStoreDetailed(JSON.parse(text));
+      // Refuse files we can't safely apply rather than overwrite live data with
+      // an empty/mismatched store (zero silent failures).
+      if (report.futureSchema) {
+        setNotice(copy.importNewerVersion);
+        return;
+      }
+      if (report.unrecognized) {
+        setNotice(copy.importUnrecognized);
+        return;
+      }
       const merge = window.confirm(copy.importMergePrompt);
       setStore((prev) =>
         merge
@@ -197,8 +214,12 @@ export function AiSdksView({
             }
           : incoming,
       );
+      const skipped =
+        report.dropped.models + report.dropped.customModels + report.dropped.customCategories;
+      // Surface skipped entries instead of dropping them silently.
+      setNotice(skipped > 0 ? `${skipped} ${copy.importSkipped}` : null);
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : String(err));
+      setNotice(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -299,6 +320,18 @@ export function AiSdksView({
             className="shrink-0 border border-rose-300/40 px-2 py-1 text-rose-100 hover:bg-rose-400/15"
           >
             {copy.recoverDefaults}
+          </button>
+        </div>
+      )}
+      {notice && (
+        <div className="m-4 flex items-center justify-between gap-3 border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+          <span>{notice}</span>
+          <button
+            type="button"
+            onClick={() => setNotice(null)}
+            className="shrink-0 border border-amber-300/40 px-2 py-1 text-amber-50 hover:bg-amber-400/15"
+          >
+            {copy.detail.close}
           </button>
         </div>
       )}

@@ -37,6 +37,25 @@ untouched — they stay in the keychain via the Keys flow.
   panel / add model / add category / restore defaults).
 - Read-only toggle, debounced auto-save, JSON import/export, error/recovery banner.
 
+## Table + Sheet classification (company governance)
+
+Per `/Users/Company-AI-App-Standards/docs/patterns/table-governance.md`, each
+provider sheet is classified as a **Basic Table Sheet** (wide horizontally-
+scrolling columns, operational, repeated use). It implements the full Basic
+Table Sheet contract: table-scoped search, `col-id`, category filter with
+chips + clear, freeze cols, column resize, **row height / density**, **hide +
+restore columns and rows**, **column & row context menus**, default/asc/desc
+sort arrows + `aria-sort`, **Reset view**, and auto-saved view preferences
+(sizing, visibility, frozen, sort, filter, density, hidden rows).
+
+Documented exceptions:
+
+- **Row virtualization / 1000-row perf** — N/A. Each sheet renders well under 20
+  rows (a provider's model list), so virtualization is not required.
+- **Per-column `Provider` filter** — N/A. Every row in a sheet is the same
+  provider (the sheet *is* the provider), so a provider filter would always have
+  one option. The category-like **Type** column carries the mandatory filter.
+
 ## Out of scope
 
 - Consuming these parameters in dispatch / provider routing (follow-up).

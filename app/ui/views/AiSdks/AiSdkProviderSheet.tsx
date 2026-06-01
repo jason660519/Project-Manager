@@ -4,20 +4,34 @@
  * One provider's editable parameter sheet — a wide TanStack v8 table:
  *   col-id (frozen) | col-provider | col-model | col-type | col-param-<key>…
  *
- * Columns after col-type are derived from the provider's parameter catalog;
- * each renders an EditableParamCell. Follows the KeysProviderTable contract for
- * search / sort / resize / freeze, persisting view prefs by canonical col- id
- * via useArenaTablePrefs. Row click opens a parameter-metadata detail panel.
+ * Implements the company Basic Table Sheet contract (see
+ * `.project-manager/features/F43/README.md` for the classification + documented
+ * exceptions): table-scoped debounced search, category filter with chips +
+ * clear, freeze cols, column resize, density / per-row height, hide + restore
+ * columns and rows, column & row context menus, default/asc/desc sort arrows
+ * with `aria-sort`, Reset view, and auto-saved view preferences
+ * (`useAiSdksTablePrefs`). Row click / "View details" opens the metadata panel.
  */
 
-import React, { useMemo, useState } from 'react';
-import { Info, Plus, RotateCcw, Snowflake, X } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronsUpDown,
+  Eye,
+  EyeOff,
+  Info,
+  MoreVertical,
+  Plus,
+  RotateCcw,
+  Snowflake,
+  X,
+} from 'lucide-react';
 import {
   createColumnHelper,
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
-  type SortingState,
   useReactTable,
 } from '@tanstack/react-table';
 
@@ -34,8 +48,17 @@ import {
   type AiSdksConfig,
 } from '../../../../lib/aiSdks/store';
 import type { Translations } from '../../../../lib/i18n';
-import { useArenaTablePrefs } from '../Keys/ArenaTableViewControls';
 import { EditableParamCell } from './EditableParamCell';
+import { TableMenu, type TableMenuItem } from './TableMenu';
+import {
+  DENSITY_ROW_HEIGHT,
+  MAX_COLUMN_WIDTH,
+  MAX_ROW_HEIGHT,
+  MIN_COLUMN_WIDTH,
+  MIN_ROW_HEIGHT,
+  useAiSdksTablePrefs,
+  type RowDensity,
+} from './useAiSdksTablePrefs';
 
 type AiSdksCopy = Translations['aiSdks'];
 
@@ -61,11 +84,10 @@ interface AiSdkProviderSheetProps {
 }
 
 const columnHelper = createColumnHelper<AiSdkRow>();
+const DENSITIES: readonly RowDensity[] = ['compact', 'comfortable', 'expanded'];
 
-function SortMarker({ value }: { value: false | 'asc' | 'desc' }) {
-  if (value === 'asc') return <span className="text-emerald-200">↑</span>;
-  if (value === 'desc') return <span className="text-emerald-200">↓</span>;
-  return null;
+function replacePlaceholder(template: string, values: Record<string, string | number>): string {
+  return Object.entries(values).reduce((text, [k, v]) => text.replace(`{${k}}`, String(v)), template);
 }
 
 function rangeText(spec: ParamSpec): string {
@@ -111,20 +133,13 @@ export function AiSdkProviderSheet({
     return [...catalog, ...custom];
   }, [providerId, store]);
 
-  const [searchText, setSearchText] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [newModel, setNewModel] = useState('');
-  const [newCategory, setNewCategory] = useState('');
-
   const columnIds = useMemo(
     () => ['col-id', 'col-provider', 'col-model', 'col-type', ...specs.map((s) => `col-param-${s.key}`)],
     [specs],
   );
   const defaultSizing = useMemo<Record<string, number>>(() => {
     const sizing: Record<string, number> = {
-      'col-id': 220,
+      'col-id': 240,
       'col-provider': 200,
       'col-model': 220,
       'col-type': 150,
@@ -135,6 +150,15 @@ export function AiSdkProviderSheet({
     return sizing;
   }, [specs]);
 
+  const rowIds = useMemo(() => rows.map((r) => r.id), [rows]);
+
+  const prefs = useAiSdksTablePrefs({
+    storageKey: `projectManager.aiSdks.${providerId}.tableView.v1`,
+    columnIds,
+    rowIds,
+    defaultSizing,
+    defaultFrozenColumnIds: ['col-id'],
+  });
   const {
     columnSizing,
     setColumnSizing,
@@ -142,17 +166,38 @@ export function AiSdkProviderSheet({
     setColumnVisibility,
     frozenColumnIds,
     setFrozenColumnIds,
-    resetPrefs,
-  } = useArenaTablePrefs({
-    storageKey: `projectManager.aiSdks.${providerId}.tablePrefs.v1`,
-    columnIds,
-    defaultSizing,
-    defaultFrozenColumnIds: ['col-id'],
-  });
+    sorting,
+    setSorting,
+    typeFilter,
+    setTypeFilter,
+    density,
+    setDensity,
+    rowHeightById,
+    setRowHeight,
+    hiddenRowIds,
+    setHiddenRowIds,
+    resetView,
+  } = prefs;
+
+  // Table-scoped search with a 200 ms debounce (company 2.1).
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput), 200);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [newModel, setNewModel] = useState('');
+  const [newCategory, setNewCategory] = useState('');
+
+  const hiddenRowSet = useMemo(() => new Set(hiddenRowIds), [hiddenRowIds]);
+  const filtersActive = typeFilter !== 'all' || search.trim() !== '';
 
   const filteredRows = useMemo(() => {
-    const keyword = searchText.trim().toLowerCase();
+    const keyword = search.trim().toLowerCase();
     return rows.filter((row) => {
+      if (hiddenRowSet.has(row.id)) return false;
       if (typeFilter !== 'all' && row.modelType !== typeFilter) return false;
       if (!keyword) return true;
       return [row.id, row.model, row.providerLabel, row.modelType]
@@ -160,19 +205,66 @@ export function AiSdkProviderSheet({
         .toLowerCase()
         .includes(keyword);
     });
-  }, [rows, searchText, typeFilter]);
+  }, [rows, search, typeFilter, hiddenRowSet]);
 
-  const columns = useMemo(
-    () => [
+  const colLabel = useMemo(() => {
+    const map = new Map<string, string>([
+      ['col-id', copy.columns.id],
+      ['col-provider', copy.columns.provider],
+      ['col-model', copy.columns.model],
+      ['col-type', copy.columns.type],
+    ]);
+    specs.forEach((s) => map.set(`col-param-${s.key}`, s.label));
+    return map;
+  }, [copy, specs]);
+
+  // Row context-menu handlers — defined before `columns`, which closes over them.
+  const hideRow = (rowId: string) => {
+    if (filteredRows.length <= 1) return; // never hide the last visible row
+    setHiddenRowIds((prev) => (prev.includes(rowId) ? prev : [...prev, rowId]));
+  };
+  const restoreRow = (rowId: string) =>
+    setHiddenRowIds((prev) => prev.filter((id) => id !== rowId));
+  const promptResizeRow = (rowId: string) => {
+    const current = rowHeightById[rowId] ?? DENSITY_ROW_HEIGHT[density];
+    const input = window.prompt(
+      replacePlaceholder(copy.menu.resizeRowPrompt, { min: MIN_ROW_HEIGHT, max: MAX_ROW_HEIGHT }),
+      String(current),
+    );
+    if (input === null) return;
+    const parsed = Number(input);
+    if (!Number.isFinite(parsed)) return;
+    setRowHeight(rowId, parsed);
+  };
+
+  // Columns close over per-render row handlers, so they are rebuilt each render
+  // (the table is tiny — well under 20 rows — so this is cheap).
+  const columns = [
       columnHelper.accessor((row) => row.id, {
         id: 'col-id',
         header: copy.columns.id,
-        cell: (info) => <span className="font-mono text-[11px] text-stone-400">{info.getValue()}</span>,
+        cell: (info) => (
+          <div className="flex items-center gap-1.5">
+            <RowMenu
+              rowId={info.row.original.id}
+              model={info.row.original.model}
+              copy={copy}
+              canHide={filteredRows.length > 1}
+              hiddenRowIds={hiddenRowIds}
+              rowLabelById={(id) => rows.find((r) => r.id === id)?.model ?? id}
+              onViewDetails={() => setSelectedId(info.row.original.id)}
+              onResizeRow={() => promptResizeRow(info.row.original.id)}
+              onHideRow={() => hideRow(info.row.original.id)}
+              onRestoreRow={restoreRow}
+              onRestoreAllRows={() => setHiddenRowIds([])}
+            />
+            <span className="truncate font-mono text-[11px] text-stone-400">{info.getValue()}</span>
+          </div>
+        ),
       }),
       columnHelper.accessor((row) => row.providerLabel, {
         id: 'col-provider',
         header: copy.columns.provider,
-        enableColumnFilter: true,
         cell: (info) => <span className="font-medium text-stone-100">{info.getValue()}</span>,
       }),
       columnHelper.accessor((row) => row.model, {
@@ -183,8 +275,6 @@ export function AiSdkProviderSheet({
       columnHelper.accessor((row) => row.modelType, {
         id: 'col-type',
         header: copy.columns.type,
-        enableColumnFilter: true,
-        filterFn: 'equalsString',
         cell: (info) => (
           <select
             value={info.getValue()}
@@ -222,9 +312,7 @@ export function AiSdkProviderSheet({
           ),
         }),
       ),
-    ],
-    [copy, specs, categories, readOnly, store, onSetModelType, onSetParam],
-  );
+  ];
 
   const table = useReactTable({
     data: filteredRows,
@@ -238,7 +326,7 @@ export function AiSdkProviderSheet({
     getSortedRowModel: getSortedRowModel(),
   });
 
-  // Freeze offsets (mirrors KeysProviderTable).
+  // ── Freeze offsets (mirrors KeysProviderTable) ────────────────────────────
   const visibleColumns = table.getVisibleLeafColumns();
   const freezeCandidateIds = visibleColumns.map((c) => c.id);
   const frozenColumnCount = Math.min(
@@ -270,12 +358,83 @@ export function AiSdkProviderSheet({
       ? `${header ? 'z-30' : 'z-20'} bg-[rgb(var(--pm-rail))]/95 ${lastFrozenId === columnId ? 'shadow-[8px_0_14px_-12px_rgba(255,255,255,0.5)]' : ''}`
       : '';
 
+  // ── View-control handlers ─────────────────────────────────────────────────
   const handleFreezeCountChange = (value: string) => {
     const parsed = Number(value);
     const next = Number.isFinite(parsed)
       ? Math.max(0, Math.min(freezeCandidateIds.length, Math.round(parsed)))
       : 0;
     setFrozenColumnIds(freezeCandidateIds.slice(0, next));
+  };
+  const freezeThrough = (columnId: string) => {
+    const idx = freezeCandidateIds.indexOf(columnId);
+    if (idx >= 0) setFrozenColumnIds(freezeCandidateIds.slice(0, idx + 1));
+  };
+  const promptResizeColumn = (columnId: string) => {
+    const current = columnSizing[columnId] ?? defaultSizing[columnId] ?? 150;
+    const input = window.prompt(
+      replacePlaceholder(copy.menu.resizeColumnPrompt, { min: MIN_COLUMN_WIDTH, max: MAX_COLUMN_WIDTH }),
+      String(current),
+    );
+    if (input === null) return;
+    const parsed = Number(input);
+    if (!Number.isFinite(parsed)) return;
+    const clamped = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, Math.round(parsed)));
+    setColumnSizing((prev) => ({ ...prev, [columnId]: clamped }));
+  };
+  const hideColumn = (columnId: string) =>
+    setColumnVisibility((prev) => ({ ...prev, [columnId]: false }));
+  const restoreColumn = (columnId: string) =>
+    setColumnVisibility((prev) => ({ ...prev, [columnId]: true }));
+  const restoreAllColumns = () =>
+    setColumnVisibility(Object.fromEntries(columnIds.map((id) => [id, true])));
+
+  const handleResetView = () => {
+    resetView();
+    setSearchInput('');
+    setSearch('');
+  };
+  const clearFilters = () => {
+    setTypeFilter('all');
+    setSearchInput('');
+    setSearch('');
+  };
+
+  const hiddenColumnIds = columnIds.filter((id) => columnVisibility[id] === false);
+  const visibleDataColCount = table.getVisibleLeafColumns().length;
+
+  const columnMenuItems = (columnId: string): TableMenuItem[] => {
+    const column = table.getColumn(columnId);
+    const m = copy.menu;
+    const items: TableMenuItem[] = [];
+    if (column?.getCanSort()) {
+      items.push({ key: 'asc', label: m.sortAsc, icon: <ArrowUp size={12} />, onSelect: () => column.toggleSorting(false) });
+      items.push({ key: 'desc', label: m.sortDesc, icon: <ArrowDown size={12} />, onSelect: () => column.toggleSorting(true) });
+      items.push({ key: 'reset-sort', label: m.resetSort, onSelect: () => column.clearSorting() });
+      items.push({ key: 'sep-sort', separator: true });
+    }
+    if (columnId === 'col-type') {
+      items.push({ key: 'f-all', label: copy.filters.allTypes, checked: typeFilter === 'all', onSelect: () => setTypeFilter('all') });
+      categories.forEach((c) =>
+        items.push({ key: `f-${c}`, label: c, checked: typeFilter === c, onSelect: () => setTypeFilter(c) }),
+      );
+      items.push({ key: 'sep-filter', separator: true });
+    }
+    items.push({ key: 'resize', label: m.resizeColumn, onSelect: () => promptResizeColumn(columnId) });
+    items.push({ key: 'freeze', label: m.freezeThrough, icon: <Snowflake size={12} />, onSelect: () => freezeThrough(columnId) });
+    items.push({
+      key: 'hide',
+      label: m.hideColumn,
+      icon: <EyeOff size={12} />,
+      disabled: columnId === 'col-id' || visibleDataColCount <= 1,
+      onSelect: () => hideColumn(columnId),
+    });
+    if (hiddenColumnIds.length > 0) {
+      items.push({ key: 'restore-cols', label: m.restoreColumns, icon: <Eye size={12} />, onSelect: restoreAllColumns });
+    }
+    items.push({ key: 'sep-reset', separator: true });
+    items.push({ key: 'reset-view', label: m.resetView, icon: <RotateCcw size={12} />, onSelect: handleResetView });
+    return items;
   };
 
   const selectedRow = selectedId ? rows.find((r) => r.id === selectedId) ?? null : null;
@@ -296,14 +455,39 @@ export function AiSdkProviderSheet({
   return (
     <div className="flex h-full min-h-0">
       <div className="flex min-h-0 flex-1 flex-col border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72">
-        {/* Toolbar: search | freeze | filter | add model | add category | restore */}
+        {/* Toolbar: Search | Filters | Freeze | Hidden cols | Hidden rows | Density | Reset view | Dataset actions */}
         <div className="flex flex-wrap items-center gap-2 border-b border-stone-200/12 bg-white/[0.02] px-4 py-3">
-          <input
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            placeholder={copy.controls.searchPlaceholder}
-            className="h-8 w-56 border border-stone-200/18 bg-[rgb(var(--pm-input))] px-2 text-xs text-stone-200 outline-none focus:ring-1 focus:ring-emerald-400/50"
-          />
+          <div className="relative">
+            <input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder={copy.controls.searchPlaceholder}
+              className="h-8 w-56 border border-stone-200/18 bg-[rgb(var(--pm-input))] px-2 pr-7 text-xs text-stone-200 outline-none focus:ring-1 focus:ring-emerald-400/50"
+            />
+            {searchInput && (
+              <button
+                type="button"
+                aria-label={copy.controls.searchClear}
+                onClick={() => setSearchInput('')}
+                className="absolute right-1 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-200"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          <select
+            value={typeFilter}
+            aria-label={copy.filters.type}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="h-8 border border-stone-200/18 bg-[rgb(var(--pm-input))] px-1.5 text-xs text-stone-200 outline-none focus:ring-1 focus:ring-emerald-400/50"
+          >
+            <option value="all" className="bg-stone-900">{copy.filters.allTypes}</option>
+            {categories.map((c) => (
+              <option key={c} value={c} className="bg-stone-900">{c}</option>
+            ))}
+          </select>
+
           <div className="flex h-8 items-center gap-1 border border-stone-200/18 px-2 text-xs text-stone-200">
             <Snowflake size={13} className="text-cyan-300" />
             <label htmlFor={`${providerId}-freeze`} className="text-[10px] text-stone-400">
@@ -320,19 +504,79 @@ export function AiSdkProviderSheet({
               className="h-6 w-11 border border-stone-200/18 bg-[rgb(var(--pm-input))] px-1 text-center text-xs text-stone-100 outline-none focus:ring-1 focus:ring-emerald-400/50"
             />
           </div>
-          <select
-            value={typeFilter}
-            aria-label={copy.filters.type}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="h-8 border border-stone-200/18 bg-[rgb(var(--pm-input))] px-1.5 text-xs text-stone-200 outline-none focus:ring-1 focus:ring-emerald-400/50"
-          >
-            <option value="all" className="bg-stone-900">{copy.filters.allTypes}</option>
-            {categories.map((c) => (
-              <option key={c} value={c} className="bg-stone-900">{c}</option>
-            ))}
-          </select>
 
-          <div className="ml-auto flex flex-wrap items-center gap-2">
+          {/* Hidden cols recovery */}
+          <TableMenu
+            triggerLabel={copy.controls.hiddenColumns}
+            triggerClassName="inline-flex h-8 items-center gap-1 border border-stone-200/18 px-2 text-xs text-stone-300 hover:bg-white/[0.04] disabled:opacity-50"
+            trigger={<span>{replacePlaceholder('{label} ({count})', { label: copy.controls.hiddenColumns, count: hiddenColumnIds.length })}</span>}
+            align="left"
+            items={
+              hiddenColumnIds.length === 0
+                ? [{ key: 'none', label: copy.menu.none, disabled: true, onSelect: () => {} }]
+                : [
+                    ...hiddenColumnIds.map((id) => ({
+                      key: id,
+                      label: colLabel.get(id) ?? id,
+                      icon: <Eye size={12} />,
+                      onSelect: () => restoreColumn(id),
+                    })),
+                    { key: 'sep', separator: true as const },
+                    { key: 'all', label: copy.controls.restoreAll, onSelect: restoreAllColumns },
+                  ]
+            }
+          />
+
+          {/* Hidden rows recovery */}
+          <TableMenu
+            triggerLabel={copy.controls.hiddenRows}
+            triggerClassName="inline-flex h-8 items-center gap-1 border border-stone-200/18 px-2 text-xs text-stone-300 hover:bg-white/[0.04]"
+            trigger={<span>{replacePlaceholder('{label} ({count})', { label: copy.controls.hiddenRows, count: hiddenRowIds.length })}</span>}
+            align="left"
+            items={
+              hiddenRowIds.length === 0
+                ? [{ key: 'none', label: copy.menu.none, disabled: true, onSelect: () => {} }]
+                : [
+                    ...hiddenRowIds.map((id) => ({
+                      key: id,
+                      label: rows.find((r) => r.id === id)?.model ?? id,
+                      icon: <Eye size={12} />,
+                      onSelect: () => restoreRow(id),
+                    })),
+                    { key: 'sep', separator: true as const },
+                    { key: 'all', label: copy.controls.restoreAll, onSelect: () => setHiddenRowIds([]) },
+                  ]
+            }
+          />
+
+          {/* Density */}
+          <div className="flex h-8 items-center border border-stone-200/18" role="group" aria-label={copy.controls.density}>
+            {DENSITIES.map((d) => (
+              <button
+                key={d}
+                type="button"
+                aria-pressed={density === d}
+                onClick={() => setDensity(d)}
+                className={`h-full px-2 text-[11px] ${
+                  density === d ? 'bg-emerald-100/10 text-emerald-100' : 'text-stone-300 hover:bg-white/[0.04]'
+                }`}
+              >
+                {copy.density[d]}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleResetView}
+            title={copy.controls.resetViewTitle}
+            className="inline-flex h-8 items-center gap-1 border border-stone-200/18 px-2 text-xs text-stone-200 hover:bg-white/[0.04]"
+          >
+            <RotateCcw size={13} /> {copy.controls.resetView}
+          </button>
+
+          {/* Dataset actions — visually separated from view controls */}
+          <div className="ml-auto flex flex-wrap items-center gap-2 border-l border-stone-200/12 pl-2">
             <div className="flex h-8 items-center border border-stone-200/18">
               <input
                 value={newModel}
@@ -340,7 +584,7 @@ export function AiSdkProviderSheet({
                 onChange={(e) => setNewModel(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddModel()}
                 placeholder={copy.controls.addModelPlaceholder}
-                className="h-full w-40 bg-transparent px-2 text-xs text-stone-200 outline-none disabled:opacity-50"
+                className="h-full w-36 bg-transparent px-2 text-xs text-stone-200 outline-none disabled:opacity-50"
               />
               <button
                 type="button"
@@ -358,7 +602,7 @@ export function AiSdkProviderSheet({
                 onChange={(e) => setNewCategory(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
                 placeholder={copy.controls.addCategoryPlaceholder}
-                className="h-full w-32 bg-transparent px-2 text-xs text-stone-200 outline-none disabled:opacity-50"
+                className="h-full w-28 bg-transparent px-2 text-xs text-stone-200 outline-none disabled:opacity-50"
               />
               <button
                 type="button"
@@ -381,70 +625,139 @@ export function AiSdkProviderSheet({
           </div>
         </div>
 
+        {/* Active filter chips */}
+        {filtersActive && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-stone-200/10 bg-white/[0.01] px-4 py-2 text-[11px]">
+            {typeFilter !== 'all' && (
+              <span className="inline-flex items-center gap-1 border border-amber-200/25 bg-amber-100/10 px-2 py-0.5 text-amber-100/90">
+                {copy.columns.type}: {typeFilter}
+                <button type="button" aria-label={copy.controls.clearFilters} onClick={() => setTypeFilter('all')} className="hover:text-white">
+                  <X size={11} />
+                </button>
+              </span>
+            )}
+            {search.trim() && (
+              <span className="inline-flex items-center gap-1 border border-stone-200/25 bg-white/[0.04] px-2 py-0.5 text-stone-200">
+                “{search.trim()}”
+                <button type="button" aria-label={copy.controls.searchClear} onClick={() => setSearchInput('')} className="hover:text-white">
+                  <X size={11} />
+                </button>
+              </span>
+            )}
+            <button type="button" onClick={clearFilters} className="text-stone-400 underline-offset-2 hover:text-stone-100 hover:underline">
+              {copy.controls.clearFilters}
+            </button>
+          </div>
+        )}
+
         {/* Table */}
         <div className="min-h-0 flex-1 overflow-auto">
           <table className="border-collapse text-left" style={{ width: table.getTotalSize() }}>
             <thead className="sticky top-0 z-10 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <th
-                      key={header.id}
-                      className={`relative select-none border-r border-stone-200/10 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-400 ${frozenClass(header.column.id, true)}`}
-                      style={cellStyle(header.column.id)}
-                    >
-                      <button
-                        type="button"
-                        onClick={header.column.getToggleSortingHandler()}
-                        disabled={!header.column.getCanSort()}
-                        className="flex w-full items-center justify-between gap-2 text-left disabled:cursor-default"
+                  {headerGroup.headers.map((header) => {
+                    const sorted = header.column.getIsSorted();
+                    const ariaSort = sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : 'none';
+                    return (
+                      <th
+                        key={header.id}
+                        aria-sort={header.column.getCanSort() ? ariaSort : undefined}
+                        className={`relative select-none border-r border-stone-200/10 px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-400 ${frozenClass(header.column.id, true)}`}
+                        style={cellStyle(header.column.id)}
                       >
-                        <span className="truncate">
-                          {flexRender(header.column.columnDef.header, header.getContext())}
-                        </span>
-                        <SortMarker value={header.column.getIsSorted()} />
-                      </button>
-                      {header.column.getCanResize() && (
-                        <button
-                          type="button"
-                          aria-label={`Resize ${header.column.id}`}
-                          onMouseDown={header.getResizeHandler()}
-                          onTouchStart={header.getResizeHandler()}
-                          className="absolute right-0 top-0 h-full w-2 cursor-col-resize border-r border-transparent hover:border-emerald-300/70 focus-visible:border-emerald-300"
-                        />
-                      )}
-                    </th>
-                  ))}
+                        <div className="flex items-center justify-between gap-1">
+                          <button
+                            type="button"
+                            onClick={header.column.getToggleSortingHandler()}
+                            disabled={!header.column.getCanSort()}
+                            className="flex min-w-0 flex-1 items-center gap-1.5 text-left disabled:cursor-default"
+                          >
+                            <span className="truncate">
+                              {flexRender(header.column.columnDef.header, header.getContext())}
+                            </span>
+                            {header.column.getCanSort() && (
+                              <span className="shrink-0 text-stone-500">
+                                {sorted === 'asc' ? (
+                                  <ArrowUp size={12} className="text-emerald-200" />
+                                ) : sorted === 'desc' ? (
+                                  <ArrowDown size={12} className="text-emerald-200" />
+                                ) : (
+                                  <ChevronsUpDown size={12} className="opacity-50" />
+                                )}
+                              </span>
+                            )}
+                          </button>
+                          <TableMenu
+                            triggerLabel={`${copy.menu.column}: ${colLabel.get(header.column.id) ?? header.column.id}`}
+                            trigger={<MoreVertical size={13} />}
+                            items={columnMenuItems(header.column.id)}
+                          />
+                        </div>
+                        {header.column.getCanResize() && (
+                          <button
+                            type="button"
+                            aria-label={`${copy.menu.resizeColumn} ${colLabel.get(header.column.id) ?? header.column.id}`}
+                            onMouseDown={header.getResizeHandler()}
+                            onTouchStart={header.getResizeHandler()}
+                            className="absolute right-0 top-0 h-full w-2 cursor-col-resize border-r border-transparent hover:border-emerald-300/70 focus-visible:border-emerald-300"
+                          />
+                        )}
+                      </th>
+                    );
+                  })}
                 </tr>
               ))}
             </thead>
             <tbody>
-              {table.getRowModel().rows.map((row) => (
-                <tr
-                  key={row.id}
-                  onClick={() => setSelectedId(row.original.id)}
-                  className={`cursor-pointer border-b border-stone-200/10 transition-colors hover:bg-white/[0.045] ${
-                    selectedId === row.original.id ? 'bg-emerald-500/5' : ''
-                  }`}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <td
-                      key={cell.id}
-                      className={`relative isolate border-r border-stone-200/10 px-4 py-2 align-middle text-sm text-stone-300 ${frozenClass(cell.column.id)}`}
-                      style={cellStyle(cell.column.id)}
-                    >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
-                </tr>
-              ))}
+              {table.getRowModel().rows.map((row) => {
+                const height = rowHeightById[row.original.id] ?? DENSITY_ROW_HEIGHT[density];
+                return (
+                  <tr
+                    key={row.id}
+                    onClick={() => setSelectedId(row.original.id)}
+                    style={{ height }}
+                    className={`cursor-pointer border-b border-stone-200/10 transition-colors hover:bg-white/[0.045] ${
+                      selectedId === row.original.id ? 'bg-emerald-500/5' : ''
+                    }`}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <td
+                        key={cell.id}
+                        className={`relative isolate overflow-hidden border-r border-stone-200/10 px-3 py-1.5 align-middle text-sm text-stone-300 ${frozenClass(cell.column.id)}`}
+                        style={cellStyle(cell.column.id)}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
               {table.getRowModel().rows.length === 0 && (
                 <tr>
                   <td
                     colSpan={table.getVisibleLeafColumns().length}
                     className="px-4 py-8 text-center text-xs text-stone-500"
                   >
-                    {rows.length === 0 ? copy.empty.noModels : copy.empty.noMatch}
+                    {rows.length === 0 ? (
+                      copy.empty.noModels
+                    ) : (
+                      <div className="flex flex-col items-center gap-2">
+                        <span>{copy.empty.noMatch}</span>
+                        {(filtersActive || hiddenRowIds.length > 0) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              clearFilters();
+                              setHiddenRowIds([]);
+                            }}
+                            className="border border-stone-200/20 px-2 py-1 text-stone-200 hover:bg-white/[0.04]"
+                          >
+                            {copy.empty.clearSearch}
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </td>
                 </tr>
               )}
@@ -508,5 +821,59 @@ export function AiSdkProviderSheet({
         </aside>
       )}
     </div>
+  );
+}
+
+// ── Row context menu (explicit, keyboard-operable; company 2.9 / 3.2) ─────────
+function RowMenu({
+  rowId,
+  model,
+  copy,
+  canHide,
+  hiddenRowIds,
+  rowLabelById,
+  onViewDetails,
+  onResizeRow,
+  onHideRow,
+  onRestoreRow,
+  onRestoreAllRows,
+}: {
+  rowId: string;
+  model: string;
+  copy: AiSdksCopy;
+  canHide: boolean;
+  hiddenRowIds: string[];
+  rowLabelById: (id: string) => string;
+  onViewDetails: () => void;
+  onResizeRow: () => void;
+  onHideRow: () => void;
+  onRestoreRow: (id: string) => void;
+  onRestoreAllRows: () => void;
+}) {
+  const m = copy.menu;
+  const items: TableMenuItem[] = [
+    { key: 'details', label: m.viewDetails, icon: <Info size={12} />, onSelect: onViewDetails },
+    { key: 'resize', label: m.resizeRow, onSelect: onResizeRow },
+    { key: 'hide', label: m.hideRow, icon: <EyeOff size={12} />, disabled: !canHide, onSelect: onHideRow },
+  ];
+  if (hiddenRowIds.length > 0) {
+    items.push({ key: 'sep', separator: true });
+    hiddenRowIds.forEach((id) =>
+      items.push({
+        key: `restore-${id}`,
+        label: `${m.restoreRows}: ${rowLabelById(id)}`,
+        icon: <Eye size={12} />,
+        onSelect: () => onRestoreRow(id),
+      }),
+    );
+    items.push({ key: 'restore-all', label: copy.controls.restoreAll, onSelect: onRestoreAllRows });
+  }
+  return (
+    <TableMenu
+      triggerLabel={`${m.row}: ${model}`}
+      trigger={<MoreVertical size={12} />}
+      align="left"
+      items={items}
+    />
   );
 }

@@ -70,9 +70,15 @@ change to the file shape.
   normalization only — a stringy numeric value is preserved so that
   `validateParam` can flag it (no silent value loss).
 - `validateParam(spec, value)` enforces type, numeric min/max (clamping out of
-  range), integer-ness (rounding), and enum membership. An empty value maps to
-  `null` (unset → falls back to the spec default).
+  range), integer-ness (rounding **then** re-clamping so a rounded value cannot
+  slip past `max`), and enum membership. An empty value maps to `null` (unset →
+  falls back to the spec default).
 - The view aggregates per-provider validation errors into a red sheet-tab badge.
+- `normalizeStoreDetailed(raw)` returns the normalized store **plus a report**
+  (`futureSchema`, `unrecognized`, per-section `dropped` counts). The Import flow
+  uses it to refuse a file from a newer `schemaVersion` or an unrecognizable
+  shape (rather than overwriting live data with an empty store) and to surface a
+  dismissible notice when entries were skipped — no silent partial import.
 
 ## Recovery & failure modes
 
@@ -83,6 +89,21 @@ change to the file shape.
   failed* with the underlying message (Iron Rule: zero silent failures).
 - Malformed `localStorage` view-preference state is normalized by
   `useArenaTablePrefs`, never crashing the table.
+
+## Table view preferences
+
+Each provider sheet is a company **Basic Table Sheet**. Its full view state —
+column sizing, column visibility, frozen columns, sorting, the category (type)
+filter, row density, per-row height overrides, and hidden rows — is auto-saved
+(1 s debounce) under `projectManager.aiSdks.<providerId>.tableView.v1` by
+`app/ui/views/AiSdks/useAiSdksTablePrefs.ts`. State is normalized on read
+(`normalizeTableView`): unknown column/row ids are dropped, widths are clamped
+to 56–720 px and row heights to 28–160 px, and malformed values fall back to
+defaults — never throwing. `Reset view` restores the documented defaults. This
+is separate from the Keys view's `useArenaTablePrefs` (which persists only
+sizing/visibility/frozen); the AI SDKs sheet needs the wider contract so it owns
+a dedicated model. IDs persisted are canonical `col-*` / row ids only — never
+translated labels.
 
 ## Maintenance rule
 

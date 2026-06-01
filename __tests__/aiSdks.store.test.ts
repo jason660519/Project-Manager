@@ -3,9 +3,10 @@ import {
   effectiveParamValue,
   emptyAiSdksConfig,
   normalizeStore,
+  normalizeStoreDetailed,
   validateParam,
 } from '../lib/aiSdks/store';
-import { getParamSpecs } from '../lib/aiSdks/catalog';
+import { getParamSpecs, type ParamSpec } from '../lib/aiSdks/catalog';
 import {
   AI_SDKS_SHEET_SLUGS,
   DEFAULT_AI_SDKS_SHEET_SLUG,
@@ -33,6 +34,24 @@ describe('normalizeStore', () => {
     expect(out.models['openai:gpt-4o'].enabled).toBe(true);
     // override with no valid params keeps the entry but without a params key
     expect(out.models['openai:o1'].params).toBeUndefined();
+  });
+
+  it('reports a newer schemaVersion, unrecognized shape, and dropped entries', () => {
+    expect(normalizeStoreDetailed({ schemaVersion: 999, models: {} }).report).toMatchObject({
+      futureSchema: true,
+      incomingSchemaVersion: 999,
+    });
+    expect(normalizeStoreDetailed({ foo: 'bar' }).report.unrecognized).toBe(true);
+    expect(normalizeStoreDetailed(null).report.unrecognized).toBe(true);
+    // A valid-shaped config is not flagged as unrecognized.
+    expect(normalizeStoreDetailed({ models: {} }).report.unrecognized).toBe(false);
+
+    const { report } = normalizeStoreDetailed({
+      models: { 'a:b': 'not-an-object' },
+      customModels: [{ providerId: 'openai' }, 5],
+      customCategories: ['ok', '  '],
+    });
+    expect(report.dropped).toEqual({ models: 1, customModels: 2, customCategories: 1 });
   });
 
   it('dedupes custom models and categories', () => {
@@ -63,6 +82,20 @@ describe('validateParam', () => {
   it('rounds non-integers for integer specs', () => {
     expect(validateParam(maxTokens, 10.4)).toMatchObject({ ok: false, clamped: 10 });
     expect(validateParam(maxTokens, 100)).toEqual({ ok: true });
+  });
+
+  it('range-checks the rounded value so it cannot slip past max', () => {
+    const spec: ParamSpec = {
+      key: 'k',
+      label: 'K',
+      type: 'integer',
+      min: 0,
+      max: 8,
+      default: 1,
+      description: 'test-only integer spec',
+    };
+    // 8.9 rounds to 9, which exceeds max 8 → clamp to 8 (not the rounded 9).
+    expect(validateParam(spec, 8.9)).toMatchObject({ ok: false, clamped: 8 });
   });
 
   it('treats empty value as unset', () => {

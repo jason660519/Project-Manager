@@ -72,16 +72,58 @@ function normalizeParamValue(raw: unknown): ParamValue | undefined {
 }
 
 /**
- * Defensive read normalizer: tolerate any shape on disk, drop unknown/invalid
- * fields, and always return a structurally-valid config. Never throws.
+ * Outcome of a normalization pass — enough for an import flow to refuse a file
+ * from the future or warn about silently-skipped entries (zero silent failures).
  */
-export function normalizeStore(raw: unknown): AiSdksConfig {
+export interface NormalizeReport {
+  /** schemaVersion declared on the input, if any. */
+  incomingSchemaVersion?: number;
+  /** Input declared a schemaVersion newer than this build understands. */
+  futureSchema: boolean;
+  /** Input was not a recognizable ai-sdks config object. */
+  unrecognized: boolean;
+  /** Malformed entries dropped during normalization, by section. */
+  dropped: { models: number; customModels: number; customCategories: number };
+}
+
+/**
+ * Defensive read normalizer with a report: tolerate any shape on disk, drop
+ * unknown/invalid fields, and always return a structurally-valid config. Never
+ * throws. The report lets callers (e.g. import) surface what was rejected.
+ */
+export function normalizeStoreDetailed(raw: unknown): { store: AiSdksConfig; report: NormalizeReport } {
   const base = emptyAiSdksConfig();
-  if (!isPlainObject(raw)) return base;
+  const report: NormalizeReport = {
+    futureSchema: false,
+    unrecognized: false,
+    dropped: { models: 0, customModels: 0, customCategories: 0 },
+  };
+  if (!isPlainObject(raw)) {
+    report.unrecognized = true;
+    return { store: base, report };
+  }
+
+  if (typeof raw.schemaVersion === 'number') {
+    report.incomingSchemaVersion = raw.schemaVersion;
+    if (raw.schemaVersion > AI_SDKS_SCHEMA_VERSION) report.futureSchema = true;
+  }
+  // Nothing that looks like an ai-sdks config — caller should refuse rather than
+  // normalize to empty (which on "overwrite" would silently wipe live data).
+  if (
+    !isPlainObject(raw.models) &&
+    !Array.isArray(raw.customModels) &&
+    !Array.isArray(raw.customCategories) &&
+    typeof raw.schemaVersion !== 'number'
+  ) {
+    report.unrecognized = true;
+  }
 
   if (isPlainObject(raw.models)) {
     for (const [id, value] of Object.entries(raw.models)) {
-      if (!isPlainObject(value)) continue;
+      if (!isPlainObject(value)) {
+        report.dropped.models += 1;
+        continue;
+      }
       const override: AiSdksModelOverride = {};
       if (typeof value.modelType === 'string' && value.modelType.trim()) {
         override.modelType = value.modelType;
@@ -102,9 +144,15 @@ export function normalizeStore(raw: unknown): AiSdksConfig {
   if (Array.isArray(raw.customModels)) {
     const seen = new Set<string>();
     for (const item of raw.customModels) {
-      if (!isPlainObject(item)) continue;
+      if (!isPlainObject(item)) {
+        report.dropped.customModels += 1;
+        continue;
+      }
       const { providerId, model } = item;
-      if (typeof providerId !== 'string' || typeof model !== 'string' || !model.trim()) continue;
+      if (typeof providerId !== 'string' || typeof model !== 'string' || !model.trim()) {
+        report.dropped.customModels += 1;
+        continue;
+      }
       const id = typeof item.id === 'string' && item.id ? item.id : `${providerId}:${model}`;
       if (seen.has(id)) continue;
       seen.add(id);
@@ -117,13 +165,22 @@ export function normalizeStore(raw: unknown): AiSdksConfig {
   if (Array.isArray(raw.customCategories)) {
     const seen = new Set<string>();
     for (const c of raw.customCategories) {
-      if (typeof c !== 'string' || !c.trim() || seen.has(c)) continue;
+      if (typeof c !== 'string' || !c.trim()) {
+        report.dropped.customCategories += 1;
+        continue;
+      }
+      if (seen.has(c)) continue;
       seen.add(c);
       base.customCategories.push(c);
     }
   }
 
-  return base;
+  return { store: base, report };
+}
+
+/** Convenience wrapper: structurally-valid config, discarding the report. */
+export function normalizeStore(raw: unknown): AiSdksConfig {
+  return normalizeStoreDetailed(raw).store;
 }
 
 // ── Read / write ──────────────────────────────────────────────────────────────
@@ -223,15 +280,21 @@ export function validateParam(spec: ParamSpec, value: ParamValue): ParamValidati
     case 'integer': {
       const num = typeof value === 'number' ? value : Number(value);
       if (!Number.isFinite(num)) return { ok: false, message: 'Must be a number.' };
-      if (spec.type === 'integer' && !Number.isInteger(num)) {
-        return { ok: false, message: 'Must be a whole number.', clamped: Math.round(num) };
+      // Round non-integers first, then range-check the rounded value so a
+      // rounded result can't slip past min/max (e.g. 8.9 → 9 with max 8 → 8).
+      let coerced = num;
+      let roundMessage: string | undefined;
+      if (spec.type === 'integer' && !Number.isInteger(coerced)) {
+        coerced = Math.round(coerced);
+        roundMessage = 'Must be a whole number.';
       }
-      if (spec.min !== undefined && num < spec.min) {
+      if (spec.min !== undefined && coerced < spec.min) {
         return { ok: false, message: `Minimum is ${spec.min}.`, clamped: spec.min };
       }
-      if (spec.max !== undefined && num > spec.max) {
+      if (spec.max !== undefined && coerced > spec.max) {
         return { ok: false, message: `Maximum is ${spec.max}.`, clamped: spec.max };
       }
+      if (roundMessage) return { ok: false, message: roundMessage, clamped: coerced };
       return { ok: true };
     }
 
