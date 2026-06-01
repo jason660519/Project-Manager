@@ -129,3 +129,27 @@ full contract. New / changed:
   shrink + persist), sort (aria-sort=ascending + persisted), Reset view restores
   all defaults. 0 console errors.
 - `npm run verify:baseline`: PASS.
+
+## 2026-06-01 — Fix: missing horizontal scrollbar on wide sheet (Claude)
+
+Reported: the wide table cut columns off at the right with no visible horizontal
+scrollbar. Root cause was two layered defects:
+
+1. **Page-level overflow instead of pane scroll.** The sheet's panel was a
+   `flex-1` flex item without `min-w-0`, so it grew to the table's content width
+   (~1561px) rather than clamping to the viewport; the `overflow-hidden` ancestor
+   then merely *clipped* the extra columns and the inner `overflow-auto` never
+   triggered. Fix: `min-w-0 w-full` on the panel so the table pane (not the page)
+   owns the horizontal scroll. Verified: pane clientWidth 923 / scrollWidth 1561,
+   `document` no longer overflows.
+2. **Overlay scrollbar hidden by macOS/WKWebView.** Added a reusable `pm-scroll`
+   utility (`app/globals.css`) using `::-webkit-scrollbar` (and deliberately NOT
+   the standard `scrollbar-width`/`scrollbar-color`, which make Chrome/WebKit
+   ignore the webkit pseudo and fall back to an auto-hiding overlay). Result: a
+   persistent, space-reserving bar (`offsetHeight - clientHeight == 12`).
+
+Verified in headed Chrome: bar visible above the bottom tabs; scrolling fully
+right reveals Top P / Top K / Stop Sequences while the frozen ID column stays
+pinned. Recorded both rules in `docs/engineering/table-standards.md` (the company
+baseline didn't spell out always-visible scrollbars — §3.3 usability implies it).
+`npm run verify:baseline`: PASS.

@@ -87,6 +87,16 @@ Canonical labels for dashboard document columns:
   - header/toolbar/sheets use `shrink-0`
   - table pane is the only vertical scroll owner (`min-h-0 flex-1 overflow-auto`)
 - Do not mix `overflow-hidden` on the same DOM node that owns table scrolling (`overflow-x-auto` / `overflow-auto`).
+- Horizontally scrolling tables MUST show a **persistent, visible** scrollbar — add the
+  `pm-scroll` utility (in `app/globals.css`) to the scroll pane. macOS and the Tauri
+  WKWebView default to overlay scrollbars that auto-hide, making horizontal overflow
+  undiscoverable; `pm-scroll` defines `::-webkit-scrollbar` (and deliberately omits the
+  standard `scrollbar-width`/`scrollbar-color`, which would re-enable the overlay) to
+  force an always-visible, space-reserving bar.
+- A flex child that holds a wider-than-viewport table MUST set `min-w-0` (and `w-full`),
+  or it grows to the table's content width and the **page** overflows horizontally
+  instead of the table pane scrolling internally (an `overflow-hidden` ancestor then just
+  clips columns with no scrollbar). The table pane — never the page — owns horizontal scroll.
 
 ## Required Verification
 

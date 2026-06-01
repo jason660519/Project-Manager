@@ -90,6 +90,28 @@ textarea {
   background: rgba(253, 230, 138, 0.35);
 }
 
+/* ── Always-visible styled scrollbars for table / sheet scroll panes ───────── */
+/* macOS and the Tauri WKWebView default to overlay scrollbars that stay hidden
+   until the user actively scrolls, which makes a wide table's horizontal
+   overflow undiscoverable. Defining ::-webkit-scrollbar opts the element out of
+   overlay scrollbars, so .pm-scroll shows a persistent, grabbable bar — required
+   for the company "horizontally scrolling table" contract to be usable. */
+/* NB: deliberately NOT setting the standard `scrollbar-width`/`scrollbar-color`.
+   When those are present, Chrome/WebKit switch to standard rendering and ignore
+   ::-webkit-scrollbar, giving a non-reserving overlay bar that auto-hides — the
+   exact bug we're fixing. ::-webkit-scrollbar alone forces a persistent,
+   space-reserving classic bar. The app targets the Tauri WKWebView + Chrome. */
+.pm-scroll::-webkit-scrollbar { height: 12px; width: 12px; }
+.pm-scroll::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.03); }
+.pm-scroll::-webkit-scrollbar-thumb {
+  background: rgba(168, 162, 158, 0.4);
+  border-radius: 7px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+.pm-scroll::-webkit-scrollbar-thumb:hover { background: rgba(214, 211, 209, 0.6); }
+.pm-scroll::-webkit-scrollbar-corner { background: transparent; }
+
 /* ── FeatureDocPanel markdown prose ─────────────────────────────────────── */
 .pm-prose { color: rgb(214 211 209); font-size: 13px; line-height: 1.7; }
 .pm-prose h1 { font-size: 17px; font-weight: 700; color: rgb(245 245 244); margin: 0 0 12px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 6px; }

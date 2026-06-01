@@ -453,8 +453,11 @@ export function AiSdkProviderSheet({
   };
 
   return (
-    <div className="flex h-full min-h-0">
-      <div className="flex min-h-0 flex-1 flex-col border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72">
+    <div className="flex h-full min-h-0 w-full">
+      {/* min-w-0 lets this flex item clamp to the available width instead of
+          growing to the table's content width — so the table pane (not the page)
+          owns the horizontal scroll and the .pm-scroll bar becomes reachable. */}
+      <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72">
         {/* Toolbar: Search | Filters | Freeze | Hidden cols | Hidden rows | Density | Reset view | Dataset actions */}
         <div className="flex flex-wrap items-center gap-2 border-b border-stone-200/12 bg-white/[0.02] px-4 py-3">
           <div className="relative">
@@ -651,7 +654,7 @@ export function AiSdkProviderSheet({
         )}
 
         {/* Table */}
-        <div className="min-h-0 flex-1 overflow-auto">
+        <div className="pm-scroll min-h-0 flex-1 overflow-auto">
           <table className="border-collapse text-left" style={{ width: table.getTotalSize() }}>
             <thead className="sticky top-0 z-10 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
               {table.getHeaderGroups().map((headerGroup) => (
@@ -782,7 +785,7 @@ export function AiSdkProviderSheet({
               <X size={13} />
             </button>
           </div>
-          <div className="min-h-0 flex-1 overflow-auto p-3 text-xs">
+          <div className="pm-scroll min-h-0 flex-1 overflow-auto p-3 text-xs">
             {specs.map((spec) => {
               const value = effectiveParamValue(spec, store.models[selectedRow.id]);
               const result = validateParam(spec, value);
