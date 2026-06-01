@@ -4,19 +4,19 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-05-31T02:15:13.349Z",
+    "generatedAt": "2026-06-01T01:15:25.960Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
     "manifestAudience": "internal",
-    "totalDocuments": 84,
+    "totalDocuments": 85,
     "totalFolders": 13,
     "publicDocuments": 28,
-    "internalDocuments": 55,
+    "internalDocuments": 56,
     "restrictedDocuments": 1,
-    "publishableDocuments": 13,
-    "reviewRequiredDocuments": 47,
-    "warningCount": 106
+    "publishableDocuments": 12,
+    "reviewRequiredDocuments": 48,
+    "warningCount": 109
   },
   "folders": [
     {
@@ -26,7 +26,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "sourcePath": "docs",
       "label": "All Docs",
       "title": "Documentation",
-      "summary": "84 documentation files indexed from docs.",
+      "summary": "85 documentation files indexed from docs.",
       "parentSlug": null,
       "folderSlugs": [
         "architecture",
@@ -44,14 +44,14 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       ],
       "classificationCounts": {
         "public": 28,
-        "internal": 55,
+        "internal": 56,
         "restricted": 1
       },
-      "publishableCount": 13,
-      "reviewRequiredCount": 47,
+      "publishableCount": 12,
+      "reviewRequiredCount": 48,
       "visibilityCounts": {
         "public": 28,
-        "internal": 55,
+        "internal": 56,
         "restricted": 1
       },
       "warnings": [
@@ -278,8 +278,8 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "internal": 0,
         "restricted": 0
       },
-      "publishableCount": 12,
-      "reviewRequiredCount": 12,
+      "publishableCount": 11,
+      "reviewRequiredCount": 13,
       "visibilityCounts": {
         "public": 24,
         "internal": 0,
@@ -288,9 +288,9 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "warnings": [
         "Public candidate needs review before external publishing",
         "Mentions secrets, tokens, or credentials",
+        "Mentions execution or command policy",
         "Mentions local key storage",
         "Mentions environment files",
-        "Mentions execution or command policy",
         "Mentions roadmap, pricing, investor, or strategy material"
       ]
     },
@@ -329,8 +329,8 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "internal": 0,
         "restricted": 0
       },
-      "publishableCount": 6,
-      "reviewRequiredCount": 12,
+      "publishableCount": 5,
+      "reviewRequiredCount": 13,
       "visibilityCounts": {
         "public": 18,
         "internal": 0,
@@ -339,9 +339,9 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "warnings": [
         "Public candidate needs review before external publishing",
         "Mentions secrets, tokens, or credentials",
+        "Mentions execution or command policy",
         "Mentions local key storage",
         "Mentions environment files",
-        "Mentions execution or command policy",
         "Mentions roadmap, pricing, investor, or strategy material"
       ]
     },
@@ -450,7 +450,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "sourcePath": "docs/project-process",
       "label": "Project Process",
       "title": "Project Process",
-      "summary": "15 documentation files indexed from docs/project-process.",
+      "summary": "16 documentation files indexed from docs/project-process.",
       "parentSlug": "",
       "folderSlugs": [
         "project-process/commands"
@@ -469,14 +469,14 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       ],
       "classificationCounts": {
         "public": 0,
-        "internal": 15,
+        "internal": 16,
         "restricted": 0
       },
       "publishableCount": 0,
       "reviewRequiredCount": 9,
       "visibilityCounts": {
         "public": 0,
-        "internal": 15,
+        "internal": 16,
         "restricted": 0
       },
       "warnings": [
@@ -494,7 +494,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "sourcePath": "docs/project-process/commands",
       "label": "Commands",
       "title": "Commands",
-      "summary": "5 documentation files indexed from docs/project-process/commands.",
+      "summary": "6 documentation files indexed from docs/project-process/commands.",
       "parentSlug": "project-process",
       "folderSlugs": [],
       "docIds": [
@@ -502,18 +502,19 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "project-process/commands/debug-retro",
         "project-process/commands/feature-kickoff",
         "project-process/commands/feature-resume",
-        "project-process/commands/update-progress"
+        "project-process/commands/update-progress",
+        "project-process/commands/verify-before-complete"
       ],
       "classificationCounts": {
         "public": 0,
-        "internal": 5,
+        "internal": 6,
         "restricted": 0
       },
       "publishableCount": 0,
       "reviewRequiredCount": 1,
       "visibilityCounts": {
         "public": 0,
-        "internal": 5,
+        "internal": 6,
         "restricted": 0
       },
       "warnings": [
@@ -1749,10 +1750,10 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "folderSlug": "engineering",
       "folderPath": "docs/engineering",
       "title": "Verification Runbook",
-      "summary": "Run these before handing off meaningful changes: npm run guard:legacy-surfaces npm run docs:check npm run standards:check npm run typecheck npm run test cargo check --manifest-path src-ta...",
-      "content": "# Verification Runbook\n\n> Status: Active  \n> Last updated: 2026-05-26\n> Primary files: `package.json`, `scripts/docs-governance-check.sh`, `src-tauri/Cargo.toml`, `vitest.config.ts`\n\n---\n\n## English Version\n\n## 1. Standard Check Order\n\nRun these before handing off meaningful changes:\n\n```bash\nnpm run guard:legacy-surfaces\nnpm run docs:check\nnpm run standards:check\nnpm run typecheck\nnpm run test\ncargo check --manifest-path src-tauri/Cargo.toml\nnpm run build\n```\n\nUse narrower checks for small documentation-only changes, but `docs:check` and `standards:check` should still run.\n\n## 2. What Each Check Covers\n\n| Command | Covers | Notes |\n| --- | --- | --- |\n| `npm run guard:legacy-surfaces` | Retired Coding Editor entry, current `/xmux` route, draggable dashboard sheets | Also runs automatically before `npm run build`. |\n| `npm run docs:check` | Filename safety, repo-local docs layout, bilingual heading order | Required after docs edits. |\n| `npm run standards:check` | Company baseline standards | May report P2 advisory findings. |\n| `npm run typecheck` | Next typegen and TypeScript correctness | Required after TS or UI edits. |\n| `npm run test` | Vitest unit and component tests | Required after storage, UI state, parser, or helper changes. |\n| `cargo check --manifest-path src-tauri/Cargo.toml` | Rust command type checks | Required after Tauri bridge or dependency changes. |\n| `npm run build` | Static export build | Required before release or major UI changes. |\n\n## 3. Documentation-Only Minimum\n\nFor docs-only changes:\n\n```bash\nnpm run docs:check\nnpm run standards:check\n```\n\nIf docs include code snippets that refer to command names or schema fields, also run targeted searches against source files to confirm names are current.\n\n## 4. Release Readiness\n\nBefore a packaged desktop build:\n\n1. Run the full check order.\n2. Run `npm run branch:check`; confirm stale local branches are not the source of old UI behavior.\n3. Run `npm run tauri:build`; the release secret backend guard must pass and fail if `PM_DEV_PLAINTEXT_SECRETS=1`.\n4. Verify Browser mode still starts on port `43187`.\n5. Verify Tauri mode can read a local `.project-manager.json`.\n6. Verify secrets show configured state without rendering raw values.\n7. Verify live agent dispatch shows command, working directory, PID, logs, and exit state.\n8. Verify failed or blocked commands are not shown as successful.\n\n## 5. Current Advisory\n\n`standards:check` currently reports a P2 advisory for hard-coded color values outside docs, build, and icon folders. This is not a blocking P0 or P1 failure, but future UI cleanup should migrate repeated arbitrary colors into shared Tailwind tokens or documented design tokens.\n\n---\n\n## 中文版本\n\n## 1. Standard Check Order\n\n有實質變更時，交付前執行：\n\n```bash\nnpm run guard:legacy-surfaces\nnpm run docs:check\nnpm run standards:check\nnpm run typecheck\nnpm run test\ncargo check --manifest-path src-tauri/Cargo.toml\nnpm run build\n```\n\n小型 docs-only changes 可以跑較窄的檢查，但仍應執行 `docs:check` 與 `standards:check`。\n\n## 2. 各檢查涵蓋範圍\n\n| Command | Covers | 說明 |\n| --- | --- | --- |\n| `npm run guard:legacy-surfaces` | Retired Coding Editor entry、current `/xmux` route、draggable dashboard sheets | `npm run build` 前會自動執行。 |\n| `npm run docs:check` | Filename safety、repo-local docs layout、bilingual heading order | Docs edits 後必跑。 |\n| `npm run standards:check` | Company baseline standards | 可能回報 P2 advisory findings。 |\n| `npm run typecheck` | Next typegen 與 TypeScript correctness | TS 或 UI edits 後必跑。 |\n| `npm run test` | Vitest unit 與 component tests | Storage、UI state、parser、helper changes 後必跑。 |\n| `cargo check --manifest-path src-tauri/Cargo.toml` | Rust command type checks | Tauri bridge 或 dependency changes 後必跑。 |\n| `npm run build` | Static export build | Release 或 major UI changes 前必跑。 |\n\n## 3. Documentation-Only Minimum\n\nDocs-only changes：\n\n```bash\nnpm run docs:check\nnpm run standards:check\n```\n\n如果文件中的 code snippets 提到 command names 或 schema fields，也要針對 source files 做 targeted searches，確認名稱仍是最新。\n\n## 4. Release Readiness\n\nDesktop packaged build 前：\n\n1. 執行 full check order。\n2. 執行 `npm run branch:check`；確認 stale local branch 不是舊 UI 復活來源。\n3. 執行 `npm run tauri:build`；release secret backend guard 必須通過，若 `PM_DEV_PLAINTEXT_SECRETS=1` 必須失敗。\n4. 確認 Browser mode 仍在 port `43187` 啟動。\n5. 確認 Tauri mode 可讀本機 `.project-manager.json`。\n6. 確認 secrets 只顯示 configured state，不 render raw values。\n7. 確認 live agent dispatch 顯示 command、working directory、PID、logs、exit state。\n8. 確認 failed 或 blocked commands 不會被顯示為 successful。\n\n## 5. Current Advisory\n\n`standards:check` 目前會回報 hard-coded color values outside docs、build、icon folders 的 P2 advisory。這不是 P0 或 P1 blocking failure，但未來 UI cleanup 應把重複 arbitrary colors 收斂進 shared Tailwind tokens 或 documented design tokens。\n",
-      "contentHash": "812041ce0e7368fc",
-      "readingMinutes": 4,
+      "summary": "Run these before handing off meaningful changes: npm run verify:baseline `verify:baseline` runs: `typecheck`, `standards:check`, `docs:check`, static-export hygiene scan, full `npm test`,...",
+      "content": "# Verification Runbook\n\n> Status: Active  \n> Last updated: 2026-05-26\n> Primary files: `package.json`, `scripts/docs-governance-check.sh`, `src-tauri/Cargo.toml`, `vitest.config.ts`\n\n---\n\n## English Version\n\n## 1. Standard Check Order\n\nRun these before handing off meaningful changes:\n\n```bash\nnpm run verify:baseline\n```\n\n`verify:baseline` runs: `typecheck`, `standards:check`, `docs:check`, static-export hygiene scan, full `npm test`, `cargo check` (when available), and `npm run build`.\n\n**Equivalent manual steps** (when debugging one failure):\n\n```bash\nnpm run guard:legacy-surfaces\nnpm run docs:check\nnpm run standards:check\nnpm run verify:static-export\nnpm run typecheck\nnpm run test\ncargo check --manifest-path src-tauri/Cargo.toml\nnpm run build\n```\n\nUse narrower checks for small documentation-only changes, but `docs:check` and `standards:check` should still run.\n\n## 2. What Each Check Covers\n\n| Command | Covers | Notes |\n| --- | --- | --- |\n| `npm run guard:legacy-surfaces` | Retired Coding Editor entry, current `/xmux` route, draggable dashboard sheets | Also runs automatically before `npm run build`. |\n| `npm run docs:check` | Filename safety, repo-local docs layout, bilingual heading order | Required after docs edits. |\n| `npm run standards:check` | Company baseline standards | May report P2 advisory findings. |\n| `npm run typecheck` | Next typegen and TypeScript correctness | Required after TS or UI edits. |\n| `npm run test` | Vitest unit and component tests | Required after storage, UI state, parser, or helper changes. |\n| `cargo check --manifest-path src-tauri/Cargo.toml` | Rust command type checks | Required after Tauri bridge or dependency changes. |\n| `npm run build` | Static export build | Required before release or major UI changes. |\n| `npm run verify:baseline` | **Single AI-engineer gate** — all of the above plus hygiene scan | Required before claiming done, 100%, commit, or PR. |\n| `npm run verify:static-export` | Client-bundle / hydration anti-patterns only | Runs inside `verify:baseline`; use alone for quick UI diffs. |\n\n## 3. Documentation-Only Minimum\n\nFor docs-only changes:\n\n```bash\nnpm run docs:check\nnpm run standards:check\n```\n\nIf docs include code snippets that refer to command names or schema fields, also run targeted searches against source files to confirm names are current.\n\n## 4. Release Readiness\n\nBefore a packaged desktop build:\n\n1. Run the full check order.\n2. Run `npm run branch:check`; confirm stale local branches are not the source of old UI behavior.\n3. Run `npm run tauri:build`; the release secret backend guard must pass and fail if `PM_DEV_PLAINTEXT_SECRETS=1`.\n4. Verify Browser mode still starts on port `43187`.\n5. Verify Tauri mode can read a local `.project-manager.json`.\n6. Verify secrets show configured state without rendering raw values.\n7. Verify live agent dispatch shows command, working directory, PID, logs, and exit state.\n8. Verify failed or blocked commands are not shown as successful.\n\n## 5. Current Advisory\n\n`standards:check` currently reports a P2 advisory for hard-coded color values outside docs, build, and icon folders. This is not a blocking P0 or P1 failure, but future UI cleanup should migrate repeated arbitrary colors into shared Tailwind tokens or documented design tokens.\n\n## 6. AI Engineer Completion Contract\n\nAutomated tests alone are **not** sufficient for UI work. This section exists because partial verification (e.g. subset of tests without `npm run build`, or no browser open) has shipped broken static exports and hydration errors.\n\n### 6.1 Mandatory automated gate\n\n```bash\nnpm run verify:baseline\n```\n\nAll steps must exit 0 before:\n\n- saying \"verification passed\" or \"all green\"\n- setting Development sheet progress to **100%** or status `completed`\n- offering git commit or PR (user must still explicitly request commit/PR)\n\nSkill: `.claude/skills/verify-before-complete/SKILL.md`. Cursor rule: `.cursor/rules/verify-before-complete.mdc`.\n\n### 6.2 Static-export hygiene (inside baseline)\n\n`npm run verify:static-export` (`scripts/check-static-export-hygiene.mjs`) blocks:\n\n| Pattern | Failure mode |\n| --- | --- |\n| Node `fs` import in client-reachable modules | `npm run build` / client bundle error |\n| `useState(readStored…)` or `useState(() => localStorage…)` in `'use client'` files | React hydration mismatch |\n| Missing `*.server.ts` split for sidecar / disk I/O | Same as fs leak |\n\n**Fix:** constant SSR-safe initial state → `useEffect` hydrate → persist only after hydrated.\n\n### 6.3 Manual browser smoke (UI / routing / client state)\n\nAfter green `verify:baseline`:\n\n1. `npm run dev` (port **43187**) or `npm run tauri:dev` for shell/bridge changes.\n2. Open changed route(s) in **Chrome, Safari, or Tauri**.\n3. DevTools Console: no React hydration errors on happy path.\n4. Exercise one primary interaction on the changed surface.\n\n**Do not** use Cursor embedded browser as the only smoke test — it may inject `data-cursor-ref` and produce false hydration warnings.\n\n### 6.4 dev-log honesty\n\n`dev-log.md` must list commands **actually run** in the session, not a generic checklist copied from this doc.\n\n## 7. CI and Local Git Hooks\n\n### 7.1 GitHub Actions\n\nWorkflow: `.github/workflows/verify-baseline.yml`\n\nRuns on every **pull request** and **push to `main`**: `npm run verify:baseline` (typecheck, docs, hygiene, full tests, `cargo check`, static build). Company `standards:check` is skipped in CI (`VERIFY_SKIP_STANDARDS=1`) because the standards repo path is machine-local; run `npm run standards:check` locally before ship.\n\n### 7.2 Pre-commit hook (optional, recommended)\n\nInstall once per clone:\n\n```bash\nnpm run githooks:install\n```\n\nHooks live in `.githooks/pre-commit` and run **`npm run verify:static-export`** when staged files include `.ts` / `.tsx`. Fast guard against client `fs` leaks and hydration footguns.\n\nTo bypass in an emergency (discouraged): `git commit --no-verify` — document why in the PR.\n\n---\n\n## 中文版本\n\n## 1. Standard Check Order\n\n有實質變更時，交付前執行：\n\n```bash\nnpm run verify:baseline\n```\n\n`verify:baseline` 依序執行：`typecheck`、`standards:check`、`docs:check`、static-export hygiene scan、完整 `npm test`、`cargo check`（若可用）、`npm run build`。\n\n**等價手動步驟**（除錯單一步驟時）：\n\n```bash\nnpm run guard:legacy-surfaces\nnpm run docs:check\nnpm run standards:check\nnpm run verify:static-export\nnpm run typecheck\nnpm run test\ncargo check --manifest-path src-tauri/Cargo.toml\nnpm run build\n```\n\n小型 docs-only changes 可以跑較窄的檢查，但仍應執行 `docs:check` 與 `standards:check`。\n\n## 2. 各檢查涵蓋範圍\n\n| Command | Covers | 說明 |\n| --- | --- | --- |\n| `npm run guard:legacy-surfaces` | Retired Coding Editor entry、current `/xmux` route、draggable dashboard sheets | `npm run build` 前會自動執行。 |\n| `npm run docs:check` | Filename safety、repo-local docs layout、bilingual heading order | Docs edits 後必跑。 |\n| `npm run standards:check` | Company baseline standards | 可能回報 P2 advisory findings。 |\n| `npm run typecheck` | Next typegen 與 TypeScript correctness | TS 或 UI edits 後必跑。 |\n| `npm run test` | Vitest unit 與 component tests | Storage、UI state、parser、helper changes 後必跑。 |\n| `cargo check --manifest-path src-tauri/Cargo.toml` | Rust command type checks | Tauri bridge 或 dependency changes 後必跑。 |\n| `npm run build` | Static export build | Release 或 major UI changes 前必跑。 |\n| `npm run verify:baseline` | **AI 工程師單一關卡** — 上述全部加上 hygiene scan | 宣稱 done、100%、commit、PR 前必跑。 |\n| `npm run verify:static-export` | 僅 client-bundle / hydration 反模式 | 含於 `verify:baseline`；UI diff 可單獨快跑。 |\n\n## 3. Documentation-Only Minimum\n\nDocs-only changes：\n\n```bash\nnpm run docs:check\nnpm run standards:check\n```\n\n如果文件中的 code snippets 提到 command names 或 schema fields，也要針對 source files 做 targeted searches，確認名稱仍是最新。\n\n## 4. Release Readiness\n\nDesktop packaged build 前：\n\n1. 執行 full check order。\n2. 執行 `npm run branch:check`；確認 stale local branch 不是舊 UI 復活來源。\n3. 執行 `npm run tauri:build`；release secret backend guard 必須通過，若 `PM_DEV_PLAINTEXT_SECRETS=1` 必須失敗。\n4. 確認 Browser mode 仍在 port `43187` 啟動。\n5. 確認 Tauri mode 可讀本機 `.project-manager.json`。\n6. 確認 secrets 只顯示 configured state，不 render raw values。\n7. 確認 live agent dispatch 顯示 command、working directory、PID、logs、exit state。\n8. 確認 failed 或 blocked commands 不會被顯示為 successful。\n\n## 5. Current Advisory\n\n`standards:check` 目前會回報 hard-coded color values outside docs、build、icon folders 的 P2 advisory。這不是 P0 或 P1 blocking failure，但未來 UI cleanup 應把重複 arbitrary colors 收斂進 shared Tailwind tokens 或 documented design tokens。\n\n## 6. AI 工程師收尾合約\n\nAutomated tests **不足以**涵蓋 UI 工作。本節是因部分驗證（例如未跑 `npm run build`、或未實際開啟 app）曾交付壞掉的 static export 與 hydration error。\n\n### 6.1 強制自動化關卡\n\n```bash\nnpm run verify:baseline\n```\n\n以下行為前，所有步驟必須 exit 0：\n\n- 宣稱「verification passed」或「all green」\n- 將 Development sheet progress 設為 **100%** 或 status `completed`\n- 主動提供 git commit 或 PR（使用者仍須明確要求 commit/PR）\n\nSkill：`.claude/skills/verify-before-complete/SKILL.md`。Cursor rule：`.cursor/rules/verify-before-complete.mdc`。\n\n### 6.2 Static-export hygiene（含於 baseline）\n\n`npm run verify:static-export`（`scripts/check-static-export-hygiene.mjs`）阻擋：\n\n| 模式 | 失敗型態 |\n| --- | --- |\n| client 可達模組 import Node `fs` | `npm run build` / client bundle 錯誤 |\n| `'use client'` 內 `useState(readStored…)` 或 `useState(() => localStorage…)` | React hydration mismatch |\n| sidecar / 磁碟 I/O 未拆 `*.server.ts` | 同 fs leak |\n\n**修法：** SSR-safe 常數初始 state → `useEffect` hydrate → hydrated 後才 persist。\n\n### 6.3 手動 browser smoke（UI / routing / client state）\n\n`verify:baseline` 全綠後：\n\n1. `npm run dev`（port **43187**）或 shell/bridge 變更時 `npm run tauri:dev`。\n2. 在 **Chrome、Safari 或 Tauri** 開啟變更路由。\n3. DevTools Console：happy path 無 React hydration error。\n4. 在變更 surface 執行一個主要互動。\n\n**勿**僅以 Cursor embedded browser 當唯一 smoke test — 可能注入 `data-cursor-ref` 造成假 hydration 警告。\n\n### 6.4 dev-log 誠實紀錄\n\n`dev-log.md` 必須列出本 session **實際執行**的指令，不可只複製本文件 checklist。\n\n## 7. CI 與本機 Git Hooks\n\n### 7.1 GitHub Actions\n\nWorkflow：`.github/workflows/verify-baseline.yml`\n\n每個 **pull request** 與 **push 到 `main`** 執行 `npm run verify:baseline`（typecheck、docs、hygiene、完整 tests、`cargo check`、static build）。CI 略過 Company `standards:check`（`VERIFY_SKIP_STANDARDS=1`），因 standards repo 路徑在本機；ship 前請在本機跑 `npm run standards:check`。\n\n### 7.2 Pre-commit hook（選用，建議）\n\n每個 clone 安裝一次：\n\n```bash\nnpm run githooks:install\n```\n\nHook 位於 `.githooks/pre-commit`；當 staged 檔含 `.ts` / `.tsx` 時執行 **`npm run verify:static-export`**，快速擋 client `fs` leak 與 hydration 反模式。\n\n緊急略過（不建議）：`git commit --no-verify` — 請在 PR 說明原因。\n\n---\n\n---\n",
+      "contentHash": "0dc7fcb3e560f98c",
+      "readingMinutes": 7,
       "classification": "internal",
       "classificationSource": "policy",
       "classificationConfidence": 0.95,
@@ -1773,7 +1774,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "warnings": [
         "Mentions secrets, tokens, or credentials"
       ],
-      "updatedAt": "2026-05-25T23:47:13.000Z"
+      "updatedAt": "2026-06-01T01:15:25.960Z"
     },
     {
       "id": "file-naming-standards",
@@ -1850,17 +1851,17 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "folderPath": "docs/guides/features",
       "title": "AI Assistants Control Console",
       "summary": "The AI Assistants Control Console is Project Manager's mission control surface for assistant instances, engineer roles, workflow supervision, permissions, memory, jobs, and audit history....",
-      "content": "\n# AI Assistants Control Console\n\nThe AI Assistants Control Console is Project Manager's mission control surface for assistant instances, engineer roles, workflow supervision, permissions, memory, jobs, and audit history.\n\nThe floating AI Assistant and the standalone chat page are conversation surfaces. The Control Console is broader: it explains what the assistant is allowed to know, which AI Engineers it can dispatch, which skills and memories are available, and what happened during a workflow run.\n\n## Console areas\n\n| Area | What you inspect or control | Why it matters |\n|---|---|---|\n| Chat | Active conversation with the selected assistant. | Ask questions, draft workflow proposals, and inspect selected project context. |\n| Overview | Assistant identity, runtime health, active state, and recent jobs. | Confirms whether the assistant is idle, running, blocked, or degraded. |\n| AI Engineers | Role definitions used by dispatch and workflow nodes. | Controls role name, prompt, model, fallback chain, skills, working scope, and capabilities. |\n| Profiles | Assistant profile source and behavior defaults. | Separates general assistant personality from role-specific AI Engineer instructions. |\n| Skills / Memory | Context sources available to assistants and workers. | Shows whether context is global, project-scoped, role-scoped, or worker-scoped. |\n| Workflow Runs | Persisted DAG runs created by Dispatch. | Shows run status, node readiness, worker session scope, runtime profile, and artifacts. |\n| Dreaming / Jobs | Offline proposal generation and background work. | Produces proposals and artifacts without silently changing project config. |\n| Permissions | Tool, command, file, network, and memory-write approvals. | Blocks risky work before a worker starts. |\n| Audit | Who changed or accessed what, when, and why. | Makes workflow creation, retry, resume, cancellation, and memory reads reviewable. |\n\n## How it relates to other views\n\n```mermaid\nflowchart LR\n  console[\"AI Assistants Control Console\"] --> chat[\"Chat\"]\n  console --> engineers[\"AI Engineers\"]\n  console --> dispatch[\"Dispatch / Development\"]\n  console --> hub[\"Integrations Hub\"]\n  console --> sessions[\"Sessions\"]\n  console --> logs[\"Logs / Audit\"]\n  engineers --> worker[\"WorkerSpec\"]\n  hub --> worker\n  dispatch --> workflow[\"WorkflowRun\"]\n  workflow --> sessions\n  workflow --> logs\n```\n\nThe Console should answer these operator questions:\n\n- Which assistant or AI Engineer is about to act?\n- Which provider and model will it use?\n- Which tools, skills, memories, and files can it access?\n- Which workflow node is running or blocked?\n- Which session store and checkpoint will be used if it resumes?\n- Which artifacts were produced, and which logs prove the result?\n\n## Key terms\n\n| Term | Meaning |\n|---|---|\n| Assistant Instance | A user-facing assistant with chat state, profile, and permissions. |\n| AI Engineer | A reusable role definition that can be assigned to workflow nodes. |\n| Worker | One runtime instance created to run one workflow node. |\n| Profile Source | The assistant-level configuration that shapes general behavior. |\n| Skill Source | A project skill, MCP tool, plugin, command, or capability candidate that a worker may use. |\n| Memory Scope | The boundary that decides where durable context can be read or written. |\n| Dreaming Job | Background proposal generation that creates reviewable artifacts. |\n| Permission | A rule that allows, blocks, or requires confirmation for a risky action. |\n| Audit Event | A durable record of config, workflow, permission, memory, or runtime activity. |\n| Worker Run | One node execution with a selected role, model, runtime, tool bundle, and session scope. |\n\n## Operating workflow\n\n1. Open the Console and confirm the selected project and assistant.\n2. Review the AI Engineer role that will be used for the work.\n3. Confirm provider, model, fallback chain, skills, capabilities, and working scope.\n4. Review Skills / Memory to make sure the worker will not inherit unrelated context.\n5. Check Permissions for blocked tools, commands, file paths, and memory writes.\n6. Start or inspect a workflow proposal from Chat, Dreaming / Jobs, or Dispatch.\n7. Open Workflow Runs to inspect persisted run/node state from `.project-manager/workflow-runs/*.json`.\n8. Monitor active workers in Overview and read evidence in Sessions, Logs, and Audit.\n\n## Workflow Runs sheet\n\nThe Workflow Runs sheet is the first visible F35 control-plane surface. It reads the selected project's `.project-manager/workflow-runs/*.json` sidecars and summarizes:\n\n- total runs, active runs, ready nodes, completed runs, and blocked runs;\n- each run's workflow template, feature ID, status, node counts, and update time;\n- selected run detail with every node's role, status, dependencies, attempts, runtime provider, isolated session scope, and output artifacts.\n\nUse this sheet after Dispatch creates a DAG workflow run. It is currently a read surface; retry, resume, cancel, and live scheduler actions belong to the next runtime-adapter slices.\n\n## Memory isolation rules\n\nWorker memory must be explicit and scoped. A worker should not inherit another worker's hidden transcript just because both workers belong to the same workflow.\n\n| Scope | When to use it | Default access |\n|---|---|---|\n| Global assistant memory | Stable product preferences and general operator preferences. | Assistant chat only, not worker runs by default. |\n| Project memory | Project instructions, architecture notes, and standards. | Available when selected by workflow or role. |\n| Role memory | Durable role-specific behavior notes. | Available to workers using that AI Engineer role. |\n| Workflow-run memory | Shared run-level decisions approved by the Coordinator. | Available to declared downstream nodes. |\n| Worker session | Transcript and checkpoint for one node + agent. | Private to that worker unless explicitly shared. |\n\nFor multi-agent DAG workflows, the session key must include project, workflow, run, node, and agent identity. Downstream summarizers should consume declared artifacts by default, not private sibling transcripts.\n\n## Safety expectations\n\n- The Console may draft changes, but it should not silently mutate role definitions, memory, permissions, or workflow templates.\n- Secrets and API keys are referenced by configured provider state, never shown as raw values.\n- Missing provider, missing model, missing capability, blocked permission, and degraded runtime states must be visible.\n- Retrying or resuming a worker must show the exact checkpoint and session scope.\n- Audit should record workflow create, start, retry, resume, cancel, permission decision, memory read, and memory write events.\n\n## Current status\n\nThe current implementation already has chat, AI Engineers, provider/model selection, capability assignment, sessions, logs, F35 workflow DAG contracts, Dispatch DAG template selection, WorkflowRun sidecar persistence, and a Workflow Runs sheet for browsing persisted DAG state. The next product step is to add runtime adapters and live scheduler controls.\n\n## Related guides\n\n- [AI Assistant](chat.md)\n- [AI Engineers](engineers.md)\n- [Agent Workflows](agent-workflows.md)\n- [Integrations Hub](integrations-hub.md)\n",
-      "contentHash": "7445ccb7221d78e3",
-      "readingMinutes": 5,
+      "content": "\n# AI Assistants Control Console\n\nThe AI Assistants Control Console is Project Manager's mission control surface for assistant instances, engineer roles, workflow supervision, permissions, memory, jobs, and audit history.\n\nThe floating AI Assistant and the standalone chat page are conversation surfaces. The Control Console is broader: it explains what the assistant is allowed to know, which AI Engineers it can dispatch, which skills and memories are available, and what happened during a workflow run.\n\n## Console areas\n\n| Area | What you inspect or control | Why it matters |\n|---|---|---|\n| Chat | Active conversation with the selected assistant. | Ask questions, draft workflow proposals, and inspect selected project context. |\n| Overview | Assistant identity, runtime health, active state, terminal command boundaries, and recent jobs. | Confirms whether the assistant is idle, running, blocked, or degraded; shows whitelist/blacklist rules for shell execution. |\n| AI Engineers | Role definitions used by dispatch and workflow nodes. | Controls role name, prompt, model, fallback chain, skills, working scope, and capabilities. |\n| Profiles | Assistant profile source and behavior defaults. | Separates general assistant personality from role-specific AI Engineer instructions. |\n| Skills / Memory | Context sources available to assistants and workers. | Shows whether context is global, project-scoped, role-scoped, or worker-scoped. |\n| Workflow Runs | Persisted DAG runs created by Dispatch. | Shows run status, node readiness, worker session scope, runtime profile, and artifacts. |\n| Dreaming / Jobs | Offline proposal generation and background work. | Produces proposals and artifacts without silently changing project config. |\n| Permissions | Tool, command, file, network, and memory-write approvals. | Blocks risky work before a worker starts. |\n| Audit | Who changed or accessed what, when, and why. | Makes workflow creation, retry, resume, cancellation, and memory reads reviewable. |\n\n## How it relates to other views\n\n```mermaid\nflowchart LR\n  console[\"AI Assistants Control Console\"] --> chat[\"Chat\"]\n  console --> engineers[\"AI Engineers\"]\n  console --> dispatch[\"Dispatch / Development\"]\n  console --> hub[\"Integrations Hub\"]\n  console --> sessions[\"Sessions\"]\n  console --> logs[\"Logs / Audit\"]\n  engineers --> worker[\"WorkerSpec\"]\n  hub --> worker\n  dispatch --> workflow[\"WorkflowRun\"]\n  workflow --> sessions\n  workflow --> logs\n```\n\nThe Console should answer these operator questions:\n\n- Which assistant or AI Engineer is about to act?\n- Which provider and model will it use?\n- Which tools, skills, memories, and files can it access?\n- Which workflow node is running or blocked?\n- Which session store and checkpoint will be used if it resumes?\n- Which artifacts were produced, and which logs prove the result?\n\n## Key terms\n\n| Term | Meaning |\n|---|---|\n| Assistant Instance | A user-facing assistant with chat state, profile, and permissions. |\n| AI Engineer | A reusable role definition that can be assigned to workflow nodes. |\n| Worker | One runtime instance created to run one workflow node. |\n| Profile Source | The assistant-level configuration that shapes general behavior. |\n| Skill Source | A project skill, MCP tool, plugin, command, or capability candidate that a worker may use. |\n| Memory Scope | The boundary that decides where durable context can be read or written. |\n| Dreaming Job | Background proposal generation that creates reviewable artifacts. |\n| Permission | A rule that allows, blocks, or requires confirmation for a risky action. |\n| Terminal Operational Boundaries | Whitelist/blacklist policy that constrains which shell commands an assistant may execute in the user's system terminal. |\n| Audit Event | A durable record of config, workflow, permission, memory, or runtime activity. |\n| Worker Run | One node execution with a selected role, model, runtime, tool bundle, and session scope. |\n\n## Operating workflow\n\n1. Open the Console and confirm the selected project and assistant.\n2. Review the AI Engineer role that will be used for the work.\n3. Confirm provider, model, fallback chain, skills, capabilities, and working scope.\n4. Review Skills / Memory to make sure the worker will not inherit unrelated context.\n5. Check Permissions for blocked tools, commands, file paths, and memory writes.\n6. Start or inspect a workflow proposal from Chat, Dreaming / Jobs, or Dispatch.\n7. Open Workflow Runs to inspect persisted run/node state from `.project-manager/workflow-runs/*.json`.\n8. Monitor active workers in Overview and read evidence in Sessions, Logs, and Audit.\n\n## Workflow Runs sheet\n\nThe Workflow Runs sheet is the first visible F35 control-plane surface. It reads the selected project's `.project-manager/workflow-runs/*.json` sidecars and summarizes:\n\n- total runs, active runs, ready nodes, completed runs, and blocked runs;\n- each run's workflow template, feature ID, status, node counts, and update time;\n- selected run detail with every node's role, status, dependencies, attempts, runtime provider, isolated session scope, and output artifacts.\n\nUse this sheet after Dispatch creates a DAG workflow run. It is currently a read surface; retry, resume, cancel, and live scheduler actions belong to the next runtime-adapter slices.\n\n## Terminal Operational Boundaries (Overview)\n\nThe Overview sheet exposes **Terminal Operational Boundaries** — a default-deny whitelist/blacklist framework for AI assistant shell execution in the user's system terminal.\n\n| List | Purpose |\n|---|---|\n| Whitelist | Explicitly permitted safe commands (inspection, read-only git, package scripts, compile checks). |\n| Blacklist | Always-blocked high-risk patterns (recursive delete, privilege escalation, permission mutation, remote pipe-to-shell, credential reads). |\n\nEvaluation order: normalize input → match blacklist (wins) → match whitelist → apply policy mode. Unknown commands are blocked under default-deny.\n\nFull permission scopes (`profile:read`, `tool:run_command`, etc.) remain on the **Permissions** sheet; terminal boundaries focus only on command-pattern safety.\n\nWhen `tool:run_command` is **guarded**, chat shows **Approve & Run** on the tool card before execution proceeds. Blocked commands enqueue **Blocked Command Review Queue** items on Overview for whitelist/blacklist review.\n\n## Memory isolation rules\n\nWorker memory must be explicit and scoped. A worker should not inherit another worker's hidden transcript just because both workers belong to the same workflow.\n\n| Scope | When to use it | Default access |\n|---|---|---|\n| Global assistant memory | Stable product preferences and general operator preferences. | Assistant chat only, not worker runs by default. |\n| Project memory | Project instructions, architecture notes, and standards. | Available when selected by workflow or role. |\n| Role memory | Durable role-specific behavior notes. | Available to workers using that AI Engineer role. |\n| Workflow-run memory | Shared run-level decisions approved by the Coordinator. | Available to declared downstream nodes. |\n| Worker session | Transcript and checkpoint for one node + agent. | Private to that worker unless explicitly shared. |\n\nFor multi-agent DAG workflows, the session key must include project, workflow, run, node, and agent identity. Downstream summarizers should consume declared artifacts by default, not private sibling transcripts.\n\n## Safety expectations\n\n- The Console may draft changes, but it should not silently mutate role definitions, memory, permissions, or workflow templates.\n- Secrets and API keys are referenced by configured provider state, never shown as raw values.\n- Missing provider, missing model, missing capability, blocked permission, and degraded runtime states must be visible.\n- Retrying or resuming a worker must show the exact checkpoint and session scope.\n- Audit should record workflow create, start, retry, resume, cancel, permission decision, memory read, and memory write events.\n\n## Current status\n\nThe current implementation already has chat, AI Engineers, provider/model selection, capability assignment, sessions, logs, F35 workflow DAG contracts, Dispatch DAG template selection, WorkflowRun sidecar persistence, and a Workflow Runs sheet for browsing persisted DAG state. The next product step is to add runtime adapters and live scheduler controls.\n\n## Related guides\n\n- [AI Assistant](chat.md)\n- [AI Engineers](engineers.md)\n- [Agent Workflows](agent-workflows.md)\n- [Integrations Hub](integrations-hub.md)\n",
+      "contentHash": "df239b15fc6efe44",
+      "readingMinutes": 6,
       "classification": "public",
       "classificationSource": "frontmatter",
       "classificationConfidence": 0.95,
       "classificationReason": "User-facing AI Assistants Control Console guide with no private infrastructure details.",
       "matchedPolicyRule": "CLS-FRONTMATTER-OVERRIDE",
-      "publish": true,
-      "reviewStatus": "approved",
-      "needsReview": false,
+      "publish": false,
+      "reviewStatus": "review-required",
+      "needsReview": true,
       "visibility": "public",
       "audience": [
         "users",
@@ -1870,8 +1871,12 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "guides",
         "table"
       ],
-      "warnings": [],
-      "updatedAt": "2026-05-28T03:09:20.000Z"
+      "warnings": [
+        "Public candidate needs review before external publishing",
+        "Mentions secrets, tokens, or credentials",
+        "Mentions execution or command policy"
+      ],
+      "updatedAt": "2026-06-01T00:33:36.074Z"
     },
     {
       "id": "guides/features/channels",
@@ -3357,6 +3362,37 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       ],
       "warnings": [],
       "updatedAt": "2026-05-22T02:26:41.000Z"
+    },
+    {
+      "id": "project-process/commands/verify-before-complete",
+      "slug": "project-process/commands/verify-before-complete",
+      "route": "/documentation/project-process/commands/verify-before-complete",
+      "sourcePath": "docs/project-process/commands/verify-before-complete.md",
+      "folderSlug": "project-process/commands",
+      "folderPath": "docs/project-process/commands",
+      "title": "Verify Before Complete",
+      "summary": "Run this workflow when an AI engineer is about to mark work **done**, set feature progress to **100%**, or offer **commit/PR**. - `verify before complete` - `收尾驗證` - `可以 commit 了嗎` - `ver...",
+      "content": "# Verify Before Complete\n\n> Status: Active  \n> Last updated: 2026-06-01  \n> Primary command: `npm run verify:baseline`\n\nRun this workflow when an AI engineer is about to mark work **done**, set feature progress to **100%**, or offer **commit/PR**.\n\n## Trigger Phrases\n\n- `verify before complete`\n- `收尾驗證`\n- `可以 commit 了嗎`\n- `verification passed` (use this workflow to **prove** it, not to claim it)\n\n## Steps\n\n1. `npm run verify:baseline` — all green.\n2. UI/routing changes: manual smoke in Chrome/Safari/Tauri on port 43187 (see `docs/engineering/verification-runbook.md` §6.3).\n3. Update `dev-log.md` with commands **actually run**.\n4. Do **not** commit unless the user explicitly asks.\n\nFull skill: `.claude/skills/verify-before-complete/SKILL.md`\n",
+      "contentHash": "dbfde60770270139",
+      "readingMinutes": 1,
+      "classification": "internal",
+      "classificationSource": "policy",
+      "classificationConfidence": 0.96,
+      "classificationReason": "Project process, logs, archive, and feature-tracking docs are internal operating records.",
+      "matchedPolicyRule": "CLS-INTERNAL-PROCESS",
+      "publish": false,
+      "reviewStatus": "ai-classified",
+      "needsReview": false,
+      "visibility": "internal",
+      "audience": [
+        "team",
+        "operators"
+      ],
+      "tags": [
+        "project-process"
+      ],
+      "warnings": [],
+      "updatedAt": "2026-06-01T01:14:05.532Z"
     }
   ],
   "routes": [
@@ -3456,6 +3492,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
     "project-process/commands/debug-retro",
     "project-process/commands/feature-kickoff",
     "project-process/commands/feature-resume",
-    "project-process/commands/update-progress"
+    "project-process/commands/update-progress",
+    "project-process/commands/verify-before-complete"
   ]
 } satisfies DocumentationSiteManifest;

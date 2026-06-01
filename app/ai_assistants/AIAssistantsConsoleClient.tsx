@@ -35,8 +35,19 @@ import {
   updatePermission,
   updateProfileSource,
   updateSkill,
+  updateTerminalBoundaries,
+  updateTerminalBlockSuggestions,
 } from '../../lib/ai-assistants/repository';
+import { mergeBoundaryRules } from '../../lib/ai-assistants/terminalBoundaries';
+import { saveTerminalBoundariesSidecar } from '../../lib/ai-assistants/terminalBoundariesSidecar';
+import {
+  loadTerminalBlockSuggestions,
+  saveTerminalBlockSuggestions,
+  updateTerminalBlockSuggestionStatus,
+} from '../../lib/ai-assistants/terminalBlockSuggestions';
+import type { TerminalBlockSuggestion } from '../../lib/ai-assistants/types';
 import { validateAssistantInstance } from '../../lib/ai-assistants/validation';
+import { createDefaultConsoleState } from '../../lib/ai-assistants/defaults';
 import type {
   AIAssistantConfig,
   AIAssistantSheetId,
@@ -51,6 +62,8 @@ import type {
   DailyLogCategory,
   DailyLogSeverity,
   PermissionState,
+  TerminalCommandRule,
+  TerminalOperationalBoundaries,
 } from '../../lib/ai-assistants/types';
 import {
   listAgentWorkflowRuns,
@@ -164,16 +177,325 @@ const selectClass =
 
 const EMPTY_WORKFLOW_RUNS: AgentWorkflowRun[] = [];
 
+function TerminalCommandList({
+  title,
+  tone,
+  rules,
+  emptyLabel,
+}: {
+  title: string;
+  tone: 'whitelist' | 'blacklist';
+  rules: TerminalCommandRule[];
+  emptyLabel: string;
+}) {
+  const headerClass =
+    tone === 'whitelist'
+      ? 'border-emerald-300/20 bg-emerald-950/20 text-emerald-100'
+      : 'border-red-400/25 bg-red-950/20 text-red-100';
+
+  return (
+    <div className="flex min-h-0 flex-col overflow-hidden rounded border border-stone-200/10 bg-stone-950/40">
+      <div className={clsx('border-b px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.1em]', headerClass)}>
+        {title}
+      </div>
+      <div className="min-h-0 flex-1 divide-y divide-stone-200/10 overflow-y-auto">
+        {rules.length === 0 ? (
+          <p className="px-3 py-4 text-[11px] text-stone-500">{emptyLabel}</p>
+        ) : (
+          rules.map((rule) => (
+            <div key={rule.id} className="px-3 py-2.5">
+              <div className="flex items-start justify-between gap-2">
+                <span className="font-mono text-[11px] text-stone-200">{rule.pattern}</span>
+                <span className="shrink-0 rounded border border-stone-200/15 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.08em] text-stone-500">
+                  {rule.category}
+                </span>
+              </div>
+              <p className="mt-1 text-[10px] leading-relaxed text-stone-500">{rule.description}</p>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TerminalOperationalBoundariesPanel({
+  boundaries,
+  onSave,
+  projectRoot,
+  assistantId,
+}: {
+  boundaries: TerminalOperationalBoundaries;
+  onSave: (boundaries: TerminalOperationalBoundaries) => void;
+  projectRoot?: string;
+  assistantId: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [policyMode, setPolicyMode] = useState(boundaries.policyMode);
+  const [whitelistDraft, setWhitelistDraft] = useState(
+    boundaries.whitelist.map((rule) => rule.pattern).join('\n'),
+  );
+  const [blacklistDraft, setBlacklistDraft] = useState(
+    boundaries.blacklist.map((rule) => rule.pattern).join('\n'),
+  );
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setPolicyMode(boundaries.policyMode);
+    setWhitelistDraft(boundaries.whitelist.map((rule) => rule.pattern).join('\n'));
+    setBlacklistDraft(boundaries.blacklist.map((rule) => rule.pattern).join('\n'));
+  }, [boundaries]);
+
+  const handleSave = async () => {
+    setSaveError(null);
+    setSaving(true);
+    const whitelistPatterns = whitelistDraft.split('\n').map((line) => line.trim()).filter(Boolean);
+    const blacklistPatterns = blacklistDraft.split('\n').map((line) => line.trim()).filter(Boolean);
+    const next: TerminalOperationalBoundaries = {
+      policyMode,
+      whitelist: mergeBoundaryRules(boundaries.whitelist, whitelistPatterns, 'whitelist'),
+      blacklist: mergeBoundaryRules(boundaries.blacklist, blacklistPatterns, 'blacklist'),
+      updatedAt: new Date().toISOString(),
+    };
+    try {
+      if (projectRoot) {
+        await saveTerminalBoundariesSidecar(projectRoot, assistantId, next);
+      }
+      onSave(next);
+      setEditing(false);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Failed to save terminal boundaries');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="rounded border border-stone-200/15 bg-white/[0.03]">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-stone-200/10 px-4 py-3">
+        <div>
+          <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-stone-200">
+            Terminal Operational Boundaries
+          </h2>
+          <p className="mt-1 max-w-xl text-[11px] leading-relaxed text-stone-500">
+            Whitelist and blacklist rules that constrain AI assistant shell input in the user&apos;s system terminal.
+            Blacklist matches always win; unknown commands are blocked under default-deny policy.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone="guarded">{boundaries.policyMode}</Badge>
+          <span className="flex items-center gap-1 rounded border border-stone-200/15 px-2 py-1 text-[10px] text-stone-400">
+            <Terminal size={11} />
+            {boundaries.whitelist.length} allowed / {boundaries.blacklist.length} blocked
+          </span>
+          <button
+            type="button"
+            onClick={() => setEditing((prev) => !prev)}
+            className="rounded border border-stone-200/15 px-2 py-1 text-[10px] font-semibold text-stone-200 hover:border-amber-200/30"
+          >
+            {editing ? 'Cancel' : 'Edit'}
+          </button>
+        </div>
+      </div>
+
+      {editing ? (
+        <div className="space-y-3 p-4">
+          <Field label="Policy Mode" helper="default-deny blocks commands not on the whitelist.">
+            <select
+              className={selectClass}
+              value={policyMode}
+              onChange={(event) => setPolicyMode(event.target.value as TerminalOperationalBoundaries['policyMode'])}
+            >
+              <option value="default-deny">default-deny</option>
+              <option value="default-allow">default-allow</option>
+            </select>
+          </Field>
+          <div className="grid gap-3 lg:grid-cols-2">
+            <Field label="Whitelist Patterns" helper="One command pattern per line.">
+              <textarea
+                className={`${inputClass} min-h-[180px] font-mono text-[11px]`}
+                value={whitelistDraft}
+                onChange={(event) => setWhitelistDraft(event.target.value)}
+                spellCheck={false}
+              />
+            </Field>
+            <Field label="Blacklist Patterns" helper="One command pattern per line. Blacklist always wins.">
+              <textarea
+                className={`${inputClass} min-h-[180px] font-mono text-[11px]`}
+                value={blacklistDraft}
+                onChange={(event) => setBlacklistDraft(event.target.value)}
+                spellCheck={false}
+              />
+            </Field>
+          </div>
+          {saveError && (
+            <p className="rounded border border-red-400/20 bg-red-950/20 px-3 py-2 text-[11px] text-red-100">{saveError}</p>
+          )}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void handleSave()}
+              className="rounded border border-emerald-200/20 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-semibold text-emerald-100 disabled:opacity-40"
+            >
+              {saving ? 'Saving…' : 'Save Boundaries'}
+            </button>
+            {!projectRoot && !saveError && (
+              <span className="self-center text-[10px] text-amber-200/80">
+                Boundaries saved to console state only — select a project to persist sidecar JSON.
+              </span>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-3 p-4 lg:grid-cols-2">
+          <TerminalCommandList
+            title="Whitelist"
+            tone="whitelist"
+            rules={boundaries.whitelist}
+            emptyLabel="No whitelisted terminal commands configured."
+          />
+          <TerminalCommandList
+            title="Blacklist"
+            tone="blacklist"
+            rules={boundaries.blacklist}
+            emptyLabel="No blacklisted terminal commands configured."
+          />
+        </div>
+      )}
+
+      <div className="border-t border-stone-200/10 px-4 py-2.5 text-[10px] text-stone-500">
+        Evaluation order: normalize input → match blacklist → match whitelist → apply policy mode.
+        Last updated: {boundaries.updatedAt}
+        {projectRoot ? ` · Sidecar: ${projectRoot}/.project-manager/assistants/${assistantId}/terminal-boundaries.json` : ''}
+      </div>
+    </section>
+  );
+}
+
+function TerminalBlockSuggestionsPanel({
+  suggestions,
+  projectRoot,
+  assistantId,
+  onUpdateSuggestions,
+  onAddToBlacklist,
+  onAddToWhitelist,
+}: {
+  suggestions: TerminalBlockSuggestion[];
+  projectRoot?: string;
+  assistantId: string;
+  onUpdateSuggestions: (suggestions: TerminalBlockSuggestion[]) => void;
+  onAddToBlacklist: (suggestion: TerminalBlockSuggestion) => void;
+  onAddToWhitelist: (suggestion: TerminalBlockSuggestion) => void;
+}) {
+  const pending = suggestions.filter((item) => item.status === 'pending');
+  if (pending.length === 0) return null;
+
+  return (
+    <section className="rounded border border-amber-300/20 bg-amber-950/10">
+      <div className="border-b border-amber-300/15 px-4 py-3">
+        <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-amber-100">
+          Blocked Command Review Queue
+        </h2>
+        <p className="mt-1 text-[11px] text-stone-400">
+          Recent terminal blocks awaiting operator review. Accept adds the pattern to a boundary list.
+        </p>
+      </div>
+      <div className="divide-y divide-stone-200/10">
+        {pending.slice(0, 8).map((suggestion) => (
+          <div key={suggestion.id} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
+            <div className="min-w-0">
+              <p className="font-mono text-[11px] text-stone-200">{suggestion.normalizedCommand}</p>
+              <p className="mt-1 text-[10px] text-stone-500">
+                {suggestion.reason}
+                {suggestion.matchedRuleId ? ` · rule ${suggestion.matchedRuleId}` : ''}
+                {' · '}
+                {suggestion.createdAt}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => onAddToBlacklist(suggestion)}
+                className="rounded border border-red-400/25 bg-red-950/20 px-2 py-1 text-[10px] font-semibold text-red-100"
+              >
+                Add to Blacklist
+              </button>
+              <button
+                type="button"
+                onClick={() => onAddToWhitelist(suggestion)}
+                className="rounded border border-emerald-300/25 bg-emerald-950/20 px-2 py-1 text-[10px] font-semibold text-emerald-100"
+              >
+                Add to Whitelist
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = updateTerminalBlockSuggestionStatus(suggestions, suggestion.id, 'dismissed');
+                  onUpdateSuggestions(next);
+                  if (projectRoot) {
+                    void saveTerminalBlockSuggestions(projectRoot, assistantId, next);
+                  }
+                }}
+                className="rounded border border-stone-200/15 px-2 py-1 text-[10px] font-semibold text-stone-300"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function OverviewSheet({
   assistant,
   onSaveInstance,
+  onSaveTerminalBoundaries,
+  onUpdateBlockSuggestions,
+  projectRoot,
 }: {
   assistant: AIAssistantConfig;
   onSaveInstance: (instance: AssistantInstanceConfig) => void;
+  onSaveTerminalBoundaries: (boundaries: TerminalOperationalBoundaries) => void;
+  onUpdateBlockSuggestions: (suggestions: TerminalBlockSuggestion[]) => void;
+  projectRoot?: string;
 }) {
   const enabledSkills = assistant.skills.filter((skill) => skill.enabled).length;
   const warnings = assistant.dailyLogs.filter((log) => log.severity !== 'info').length;
   const blockedPermissions = assistant.permissions.filter((permission) => permission.state === 'blocked').length;
+
+  const addSuggestionToList = (
+    suggestion: TerminalBlockSuggestion,
+    listKind: 'whitelist' | 'blacklist',
+  ) => {
+    const pattern = suggestion.normalizedCommand;
+    const nextBoundaries: TerminalOperationalBoundaries = {
+      ...assistant.terminalBoundaries,
+      whitelist:
+        listKind === 'whitelist'
+          ? mergeBoundaryRules(assistant.terminalBoundaries.whitelist, [pattern], 'whitelist')
+          : assistant.terminalBoundaries.whitelist,
+      blacklist:
+        listKind === 'blacklist'
+          ? mergeBoundaryRules(assistant.terminalBoundaries.blacklist, [pattern], 'blacklist')
+          : assistant.terminalBoundaries.blacklist,
+      updatedAt: new Date().toISOString(),
+    };
+    const nextSuggestions = updateTerminalBlockSuggestionStatus(
+      assistant.terminalBlockSuggestions,
+      suggestion.id,
+      'accepted',
+    );
+    onSaveTerminalBoundaries(nextBoundaries);
+    onUpdateBlockSuggestions(nextSuggestions);
+    if (projectRoot) {
+      void saveTerminalBoundariesSidecar(projectRoot, assistant.id, nextBoundaries);
+      void saveTerminalBlockSuggestions(projectRoot, assistant.id, nextSuggestions);
+    }
+  };
 
   return (
     <div className="space-y-4 p-4">
@@ -185,20 +507,12 @@ function OverviewSheet({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <section className="rounded border border-stone-200/15 bg-white/[0.03]">
-          <div className="border-b border-stone-200/10 px-4 py-3">
-            <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-stone-200">Operational Boundaries</h2>
-          </div>
-          <div className="divide-y divide-stone-200/10 text-[12px]">
-            {assistant.permissions.slice(0, 5).map((permission) => (
-              <div key={permission.id} className="grid gap-2 px-4 py-3 md:grid-cols-[160px_1fr_100px]">
-                <span className="font-mono text-[11px] text-stone-300">{permission.scope}</span>
-                <span className="text-stone-400">{permission.description}</span>
-                <Badge tone={permission.state}>{permission.state}</Badge>
-              </div>
-            ))}
-          </div>
-        </section>
+        <TerminalOperationalBoundariesPanel
+          boundaries={assistant.terminalBoundaries}
+          projectRoot={projectRoot}
+          assistantId={assistant.id}
+          onSave={onSaveTerminalBoundaries}
+        />
 
         <section className="rounded border border-stone-200/15 bg-white/[0.03]">
           <div className="border-b border-stone-200/10 px-4 py-3">
@@ -211,6 +525,15 @@ function OverviewSheet({
           </div>
         </section>
       </div>
+
+      <TerminalBlockSuggestionsPanel
+        suggestions={assistant.terminalBlockSuggestions}
+        projectRoot={projectRoot}
+        assistantId={assistant.id}
+        onUpdateSuggestions={onUpdateBlockSuggestions}
+        onAddToBlacklist={(suggestion) => addSuggestionToList(suggestion, 'blacklist')}
+        onAddToWhitelist={(suggestion) => addSuggestionToList(suggestion, 'whitelist')}
+      />
 
       <div className="rounded border border-stone-200/15 bg-white/[0.02]">
         <InstanceSheet assistant={assistant} onSave={onSaveInstance} />
@@ -988,12 +1311,48 @@ export function AIAssistantsConsoleClient({
   initialWorkflowRuns,
 }: AIAssistantsConsoleClientProps) {
   const router = useRouter();
-  const [state, setState] = useState<AIAssistantsConsoleState>(() => loadAIAssistantsConsoleState());
+  const [state, setState] = useState<AIAssistantsConsoleState>(createDefaultConsoleState);
+  const [consoleHydrated, setConsoleHydrated] = useState(false);
   const selectedAssistant = state.assistants.find((assistant) => assistant.id === state.selectedAssistantId) ?? state.assistants[0];
 
   useEffect(() => {
+    setState(loadAIAssistantsConsoleState());
+    setConsoleHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!consoleHydrated) return;
     saveAIAssistantsConsoleState(state);
-  }, [state]);
+  }, [state, consoleHydrated]);
+
+  useEffect(() => {
+    if (!consoleHydrated || !projectRoot || !selectedAssistant) return;
+    const assistantId = selectedAssistant.id;
+    let cancelled = false;
+    Promise.all([
+      import('../../lib/ai-assistants/terminalBoundariesSidecar').then(({ loadTerminalBoundariesSidecar }) =>
+        loadTerminalBoundariesSidecar(projectRoot, assistantId),
+      ),
+      loadTerminalBlockSuggestions(projectRoot, assistantId),
+    ])
+      .then(([sidecar, blockSuggestions]) => {
+        if (cancelled) return;
+        setState((prev) =>
+          updateAssistant(prev, assistantId, (assistant) => ({
+            ...assistant,
+            terminalBoundaries: sidecar ?? assistant.terminalBoundaries,
+            terminalBlockSuggestions:
+              blockSuggestions.length > 0 ? blockSuggestions : assistant.terminalBlockSuggestions,
+          })),
+        );
+      })
+      .catch(() => {
+        // Sidecar load is optional; defaults remain in local console state.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [consoleHydrated, projectRoot, selectedAssistant?.id]);
 
   if (!selectedAssistant) return null;
 
@@ -1035,7 +1394,14 @@ export function AIAssistantsConsoleClient({
     content = (
       <OverviewSheet
         assistant={selectedAssistant}
+        projectRoot={projectRoot}
         onSaveInstance={(instance) => updateSelected((assistant) => updateAssistantInstance(assistant, instance))}
+        onSaveTerminalBoundaries={(boundaries) =>
+          updateSelected((assistant) => updateTerminalBoundaries(assistant, boundaries))
+        }
+        onUpdateBlockSuggestions={(suggestions) =>
+          updateSelected((assistant) => updateTerminalBlockSuggestions(assistant, suggestions))
+        }
       />
     );
   } else if (effectiveSheet === 'profile') {

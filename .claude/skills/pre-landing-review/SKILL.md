@@ -86,6 +86,13 @@ Apply these categories first. Each finding must cite `file:line` and propose a c
 - New file under `app/api/` referenced from a component (won't exist in built Tauri app) → **static-export miss**.
 - New feature added to `config.json`? → Verify `.project-manager/features/<ID>/README.md` exists.
 
+### 3H. Static Export, Client Bundle & Hydration
+- **`import … from 'fs'`** (or `node:fs`) in a `'use client'` file or any module imported by `app/ui/**`, `components/**`, `app/chat/**`, `app/ai_assistants/**` without a `*.server.ts` split → **build break / client bundle leak**. Move to `*.server.ts`, `app/api/*`, or Tauri bridge.
+- **`useState(readStored…)` or `useState(() => localStorage…)`** in `'use client'` files → **SSR hydration mismatch** (server HTML ≠ client first paint). Default constant state; hydrate in `useEffect` after mount.
+- New **`app/api/**/route.ts`** without `export const dynamic = 'force-static'` when `next build` fails on that route → add the export (see F41 terminal-boundaries routes).
+- Run **`npm run verify:static-export`** (or full **`npm run verify:baseline`**) before claiming the diff is landing-ready.
+- UI/routing changes without **manual browser smoke** (Chrome/Safari/Tauri, not Cursor embedded browser alone) → flag as **incomplete verification** even if tests pass.
+
 ### 3D. LLM Output Trust Boundary (applies to AI flows)
 - LLM-generated string written to `.project-manager.json` / file path / shell arg WITHOUT shape + content validation → **stored prompt injection / path traversal**.
 - LLM-generated URL passed to `fetch()` / Rust `reqwest` WITHOUT allowlist → **SSRF**.

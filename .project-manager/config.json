@@ -1256,6 +1256,44 @@
         ],
         "kickoffAt": "2026-05-30T02:24:16.102Z"
       }
+    },
+    {
+      "id": "F41",
+      "name": "Terminal Operational Boundaries",
+      "category": "Frontend/UI + Security",
+      "status": "completed",
+      "progress": 100,
+      "phase": "done",
+      "points": 8,
+      "locatedSection": "app/ai_assistants",
+      "readmePath": ".project-manager/features/F41/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F41/",
+        "spec": ".project-manager/features/F41/feature-spec.md",
+        "tdd": ".project-manager/features/F41/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F41/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F41/",
+        "implementation": "app/ai_assistants/AIAssistantsConsoleClient.tsx",
+        "test": "__tests__/ai-assistants.terminal-boundaries.test.ts"
+      },
+      "notes": "AI assistant shell whitelist/blacklist policy with Rust enforcement",
+      "createdAt": "2026-06-01T00:10:59.933Z",
+      "updatedAt": "2026-06-01T00:40:00.000Z",
+      "updatedBy": "Cursor Agent",
+      "metadata": {
+        "evidencePaths": [
+          "app/ai_assistants/AIAssistantsConsoleClient.tsx",
+          "lib/ai-assistants/terminalBoundaries.ts",
+          "lib/ai-assistants/terminalBoundariesSidecar.ts",
+          "lib/chat/toolExecutor.ts",
+          "src-tauri/src/terminal_boundaries.rs",
+          "__tests__/ai-assistants.terminal-boundaries.test.ts",
+          "__tests__/chat.toolExecutor.terminal.test.ts",
+          "__tests__/xmux.terminal-boundaries.test.ts",
+          ".project-manager/features/F41/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-01T00:10:59.933Z"
+      }
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",
@@ -1266,6 +1304,6 @@
     "root": "/Volumes/KLEVV-4T-1/Project-Manager"
   },
   "schemaVersion": 8,
-  "updatedAt": "2026-05-31T17:40:00.000+10:00",
-  "updatedBy": "Codex"
+  "updatedAt": "2026-06-01T00:10:59.933Z",
+  "updatedBy": "Cursor Agent"
 }

@@ -30,6 +30,18 @@ Project Manager-specific implementation rules live in:
 - `./docs/architecture/`
 - `./.claude/skills/table-and-sheet-layout/SKILL.md`
 - `./.agents/skills/table-and-sheet-layout/SKILL.md`
+- `./.claude/skills/verify-before-complete/SKILL.md`
+- `./.agents/skills/verify-before-complete/SKILL.md`
+
+## Completion gate (mandatory)
+
+Before claiming **done**, marking a feature **100%**, or offering **commit/PR**:
+
+```bash
+npm run verify:baseline
+```
+
+Follow `./.claude/skills/verify-before-complete/SKILL.md`. UI changes also require manual browser smoke in Chrome/Safari/Tauri (not Cursor embedded browser alone). See `./docs/engineering/verification-runbook.md` §6.
 
 If Project Manager must deviate from company standards, create an ADR under `docs/architecture/`.
 
@@ -53,6 +65,8 @@ When the user asks for `/debug-retro`, `debug-retro`, `沉澱本次debug經驗`,
 When the user asks for `/feature-kickoff`, `feature-kickoff`, `新增今天工作ID`, `先登記Development sheet`, `先建Feature Spec/TDD/Dev log`, or asks to create the feature checkpoint before implementation, follow `docs/project-process/commands/feature-kickoff.md` and use `npm run feature:kickoff -- ...` to create or update the Development sheet feature entry and canonical `.project-manager/features/<ID>/` artifacts before code changes.
 
 When the user asks for `/feature-resume Fxx`, `feature-resume`, `接續 Fxx`, `接續同事的 feature id`, or asks to continue an existing work ID, follow `docs/project-process/commands/feature-resume.md` and use `npm run feature:resume -- --id Fxx ...` to read the existing feature artifacts, append a continuation block to `dev-log.md`, and update Development sheet metadata before code changes.
+
+When the user asks to verify completion, wrap up with proof, or asks `可以 commit 了嗎` before shipping, follow `docs/project-process/commands/verify-before-complete.md` and the `verify-before-complete` skill — run `npm run verify:baseline` and manual browser smoke for UI work before claiming done or offering commit/PR.
 
 ## Context7
 

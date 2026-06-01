@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle2, ChevronDown, ChevronRight, Code2, FileSearch, FolderSearch, Loader2, Search, Settings2, Terminal, Wrench, XCircle } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronRight, Code2, FileSearch, FolderSearch, Loader2, Search, Settings2, ShieldAlert, Terminal, Wrench, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -13,7 +13,7 @@ export interface ToolCallDisplay {
   arguments: Record<string, unknown>;
   result?: string;
   error?: boolean;
-  status: 'running' | 'done' | 'error';
+  status: 'running' | 'done' | 'error' | 'pending_confirmation';
 }
 
 const TOOL_ICONS: Record<string, React.ComponentType<{ size: number; className?: string }>> = {
@@ -62,49 +62,64 @@ function formatArgs(name: string, args: Record<string, unknown>): string {
 
 interface ToolCallCardProps {
   call: ToolCallDisplay;
+  onConfirmGuarded?: (call: ToolCallDisplay) => void | Promise<void>;
+  onDenyGuarded?: (call: ToolCallDisplay) => void;
 }
 
-export function ToolCallCard({ call }: ToolCallCardProps) {
+export function ToolCallCard({ call, onConfirmGuarded, onDenyGuarded }: ToolCallCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const isRunning = call.status === 'running';
+  const isPending = call.status === 'pending_confirmation';
   const isError = call.status === 'error';
-  const isDone = call.status === 'done';
   const Icon = TOOL_ICONS[call.name] || Wrench;
   const label = TOOL_LABELS[call.name] || call.name;
+
+  const handleConfirm = async () => {
+    if (!onConfirmGuarded || confirming) return;
+    setConfirming(true);
+    try {
+      await onConfirmGuarded(call);
+    } finally {
+      setConfirming(false);
+    }
+  };
 
   return (
     <div
       className={[
         'group rounded border px-2.5 py-2 text-[11px] leading-relaxed transition-all',
         isRunning ? 'border-amber-200/20 bg-amber-950/20 animate-pulse' :
+        isPending ? 'border-amber-300/25 bg-amber-950/25' :
         isError ? 'border-red-400/20 bg-red-950/20' :
         'border-stone-200/15 bg-stone-950/60',
       ].join(' ')}
     >
-      {/* Header */}
       <button
         type="button"
         onClick={() => call.result && setExpanded(!expanded)}
         className="flex w-full items-center gap-2 text-left"
       >
-        {isRunning ? (
+        {isRunning || confirming ? (
           <Loader2 size={13} className="shrink-0 animate-spin text-amber-300/80" />
+        ) : isPending ? (
+          <ShieldAlert size={13} className="shrink-0 text-amber-300" />
         ) : isError ? (
           <XCircle size={13} className="shrink-0 text-red-400" />
         ) : (
           <CheckCircle2 size={13} className="shrink-0 text-emerald-400" />
         )}
-        
+
         <Icon size={13} className="shrink-0 text-stone-400" />
-        
+
         <span className="flex-1 truncate text-[10px] font-medium text-stone-300">
           {label}
         </span>
-        
-        <span className="text-[9px] text-stone-500 max-w-[200px] truncate">
+
+        <span className="max-w-[200px] truncate text-[9px] text-stone-500">
           {formatArgs(call.name, call.arguments)}
         </span>
-        
+
         {call.result && (
           <span className="shrink-0 text-stone-500">
             {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -112,8 +127,33 @@ export function ToolCallCard({ call }: ToolCallCardProps) {
         )}
       </button>
 
-      {/* Expanded result */}
-      {expanded && call.result && (
+      {isPending && (
+        <div className="mt-2 space-y-2">
+          {call.result && (
+            <p className="text-[10px] leading-relaxed text-amber-100/90">{call.result}</p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={confirming}
+              onClick={() => void handleConfirm()}
+              className="rounded border border-emerald-200/25 bg-emerald-500/10 px-2 py-1 text-[10px] font-semibold text-emerald-100 disabled:opacity-40"
+            >
+              {confirming ? 'Running…' : 'Approve & Run'}
+            </button>
+            <button
+              type="button"
+              disabled={confirming}
+              onClick={() => onDenyGuarded?.(call)}
+              className="rounded border border-stone-200/15 px-2 py-1 text-[10px] font-semibold text-stone-300"
+            >
+              Deny
+            </button>
+          </div>
+        </div>
+      )}
+
+      {expanded && call.result && !isPending && (
         <div className={[
           'mt-2 overflow-x-auto rounded border px-2 py-1.5 font-mono text-[10px]',
           isError ? 'border-red-400/15 bg-red-950/30 text-red-200/80' :
@@ -135,19 +175,24 @@ export function ToolCallCard({ call }: ToolCallCardProps) {
   );
 }
 
-// ── Group container ─────────────────────────────────────────────────────────
-
 interface ToolCallGroupProps {
   calls: ToolCallDisplay[];
+  onConfirmGuarded?: (call: ToolCallDisplay) => void | Promise<void>;
+  onDenyGuarded?: (call: ToolCallDisplay) => void;
 }
 
-export function ToolCallGroup({ calls }: ToolCallGroupProps) {
+export function ToolCallGroup({ calls, onConfirmGuarded, onDenyGuarded }: ToolCallGroupProps) {
   if (calls.length === 0) return null;
-  
+
   return (
     <div className="mr-4 space-y-1.5 mb-2">
       {calls.map((call) => (
-        <ToolCallCard key={call.id} call={call} />
+        <ToolCallCard
+          key={call.id}
+          call={call}
+          onConfirmGuarded={onConfirmGuarded}
+          onDenyGuarded={onDenyGuarded}
+        />
       ))}
     </div>
   );

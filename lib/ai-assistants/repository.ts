@@ -1,6 +1,7 @@
 'use client';
 
 import { createDefaultConsoleState } from './defaults';
+import { createDefaultTerminalBoundaries } from './terminalBoundaries';
 import type {
   AIAssistantConfig,
   AIAssistantsConsoleState,
@@ -9,9 +10,22 @@ import type {
   AssistantPermissionRule,
   AssistantProfileSource,
   AssistantSkillConfig,
+  TerminalOperationalBoundaries,
+  TerminalBlockSuggestion,
 } from './types';
 
 const STORAGE_KEY = 'projectManager:ai-assistants-console:v1';
+
+function hydrateAssistant(assistant: AIAssistantConfig): AIAssistantConfig {
+  let next = assistant;
+  if (!next.terminalBoundaries) {
+    next = { ...next, terminalBoundaries: createDefaultTerminalBoundaries() };
+  }
+  if (!next.terminalBlockSuggestions) {
+    next = { ...next, terminalBlockSuggestions: [] };
+  }
+  return next;
+}
 
 export function loadAIAssistantsConsoleState(): AIAssistantsConsoleState {
   if (typeof window === 'undefined') return createDefaultConsoleState();
@@ -20,7 +34,10 @@ export function loadAIAssistantsConsoleState(): AIAssistantsConsoleState {
     if (!raw) return createDefaultConsoleState();
     const parsed = JSON.parse(raw) as AIAssistantsConsoleState;
     if (!parsed.assistants?.length) return createDefaultConsoleState();
-    return parsed;
+    return {
+      ...parsed,
+      assistants: parsed.assistants.map(hydrateAssistant),
+    };
   } catch {
     return createDefaultConsoleState();
   }
@@ -145,4 +162,38 @@ export function updatePermission(
       outcome: permission.risk === 'high' ? 'requires-review' : 'recorded',
     },
   );
+}
+
+export function updateTerminalBoundaries(
+  assistant: AIAssistantConfig,
+  boundaries: TerminalOperationalBoundaries,
+): AIAssistantConfig {
+  return appendAuditEvent(
+    {
+      ...assistant,
+      terminalBoundaries: {
+        ...boundaries,
+        updatedAt: new Date().toISOString(),
+      },
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      actor: 'user',
+      action: 'Updated terminal operational boundaries',
+      target: assistant.id,
+      risk: 'high',
+      outcome: 'requires-review',
+    },
+  );
+}
+
+export function updateTerminalBlockSuggestions(
+  assistant: AIAssistantConfig,
+  suggestions: TerminalBlockSuggestion[],
+): AIAssistantConfig {
+  return {
+    ...assistant,
+    terminalBlockSuggestions: suggestions,
+    updatedAt: new Date().toISOString(),
+  };
 }

@@ -46,21 +46,27 @@ function applyThemeToDom(id: ThemeId) {
   document.documentElement.setAttribute('data-theme', id === 'emerald' ? '' : id);
 }
 
+function readStoredTheme(): ThemeId {
+  if (typeof window === 'undefined') return 'emerald';
+  const stored = window.localStorage.getItem(STORAGE_KEY) as ThemeId | null;
+  return stored && THEMES.some((item) => item.id === stored) ? stored : 'emerald';
+}
+
 export function useTheme() {
-  const [theme, setThemeState] = useState<ThemeId>(() => {
-    if (typeof window === 'undefined') return 'emerald';
-    return (window.localStorage.getItem(STORAGE_KEY) as ThemeId) ?? 'emerald';
-  });
+  const [theme, setThemeState] = useState<ThemeId>('emerald');
 
   useEffect(() => {
-    applyThemeToDom(theme);
-  }, [theme]);
+    const stored = readStoredTheme();
+    setThemeState(stored);
+    applyThemeToDom(stored);
+  }, []);
 
   const setTheme = (id: ThemeId) => {
     setThemeState(id);
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(STORAGE_KEY, id);
     }
+    applyThemeToDom(id);
   };
 
   return { theme, setTheme, themes: THEMES };

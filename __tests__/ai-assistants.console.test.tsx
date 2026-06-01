@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AIAssistantsConsoleClient } from '../app/ai_assistants/AIAssistantsConsoleClient';
@@ -38,7 +38,11 @@ describe('AIAssistantsConsoleClient', () => {
     expect(screen.getByText('AI Assistants Control Console')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Instance/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Permissions/i })).toBeInTheDocument();
-    expect(screen.getByText('Operational Boundaries')).toBeInTheDocument();
+    expect(screen.getByText('Terminal Operational Boundaries')).toBeInTheDocument();
+    expect(screen.getByText('Whitelist')).toBeInTheDocument();
+    expect(screen.getByText('Blacklist')).toBeInTheDocument();
+    expect(screen.getByText('git status --short')).toBeInTheDocument();
+    expect(screen.getByText('rm -rf *')).toBeInTheDocument();
   });
 
   it('validates instance URLs and shows production URL warnings', async () => {
@@ -77,6 +81,41 @@ describe('AIAssistantsConsoleClient', () => {
       'projectManager:ai-assistants-console:v1',
       expect.stringContaining('"scope":"tool:run_command"'),
     );
+  });
+
+  it('hydrates sidecar data after mount without React state warnings', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('terminal-boundaries')) {
+        return new Response(JSON.stringify({ error: 'not_found' }), { status: 404 });
+      }
+      if (url.includes('terminal-block-suggestions')) {
+        return new Response(JSON.stringify({ suggestions: [] }), { status: 200 });
+      }
+      return new Response('{}', { status: 404 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <AIAssistantsConsoleClient
+        activeSheet="overview"
+        projectRoot="/Users/Project-Manager"
+      />,
+    );
+
+    await screen.findByText('Terminal Operational Boundaries');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+
+    const reactStateWarnings = consoleError.mock.calls
+      .flat()
+      .filter((message) => typeof message === 'string')
+      .filter((message) => message.includes("hasn't mounted yet") || message.includes('side-effect in your render'));
+
+    expect(reactStateWarnings).toHaveLength(0);
+
+    consoleError.mockRestore();
+    vi.unstubAllGlobals();
   });
 
   it('renders persisted workflow runs and isolated node session scopes', () => {

@@ -1,0 +1,54 @@
+# Full verification baseline — required on pull requests and pushes to main.
+# Mirrors `npm run verify:baseline` (see scripts/verify-baseline.sh).
+#
+# Company AI App Standards are skipped in CI (VERIFY_SKIP_STANDARDS=1) because
+# the standards repo is a local checkout path on developer machines.
+
+name: Verify Baseline
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: verify-baseline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      VERIFY_SKIP_STANDARDS: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Install Tauri Linux dependencies (cargo check)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev
+
+      - name: verify:baseline
+        run: npm run verify:baseline

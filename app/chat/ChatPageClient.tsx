@@ -59,10 +59,13 @@ function saveSessions(sessions: StoredSession[]) {
 
 function CurrentSessionMessages({
   messages, loading, thinkingActive, thinkingText, toolCalls,
+  onConfirmGuarded, onDenyGuarded,
 }: {
   messages: ChatMessage[]; loading: boolean;
   thinkingActive: boolean; thinkingText: string;
   toolCalls: ToolCallDisplay[];
+  onConfirmGuarded?: (call: ToolCallDisplay) => void | Promise<void>;
+  onDenyGuarded?: (call: ToolCallDisplay) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showLoading, setShowLoading] = useState(false);
@@ -95,7 +98,11 @@ function CurrentSessionMessages({
       <ThinkingIndicator active={thinkingActive} text={thinkingText} />
       
       {/* Tool calls */}
-      <ToolCallGroup calls={toolCalls} />
+      <ToolCallGroup
+        calls={toolCalls}
+        onConfirmGuarded={onConfirmGuarded}
+        onDenyGuarded={onDenyGuarded}
+      />
       
       {showLoading && (
         <div className="mr-4 flex animate-pulse items-center gap-2 rounded border border-stone-200/15 bg-stone-950/60 px-2.5 py-2 text-[11px] text-stone-400">
@@ -201,6 +208,46 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
     });
   }, []);
 
+  const handleConfirmGuarded = useCallback(async (call: ToolCallDisplay) => {
+    const projectRoot = initialChatContext?.selectedProject?.config.project.root ?? '';
+    if (!projectRoot) return;
+    const { buildTerminalToolContext } = await import('../../lib/chat/chatAgent');
+    const { buildToolContextForExecution, executeConfirmedToolCall } = await import('../../lib/chat/executeConfirmedTool');
+    const { resolveToolCallStatusFromResult } = await import('../../lib/chat/toolCallDisplay');
+    const terminalCtx = buildTerminalToolContext(projectRoot);
+    setToolCalls((prev) =>
+      prev.map((tc) => (tc.id === call.id ? { ...tc, status: 'running' as const } : tc)),
+    );
+    const result = await executeConfirmedToolCall(
+      { id: call.id, name: call.name, arguments: call.arguments },
+      buildToolContextForExecution({
+        projectRoot,
+        assistantId: terminalCtx.assistantId,
+        terminalBoundaries: terminalCtx.terminalBoundaries,
+        runCommandPermission: 'guarded',
+      }),
+    );
+    const resolved = resolveToolCallStatusFromResult(result.content, result.error);
+    setToolCalls((prev) =>
+      prev.map((tc) => (tc.id === call.id ? { ...tc, ...resolved } : tc)),
+    );
+  }, [initialChatContext?.selectedProject?.config.project.root]);
+
+  const handleDenyGuarded = useCallback((call: ToolCallDisplay) => {
+    setToolCalls((prev) =>
+      prev.map((tc) =>
+        tc.id === call.id
+          ? {
+              ...tc,
+              status: 'error' as const,
+              error: true,
+              result: 'Guarded terminal execution denied by user.',
+            }
+          : tc,
+      ),
+    );
+  }, []);
+
   const handleSend = async (content: string, files?: { name: string; content: string; previewUrl?: string }[]) => {
     if (loading) return;
 
@@ -284,9 +331,12 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
         },
         onToolResult: (id: string, content: string, error?: boolean) => {
           setThinkingActive(false);
-          setToolCalls(prev => prev.map(tc =>
-            tc.id === id ? { ...tc, result: content, error, status: (error ? 'error' : 'done') as ToolCallDisplay['status'] } : tc
-          ));
+          void import('../../lib/chat/toolCallDisplay').then(({ resolveToolCallStatusFromResult }) => {
+            const resolved = resolveToolCallStatusFromResult(content, error);
+            setToolCalls(prev => prev.map(tc =>
+              tc.id === id ? { ...tc, ...resolved } : tc
+            ));
+          });
         },
       });
 
@@ -578,6 +628,8 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
             thinkingActive={thinkingActive}
             thinkingText={thinkingText}
             toolCalls={toolCalls}
+            onConfirmGuarded={handleConfirmGuarded}
+            onDenyGuarded={handleDenyGuarded}
           />
         )}
 

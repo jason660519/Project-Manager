@@ -55,7 +55,17 @@ git merge origin/main --no-edit
 
 ## Step 3: Verification gauntlet (all must be green)
 
-Run in parallel where dependencies allow:
+Run the single consolidated gate:
+
+```bash
+npm run verify:baseline
+```
+
+This executes: `typecheck`, `standards:check`, `docs:check`, static-export hygiene scan, full `npm test`, `cargo check` (when `cargo` is on PATH), and `npm run build`.
+
+**Any failure → STOP.** Paste the failing output. Do not commit a red baseline.
+
+**Equivalent manual run** (only if debugging one step):
 
 ```bash
 npm run typecheck
@@ -63,11 +73,6 @@ cargo check --manifest-path src-tauri/Cargo.toml
 npm test
 cargo test --manifest-path src-tauri/Cargo.toml
 npm run docs:check
-```
-
-Then a single sequential static-build smoke:
-
-```bash
 npm run build
 ```
 
@@ -108,7 +113,7 @@ Inspect staged + unstaged. If unstaged exist, batch into the commit (PM is singl
 Draft a commit message:
 - **Title (≤ 72 chars):** Conventional commit style — `feat(area): summary` / `fix(area): summary` / `refactor(area): summary` / `docs(area): summary`. `area` examples: `bridge`, `ingestion`, `ui`, `adapter`, `schema`, `rust`.
 - **Body:** Bullet the *why*, not the *what*. The diff shows the what. 2–6 bullets.
-- **Footer:** `Co-Authored-By: Codex Opus 4.7 (1M context) <noreply@anthropic.com>` (per Git Safety Protocol).
+- **Footer:** `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>` (per Git Safety Protocol).
 
 Show the proposed message via AskUserQuestion:
 - A) Commit as written
@@ -123,7 +128,7 @@ git commit -m "$(cat <<'EOF'
 
 <body>
 
-Co-Authored-By: Codex Opus 4.7 (1M context) <noreply@anthropic.com>
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
 )"
 ```
@@ -179,7 +184,7 @@ PR body:
 - [ ] <manual UI verification step in tauri:dev>
 - [ ] <…>
 
-🤖 Generated with [Codex](https://Codex.com/Codex)
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
 ```
 
 Use `gh pr create --title "..." --body "$(cat <<'EOF' ... EOF)"`.

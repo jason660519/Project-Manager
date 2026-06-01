@@ -17,7 +17,7 @@ The floating AI Assistant and the standalone chat page are conversation surfaces
 | Area | What you inspect or control | Why it matters |
 |---|---|---|
 | Chat | Active conversation with the selected assistant. | Ask questions, draft workflow proposals, and inspect selected project context. |
-| Overview | Assistant identity, runtime health, active state, and recent jobs. | Confirms whether the assistant is idle, running, blocked, or degraded. |
+| Overview | Assistant identity, runtime health, active state, terminal command boundaries, and recent jobs. | Confirms whether the assistant is idle, running, blocked, or degraded; shows whitelist/blacklist rules for shell execution. |
 | AI Engineers | Role definitions used by dispatch and workflow nodes. | Controls role name, prompt, model, fallback chain, skills, working scope, and capabilities. |
 | Profiles | Assistant profile source and behavior defaults. | Separates general assistant personality from role-specific AI Engineer instructions. |
 | Skills / Memory | Context sources available to assistants and workers. | Shows whether context is global, project-scoped, role-scoped, or worker-scoped. |
@@ -64,6 +64,7 @@ The Console should answer these operator questions:
 | Memory Scope | The boundary that decides where durable context can be read or written. |
 | Dreaming Job | Background proposal generation that creates reviewable artifacts. |
 | Permission | A rule that allows, blocks, or requires confirmation for a risky action. |
+| Terminal Operational Boundaries | Whitelist/blacklist policy that constrains which shell commands an assistant may execute in the user's system terminal. |
 | Audit Event | A durable record of config, workflow, permission, memory, or runtime activity. |
 | Worker Run | One node execution with a selected role, model, runtime, tool bundle, and session scope. |
 
@@ -87,6 +88,21 @@ The Workflow Runs sheet is the first visible F35 control-plane surface. It reads
 - selected run detail with every node's role, status, dependencies, attempts, runtime provider, isolated session scope, and output artifacts.
 
 Use this sheet after Dispatch creates a DAG workflow run. It is currently a read surface; retry, resume, cancel, and live scheduler actions belong to the next runtime-adapter slices.
+
+## Terminal Operational Boundaries (Overview)
+
+The Overview sheet exposes **Terminal Operational Boundaries** — a default-deny whitelist/blacklist framework for AI assistant shell execution in the user's system terminal.
+
+| List | Purpose |
+|---|---|
+| Whitelist | Explicitly permitted safe commands (inspection, read-only git, package scripts, compile checks). |
+| Blacklist | Always-blocked high-risk patterns (recursive delete, privilege escalation, permission mutation, remote pipe-to-shell, credential reads). |
+
+Evaluation order: normalize input → match blacklist (wins) → match whitelist → apply policy mode. Unknown commands are blocked under default-deny.
+
+Full permission scopes (`profile:read`, `tool:run_command`, etc.) remain on the **Permissions** sheet; terminal boundaries focus only on command-pattern safety.
+
+When `tool:run_command` is **guarded**, chat shows **Approve & Run** on the tool card before execution proceeds. Blocked commands enqueue **Blocked Command Review Queue** items on Overview for whitelist/blacklist review.
 
 ## Memory isolation rules
 

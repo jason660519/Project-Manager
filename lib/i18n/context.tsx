@@ -34,7 +34,12 @@ interface I18nContextValue {
 const I18nContext = createContext<I18nContextValue | null>(null);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(readStoredLocale);
+  // SSR + first client paint must match (always 'en'). Hydrate from localStorage after mount.
+  const [locale, setLocaleState] = useState<Locale>('en');
+
+  useEffect(() => {
+    setLocaleState(readStoredLocale());
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute('lang', locale);

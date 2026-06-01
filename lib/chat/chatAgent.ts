@@ -12,6 +12,9 @@ import {
 import { loadProviderKey } from '../keys/loadProviderKey';
 import type { LlmProviderId } from '../keys/llmProviders';
 import type { Feature } from '../types';
+import { loadAIAssistantsConsoleState } from '../ai-assistants/repository';
+import type { PermissionState, TerminalOperationalBoundaries } from '../ai-assistants/types';
+import { createDefaultTerminalBoundaries } from '../ai-assistants/terminalBoundaries';
 import type { ChatContext, ChatMessage, SendChatMessageRequest, SendChatMessageResult } from './types';
 
 const ROUTES: Record<string, string> = {
@@ -827,6 +830,23 @@ interface AgentStreamResult {
   toolCalls: Array<{ id: string; name: string; arguments: Record<string, unknown>; result?: string; error?: boolean }>;
 }
 
+export function buildTerminalToolContext(projectRoot: string): {
+  assistantId: string;
+  terminalBoundaries: TerminalOperationalBoundaries;
+  runCommandPermission: PermissionState;
+} {
+  const state = typeof window !== 'undefined' ? loadAIAssistantsConsoleState() : null;
+  const assistant =
+    state?.assistants.find((item) => item.id === state.selectedAssistantId) ?? state?.assistants[0];
+  const assistantId = assistant?.id ?? 'pm-assistant';
+  const runCommandPermission =
+    assistant?.permissions.find((permission) => permission.scope === 'tool:run_command')?.state ??
+    'blocked';
+  const terminalBoundaries =
+    assistant?.terminalBoundaries ?? createDefaultTerminalBoundaries();
+  return { assistantId, terminalBoundaries, runCommandPermission };
+}
+
 /**
  * Call the AI Agent API with tool support.
  * Streams thinking, tool calls, and text responses.
@@ -849,8 +869,12 @@ async function callAgentApi(
 
   // Build tool context
   const project = context.selectedProject;
+  const terminalCtx = buildTerminalToolContext(project?.config.project.root ?? '');
   const toolContext = {
     projectRoot: project?.config.project.root ?? '',
+    assistantId: terminalCtx.assistantId,
+    terminalBoundaries: terminalCtx.terminalBoundaries,
+    runCommandPermission: terminalCtx.runCommandPermission,
     features: (context.features ?? project?.config.features ?? []).map(f => ({
       id: f.id, name: f.name, status: f.status, progress: f.progress,
       category: f.category, phase: f.phase, points: f.points,

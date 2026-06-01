@@ -3,7 +3,9 @@
 import { Bot, ChevronDown, ExternalLink, MessageSquareText, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { sendChatMessage } from '../../lib/chat/chatAgent';
+import { sendChatMessage, buildTerminalToolContext } from '../../lib/chat/chatAgent';
+import { buildToolContextForExecution, executeConfirmedToolCall } from '../../lib/chat/executeConfirmedTool';
+import { resolveToolCallStatusFromResult } from '../../lib/chat/toolCallDisplay';
 import type { ChatContext, ChatMessage } from '../../lib/chat/types';
 import { useI18n } from '../../lib/i18n';
 import { ChatInput, type AttachedFile, type ChatInputApi } from './ChatInput';
@@ -100,6 +102,43 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen, docked
     return () => window.removeEventListener('pm:xmux-selected-element', handleSelectedElement);
   }, [docked]);
 
+  const handleConfirmGuarded = useCallback(async (call: ToolCallDisplay) => {
+    const projectRoot = context.selectedProject?.config.project.root ?? '';
+    if (!projectRoot) return;
+    const terminalCtx = buildTerminalToolContext(projectRoot);
+    setToolCalls((prev) =>
+      prev.map((tc) => (tc.id === call.id ? { ...tc, status: 'running' as const } : tc)),
+    );
+    const result = await executeConfirmedToolCall(
+      { id: call.id, name: call.name, arguments: call.arguments },
+      buildToolContextForExecution({
+        projectRoot,
+        assistantId: terminalCtx.assistantId,
+        terminalBoundaries: terminalCtx.terminalBoundaries,
+        runCommandPermission: 'guarded',
+      }),
+    );
+    const resolved = resolveToolCallStatusFromResult(result.content, result.error);
+    setToolCalls((prev) =>
+      prev.map((tc) => (tc.id === call.id ? { ...tc, ...resolved } : tc)),
+    );
+  }, [context.selectedProject?.config.project.root]);
+
+  const handleDenyGuarded = useCallback((call: ToolCallDisplay) => {
+    setToolCalls((prev) =>
+      prev.map((tc) =>
+        tc.id === call.id
+          ? {
+              ...tc,
+              status: 'error' as const,
+              error: true,
+              result: 'Guarded terminal execution denied by user.',
+            }
+          : tc,
+      ),
+    );
+  }, []);
+
   const handleStreamSend = useCallback(async (content: string, files?: AttachedFile[]) => {
     if (loading) return;
 
@@ -160,8 +199,9 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen, docked
         },
         onToolResult: (id: string, content: string, error?: boolean) => {
           setThinkingActive(false);
+          const resolved = resolveToolCallStatusFromResult(content, error);
           setToolCalls(prev => prev.map(tc =>
-            tc.id === id ? { ...tc, result: content, error, status: (error ? 'error' : 'done') as ToolCallDisplay['status'] } : tc
+            tc.id === id ? { ...tc, ...resolved } : tc
           ));
         },
       });
@@ -274,7 +314,11 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen, docked
             
             {/* Thinking & Tools */}
             <ThinkingIndicator active={thinkingActive} text={thinkingText} />
-            <ToolCallGroup calls={toolCalls} />
+            <ToolCallGroup
+              calls={toolCalls}
+              onConfirmGuarded={handleConfirmGuarded}
+              onDenyGuarded={handleDenyGuarded}
+            />
           </div>
         )}
 

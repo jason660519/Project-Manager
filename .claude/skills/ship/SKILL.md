@@ -55,7 +55,17 @@ git merge origin/main --no-edit
 
 ## Step 3: Verification gauntlet (all must be green)
 
-Run in parallel where dependencies allow:
+Run the single consolidated gate:
+
+```bash
+npm run verify:baseline
+```
+
+This executes: `typecheck`, `standards:check`, `docs:check`, static-export hygiene scan, full `npm test`, `cargo check` (when `cargo` is on PATH), and `npm run build`.
+
+**Any failure → STOP.** Paste the failing output. Do not commit a red baseline.
+
+**Equivalent manual run** (only if debugging one step):
 
 ```bash
 npm run typecheck
@@ -63,11 +73,6 @@ cargo check --manifest-path src-tauri/Cargo.toml
 npm test
 cargo test --manifest-path src-tauri/Cargo.toml
 npm run docs:check
-```
-
-Then a single sequential static-build smoke:
-
-```bash
 npm run build
 ```
 

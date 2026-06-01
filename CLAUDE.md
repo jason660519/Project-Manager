@@ -51,7 +51,8 @@ Source (Word/Excel/MD/Folder)
 npm run dev          # Next.js only on :43187
 npm run tauri:dev    # Full desktop app
 npm run typecheck    # next typegen + tsc --noEmit
-npm run build        # Static export to out/
+npm run verify:baseline  # FULL gate: typecheck + standards + docs + hygiene + test + cargo + build
+npm run build        # Static export to out/ (also inside verify:baseline)
 npm run docs:check   # Bilingual doc governance check
 cargo check  --manifest-path src-tauri/Cargo.toml
 ```
@@ -69,6 +70,7 @@ cargo check  --manifest-path src-tauri/Cargo.toml
 | Debug bug / regression / IPC failure | `investigate` | Stack trace / "it was working" |
 | Any table, sheet, or tab-panel view | `table-and-sheet-layout` | New/modified view |
 | Final diff audit | `pre-landing-review` | Before git push |
+| **Mark done / wrap up / UI complete** | **`verify-before-complete`** | **Before 100%, commit, PR, or "verification passed"** |
 | Ship (verify → commit → push → PR) | `ship` | "ship it / land this" |
 | Save session state | `context-save` | "save context / checkpoint" |
 | Resume from checkpoint | `context-restore` | "resume / where was I" |
@@ -79,4 +81,5 @@ cargo check  --manifest-path src-tauri/Cargo.toml
 - **Zero silent failures.** Bare `catch (e) {}` / `.unwrap()` on user-facing paths is a defect.
 - **Bridge discipline.** Every Tauri command needs a typed wrapper in `lib/bridge/index.ts` AND a capability entry in `src-tauri/capabilities/default.json`.
 - **ADR adherence.** Surface contradictions with closed ADRs loudly (002 = schemaVersion, 003 = prompt in TS, 004 = key in Rust).
-- **Verification baseline.** `npm run typecheck` + `cargo check` + tests + `npm run docs:check` + `npm run build` — all green before ship.
+- **Verification baseline.** Run **`npm run verify:baseline`** (single gate) before claiming done or shipping. Partial runs do not count — see `verify-before-complete` skill.
+- **No false completion.** Never mark a feature 100%, say "verification passed", or offer commit/PR without green `verify:baseline` and (for UI) manual browser smoke in Chrome/Safari/Tauri.

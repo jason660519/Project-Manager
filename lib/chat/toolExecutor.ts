@@ -3,9 +3,23 @@
  * Executes tool calls from the AI assistant within the project context.
  * All tool execution is sandboxed to the project root.
  */
-import { execSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 import { existsSync, readFileSync, statSync } from 'fs';
 import { resolve } from 'path';
+import type { PermissionState, TerminalOperationalBoundaries } from '../ai-assistants/types';
+import {
+  evaluateTerminalCommandDetailed,
+  normalizeTerminalCommand,
+  parseAllowedCommandForExec,
+} from '../ai-assistants/terminalBoundaries';
+import { validateNpmRunScript } from '../ai-assistants/terminalBoundaries.server';
+import { resolveTerminalBoundaries } from '../ai-assistants/terminalBoundariesSidecar.server';
+import { appendTerminalBlockSuggestionSync } from '../ai-assistants/terminalBlockSuggestions.server';
+import { createTerminalBlockSuggestion } from '../ai-assistants/terminalBlockSuggestions';
+import {
+  formatGuardedConfirmationMessage,
+  formatTerminalBlockedMessage,
+} from './toolExecutionCodes';
 import type { ToolCall, ToolResult } from './tools';
 
 // ── Configuration ───────────────────────────────────────────────────────────
@@ -19,16 +33,15 @@ const ALLOWED_EXTENSIONS = [
   '.xml', '.svg', '.graphql', '.prisma', '.sql',
 ];
 
-// Commands that are always blocked for safety
-const BLOCKED_COMMANDS = [
-  /rm\s+-rf/, /sudo/, />\s*\/dev\//, /mkfs/, /dd\s+if=/,
-  /:\(\)\s*\{/, /chmod\s+777/, /curl.*\|\s*(ba)?sh/,
-];
-
 // ── Project Context ─────────────────────────────────────────────────────────
 
 export interface ToolContext {
   projectRoot: string;
+  assistantId?: string;
+  terminalBoundaries?: TerminalOperationalBoundaries;
+  runCommandPermission?: PermissionState;
+  /** Tool call IDs the user explicitly approved for guarded execution in this session. */
+  confirmedToolCallIds?: string[];
   features?: Array<{
     id: string; name: string; status: string; progress: number;
     category?: string; phase?: string; points?: number;
@@ -222,32 +235,100 @@ async function executeRunCommand(call: ToolCall, ctx: ToolContext): Promise<Tool
   const { command, workdir } = call.arguments as { command?: string; workdir?: string };
   if (!command || typeof command !== 'string') return err(call, 'Missing required parameter: command');
 
-  // Safety checks
-  for (const pattern of BLOCKED_COMMANDS) {
-    if (pattern.test(command)) return err(call, `Blocked dangerous command pattern: ${pattern}`);
+  const permission = ctx.runCommandPermission ?? 'blocked';
+  const cmd = command.slice(0, 1000);
+  if (permission === 'blocked') {
+    return err(call, 'tool:run_command is blocked. Grant or guard this permission on the Permissions sheet before executing shell commands.');
+  }
+  if (permission === 'guarded') {
+    if (!ctx.confirmedToolCallIds?.includes(call.id)) {
+      return err(call, formatGuardedConfirmationMessage(cmd));
+    }
   }
 
-  // Limit command length
-  const cmd = command.slice(0, 1000);
   const cwd = workdir ? resolve(ctx.projectRoot, workdir) : ctx.projectRoot;
-
   if (!cwd.startsWith(resolve(ctx.projectRoot))) return err(call, 'Path traversal denied');
 
-  try {
-    const output = execSync(cmd, {
-      encoding: 'utf-8',
-      cwd,
-      timeout: COMMAND_TIMEOUT,
-      maxBuffer: 1024 * 1024,
-    });
-    const truncated = output.length > MAX_COMMAND_OUTPUT
-      ? output.slice(0, MAX_COMMAND_OUTPUT) + '\n... (output truncated)'
-      : output;
-    return ok(call, truncated || '(command completed with no output)');
-  } catch (e: any) {
-    const stderr = e.stderr || e.message || String(e);
-    return err(call, `Command failed:\n${stderr.slice(0, MAX_COMMAND_OUTPUT)}`);
+  const boundaries = resolveTerminalBoundaries(
+    ctx.projectRoot,
+    ctx.assistantId ?? 'pm-assistant',
+    ctx.terminalBoundaries,
+  );
+
+  const evaluation = evaluateTerminalCommandDetailed(cmd, boundaries);
+  if (evaluation.decision !== 'allowed') {
+    if (ctx.projectRoot && ctx.assistantId) {
+      try {
+        appendTerminalBlockSuggestionSync(
+          ctx.projectRoot,
+          ctx.assistantId,
+          createTerminalBlockSuggestion({
+            command: cmd,
+            reason: evaluation.reason ?? evaluation.decision,
+            matchedRuleId: evaluation.matchedRuleId,
+            blockedSegment: evaluation.blockedSegment,
+            source: 'tool_executor',
+          }),
+        );
+      } catch {
+        // Sidecar write failure must not bypass the block.
+      }
+    }
+    return err(
+      call,
+      formatTerminalBlockedMessage({
+        command: cmd,
+        reason: evaluation.reason,
+        matchedRuleId: evaluation.matchedRuleId,
+        blockedSegment: evaluation.blockedSegment,
+      }),
+    );
   }
+
+  const segments = cmd.includes(';') || cmd.includes('&&') || cmd.includes('||') || cmd.includes('|')
+    ? cmd.split(/\s*(?:;|&&|\|\||\|)\s*/).map((s) => s.trim()).filter(Boolean)
+    : [normalizeTerminalCommand(cmd)];
+
+  const outputs: string[] = [];
+  for (const segment of segments) {
+    const normalized = normalizeTerminalCommand(segment);
+    const spec = parseAllowedCommandForExec(normalized);
+    if (!spec) {
+      return err(call, `Command matched policy but cannot be executed safely without a shell: ${normalized}`);
+    }
+    if (spec.command === 'npm' && spec.args[0] === 'run') {
+      const scriptName = spec.args[1];
+      if (!scriptName || !validateNpmRunScript(cwd, scriptName)) {
+        return err(
+          call,
+          formatTerminalBlockedMessage({
+            command: normalized,
+            reason: 'npm_script_not_in_package_json',
+            blockedSegment: normalized,
+          }),
+        );
+      }
+    }
+    try {
+      const output = execFileSync(spec.command, spec.args, {
+        encoding: 'utf-8',
+        cwd,
+        timeout: COMMAND_TIMEOUT,
+        maxBuffer: 1024 * 1024,
+      });
+      outputs.push(output);
+    } catch (e: unknown) {
+      const errObj = e as { stderr?: string; message?: string };
+      const stderr = errObj.stderr || errObj.message || String(e);
+      return err(call, `Command failed (${normalized}):\n${stderr.slice(0, MAX_COMMAND_OUTPUT)}`);
+    }
+  }
+
+  const combined = outputs.join('\n');
+  const truncated = combined.length > MAX_COMMAND_OUTPUT
+    ? combined.slice(0, MAX_COMMAND_OUTPUT) + '\n... (output truncated)'
+    : combined;
+  return ok(call, truncated || '(command completed with no output)');
 }
 
 // ── Main Executor ───────────────────────────────────────────────────────────

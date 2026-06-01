@@ -1,0 +1,26 @@
+---
+description: Mandatory verification gate — never claim done, 100%, commit, or PR without npm run verify:baseline and UI browser smoke for client changes.
+alwaysApply: true
+---
+
+# Verify before complete (Project Manager)
+
+## Iron gate
+
+Before saying **done**, **100%**, **ready to commit/PR**, or **verification passed**:
+
+1. Run `npm run verify:baseline` from repo root — all steps must exit 0.
+2. For any UI / routing / `'use client'` / i18n / localStorage change: manual smoke in **Chrome/Safari/Tauri** on port 43187. Cursor embedded browser alone is not sufficient (injects `data-cursor-ref`).
+3. Do **not** commit or open a PR unless the user explicitly asks.
+
+Read and follow `.claude/skills/verify-before-complete/SKILL.md` when wrapping up work.
+
+## Static export rules (enforced by hygiene script)
+
+- Node `fs` only in `*.server.ts`, `app/api/**`, or allowlisted server-only modules — never in client-reachable graphs.
+- Never `useState(readStored…)` or `useState(() => localStorage…)` in `'use client'` files — hydrate in `useEffect` after mount.
+- New `app/api/**/route.ts` for static export may need `export const dynamic = 'force-static'`.
+
+## Honest dev-log / dashboard metadata
+
+Do not set feature progress to 100% or status `completed` without listing commands actually run in `dev-log.md`.

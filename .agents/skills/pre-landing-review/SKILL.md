@@ -64,7 +64,7 @@ If either fails, **STOP and report.** A red baseline is the most important findi
 Apply these categories first. Each finding must cite `file:line` and propose a concrete fix.
 
 ### 3A. Bridge & IPC Safety
-- New `invoke()` call NOT routed through `lib/bridge/index.ts` → **bridge discipline violation** (AGENTS.md). Wrap it.
+- New `invoke()` call NOT routed through `lib/bridge/index.ts` → **bridge discipline violation** (CLAUDE.md). Wrap it.
 - New Tauri command in `src-tauri/src/lib.rs` NOT listed in `src-tauri/capabilities/default.json` → **runtime permission denied**.
 - Tauri command signature in Rust doesn't match the TS wrapper (arg name, type, optionality) → **silent serde failure**, Rust returns `null` or panics.
 - New `tauri::async_runtime::spawn` / child process spawn with user-supplied path or arg WITHOUT allowlist or `shell_escape` → **shell injection**.
@@ -85,6 +85,13 @@ Apply these categories first. Each finding must cite `file:line` and propose a c
 - Write path that overwrites `.project-manager.json` without an atomic rename (write-temp + rename) → corruption on crash.
 - New file under `app/api/` referenced from a component (won't exist in built Tauri app) → **static-export miss**.
 - New feature added to `config.json`? → Verify `.project-manager/features/<ID>/README.md` exists.
+
+### 3H. Static Export, Client Bundle & Hydration
+- **`import … from 'fs'`** (or `node:fs`) in a `'use client'` file or any module imported by `app/ui/**`, `components/**`, `app/chat/**`, `app/ai_assistants/**` without a `*.server.ts` split → **build break / client bundle leak**. Move to `*.server.ts`, `app/api/*`, or Tauri bridge.
+- **`useState(readStored…)` or `useState(() => localStorage…)`** in `'use client'` files → **SSR hydration mismatch** (server HTML ≠ client first paint). Default constant state; hydrate in `useEffect` after mount.
+- New **`app/api/**/route.ts`** without `export const dynamic = 'force-static'` when `next build` fails on that route → add the export (see F41 terminal-boundaries routes).
+- Run **`npm run verify:static-export`** (or full **`npm run verify:baseline`**) before claiming the diff is landing-ready.
+- UI/routing changes without **manual browser smoke** (Chrome/Safari/Tauri, not Cursor embedded browser alone) → flag as **incomplete verification** even if tests pass.
 
 ### 3D. LLM Output Trust Boundary (applies to AI flows)
 - LLM-generated string written to `.project-manager.json` / file path / shell arg WITHOUT shape + content validation → **stored prompt injection / path traversal**.

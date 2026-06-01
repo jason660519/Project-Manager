@@ -352,6 +352,52 @@ export interface SpawnTerminalOptions {
   cwd: string;
 }
 
+export interface TerminalEvaluationBridgeResult {
+  decision: 'allowed' | 'blocked' | 'unknown';
+  reason?: string;
+  matchedRuleId?: string;
+  blockedSegment?: string;
+}
+
+/**
+ * Evaluate a shell command against terminal operational boundaries.
+ * Tauri: authoritative Rust evaluator. Browser dev: TypeScript fallback.
+ */
+export async function evaluateTerminalCommandBridge(
+  command: string,
+  options?: { blacklistOnly?: boolean },
+): Promise<TerminalEvaluationBridgeResult> {
+  const trimmed = command.trim();
+  if (!trimmed) throw new Error('evaluateTerminalCommandBridge: command must not be empty');
+
+  if (isTauri()) {
+    const result = await invoke<{
+      decision: string;
+      reason?: string;
+      matchedRuleId?: string;
+      blockedSegment?: string;
+    }>('evaluate_terminal_command', {
+      command: trimmed,
+      boundaries: null,
+      blacklistOnly: options?.blacklistOnly ?? false,
+    });
+    return {
+      decision: result.decision as TerminalEvaluationBridgeResult['decision'],
+      reason: result.reason,
+      matchedRuleId: result.matchedRuleId,
+      blockedSegment: result.blockedSegment,
+    };
+  }
+
+  const { evaluateTerminalCommandDetailed, createDefaultTerminalBoundaries } = await import(
+    '../ai-assistants/terminalBoundaries'
+  );
+  const evaluation = evaluateTerminalCommandDetailed(trimmed, createDefaultTerminalBoundaries(), {
+    blacklistOnly: options?.blacklistOnly,
+  });
+  return evaluation;
+}
+
 /**
  * Open a new system Terminal window running `command` with `args` in `cwd`.
  *
@@ -364,6 +410,15 @@ export interface SpawnTerminalOptions {
 export async function spawnTerminal(opts: SpawnTerminalOptions): Promise<void> {
   if (!isTauri()) throw new Error('spawnTerminal requires Tauri runtime');
   await assertCommandPolicyAllows(opts.command);
+  const invocation = opts.args.length > 0 ? `${opts.command} ${opts.args.join(' ')}` : opts.command;
+  const evaluation = await evaluateTerminalCommandBridge(invocation, { blacklistOnly: true });
+  if (evaluation.decision !== 'allowed') {
+    throw new Error(
+      `Terminal spawn blocked (${evaluation.reason ?? evaluation.decision})${
+        evaluation.matchedRuleId ? ` rule=${evaluation.matchedRuleId}` : ''
+      }`,
+    );
+  }
   return invoke<void>('spawn_terminal', {
     command: opts.command,
     args: opts.args,

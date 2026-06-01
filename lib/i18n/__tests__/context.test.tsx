@@ -1,5 +1,5 @@
 /// <reference types="vitest/globals" />
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { I18nProvider, useI18n } from '../context';
 
 function LangDisplay() {
@@ -21,6 +21,15 @@ test('defaults to en', () => {
   render(<I18nProvider><LangDisplay /></I18nProvider>);
   expect(screen.getByTestId('locale').textContent).toBe('en');
   expect(screen.getByTestId('term').textContent).toBe('Search');
+});
+
+test('hydrates stored locale after mount', async () => {
+  localStorage.setItem('pm-lang', 'zh-hant');
+  render(<I18nProvider><LangDisplay /></I18nProvider>);
+  await waitFor(() => {
+    expect(screen.getByTestId('locale').textContent).toBe('zh-hant');
+    expect(screen.getByTestId('term').textContent).toBe('搜尋');
+  });
 });
 
 test('setLocale switches translations', () => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 /** Locale codes match Hermes's i18n/types.ts Locale union (subset). */
 export type LangId = 'en' | 'zh-hant' | 'zh' | 'ja';
@@ -32,10 +32,15 @@ export function directionForLang(id: LangId): LangDirection {
 const STORAGE_KEY = 'pm-lang';
 
 export function useLang() {
-  const [lang, setLangState] = useState<LangId>(() => {
-    if (typeof window === 'undefined') return 'en';
-    return (window.localStorage.getItem(STORAGE_KEY) as LangId) ?? 'en';
-  });
+  const [lang, setLangState] = useState<LangId>('en');
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(STORAGE_KEY) as LangId | null;
+    const initial = stored && LANGS.some((item) => item.id === stored) ? stored : 'en';
+    setLangState(initial);
+    document.documentElement.setAttribute('lang', initial);
+    document.documentElement.setAttribute('dir', directionForLang(initial));
+  }, []);
 
   const setLang = (id: LangId) => {
     setLangState(id);

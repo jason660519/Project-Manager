@@ -8,6 +8,7 @@ import type {
   AssistantProfileSource,
   AssistantSkillConfig,
 } from './types';
+import { createDefaultTerminalBoundaries } from './terminalBoundaries';
 
 const NOW = '2026-05-26T00:00:00.000Z';
 
@@ -261,6 +262,8 @@ export function createDefaultAssistant(): AIAssistantConfig {
     dailyLogs: logs,
     dreamJobs,
     permissions,
+    terminalBoundaries: createDefaultTerminalBoundaries(),
+    terminalBlockSuggestions: [],
     auditEvents,
     updatedAt: NOW,
   };

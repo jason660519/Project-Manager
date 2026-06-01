@@ -122,6 +122,39 @@ export interface AssistantAuditEvent {
   outcome: 'recorded' | 'blocked' | 'requires-review';
 }
 
+export type TerminalCommandListKind = 'whitelist' | 'blacklist';
+export type TerminalPolicyMode = 'default-deny' | 'default-allow';
+
+export interface TerminalCommandRule {
+  id: string;
+  pattern: string;
+  description: string;
+  category: string;
+  listKind: TerminalCommandListKind;
+}
+
+export interface TerminalOperationalBoundaries {
+  policyMode: TerminalPolicyMode;
+  whitelist: TerminalCommandRule[];
+  blacklist: TerminalCommandRule[];
+  updatedAt: string;
+}
+
+export type TerminalBlockSuggestionStatus = 'pending' | 'accepted' | 'dismissed';
+
+export interface TerminalBlockSuggestion {
+  id: string;
+  command: string;
+  normalizedCommand: string;
+  reason: string;
+  matchedRuleId?: string;
+  blockedSegment?: string;
+  status: TerminalBlockSuggestionStatus;
+  createdAt: string;
+  reviewedAt?: string;
+  source: 'tool_executor' | 'xmux_terminal' | 'manual';
+}
+
 export interface AIAssistantConfig {
   id: string;
   name: string;
@@ -133,6 +166,8 @@ export interface AIAssistantConfig {
   dailyLogs: AssistantDailyLog[];
   dreamJobs: AssistantDreamJob[];
   permissions: AssistantPermissionRule[];
+  terminalBoundaries: TerminalOperationalBoundaries;
+  terminalBlockSuggestions: TerminalBlockSuggestion[];
   auditEvents: AssistantAuditEvent[];
   updatedAt: string;
 }

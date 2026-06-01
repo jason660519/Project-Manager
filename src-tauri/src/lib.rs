@@ -1,5 +1,8 @@
 mod dev_secrets;
+mod terminal_boundaries;
 mod xmux_webview;
+
+use terminal_boundaries::{default_terminal_boundaries, evaluate_terminal_command_internal};
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -1614,6 +1617,23 @@ async fn spawn_terminal(
     args: Vec<String>,
     cwd: String,
 ) -> Result<(), String> {
+    let invocation = if args.is_empty() {
+        command.clone()
+    } else {
+        format!("{} {}", command, args.join(" "))
+    };
+    let evaluation = evaluate_terminal_command_internal(&invocation, &default_terminal_boundaries(), true);
+    if evaluation.decision != "allowed" {
+        return Err(format!(
+            "Terminal spawn blocked ({}){}",
+            evaluation.reason.unwrap_or_else(|| evaluation.decision.clone()),
+            evaluation
+                .matched_rule_id
+                .map(|id| format!(" rule={id}"))
+                .unwrap_or_default()
+        ));
+    }
+
     #[cfg(target_os = "macos")]
     {
         let shell_line = build_shell_line(&command, &args, &cwd);
@@ -5194,6 +5214,7 @@ pub fn run() {
             scan_projects,
             spawn_agent,
             spawn_terminal,
+            terminal_boundaries::evaluate_terminal_command,
             open_terminal_at_path,
             kill_process,
             call_anthropic,
