@@ -179,3 +179,26 @@ i18n: added `columns.candidate` to all 4 locales. Tests: new
 updated for UUID ids + migration + candidate (26 aiSdks unit tests passing).
 Docs: amended company `table-governance.md` §2.2 + checklist, updated
 `docs/engineering/ai-sdks-store.md` and this feature's README.
+
+## 2026-06-01 — Wire candidate flag into the AI Assistant (Claude)
+
+Consumed the `candidate` flag in the AI Assistant's chat model picker:
+
+- `lib/aiSdks/candidates.ts` — pure, server-safe `listCandidateModels(store)` over
+  the catalog + custom models, filtering `candidate === true`; returns
+  `CandidateModel { id, providerId, providerLabel, model, modelType }`.
+- `components/chat/ChatSettings.tsx` — loads candidates via
+  `readAiSdksStore(projectRoot)` when the settings panel opens, and adds a
+  **Candidate models** quick-pick at the top: selecting one fills Provider +
+  Model (Apply persists to `pm-chat-settings`). `ChatPanel` passes `projectRoot`.
+- Options are keyed by the model's **UUID** (`value={c.id}`) and resolved via
+  lookup — not by splitting a `"provider model"` string (a stray NUL byte in an
+  earlier draft made `indexOf(' ')` return −1; UUID lookup is robust).
+
+Test: `__tests__/aiSdks.candidates.test.ts`. Verified in headed Chrome:
+mark `claude-opus-4-7` candidate in AI SDKs → it appears as
+"Anthropic (Claude) · claude-opus-4-7" in the chat picker → selecting + Apply
+sets `{ provider: 'anthropic', model: 'claude-opus-4-7' }`. `verify:baseline`: PASS.
+
+Still open: a richer multi-select assistant↔models binding (per-assistant model
+sets) if needed — the current wiring makes candidates the curated quick-pick.

@@ -8,6 +8,8 @@ import {
   resolveModelList,
   subscribeProviderMetadataChanges,
 } from '../../lib/keys/providerMetadata';
+import { readAiSdksStore } from '../../lib/aiSdks/store';
+import { listCandidateModels, type CandidateModel } from '../../lib/aiSdks/candidates';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -22,6 +24,8 @@ export interface ChatSettingsData {
 interface ChatSettingsProps {
   current: ChatSettingsData;
   onChange: (settings: ChatSettingsData) => void;
+  /** Project root for reading the AI SDKs candidate models (Tauri); omit in browser dev. */
+  projectRoot?: string;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -58,13 +62,39 @@ export function saveChatSettings(settings: ChatSettingsData) {
 
 const ALL_PROVIDERS = listLlmProviders();
 
-export function ChatSettings({ current, onChange }: ChatSettingsProps) {
+export function ChatSettings({ current, onChange, projectRoot }: ChatSettingsProps) {
   const modelListId = useId();
   const [open, setOpen] = useState(false);
   const [provider, setProvider] = useState(current.provider);
   const [model, setModel] = useState(current.model);
   const [systemPrompt, setSystemPrompt] = useState(current.systemPrompt);
   const [metadataVersion, setMetadataVersion] = useState(0);
+  const [candidates, setCandidates] = useState<CandidateModel[]>([]);
+
+  // Load the AI SDKs candidate models when the panel opens (re-reads on each open
+  // so freshly-ticked candidates appear). Best-effort: failures leave it empty.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const store = await readAiSdksStore(projectRoot);
+        if (!cancelled) setCandidates(listCandidateModels(store));
+      } catch {
+        if (!cancelled) setCandidates([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, projectRoot]);
+
+  const pickCandidate = (id: string) => {
+    const candidate = candidates.find((c) => c.id === id);
+    if (!candidate) return;
+    setProvider(candidate.providerId);
+    setModel(candidate.model);
+  };
 
   // Sync local state when current changes externally
   useEffect(() => {
@@ -170,6 +200,31 @@ export function ChatSettings({ current, onChange }: ChatSettingsProps) {
                 <X size={12} />
               </button>
             </div>
+
+            {/* Candidate models — curated shortlist marked in the AI SDKs view */}
+            {candidates.length > 0 && (
+              <>
+                <label className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-emerald-300/70">
+                  Candidate models
+                </label>
+                <select
+                  aria-label="Candidate models"
+                  value={candidates.find((c) => c.providerId === provider && c.model === model)?.id ?? ''}
+                  onChange={(e) => pickCandidate(e.target.value)}
+                  className="mb-1 w-full rounded border border-emerald-200/25 bg-stone-900 px-2 py-1 text-[11px] text-emerald-100 outline-none focus:border-emerald-200/50"
+                >
+                  <option value="">Pick a candidate…</option>
+                  {candidates.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.providerLabel} · {c.model}
+                    </option>
+                  ))}
+                </select>
+                <p className="mb-3 text-[10px] leading-relaxed text-stone-500">
+                  Marked in AI SDKs. Selecting one fills Provider + Model below; press Apply to use it.
+                </p>
+              </>
+            )}
 
             {/* Provider */}
             <label htmlFor={`${modelListId}-provider`} className="mb-1 block text-[9px] uppercase tracking-[0.1em] text-stone-500">Provider</label>

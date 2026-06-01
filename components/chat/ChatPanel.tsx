@@ -449,6 +449,7 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen, docked
             <ChatSettings
               current={chatSettings}
               onChange={handleSettingsChange}
+              projectRoot={context.selectedProject?.config.project.root}
             />
           }
         />
