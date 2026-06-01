@@ -79,6 +79,7 @@ interface AiSdkProviderSheetProps {
   copy: AiSdksCopy;
   onSetParam: (id: string, key: string, value: ParamValue) => void;
   onSetModelType: (id: string, modelType: string) => void;
+  onSetCandidate: (id: string, candidate: boolean) => void;
   onAddModel: (model: string) => void;
   onAddCategory: (category: string) => void;
   onRestoreProviderDefaults: () => void;
@@ -108,6 +109,7 @@ export function AiSdkProviderSheet({
   copy,
   onSetParam,
   onSetModelType,
+  onSetCandidate,
   onAddModel,
   onAddCategory,
   onRestoreProviderDefaults,
@@ -135,12 +137,13 @@ export function AiSdkProviderSheet({
   }, [providerId, store]);
 
   const columnIds = useMemo(
-    () => ['col-id', 'col-provider', 'col-model', 'col-type', ...specs.map((s) => `col-param-${s.key}`)],
+    () => ['col-id', 'col-candidate', 'col-provider', 'col-model', 'col-type', ...specs.map((s) => `col-param-${s.key}`)],
     [specs],
   );
   const defaultSizing = useMemo<Record<string, number>>(() => {
     const sizing: Record<string, number> = {
       'col-id': 240,
+      'col-candidate': 120,
       'col-provider': 200,
       'col-model': 220,
       'col-type': 150,
@@ -211,6 +214,7 @@ export function AiSdkProviderSheet({
   const colLabel = useMemo(() => {
     const map = new Map<string, string>([
       ['col-id', copy.columns.id],
+      ['col-candidate', copy.columns.candidate],
       ['col-provider', copy.columns.provider],
       ['col-model', copy.columns.model],
       ['col-type', copy.columns.type],
@@ -259,9 +263,38 @@ export function AiSdkProviderSheet({
               onRestoreRow={restoreRow}
               onRestoreAllRows={() => setHiddenRowIds([])}
             />
-            <span className="truncate font-mono text-[11px] text-stone-400">{info.getValue()}</span>
+            <span
+              className="truncate font-mono text-[11px] text-stone-400"
+              title={`${providerId}:${info.row.original.model}`}
+            >
+              {info.getValue()}
+            </span>
           </div>
         ),
+      }),
+      // Candidate checkbox — when checked, the model joins the AI Assistant's
+      // candidate list (consumed there as a follow-up). Checkbox columns are not
+      // sortable per company governance.
+      columnHelper.display({
+        id: 'col-candidate',
+        header: copy.columns.candidate,
+        cell: ({ row }) => {
+          const checked = store.models[row.original.id]?.candidate === true;
+          return (
+            <input
+              type="checkbox"
+              checked={checked}
+              disabled={readOnly}
+              aria-label={`${copy.columns.candidate}: ${row.original.model}`}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                e.stopPropagation();
+                onSetCandidate(row.original.id, e.target.checked);
+              }}
+              className="h-4 w-4 cursor-pointer accent-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+            />
+          );
+        },
       }),
       columnHelper.accessor((row) => row.providerLabel, {
         id: 'col-provider',

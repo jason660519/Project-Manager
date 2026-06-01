@@ -49,18 +49,34 @@ The store holds only the user's **deltas**. The effective value of any cell is
 `lib/aiSdks/store.ts`. Bump it (and extend `normalizeStore`) on any breaking
 change to the file shape.
 
-### File shape (`schemaVersion: 1`)
+### Row id (`col-id`) — UUIDv5
+
+Per company table governance, `col-id` is a **UUID** (the future database primary
+key), not a human-readable label. It is a deterministic **UUIDv5** derived from the
+row's natural key `"<providerId>:<model>"` via `lib/aiSdks/uuid.ts`
+(`modelRowId(provider, model)`, namespace `AI_SDKS_ID_NAMESPACE`). Determinism keeps
+`ai-sdks.json` portable: every install/export computes the same id for the same
+model. The natural key is shown in the `col-id` cell tooltip for human reference;
+Provider / Model columns remain readable.
+
+### File shape (`schemaVersion: 2`)
 
 ```jsonc
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "models": {
-    "openai:gpt-4o": { "params": { "temperature": 0.3 }, "modelType": "LLM", "enabled": true }
+    // key = UUIDv5("openai:gpt-4o"); `candidate: true` adds it to the AI Assistant list
+    "2f1c…-…": { "params": { "temperature": 0.3 }, "modelType": "LLM", "candidate": true }
   },
-  "customModels": [{ "id": "openai:my-ft", "providerId": "openai", "model": "my-ft" }],
+  "customModels": [{ "id": "<uuidv5>", "providerId": "openai", "model": "my-ft" }],
   "customCategories": ["Embeddings"]
 }
 ```
+
+**v1 → v2 migration:** v1 keyed `models` / `customModels` by the `"<provider>:<model>"`
+natural key. `normalizeStore` migrates any non-UUID key on read by remapping it to
+`rowIdFromNaturalKey(key)` (and recomputes custom-model ids from `providerId`+`model`),
+so existing overrides survive — no silent loss.
 
 ## Normalization & validation
 

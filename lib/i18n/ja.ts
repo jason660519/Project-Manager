@@ -36,7 +36,7 @@ export const ja: Translations = {
     importUnrecognized: 'このファイルは有効な AI SDKs 設定ではないためインポートされませんでした。',
     importSkipped: '件のエントリが無効な形式のためインポート時にスキップされました。',
     status: { saving: '保存中…', saved: '保存しました', error: '保存に失敗しました' },
-    columns: { id: 'ID', provider: 'プロバイダー', model: 'モデル', type: 'タイプ' },
+    columns: { id: 'ID', candidate: '候補', provider: 'プロバイダー', model: 'モデル', type: 'タイプ' },
     controls: {
       searchPlaceholder: 'モデルを検索…',
       searchClear: '検索をクリア',

@@ -153,3 +153,29 @@ right reveals Top P / Top K / Stop Sequences while the frozen ID column stays
 pinned. Recorded both rules in `docs/engineering/table-standards.md` (the company
 baseline didn't spell out always-visible scrollbars — §3.3 usability implies it).
 `npm run verify:baseline`: PASS.
+
+## 2026-06-01 — col-id → UUIDv5 + candidate column (Claude)
+
+Two related requests:
+
+1. **`col-id` is now a UUID** (future database primary key), per amended company
+   governance §2.2. New `lib/aiSdks/uuid.ts` — self-contained sync SHA-1 +
+   deterministic **UUIDv5** (`modelRowId(provider, model)`, namespace
+   `AI_SDKS_ID_NAMESPACE`); proven against the canonical RFC v5 test vector.
+   Catalog rows now carry `id` (UUID) + `naturalKey` (`provider:model`, shown in
+   the col-id tooltip). Store keys `models`/`customModels` by UUID; bumped
+   `AI_SDKS_SCHEMA_VERSION` 1→2 with read-migration of old natural-key entries
+   (no silent loss). Provider-scoped ops (error badge count, restore defaults)
+   no longer rely on an id prefix — they compute the provider's UUID set from the
+   catalog + custom rows. Chose deterministic v5 over random v4 so exported
+   config stays portable / DB seeding is idempotent.
+2. **Candidate column.** New `col-candidate` checkbox immediately right of
+   `col-id`; checking it sets `candidate: true` on the row override. These rows
+   are intended as the **AI Assistant** model candidate list (consumption in the
+   AI Assistant view is a follow-up). Not sortable (checkbox column, per §2.10).
+
+i18n: added `columns.candidate` to all 4 locales. Tests: new
+`__tests__/aiSdks.uuid.test.ts` (RFC vector + determinism); catalog/store tests
+updated for UUID ids + migration + candidate (26 aiSdks unit tests passing).
+Docs: amended company `table-governance.md` §2.2 + checklist, updated
+`docs/engineering/ai-sdks-store.md` and this feature's README.

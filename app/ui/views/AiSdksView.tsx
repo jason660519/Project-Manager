@@ -19,7 +19,13 @@ import { WorkstationFrame } from '../../../components/layout/WorkstationFrame';
 import { BottomSheetTabs, type SheetTabItem } from '../../../components/sheets/BottomSheetTabs';
 import { listLlmProviders, type LlmProviderId } from '../../../lib/keys/llmProviders';
 import { useI18n } from '../../../lib/i18n';
-import { DEFAULT_MODEL_TYPES, getParamSpecs, type ParamValue } from '../../../lib/aiSdks/catalog';
+import {
+  buildProviderModelCatalog,
+  DEFAULT_MODEL_TYPES,
+  getParamSpecs,
+  type ParamValue,
+} from '../../../lib/aiSdks/catalog';
+import { modelRowId } from '../../../lib/aiSdks/uuid';
 import {
   AI_SDKS_SCHEMA_VERSION,
   emptyAiSdksConfig,
@@ -39,11 +45,19 @@ import { AiSdkProviderSheet } from './AiSdks/AiSdkProviderSheet';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
+/** Set of row ids (UUIDs) belonging to a provider — catalog models + custom rows. */
+function providerRowIds(providerId: LlmProviderId, store: AiSdksConfig): Set<string> {
+  const ids = new Set(buildProviderModelCatalog(providerId).map((e) => e.id));
+  for (const m of store.customModels) if (m.providerId === providerId) ids.add(m.id);
+  return ids;
+}
+
 function providerErrorCount(providerId: LlmProviderId, store: AiSdksConfig): number {
   const specByKey = new Map(getParamSpecs(providerId).map((s) => [s.key, s]));
+  const ownIds = providerRowIds(providerId, store);
   let count = 0;
   for (const [id, override] of Object.entries(store.models)) {
-    if (!id.startsWith(`${providerId}:`)) continue;
+    if (!ownIds.has(id)) continue;
     for (const [key, value] of Object.entries(override.params ?? {})) {
       const spec = specByKey.get(key);
       if (spec && !validateParam(spec, value).ok) count += 1;
@@ -155,9 +169,19 @@ export function AiSdksView({
     }));
   }, []);
 
+  // Candidate flag: when true the model joins the AI Assistant candidate list.
+  const setCandidate = useCallback((id: string, candidate: boolean) => {
+    setStore((prev) => {
+      const next = { ...(prev.models[id] ?? {}) };
+      if (candidate) next.candidate = true;
+      else delete (next as { candidate?: boolean }).candidate;
+      return { ...prev, models: { ...prev.models, [id]: next } };
+    });
+  }, []);
+
   const addModel = useCallback((providerId: LlmProviderId, model: string) => {
     setStore((prev) => {
-      const id = `${providerId}:${model}`;
+      const id = modelRowId(providerId, model);
       if (prev.customModels.some((m) => m.id === id)) return prev;
       return { ...prev, customModels: [...prev.customModels, { id, providerId, model }] };
     });
@@ -173,8 +197,9 @@ export function AiSdksView({
 
   const restoreProviderDefaults = useCallback((providerId: LlmProviderId) => {
     setStore((prev) => {
+      const ownIds = providerRowIds(providerId, prev);
       const models = Object.fromEntries(
-        Object.entries(prev.models).filter(([id]) => !id.startsWith(`${providerId}:`)),
+        Object.entries(prev.models).filter(([id]) => !ownIds.has(id)),
       );
       return { ...prev, models };
     });
@@ -348,6 +373,7 @@ export function AiSdksView({
             copy={copy}
             onSetParam={setParam}
             onSetModelType={setModelType}
+            onSetCandidate={setCandidate}
             onAddModel={(model) => addModel(p.id, model)}
             onAddCategory={addCategory}
             onRestoreProviderDefaults={() => restoreProviderDefaults(p.id)}

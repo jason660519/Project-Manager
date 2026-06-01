@@ -36,7 +36,7 @@ export const zhHant: Translations = {
     importUnrecognized: '此檔案不是可辨識的 AI SDKs 設定，未匯入。',
     importSkipped: '個項目在匯入時被略過（格式無效）。',
     status: { saving: '儲存中…', saved: '已儲存', error: '儲存失敗' },
-    columns: { id: 'ID', provider: '服務商', model: '模型', type: '類型' },
+    columns: { id: 'ID', candidate: '候選', provider: '服務商', model: '模型', type: '類型' },
     controls: {
       searchPlaceholder: '搜尋模型…',
       searchClear: '清除搜尋',

@@ -36,7 +36,7 @@ export const zh: Translations = {
     importUnrecognized: '该文件不是可识别的 AI SDKs 配置，未导入。',
     importSkipped: '个条目在导入时被跳过（格式无效）。',
     status: { saving: '保存中…', saved: '已保存', error: '保存失败' },
-    columns: { id: 'ID', provider: '服务商', model: '模型', type: '类型' },
+    columns: { id: 'ID', candidate: '候选', provider: '服务商', model: '模型', type: '类型' },
     controls: {
       searchPlaceholder: '搜索模型…',
       searchClear: '清除搜索',

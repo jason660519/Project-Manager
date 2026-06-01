@@ -19,8 +19,11 @@
 import { isTauriRuntime, readJsonFile, writeJsonFile } from '../bridge';
 import type { LlmProviderId } from '../keys/llmProviders';
 import { type ModelType, type ParamSpec, type ParamValue } from './catalog';
+import { isUuid, modelRowId, rowIdFromNaturalKey } from './uuid';
 
-export const AI_SDKS_SCHEMA_VERSION = 1 as const;
+// v2: `col-id` is a UUIDv5 (was the `${provider}:${model}` natural key in v1).
+// normalizeStore migrates v1 natural-key entries to their UUID on read.
+export const AI_SDKS_SCHEMA_VERSION = 2 as const;
 
 const LOCAL_STORAGE_KEY = 'projectManager.aiSdks.store.v1';
 
@@ -31,9 +34,12 @@ export interface AiSdksModelOverride {
   params?: Record<string, ParamValue>;
   /** Row include/exclude flag for downstream consumers. Defaults to true. */
   enabled?: boolean;
+  /** Marked by the user as a candidate model for the AI Assistant model list. */
+  candidate?: boolean;
 }
 
 export interface AiSdksCustomModel {
+  /** UUIDv5 col-id (matches ModelCatalogEntry.id), derived from providerId + model. */
   id: string;
   providerId: LlmProviderId;
   model: string;
@@ -42,7 +48,7 @@ export interface AiSdksCustomModel {
 
 export interface AiSdksConfig {
   schemaVersion: typeof AI_SDKS_SCHEMA_VERSION;
-  /** Keyed by ModelCatalogEntry.id (`${providerId}:${model}`). */
+  /** Keyed by ModelCatalogEntry.id — a UUIDv5 (see lib/aiSdks/uuid.ts). */
   models: Record<string, AiSdksModelOverride>;
   /** User-added rows not present in the static catalog. */
   customModels: AiSdksCustomModel[];
@@ -129,6 +135,7 @@ export function normalizeStoreDetailed(raw: unknown): { store: AiSdksConfig; rep
         override.modelType = value.modelType;
       }
       if (typeof value.enabled === 'boolean') override.enabled = value.enabled;
+      if (typeof value.candidate === 'boolean') override.candidate = value.candidate;
       if (isPlainObject(value.params)) {
         const params: Record<string, ParamValue> = {};
         for (const [k, v] of Object.entries(value.params)) {
@@ -137,7 +144,9 @@ export function normalizeStoreDetailed(raw: unknown): { store: AiSdksConfig; rep
         }
         if (Object.keys(params).length > 0) override.params = params;
       }
-      base.models[id] = override;
+      // v1→v2: a non-UUID key is an old `provider:model` natural key — migrate to
+      // its deterministic UUID so existing overrides survive the id change.
+      base.models[isUuid(id) ? id : rowIdFromNaturalKey(id)] = override;
     }
   }
 
@@ -153,7 +162,9 @@ export function normalizeStoreDetailed(raw: unknown): { store: AiSdksConfig; rep
         report.dropped.customModels += 1;
         continue;
       }
-      const id = typeof item.id === 'string' && item.id ? item.id : `${providerId}:${model}`;
+      // Canonical id is always the deterministic UUID for (provider, model),
+      // regardless of any stale natural-key id stored in v1.
+      const id = modelRowId(providerId, model);
       if (seen.has(id)) continue;
       seen.add(id);
       const entry: AiSdksCustomModel = { id, providerId: providerId as LlmProviderId, model };

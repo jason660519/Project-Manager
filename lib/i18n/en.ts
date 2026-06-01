@@ -36,7 +36,7 @@ export const en: Translations = {
     importUnrecognized: 'This file is not a recognizable AI SDKs config and was not imported.',
     importSkipped: 'entries were skipped during import (invalid shape).',
     status: { saving: 'Saving…', saved: 'Saved', error: 'Save failed' },
-    columns: { id: 'ID', provider: 'Provider', model: 'Model', type: 'Type' },
+    columns: { id: 'ID', candidate: 'Candidate', provider: 'Provider', model: 'Model', type: 'Type' },
     controls: {
       searchPlaceholder: 'Search models…',
       searchClear: 'Clear search',

@@ -8,11 +8,16 @@ workstation view: one bottom sheet tab per provider, each a wide editable table.
 
 Required column contract per sheet:
 
-1. `col-id` — globally-unique stable string id per model row (frozen).
-2. `col-provider` — provider official full name.
-3. `col-model` — model identifier.
-4. `col-type` — classification (LLM / VLM / Coding Agent + user-extensible).
-5. `col-param-*` — one editable column per tunable SDK parameter (type / range /
+1. `col-id` — **UUIDv5** per model row (the future DB primary key), frozen.
+   Deterministic from the natural key `<provider>:<model>` (`lib/aiSdks/uuid.ts`);
+   the natural key shows in the cell tooltip.
+2. `col-candidate` — checkbox; when checked the model becomes a candidate for the
+   **AI Assistant** model list (consumed there as a follow-up). Persisted as
+   `candidate: true` on the row override.
+3. `col-provider` — provider official full name.
+4. `col-model` — model identifier.
+5. `col-type` — classification (LLM / VLM / Coding Agent + user-extensible).
+6. `col-param-*` — one editable column per tunable SDK parameter (type / range /
    default / description surfaced in header + detail panel).
 
 Non-secret parameter values persist to `.project-manager/ai-sdks.json` (own

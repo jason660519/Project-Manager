@@ -39,7 +39,7 @@ export interface Translations {
     /** "{count} entr(ies) skipped during import" — component substitutes {count}. */
     importSkipped: string;
     status: { saving: string; saved: string; error: string };
-    columns: { id: string; provider: string; model: string; type: string };
+    columns: { id: string; candidate: string; provider: string; model: string; type: string };
     controls: {
       searchPlaceholder: string;
       searchClear: string;

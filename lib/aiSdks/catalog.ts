@@ -20,6 +20,7 @@ import {
   type LlmProviderId,
   type LlmProviderSpec,
 } from '../keys/llmProviders';
+import { modelRowId } from './uuid';
 
 /** Built-in model classification tags. Users may add custom categories on top. */
 export const DEFAULT_MODEL_TYPES = ['LLM', 'VLM', 'Coding Agent'] as const;
@@ -46,8 +47,10 @@ export interface ParamSpec {
 }
 
 export interface ModelCatalogEntry {
-  /** Globally-unique stable id: `${providerId}:${model}`. */
+  /** Stable UUIDv5 (col-id) derived from `naturalKey` — the future DB primary key. */
   id: string;
+  /** Human-readable natural key `${providerId}:${model}` the UUID is derived from. */
+  naturalKey: string;
   providerId: LlmProviderId;
   /** Provider official full name (from the registry label). */
   providerLabel: string;
@@ -116,7 +119,8 @@ export function inferModelType(model: string): ModelType {
 
 function buildEntriesForProvider(provider: LlmProviderSpec): ModelCatalogEntry[] {
   return provider.availableModels.map((model) => ({
-    id: `${provider.id}:${model}`,
+    id: modelRowId(provider.id, model),
+    naturalKey: `${provider.id}:${model}`,
     providerId: provider.id,
     providerLabel: provider.label,
     model,

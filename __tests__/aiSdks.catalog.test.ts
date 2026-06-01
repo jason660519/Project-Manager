@@ -5,16 +5,20 @@ import {
   getParamSpecs,
   inferModelType,
 } from '../lib/aiSdks/catalog';
+import { isUuid, modelRowId } from '../lib/aiSdks/uuid';
 import { getLlmProviderIds } from '../lib/keys/llmProviders';
 
 describe('aiSdks catalog', () => {
-  it('builds a globally-unique id for every model row', () => {
+  it('builds a unique, deterministic UUIDv5 col-id for every model row', () => {
     const rows = buildModelCatalog();
     const ids = rows.map((r) => r.id);
     expect(ids.length).toBeGreaterThan(0);
-    expect(new Set(ids).size).toBe(ids.length);
-    // id format is `${providerId}:${model}`
-    rows.forEach((r) => expect(r.id).toBe(`${r.providerId}:${r.model}`));
+    expect(new Set(ids).size).toBe(ids.length); // globally unique
+    rows.forEach((r) => {
+      expect(isUuid(r.id)).toBe(true); // UUID for future DB primary key
+      expect(r.naturalKey).toBe(`${r.providerId}:${r.model}`);
+      expect(r.id).toBe(modelRowId(r.providerId, r.model)); // deterministic from natural key
+    });
   });
 
   it('covers every registry provider with at least one parameter column', () => {

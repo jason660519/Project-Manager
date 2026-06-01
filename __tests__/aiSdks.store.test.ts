@@ -7,6 +7,7 @@ import {
   validateParam,
 } from '../lib/aiSdks/store';
 import { getParamSpecs, type ParamSpec } from '../lib/aiSdks/catalog';
+import { isUuid, modelRowId } from '../lib/aiSdks/uuid';
 import {
   AI_SDKS_SHEET_SLUGS,
   DEFAULT_AI_SDKS_SHEET_SLUG,
@@ -21,19 +22,35 @@ describe('normalizeStore', () => {
     expect(normalizeStore(42)).toEqual(emptyAiSdksConfig());
   });
 
-  it('drops invalid param values and empty override maps', () => {
+  it('drops invalid param values and empty override maps (keyed by migrated UUID)', () => {
     const out = normalizeStore({
       models: {
         'openai:gpt-4o': { params: { temperature: 0.5, bogus: { nested: true }, top_p: 'x' }, enabled: true },
         'openai:o1': { params: {} },
       },
     });
-    // Non-primitive values (objects) are dropped; primitives are kept for
-    // validateParam to flag semantically later (no silent value loss).
-    expect(out.models['openai:gpt-4o'].params).toEqual({ temperature: 0.5, top_p: 'x' });
-    expect(out.models['openai:gpt-4o'].enabled).toBe(true);
-    // override with no valid params keeps the entry but without a params key
-    expect(out.models['openai:o1'].params).toBeUndefined();
+    const gpt4oId = modelRowId('openai', 'gpt-4o');
+    const o1Id = modelRowId('openai', 'o1');
+    // v1 natural keys are migrated to their UUID; non-primitive values dropped,
+    // primitives kept for validateParam to flag later (no silent value loss).
+    expect(out.models[gpt4oId].params).toEqual({ temperature: 0.5, top_p: 'x' });
+    expect(out.models[gpt4oId].enabled).toBe(true);
+    expect(out.models[o1Id].params).toBeUndefined();
+  });
+
+  it('migrates v1 natural-key model ids to UUID and preserves the candidate flag', () => {
+    const out = normalizeStore({
+      schemaVersion: 1,
+      models: { 'anthropic:claude-opus-4-7': { candidate: true, params: { temperature: 0.4 } } },
+    });
+    const uuid = modelRowId('anthropic', 'claude-opus-4-7');
+    expect(isUuid(uuid)).toBe(true);
+    expect(out.models['anthropic:claude-opus-4-7']).toBeUndefined(); // old key gone
+    expect(out.models[uuid].candidate).toBe(true);
+    expect(out.models[uuid].params).toEqual({ temperature: 0.4 });
+    // A value already keyed by UUID is left as-is.
+    const keyed = normalizeStore({ models: { [uuid]: { candidate: false } } });
+    expect(keyed.models[uuid].candidate).toBe(false);
   });
 
   it('reports a newer schemaVersion, unrecognized shape, and dropped entries', () => {
@@ -64,7 +81,7 @@ describe('normalizeStore', () => {
       customCategories: ['Embeddings', 'Embeddings', '  ', 'TTS'],
     });
     expect(out.customModels).toHaveLength(1);
-    expect(out.customModels[0].id).toBe('openai:foo');
+    expect(out.customModels[0].id).toBe(modelRowId('openai', 'foo')); // canonical UUID id
     expect(out.customCategories).toEqual(['Embeddings', 'TTS']);
   });
 });
