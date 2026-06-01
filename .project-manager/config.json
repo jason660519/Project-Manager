@@ -1294,6 +1294,45 @@
         ],
         "kickoffAt": "2026-06-01T00:10:59.933Z"
       }
+    },
+    {
+      "id": "F42",
+      "name": "Chat Runtime Security Boundary Migration",
+      "category": "Security/Runtime",
+      "status": "in_progress",
+      "progress": 90,
+      "phase": "development",
+      "points": 8,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F42/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F42/",
+        "spec": ".project-manager/features/F42/feature-spec.md",
+        "tdd": ".project-manager/features/F42/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F42/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F42/",
+        "implementation": "lib/chat/chatAgent.ts",
+        "test": "__tests__/chat.agent.test.ts"
+      },
+      "notes": "Migrate AI Assistant chat provider calls behind secure runtime boundaries, add abort/process cleanup, shared session persistence, provider/model metadata, saved-session search/export/memory, and browser/Tauri multimodal image payloads. Remaining gates: cargo check and Chrome/Safari/Tauri manual smoke.",
+      "createdAt": "2026-06-01T01:52:37.435Z",
+      "updatedAt": "2026-06-01T02:42:45.000Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "lib/chat/chatAgent.ts",
+          "lib/chat/providerPayloads.ts",
+          "lib/chat/multimodal.ts",
+          "app/api/chat/route.ts",
+          "app/api/chat/stream/route.ts",
+          "app/api/chat/agent/route.ts",
+          "__tests__/chat.agent.test.ts",
+          "__tests__/chat.providerPayloads.test.ts",
+          "__tests__/chat.route.test.ts",
+          ".project-manager/features/F42/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-01T01:52:37.435Z"
+      }
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",
@@ -1304,6 +1343,6 @@
     "root": "/Volumes/KLEVV-4T-1/Project-Manager"
   },
   "schemaVersion": 8,
-  "updatedAt": "2026-06-01T00:10:59.933Z",
-  "updatedBy": "Cursor Agent"
+  "updatedAt": "2026-06-01T01:52:37.435Z",
+  "updatedBy": "Codex"
 }

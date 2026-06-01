@@ -81,6 +81,10 @@ const KeysView = dynamic(
   () => import('./views/KeysView').then((mod) => mod.KeysView),
   { loading: RouteViewLoading },
 );
+const AiSdksView = dynamic(
+  () => import('./views/AiSdksView').then((mod) => mod.AiSdksView),
+  { loading: RouteViewLoading },
+);
 const SettingsView = dynamic(
   () => import('./views/SettingsView').then((mod) => mod.SettingsView),
   { loading: RouteViewLoading },
@@ -179,11 +183,12 @@ interface MainClientProps {
   initialProjectId?: string;
   integrationsSheet?: import('../../lib/integrations/types').IntegrationSheet;
   keysSheet?: import('../../lib/keys/sheetSlugs').KeysSheetSlug;
+  aiSdksSheet?: import('../../lib/aiSdks/sheetSlugs').AiSdksSheetSlug;
   documentationSlug?: string[];
   assistantSheet?: AIAssistantSheetId;
 }
 
-export function MainClient({ currentView, initialProjectId, integrationsSheet, keysSheet, documentationSlug, assistantSheet }: MainClientProps) {
+export function MainClient({ currentView, initialProjectId, integrationsSheet, keysSheet, aiSdksSheet, documentationSlug, assistantSheet }: MainClientProps) {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectEntry[]>(SEED_PROJECTS);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
@@ -1329,6 +1334,12 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
         <KeysView
           projectRoot={projectManagerRoot}
           initialSheet={keysSheet}
+        />
+      )}
+      {currentView === 'ai-sdks' && (
+        <AiSdksView
+          projectRoot={projectManagerRoot}
+          initialSheet={aiSdksSheet}
         />
       )}
       {currentView === 'settings' && <SettingsView />}

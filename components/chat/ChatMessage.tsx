@@ -81,6 +81,11 @@ export function ChatMessage({ message }: ChatMessageProps) {
             {formatTime(message.createdAt)}
           </span>
         )}
+        {!isUser && (message.provider || message.model) && (
+          <span className="min-w-0 truncate rounded border border-stone-200/10 bg-white/[0.03] px-1 py-0.5 text-[9px] text-stone-400/70">
+            {[message.provider, message.model].filter(Boolean).join(' · ')}
+          </span>
+        )}
         {!isUser && message.content && (
           <div className="ml-auto flex items-center gap-0.5">
             {message.status === 'error' && (

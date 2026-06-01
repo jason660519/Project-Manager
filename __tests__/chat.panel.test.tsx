@@ -40,6 +40,7 @@ function renderPanel(defaultExpanded = false, docked = false) {
 describe('ChatPanel', () => {
   beforeEach(() => {
     sendChatMessageMock.mockReset();
+    window.localStorage.clear();
   });
 
   it('renders toggle button when collapsed', () => {
@@ -188,6 +189,47 @@ describe('ChatPanel', () => {
     await user.click(screen.getByRole('button', { name: /ai assistant/i }));
     expect(screen.getByText('hello')).toBeInTheDocument();
     expect(screen.getByText('Persisted response')).toBeInTheDocument();
+  });
+
+  it('persists floating panel messages into saved chat sessions', async () => {
+    sendChatMessageMock.mockResolvedValueOnce({
+      content: 'Stored response',
+      provider: 'openai',
+      model: 'gpt-4o',
+    });
+    renderPanel(true);
+
+    const input = screen.getByPlaceholderText(/ask me anything/i);
+    fireEvent.change(input, { target: { value: 'remember this' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(await screen.findByText('Stored response')).toBeInTheDocument();
+    const sessions = JSON.parse(window.localStorage.getItem('projectManager:chat-sessions') ?? '[]');
+    expect(sessions[0].messages.map((message: { content: string }) => message.content)).toEqual([
+      'remember this',
+      'Stored response',
+    ]);
+    expect(sessions[0].messages[1]).toMatchObject({ provider: 'openai', model: 'gpt-4o' });
+  });
+
+  it('restores the active floating panel session on mount', () => {
+    window.localStorage.setItem('projectManager:chat-panel-active-session', 'chat-restore');
+    window.localStorage.setItem('projectManager:chat-sessions', JSON.stringify([
+      {
+        id: 'chat-restore',
+        title: 'Restored',
+        createdAt: Date.now(),
+        messages: [
+          { id: 'm1', role: 'user', content: 'old question', createdAt: Date.now() },
+          { id: 'm2', role: 'assistant', content: 'old answer', createdAt: Date.now() },
+        ],
+      },
+    ]));
+
+    renderPanel(true);
+
+    expect(screen.getByText('old question')).toBeInTheDocument();
+    expect(screen.getByText('old answer')).toBeInTheDocument();
   });
 
   it('shows localized error when agent call rejects', async () => {

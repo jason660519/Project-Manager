@@ -6,6 +6,12 @@ import {
   openAiCompatibleChatCompletionsUrl,
   resolveChatProviderApiKey,
 } from '../../../lib/chat/providerRouting';
+import {
+  buildAnthropicMessages,
+  buildGeminiContents,
+  buildOpenAiMessages,
+} from '../../../lib/chat/providerPayloads';
+import type { ChatAttachment } from '../../../lib/chat/types';
 
 interface ChatApiMessage {
   role: 'user' | 'assistant' | 'system';
@@ -20,10 +26,9 @@ interface RequestBody {
   model?: string;
   /** Custom system prompt override. Omit to use the default. */
   systemPrompt?: string;
-  /** API key passed from the client (loaded from Keychain/localStorage). */
-  apiKey?: string;
   maxTokens?: number;
   temperature?: number;
+  attachments?: ChatAttachment[];
 }
 
 interface ChatProviderResponse {
@@ -46,11 +51,11 @@ async function callProvider(
   model: string,
   messages: ChatApiMessage[],
   systemPrompt?: string,
-  clientApiKey?: string,
   maxTokens = 4096,
   temperature?: number,
+  attachments?: ChatAttachment[],
 ): Promise<ChatProviderResponse> {
-  const apiKey = resolveChatProviderApiKey(provider, clientApiKey);
+  const apiKey = resolveChatProviderApiKey(provider);
   const providerSpec = getChatProviderSpec(provider);
   const sys = systemPrompt || getSystemPrompt();
   const estimateTokens = (text: string) => Math.max(0, Math.ceil(text.length / 4));
@@ -68,7 +73,7 @@ async function callProvider(
           model,
           max_tokens: maxTokens,
           system: sys,
-          messages: messages.filter((m) => m.role !== 'system'),
+          messages: buildAnthropicMessages(messages, attachments),
           ...(typeof temperature === 'number' ? { temperature } : {}),
         }),
       });
@@ -84,11 +89,7 @@ async function callProvider(
     }
 
     case 'gemini': {
-      const contents: { role: string; parts: { text: string }[] }[] = [];
-      for (const msg of messages) {
-        if (msg.role === 'system') continue;
-        contents.push({ role: msg.role === 'assistant' ? 'model' : 'user', parts: [{ text: msg.content }] });
-      }
+      const contents = buildGeminiContents(messages, attachments);
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
         {
@@ -121,8 +122,8 @@ async function callProvider(
         ? { max_completion_tokens: maxTokens }
         : { max_tokens: maxTokens };
       const providerMessages = usesReasoningPayload
-        ? [{ role: 'developer', content: sys }, ...messages.filter((m) => m.role !== 'system')]
-        : [{ role: 'system', content: sys }, ...messages];
+        ? buildOpenAiMessages('developer', sys, messages, attachments)
+        : buildOpenAiMessages('system', sys, messages, attachments);
       const res = await fetch(openAiCompatibleChatCompletionsUrl(provider), {
         method: 'POST',
         headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
@@ -178,14 +179,11 @@ export async function POST(request: NextRequest) {
       ? Math.max(0, Math.min(2, body.temperature))
       : undefined;
 
-  // When the client provides a specific API key (loaded from Keychain),
-  // only try the user-requested provider — the key is provider-specific.
   const errors: string[] = [];
   const userProvider = body.provider && body.provider !== 'auto' ? body.provider : undefined;
   const providersToTry = buildChatProviderChain({
     model: body.model,
     userProvider,
-    hasClientApiKey: Boolean(body.apiKey),
   });
 
   for (const provider of providersToTry) {
@@ -196,9 +194,9 @@ export async function POST(request: NextRequest) {
         model,
         body.messages,
         systemPrompt,
-        body.apiKey,
         maxTokens,
         temperature,
+        body.attachments,
       );
       return NextResponse.json({ ...response, provider, model: response.model || model });
     } catch (e) {

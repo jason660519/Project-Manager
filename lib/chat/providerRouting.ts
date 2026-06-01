@@ -39,17 +39,11 @@ export function getDefaultChatModel(provider: string): string {
 export function buildChatProviderChain({
   model,
   userProvider,
-  hasClientApiKey,
 }: {
   model?: string;
   userProvider?: string;
-  hasClientApiKey?: boolean;
 }): string[] {
   const detected = model ? detectProviderFromModel(model) : undefined;
-  if (hasClientApiKey) {
-    if (userProvider) return [userProvider];
-    return detected ? [detected] : [];
-  }
   if (userProvider) {
     return [userProvider, ...FALLBACK_PROVIDERS.filter((provider) => provider !== userProvider)];
   }
@@ -59,8 +53,7 @@ export function buildChatProviderChain({
   return [...FALLBACK_PROVIDERS];
 }
 
-export function resolveChatProviderApiKey(provider: string, clientApiKey?: string): string {
-  if (clientApiKey?.trim()) return clientApiKey;
+export function resolveChatProviderApiKey(provider: string): string {
   const spec = getChatProviderSpec(provider);
   for (const envName of spec.envVarNames) {
     const value = process.env[envName];

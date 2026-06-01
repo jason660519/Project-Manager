@@ -22,11 +22,37 @@ export interface Translations {
     sessions: string;
     logs: string;
     keys: string;
+    aiSdks: string;
     shortcuts: string;
     settings: string;
     docs: string;
     companyStandards: string;
     chat: string;
+  };
+  aiSdks: {
+    title: string;
+    loadError: string;
+    recoverDefaults: string;
+    importMergePrompt: string;
+    status: { saving: string; saved: string; error: string };
+    columns: { id: string; provider: string; model: string; type: string };
+    controls: {
+      searchPlaceholder: string;
+      freezeColumns: string;
+      addModel: string;
+      addModelPlaceholder: string;
+      addCategory: string;
+      addCategoryPlaceholder: string;
+      restoreDefaults: string;
+      restoreDefaultsTitle: string;
+      readOnly: string;
+      edit: string;
+      import: string;
+      export: string;
+    };
+    filters: { type: string; allTypes: string };
+    empty: { noModels: string; noMatch: string };
+    detail: { close: string; range: string; default: string; value: string; selectHint: string };
   };
   system: {
     checkForUpdates: string;

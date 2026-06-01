@@ -5,17 +5,19 @@ import {
 import {
   onAgentExit,
   onAgentStdout,
+  callStoredChatProvider,
+  isTauriRuntime,
+  killProcess,
   spawnAgent,
   type AgentExitPayload,
   type AgentStdioPayload,
 } from '../bridge';
-import { loadProviderKey } from '../keys/loadProviderKey';
-import type { LlmProviderId } from '../keys/llmProviders';
 import type { Feature } from '../types';
 import { loadAIAssistantsConsoleState } from '../ai-assistants/repository';
 import type { PermissionState, TerminalOperationalBoundaries } from '../ai-assistants/types';
 import { createDefaultTerminalBoundaries } from '../ai-assistants/terminalBoundaries';
 import type { ChatContext, ChatMessage, SendChatMessageRequest, SendChatMessageResult } from './types';
+import { imageAttachments } from './multimodal';
 
 const ROUTES: Record<string, string> = {
   projects: '/project-progress-dashboard#projects',
@@ -156,30 +158,38 @@ interface AssistantMemory {
   [key: string]: unknown;
 }
 
-function loadMemory(): AssistantMemory {
+function memoryStorageKey(context?: ChatContext): string {
+  const project = context?.selectedProject;
+  const scope = project?.id || project?.config.project.root || 'global';
+  return `${MEMORY_KEY}:${encodeURIComponent(scope)}`;
+}
+
+function loadMemory(context?: ChatContext): AssistantMemory {
   if (typeof window === 'undefined') return {};
   try {
-    const raw = window.localStorage.getItem(MEMORY_KEY);
+    const scopedKey = memoryStorageKey(context);
+    const raw = window.localStorage.getItem(scopedKey)
+      ?? (scopedKey.endsWith(':global') ? window.localStorage.getItem(MEMORY_KEY) : null);
     return raw ? (JSON.parse(raw) as AssistantMemory) : {};
   } catch {
     return {};
   }
 }
 
-export function saveMemory(key: string, value: unknown): void {
+export function saveMemory(key: string, value: unknown, context?: ChatContext): void {
   if (typeof window === 'undefined') return;
   try {
-    const mem = loadMemory();
+    const mem = loadMemory(context);
     mem[key] = value;
     mem.lastInteractionAt = Date.now();
-    window.localStorage.setItem(MEMORY_KEY, JSON.stringify(mem));
+    window.localStorage.setItem(memoryStorageKey(context), JSON.stringify(mem));
   } catch {
     // ignore storage errors
   }
 }
 
-function getMemoryDump(): string {
-  const mem = loadMemory();
+function getMemoryDump(context?: ChatContext): string {
+  const mem = loadMemory(context);
   const entries = Object.entries(mem).filter(
     ([k]) => k !== 'lastInteraction' && k !== 'lastInteractionAt',
   );
@@ -479,32 +489,32 @@ function localCommand(request: SendChatMessageRequest): SendChatMessageResult | 
 
   // /status
   if (lowered === '/status' || lowered.includes('project status') || lowered.includes('feature status')) {
-    saveMemory('lastInteraction', '/status');
+    saveMemory('lastInteraction', '/status', request.context);
     return { content: summarizeStatus(request.context), handledLocally: true };
   }
 
   // /feature <id>
   if (lowered.startsWith('/feature ')) {
-    saveMemory('lastInteraction', content);
+    saveMemory('lastInteraction', content, request.context);
     return { content: summarizeFeature(request.context, content.slice('/feature '.length)), handledLocally: true };
   }
 
   // /runs
   if (lowered === '/runs') {
-    saveMemory('lastInteraction', '/runs');
+    saveMemory('lastInteraction', '/runs', request.context);
     return { content: summarizeRuns(request.context), handledLocally: true };
   }
 
   // /config
   if (lowered === '/config') {
-    saveMemory('lastInteraction', '/config');
+    saveMemory('lastInteraction', '/config', request.context);
     return { content: summarizeConfig(request.context), handledLocally: true };
   }
 
   // /memory
   if (lowered === '/memory' || lowered === 'memory') {
-    saveMemory('lastInteraction', '/memory');
-    return { content: getMemoryDump(), handledLocally: true };
+    saveMemory('lastInteraction', '/memory', request.context);
+    return { content: getMemoryDump(request.context), handledLocally: true };
   }
 
   // /go <view>
@@ -523,7 +533,7 @@ function localCommand(request: SendChatMessageRequest): SendChatMessageResult | 
 
   // /dispatch <id>
   if (lowered.startsWith('/dispatch ')) {
-    saveMemory('lastInteraction', content);
+    saveMemory('lastInteraction', content, request.context);
     return {
       content: buildDispatchResponse(request.context, content.slice('/dispatch '.length)),
       handledLocally: true,
@@ -547,8 +557,8 @@ function localCommand(request: SendChatMessageRequest): SendChatMessageResult | 
   // Natural language: Search
   const searchQuery = naturalLanguageSearch(content);
   if (searchQuery && request.context.selectedProject) {
-    saveMemory('lastSearch', searchQuery);
-    saveMemory('lastInteraction', `search: ${searchQuery}`);
+    saveMemory('lastSearch', searchQuery, request.context);
+    saveMemory('lastInteraction', `search: ${searchQuery}`, request.context);
     // Defer to tool execution — handled below after localCommand check
     // We return a placeholder so the caller can do the async search
     return {
@@ -654,7 +664,8 @@ async function callChatApi(
   onStream?: (chunk: string) => void,
   chatSettingsOverride?: { provider: string; model: string; systemPrompt: string },
   abortSignal?: AbortSignal,
-): Promise<string> {
+  attachments?: SendChatMessageRequest['attachments'],
+): Promise<Pick<SendChatMessageResult, 'content' | 'provider' | 'model'>> {
   // Build messages array WITHOUT system prompt (passed separately via systemPrompt field)
   const systemPrompt = chatSettingsOverride?.systemPrompt || buildSystemPrompt(context);
   const messages: { role: 'user' | 'assistant'; content: string }[] = [];
@@ -684,20 +695,29 @@ async function callChatApi(
   }
 
   const chatPayload: Record<string, unknown> = { messages };
+  const multimodalAttachments = imageAttachments(attachments);
+  if (multimodalAttachments.length > 0) chatPayload.attachments = multimodalAttachments;
   if (providerConfig.provider) chatPayload.provider = providerConfig.provider;
   if (providerConfig.model) chatPayload.model = providerConfig.model;
   // Always pass system prompt via the dedicated field
   chatPayload.systemPrompt = systemPrompt;
 
-  // Load the API key client-side (Keychain/localStorage) and forward to the server
-  const effectiveProvider = providerConfig.provider;
-  if (effectiveProvider) {
-    try {
-      const key = await loadProviderKey(effectiveProvider as LlmProviderId);
-      if (key?.trim()) {
-        chatPayload.apiKey = key;
-      }
-    } catch { /* key not available, server will try env or fail */ }
+  if (isTauriRuntime()) {
+    const provider = providerConfig.provider || 'deepseek';
+    const nativeResult = await callStoredChatProvider({
+      provider,
+      model: providerConfig.model,
+      maxTokens: 4096,
+      messages,
+      systemPrompt,
+      attachments: multimodalAttachments,
+    });
+    if (onStream && nativeResult.content) onStream(nativeResult.content);
+    return {
+      content: nativeResult.content,
+      provider: nativeResult.provider ?? provider,
+      model: nativeResult.model ?? providerConfig.model,
+    };
   }
 
   // Streaming
@@ -713,6 +733,8 @@ async function callChatApi(
       const text = await res.text();
       throw new Error(text || 'Streaming chat API failed');
     }
+    const responseProvider = res.headers.get('x-ai-provider') ?? undefined;
+    const responseModel = res.headers.get('x-ai-model') ?? undefined;
 
     const reader = res.body?.getReader();
     if (!reader) throw new Error('No response body for streaming');
@@ -755,7 +777,7 @@ async function callChatApi(
       }
     }
 
-    return result;
+    return { content: result, provider: responseProvider, model: responseModel };
   }
 
   // Non-streaming
@@ -772,33 +794,60 @@ async function callChatApi(
   }
 
   const data = await res.json();
-  return data.content ?? '';
+  return { content: data.content ?? '', provider: data.provider, model: data.model };
 }
 
 // ---------------------------------------------------------------------------
 // Agent dispatch fallback
 // ---------------------------------------------------------------------------
 
-function waitForAgentOutput(pid: number): Promise<string> {
+function createChatAbortError(): DOMException {
+  return new DOMException('Chat request aborted', 'AbortError');
+}
+
+function waitForAgentOutput(pid: number, abortSignal?: AbortSignal): Promise<string> {
   if (pid === 0 || typeof window === 'undefined') {
     return Promise.resolve(
       '已將任務發送到已配置的專案 Agent。瀏覽器 dry-run 模式下沒有即時輸出。',
     );
   }
 
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const lines: string[] = [];
     let settled = false;
     let unStdout: (() => void) | undefined;
     let unExit: (() => void) | undefined;
+    let timeoutId: number | undefined;
+
+    const cleanup = () => {
+      unStdout?.();
+      unExit?.();
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+      abortSignal?.removeEventListener('abort', abort);
+    };
 
     const finish = (message: string) => {
       if (settled) return;
       settled = true;
-      unStdout?.();
-      unExit?.();
+      cleanup();
       resolve(message);
     };
+
+    const abort = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      void killProcess(pid).catch((error) => {
+        console.warn('[chat] failed to kill aborted agent process', { pid, error });
+      });
+      reject(createChatAbortError());
+    };
+
+    if (abortSignal?.aborted) {
+      abort();
+      return;
+    }
+    abortSignal?.addEventListener('abort', abort, { once: true });
 
     void onAgentStdout((payload: AgentStdioPayload) => {
       if (payload.pid === pid) lines.push(payload.line);
@@ -815,7 +864,7 @@ function waitForAgentOutput(pid: number): Promise<string> {
       unExit = unlisten;
     });
 
-    window.setTimeout(() => {
+    timeoutId = window.setTimeout(() => {
       finish(lines.join('\n').trim() || 'Agent 仍在執行中。請到 Logs 頁面查看即時輸出。');
     }, 15000);
   });
@@ -836,6 +885,8 @@ interface AgentStreamCallbacks {
 interface AgentStreamResult {
   content: string;
   toolCalls: Array<{ id: string; name: string; arguments: Record<string, unknown>; result?: string; error?: boolean }>;
+  provider?: string;
+  model?: string;
 }
 
 export function buildTerminalToolContext(projectRoot: string): {
@@ -866,6 +917,7 @@ async function callAgentApi(
   callbacks: AgentStreamCallbacks,
   chatSettingsOverride?: { provider: string; model: string; systemPrompt: string },
   abortSignal?: AbortSignal,
+  attachments?: SendChatMessageRequest['attachments'],
 ): Promise<AgentStreamResult> {
   const systemPrompt = chatSettingsOverride?.systemPrompt || buildSystemPrompt(context);
   
@@ -920,16 +972,28 @@ async function callAgentApi(
     context: toolContext,
     systemPrompt, // Always pass the rich system prompt
   };
+  const multimodalAttachments = imageAttachments(attachments);
+  if (multimodalAttachments.length > 0) payload.attachments = multimodalAttachments;
   if (providerConfig.provider) payload.provider = providerConfig.provider;
   if (providerConfig.model) payload.model = providerConfig.model;
 
-  // Load the API key client-side (Keychain/localStorage) and forward to the server
-  const effectiveProvider = providerConfig.provider;
-  if (effectiveProvider) {
-    try {
-      const key = await loadProviderKey(effectiveProvider as LlmProviderId);
-      if (key?.trim()) payload.apiKey = key;
-    } catch { /* key not available, server will try env or fail */ }
+  if (isTauriRuntime()) {
+    const provider = providerConfig.provider || 'deepseek';
+    const nativeResult = await callStoredChatProvider({
+      provider,
+      model: providerConfig.model,
+      maxTokens: 8192,
+      messages,
+      systemPrompt,
+      attachments: multimodalAttachments,
+    });
+    callbacks.onText?.(nativeResult.content);
+    return {
+      content: nativeResult.content,
+      toolCalls: [],
+      provider: nativeResult.provider ?? provider,
+      model: nativeResult.model ?? providerConfig.model,
+    };
   }
 
   const res = await fetch('/api/chat/agent', {
@@ -950,6 +1014,8 @@ async function callAgentApi(
   const decoder = new TextDecoder();
   let buffer = '';
   let contentAccum = '';
+  let provider: string | undefined;
+  let model: string | undefined;
   const toolCalls: AgentStreamResult['toolCalls'] = [];
 
   while (true) {
@@ -971,6 +1037,10 @@ async function callAgentApi(
         switch (json.type) {
           case 'thinking_start':
             callbacks.onThinkingStart?.();
+            break;
+          case 'metadata':
+            provider = typeof json.provider === 'string' ? json.provider : provider;
+            model = typeof json.model === 'string' ? json.model : model;
             break;
           case 'thinking':
             callbacks.onThinking?.(json.text);
@@ -1004,7 +1074,7 @@ async function callAgentApi(
     }
   }
 
-  return { content: contentAccum, toolCalls };
+  return { content: contentAccum, toolCalls, provider, model };
 }
 
 // ---------------------------------------------------------------------------
@@ -1033,7 +1103,7 @@ export async function sendChatMessage(
     return local;
   }
 
-  saveMemory('lastInteraction', request.content);
+  saveMemory('lastInteraction', request.content, request.context);
 
   const project = request.context.selectedProject;
 
@@ -1053,6 +1123,7 @@ export async function sendChatMessage(
         },
         request.chatSettings,
         request.abortSignal,
+        request.attachments,
       );
       
       // If we got a meaningful response, return it
@@ -1060,6 +1131,8 @@ export async function sendChatMessage(
         return {
           content: result.content || '已執行工具呼叫，詳見上方結果。',
           toolCalls: result.toolCalls.length > 0 ? result.toolCalls : undefined,
+          provider: result.provider,
+          model: result.model,
         };
       }
     } catch (error) {
@@ -1091,8 +1164,9 @@ export async function sendChatMessage(
           request.onStream,
           request.chatSettings,
           request.abortSignal,
+          request.attachments,
         );
-        return { content: apiContent };
+        return apiContent;
       } catch (error) {
         if (isAbortError(error, request.abortSignal)) throw error;
         return { content: result.message || 'Agent 指令準備失敗。', error: true };
@@ -1104,7 +1178,7 @@ export async function sendChatMessage(
       args: result.args,
       workingDir: project.config.project.root,
     });
-    const agentOutput = await waitForAgentOutput(pid);
+    const agentOutput = await waitForAgentOutput(pid, request.abortSignal);
     if (agentOutput.includes('Agent exited with code') && !agentOutput.includes('code 0')) {
       try {
         const apiContent = await callChatApi(
@@ -1114,8 +1188,9 @@ export async function sendChatMessage(
           request.onStream,
           request.chatSettings,
           request.abortSignal,
+          request.attachments,
         );
-        return { content: apiContent };
+        return apiContent;
       } catch (error) {
         if (isAbortError(error, request.abortSignal)) throw error;
         return { content: agentOutput, error: true };
@@ -1126,15 +1201,16 @@ export async function sendChatMessage(
 
   // 3. AI API fallback
   try {
-    const content = await callChatApi(
+    const result = await callChatApi(
       request.content,
       request.history,
       request.context,
       request.onStream,
       request.chatSettings,
       request.abortSignal,
+      request.attachments,
     );
-    return { content };
+    return result;
   } catch (e) {
     if (isAbortError(e, request.abortSignal)) throw e;
     const err = e as Error;

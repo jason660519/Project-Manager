@@ -17,6 +17,12 @@ import {
   openAiCompatibleBaseUrl,
   resolveChatProviderApiKey,
 } from '../../../../lib/chat/providerRouting';
+import {
+  buildAnthropicMessages,
+  buildGeminiContents,
+  buildOpenAiMessages,
+} from '../../../../lib/chat/providerPayloads';
+import type { ChatAttachment } from '../../../../lib/chat/types';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -39,8 +45,7 @@ interface RequestBody {
   tools?: boolean;
   /** Project context for tool execution */
   context?: ToolContext;
-  /** API key passed from the client (loaded from Keychain/localStorage). */
-  apiKey?: string;
+  attachments?: ChatAttachment[];
 }
 
 // ── SSE Helpers ─────────────────────────────────────────────────────────────
@@ -49,6 +54,19 @@ const encoder = new TextEncoder();
 
 function sse(data: Record<string, unknown>): Uint8Array {
   return encoder.encode(`data: ${JSON.stringify(data)}\n\n`);
+}
+
+function formatToolResultForModel(call: ToolCall, result: ToolResult): string {
+  return JSON.stringify({
+    tool_call_id: call.id,
+    tool_name: call.name,
+    arguments: call.arguments,
+    status: result.error ? 'error' : 'ok',
+    error: Boolean(result.error),
+    content: result.content,
+    content_char_count: result.content.length,
+    generated_at: new Date().toISOString(),
+  });
 }
 
 // ── Provider Streaming with Tool Support ────────────────────────────────────
@@ -61,15 +79,19 @@ async function streamAnthropic(
   apiKey: string, model: string, sys: string, messages: ChatApiMessage[],
   send: (data: Record<string, unknown>) => void,
   tools = false, context?: ToolContext,
+  attachments?: ChatAttachment[],
   signal?: AbortSignal,
 ): Promise<void> {
+  const baseMessages = buildAnthropicMessages(messages, attachments);
+  let providerMessageIndex = -1;
   const body: Record<string, unknown> = {
     model,
     max_tokens: 8192,
     stream: true,
     system: sys,
     messages: messages.filter(m => m.role !== 'system').map(m => {
-      const msg: Record<string, unknown> = { role: m.role, content: m.content };
+      providerMessageIndex += 1;
+      const msg: Record<string, unknown> = baseMessages[providerMessageIndex] ?? { role: m.role, content: m.content };
       if (m.tool_calls) {
         // Convert OpenAI format tool_calls back to Anthropic format
         msg.content = m.tool_calls.map((tc, i) => ({
@@ -165,20 +187,13 @@ async function streamAnthropic(
 
   // Execute tool calls if any
   if (toolCalls.length > 0 && context) {
+    const executedResults: Array<{ call: ToolCall; result: ToolResult }> = [];
     for (const tc of toolCalls) {
       send({ type: 'tool_call', id: tc.id, name: tc.name, arguments: tc.arguments });
       const result = await executeToolCall(tc, context);
+      executedResults.push({ call: tc, result });
       send({ type: 'tool_result', id: tc.id, content: result.content, error: result.error });
     }
-
-    // Recurse: send tool results back to LLM for final response
-    const toolResults: ChatApiMessage[] = toolCalls.map(tc => {
-      const res = toolCalls.indexOf(tc); // We don't store results, just re-query
-      return {
-        role: 'user' as const,
-        content: `Tool result for ${tc.name}: executed successfully.`,
-      };
-    });
     
     // Feed tool results and get final response
     const followUpBody: Record<string, unknown> = {
@@ -191,10 +206,12 @@ async function streamAnthropic(
         { role: 'assistant' as const, content: toolCalls.map(tc => 
           JSON.stringify({ type: 'tool_use', id: tc.id, name: tc.name, input: tc.arguments })
         ).join('\n') },
-        { role: 'user' as const, content: toolCalls.map(tc => {
-          const idx = toolCalls.indexOf(tc);
-          return `Tool result (id: ${tc.id}): executed successfully.`;
-        }).join('\n') },
+        {
+          role: 'user' as const,
+          content: executedResults
+            .map(({ call, result }) => formatToolResultForModel(call, result))
+            .join('\n'),
+        },
       ],
     };
 
@@ -246,13 +263,14 @@ async function streamOpenAI(
   apiKey: string, model: string, sys: string, messages: ChatApiMessage[],
   send: (data: Record<string, unknown>) => void,
   tools = false, context?: ToolContext,
+  attachments?: ChatAttachment[],
   signal?: AbortSignal,
 ): Promise<void> {
   const body: Record<string, unknown> = {
     model,
     max_tokens: 8192,
     stream: true,
-    messages: [{ role: 'system', content: sys }, ...messages],
+    messages: buildOpenAiMessages('system', sys, messages, attachments),
   };
 
   if (tools) {
@@ -317,6 +335,7 @@ async function streamOpenAI(
   // Execute tool calls
   if (toolCalls.size > 0 && context) {
     const calls: ToolCall[] = [];
+    const executedResults = new Map<string, ToolResult>();
     for (const [, tc] of toolCalls) {
       let args = {};
       try { args = JSON.parse(tc.arguments || '{}'); } catch { /* keep empty */ }
@@ -327,6 +346,7 @@ async function streamOpenAI(
 
     for (const call of calls) {
       const result = await executeToolCall(call, context);
+      executedResults.set(call.id, result);
       send({ type: 'tool_result', id: call.id, content: result.content, error: result.error });
     }
 
@@ -346,7 +366,11 @@ async function streamOpenAI(
       ...calls.map(c => ({
         role: 'tool' as const,
         tool_call_id: c.id,
-        content: `Tool executed. Result available in previous messages.`,
+        content: formatToolResultForModel(c, executedResults.get(c.id) ?? {
+          tool_call_id: c.id,
+          content: '',
+          error: true,
+        }),
       })),
     ];
 
@@ -393,13 +417,14 @@ async function streamOpenAICompat(
   model: string, sys: string, messages: ChatApiMessage[],
   send: (data: Record<string, unknown>) => void,
   tools = false, context?: ToolContext,
+  attachments?: ChatAttachment[],
   signal?: AbortSignal,
 ): Promise<void> {
   const body: Record<string, unknown> = {
     model,
     max_tokens: 8192,
     stream: true,
-    messages: [{ role: 'system', content: sys }, ...messages.filter(m => m.role !== 'system')],
+    messages: buildOpenAiMessages('system', sys, messages, attachments),
   };
 
   if (tools) {
@@ -470,6 +495,7 @@ async function streamOpenAICompat(
   // Execute tool calls if any were collected
   if (toolCalls.size > 0 && context) {
     const calls: ToolCall[] = [];
+    const executedResults = new Map<string, ToolResult>();
     for (const [, tc] of toolCalls) {
       let args = {};
       try { args = JSON.parse(tc.arguments || '{}'); } catch { /* keep empty */ }
@@ -480,6 +506,7 @@ async function streamOpenAICompat(
 
     for (const call of calls) {
       const result = await executeToolCall(call, context);
+      executedResults.set(call.id, result);
       send({ type: 'tool_result', id: call.id, content: result.content, error: result.error });
     }
 
@@ -500,7 +527,11 @@ async function streamOpenAICompat(
         ...calls.map(c => ({
           role: 'tool' as const,
           tool_call_id: c.id,
-          content: `OK.`,
+          content: formatToolResultForModel(c, executedResults.get(c.id) ?? {
+            tool_call_id: c.id,
+            content: '',
+            error: true,
+          }),
         })),
       ];
 
@@ -545,16 +576,10 @@ async function streamGemini(
   sys: string,
   messages: ChatApiMessage[],
   send: (data: Record<string, unknown>) => void,
+  attachments?: ChatAttachment[],
   signal?: AbortSignal,
 ): Promise<void> {
-  const contents: { role: string; parts: { text: string }[] }[] = [];
-  for (const msg of messages) {
-    if (msg.role === 'system') continue;
-    contents.push({
-      role: msg.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: msg.content }],
-    });
-  }
+  const contents = buildGeminiContents(messages, attachments);
 
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
@@ -608,24 +633,24 @@ async function streamWithProvider(
   provider: string, model: string, sys: string, messages: ChatApiMessage[],
   tools: boolean, context: ToolContext | undefined,
   send: (data: Record<string, unknown>) => void,
-  clientApiKey?: string,
+  attachments?: ChatAttachment[],
   signal?: AbortSignal,
 ): Promise<void> {
-  const apiKey = resolveChatProviderApiKey(provider, clientApiKey);
+  const apiKey = resolveChatProviderApiKey(provider);
   const providerSpec = getChatProviderSpec(provider);
 
   switch (providerSpec.apiKind) {
     case 'anthropic':
-      return streamAnthropic(apiKey, model, sys, messages, send, tools, context, signal);
+      return streamAnthropic(apiKey, model, sys, messages, send, tools, context, attachments, signal);
 
     case 'gemini':
-      return streamGemini(apiKey, model, sys, messages, send, signal);
+      return streamGemini(apiKey, model, sys, messages, send, attachments, signal);
 
     case 'openai-compatible':
       if (provider === 'openai') {
-        return streamOpenAI(apiKey, model, sys, messages, send, tools, context, signal);
+        return streamOpenAI(apiKey, model, sys, messages, send, tools, context, attachments, signal);
       }
-      return streamOpenAICompat(provider, apiKey, openAiCompatibleBaseUrl(provider), model, sys, messages, send, tools, context, signal);
+      return streamOpenAICompat(provider, apiKey, openAiCompatibleBaseUrl(provider), model, sys, messages, send, tools, context, attachments, signal);
 
     default:
       throw new Error(`Unsupported provider: ${provider}`);
@@ -660,16 +685,16 @@ export async function POST(request: NextRequest) {
           const providersToTry = buildChatProviderChain({
             model: body.model,
             userProvider,
-            hasClientApiKey: Boolean(body.apiKey),
           });
           const errors: string[] = [];
 
           for (const provider of providersToTry) {
             try {
               const model = body.model || getDefaultChatModel(provider);
+              send({ type: 'metadata', provider, model });
               await streamWithProvider(provider, model, sys, body.messages,
                 useTools,  // All providers now support tools via streamOpenAICompat
-                context, send, body.apiKey, request.signal);
+                context, send, body.attachments, request.signal);
               break;
             } catch (e) {
               errors.push(`${provider}: ${(e as Error).message}`);

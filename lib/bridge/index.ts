@@ -18,6 +18,8 @@ import { validateWorkspaceFolderPath } from '../xmux/workspacePaths';
 const isTauri = (): boolean =>
   typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
+export const isTauriRuntime = (): boolean => isTauri();
+
 async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   const { invoke: tauriInvoke } = await import('@tauri-apps/api/core');
   return tauriInvoke<T>(command, args);
@@ -96,6 +98,22 @@ export async function migrateProjectLayout(
 export async function writeConfig(path: string, config: ProjectManagerConfig): Promise<void> {
   if (!isTauri()) throw new Error('writeConfig requires Tauri runtime');
   return invoke<void>('write_config', { path, config });
+}
+
+/**
+ * Generic JSON read/write for sibling `.project-manager/*.json` files that have
+ * their own schemaVersion and are NOT the canonical config (e.g. ai-sdks.json).
+ * Wraps the same read_config/write_config Rust commands but skips
+ * `migrateConfig` — callers own their own normalization.
+ */
+export async function readJsonFile<T = unknown>(path: string): Promise<T> {
+  if (!isTauri()) throw new Error('readJsonFile requires Tauri runtime');
+  return invoke<T>('read_config', { path });
+}
+
+export async function writeJsonFile(path: string, value: unknown): Promise<void> {
+  if (!isTauri()) throw new Error('writeJsonFile requires Tauri runtime');
+  return invoke<void>('write_config', { path, config: value });
 }
 
 export interface InitializeProjectResult {
@@ -1318,10 +1336,20 @@ export interface AnthropicMessage {
   content: string | any;
 }
 
+export interface StoredChatAttachment {
+  name: string;
+  type: string;
+  size: number;
+  content?: string;
+  dataUrl?: string;
+}
+
 export interface AnthropicResponse {
   content: string;
   inputTokens: number;
   outputTokens: number;
+  provider?: string;
+  model?: string;
 }
 
 export async function callAnthropic(opts: {
@@ -1432,6 +1460,27 @@ export async function callGemini(opts: {
     maxTokens: opts.maxTokens ?? 4096,
     messages: opts.messages,
     temperature: opts.temperature ?? null,
+  });
+}
+
+export async function callStoredChatProvider(opts: {
+  provider: string;
+  model?: string;
+  maxTokens?: number;
+  messages: AnthropicMessage[];
+  systemPrompt?: string;
+  temperature?: number;
+  attachments?: StoredChatAttachment[];
+}): Promise<AnthropicResponse> {
+  if (!isTauri()) throw new Error('callStoredChatProvider requires Tauri runtime');
+  return invoke<AnthropicResponse>('call_stored_chat_provider', {
+    provider: opts.provider,
+    model: opts.model ?? null,
+    maxTokens: opts.maxTokens ?? 4096,
+    messages: opts.messages,
+    systemPrompt: opts.systemPrompt ?? null,
+    temperature: opts.temperature ?? null,
+    attachments: opts.attachments ?? null,
   });
 }
 

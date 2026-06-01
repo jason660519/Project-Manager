@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Settings,
   ShieldCheck,
+  SlidersHorizontal,
   SquareTerminal,
   Timer,
   Wifi,
@@ -49,6 +50,7 @@ const NAV_GROUPS: NavGroup[] = [
     groupKey: 'execution',
     items: [
       { id: 'keys',             itemKey: 'keys',            href: '/keys',                     icon: KeyRound },
+      { id: 'ai-sdks',          itemKey: 'aiSdks',          href: '/ai-sdks',                  icon: SlidersHorizontal },
       { id: 'integrations-hub', itemKey: 'integrationsHub', href: '/integrations-hub/system_installed_apps', icon: Plug },
       { id: 'xmux',             itemKey: 'xmux',            href: '/xmux',                     icon: SquareTerminal },
       { id: 'cron-jobs',        itemKey: 'cronJobs',        href: '/cron-jobs',                icon: Timer },

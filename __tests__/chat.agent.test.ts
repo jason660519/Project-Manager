@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { sendChatMessage } from '../lib/chat/chatAgent';
 import type { ChatContext } from '../lib/chat/types';
-import { spawnAgent } from '../lib/bridge';
+import { callStoredChatProvider, isTauriRuntime, killProcess, spawnAgent } from '../lib/bridge';
 import { createRuntimeAdapterFromConfig } from '../lib/adapters/registry';
 
 // Mock global fetch so AI chat API fallback doesn't throw in tests
@@ -12,6 +12,13 @@ const mockFetch = vi.fn().mockResolvedValue({
 vi.stubGlobal('fetch', mockFetch);
 
 vi.mock('../lib/bridge', () => ({
+  callStoredChatProvider: vi.fn().mockResolvedValue({
+    content: 'Hello from native stored-key chat!',
+    inputTokens: 1,
+    outputTokens: 2,
+  }),
+  isTauriRuntime: vi.fn().mockReturnValue(false),
+  killProcess: vi.fn().mockResolvedValue(undefined),
   onAgentExit: vi.fn().mockResolvedValue(vi.fn()),
   onAgentStdout: vi.fn().mockResolvedValue(vi.fn()),
   spawnAgent: vi.fn().mockResolvedValue(0),
@@ -79,6 +86,7 @@ const context: ChatContext = {
 describe('sendChatMessage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
   });
 
   it('routes /go logs without spawning an agent', async () => {
@@ -156,6 +164,36 @@ describe('sendChatMessage', () => {
     expect(spawnAgent).not.toHaveBeenCalled();
   });
 
+  it('stores assistant memory per selected project', async () => {
+    const otherContext: ChatContext = {
+      ...context,
+      selectedProject: context.selectedProject
+        ? {
+            ...context.selectedProject,
+            id: 'other-project',
+            config: {
+              ...context.selectedProject.config,
+              id: 'other-project',
+              project: {
+                ...context.selectedProject.config.project,
+                root: '/tmp/other-project',
+              },
+            },
+          }
+        : undefined,
+    };
+
+    await sendChatMessage({ content: 'search feature', history: [], context });
+    await sendChatMessage({ content: 'search dashboard', history: [], context: otherContext });
+
+    expect(JSON.parse(window.localStorage.getItem('pm-assistant-memory:pm') ?? '{}')).toMatchObject({
+      lastSearch: 'feature',
+    });
+    expect(JSON.parse(window.localStorage.getItem('pm-assistant-memory:other-project') ?? '{}')).toMatchObject({
+      lastSearch: 'dashboard',
+    });
+  });
+
   it('dispatches general questions through selected project adapter', async () => {
     const result = await sendChatMessage({ content: 'What should I work on?', history: [], context });
     expect(createRuntimeAdapterFromConfig).toHaveBeenCalledWith(context.adapters[0]);
@@ -165,6 +203,23 @@ describe('sendChatMessage', () => {
       workingDir: '/tmp/project-manager',
     });
     expect(result.content).toMatch(/Agent|發送/);
+  });
+
+  it('kills the spawned local agent process when chat is aborted', async () => {
+    const controller = new AbortController();
+    vi.mocked(spawnAgent).mockImplementationOnce(async () => {
+      controller.abort();
+      return 123;
+    });
+
+    await expect(sendChatMessage({
+      content: 'run agent',
+      history: [],
+      context: { ...context, features: [] },
+      abortSignal: controller.signal,
+    })).rejects.toMatchObject({ name: 'AbortError' });
+
+    expect(killProcess).toHaveBeenCalledWith(123);
   });
 
   it('falls back to AI chat API when no agent adapter is configured', async () => {
@@ -181,7 +236,90 @@ describe('sendChatMessage', () => {
         headers: { 'content-type': 'application/json' },
       }),
     );
+    const payload = JSON.parse(mockFetch.mock.calls.at(-1)?.[1]?.body as string);
+    expect(payload.apiKey).toBeUndefined();
     expect(result.content).toContain('Hello from the AI assistant');
+  });
+
+  it('passes only image attachments to the chat API fallback payload', async () => {
+    const result = await sendChatMessage({
+      content: 'Describe this screenshot',
+      history: [],
+      context: { ...context, selectedProject: undefined, adapters: [], features: [] },
+      attachments: [
+        {
+          name: 'screen.png',
+          type: 'image/png',
+          size: 12,
+          dataUrl: 'data:image/png;base64,aGVsbG8=',
+        },
+        {
+          name: 'notes.md',
+          type: 'text/markdown',
+          size: 9,
+          content: '# Notes',
+        },
+      ],
+    });
+
+    expect(result.error).toBeFalsy();
+    const payload = JSON.parse(mockFetch.mock.calls.at(-1)?.[1]?.body as string);
+    expect(payload.apiKey).toBeUndefined();
+    expect(payload.attachments).toEqual([
+      {
+        name: 'screen.png',
+        type: 'image/png',
+        size: 12,
+        dataUrl: 'data:image/png;base64,aGVsbG8=',
+      },
+    ]);
+  });
+
+  it('uses the Tauri stored-key chat bridge without sending keys through fetch', async () => {
+    vi.mocked(isTauriRuntime).mockReturnValueOnce(true);
+    const result = await sendChatMessage({
+      content: 'question',
+      history: [],
+      context: { ...context, adapters: [] },
+      chatSettings: { provider: 'openai', model: 'gpt-4o', systemPrompt: '' },
+    });
+
+    expect(result.error).toBeFalsy();
+    expect(callStoredChatProvider).toHaveBeenCalledWith(expect.objectContaining({
+      provider: 'openai',
+      model: 'gpt-4o',
+    }));
+    expect(mockFetch).not.toHaveBeenCalledWith('/api/chat', expect.anything());
+    expect(result.content).toContain('native stored-key chat');
+  });
+
+  it('passes image attachments through the Tauri stored-key bridge', async () => {
+    vi.mocked(isTauriRuntime).mockReturnValueOnce(true);
+
+    await sendChatMessage({
+      content: 'What is in this screenshot?',
+      history: [],
+      context: { ...context, selectedProject: undefined, adapters: [], features: [] },
+      chatSettings: { provider: 'openai', model: 'gpt-4o', systemPrompt: '' },
+      attachments: [
+        {
+          name: 'screen.png',
+          type: 'image/png',
+          size: 12,
+          dataUrl: 'data:image/png;base64,aGVsbG8=',
+        },
+      ],
+    });
+
+    expect(callStoredChatProvider).toHaveBeenCalledWith(expect.objectContaining({
+      provider: 'openai',
+      attachments: [{
+        name: 'screen.png',
+        type: 'image/png',
+        size: 12,
+        dataUrl: 'data:image/png;base64,aGVsbG8=',
+      }],
+    }));
   });
 
   it('returns Chinese error when AI chat API call fails', async () => {

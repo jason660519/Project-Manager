@@ -8,6 +8,16 @@ export interface ChatMessage {
   content: string;
   createdAt: number;
   status?: 'sent' | 'loading' | 'error';
+  provider?: string;
+  model?: string;
+}
+
+export interface ChatAttachment {
+  name: string;
+  type: string;
+  size: number;
+  content?: string;
+  dataUrl?: string;
 }
 
 export interface ChatRunSummary {
@@ -40,6 +50,8 @@ export interface SendChatMessageRequest {
   onStream?: (chunk: string) => void;
   /** Optional provider/model/systemPrompt override from chat settings. */
   chatSettings?: { provider: string; model: string; systemPrompt: string };
+  /** Optional user-provided files. Images are sent as multimodal attachments when the provider route supports it. */
+  attachments?: ChatAttachment[];
   /** Agent API callbacks for tool calling support */
   onThinkingStart?: () => void;
   onThinking?: (text: string) => void;
@@ -60,4 +72,6 @@ export interface SendChatMessageResult {
     result?: string;
     error?: boolean;
   }>;
+  provider?: string;
+  model?: string;
 }

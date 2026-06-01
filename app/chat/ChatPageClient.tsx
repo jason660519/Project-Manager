@@ -1,11 +1,11 @@
 'use client';
 
-import { Bot, ChevronDown, Download, MessageSquareText, Mic, Send, Square, Trash2 } from 'lucide-react';
+import { Bot, ChevronDown, Download, MessageSquareText, Mic, Search, Send, Square, Tag, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '../../lib/i18n';
-import { ChatInput } from '../../components/chat/ChatInput';
+import { ChatInput, type AttachedFile } from '../../components/chat/ChatInput';
 import { ChatMessage as ChatMessageView } from '../../components/chat/ChatMessage';
 import { ChatSettings } from '../../components/chat/ChatSettings';
 import { QuickActions } from '../../components/chat/QuickActions';
@@ -13,12 +13,26 @@ import { ThinkingIndicator } from '../../components/chat/ThinkingIndicator';
 import { ToolCallGroup } from '../../components/chat/ToolCallCard';
 import type { ToolCallDisplay } from '../../components/chat/ToolCallCard';
 import type { ChatMessage } from '../../lib/chat/types';
+import type { ChatAttachment } from '../../lib/chat/types';
+import {
+  generateChatSessionTitle,
+  loadChatSessions,
+  saveChatSessions,
+  upsertChatSession,
+  type StoredChatSession,
+} from '../../lib/chat/sessionStorage';
+import { formatChatAsFeatureNotes } from '../../lib/chat/exportFeatureNotes';
+import { formatAttachmentDisplayText, formatTextAttachmentBlock } from '../../lib/chat/multimodal';
 
-interface StoredSession {
-  id: string;
-  title: string;
-  messages: ChatMessage[];
-  createdAt: number;
+function toChatAttachments(files?: AttachedFile[]): ChatAttachment[] | undefined {
+  if (!files?.length) return undefined;
+  return files.map((file) => ({
+    name: file.name,
+    type: file.type,
+    size: file.size,
+    content: file.content || undefined,
+    dataUrl: file.previewUrl,
+  }));
 }
 
 function makeMessage(role: ChatMessage['role'], content: string, status?: ChatMessage['status']): ChatMessage {
@@ -32,29 +46,7 @@ function makeMessage(role: ChatMessage['role'], content: string, status?: ChatMe
 }
 
 function generateTitle(messages: ChatMessage[]): string {
-  const first = messages.find((m) => m.role === 'user');
-  if (!first) return 'New Chat';
-  const text = first.content.trim();
-  return text.length > 48 ? text.slice(0, 48) + '…' : text;
-}
-
-function loadSessions(): StoredSession[] {
-  try {
-    const raw = localStorage.getItem('projectManager:chat-sessions');
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as StoredSession[];
-    return parsed.sort((a, b) => b.createdAt - a.createdAt);
-  } catch {
-    return [];
-  }
-}
-
-function saveSessions(sessions: StoredSession[]) {
-  try {
-    localStorage.setItem('projectManager:chat-sessions', JSON.stringify(sessions.slice(0, 50)));
-  } catch {
-    // quota exceeded — silently drop
-  }
+  return generateChatSessionTitle(messages);
 }
 
 function CurrentSessionMessages({
@@ -134,7 +126,7 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Sessions state
-  const [sessions, setSessions] = useState<StoredSession[]>([]);
+  const [sessions, setSessions] = useState<StoredChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -154,6 +146,10 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
   // Side toggles
   const [showHistory, setShowHistory] = useState(true);
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [sessionSearch, setSessionSearch] = useState('');
+  const [sessionTimeFilter, setSessionTimeFilter] = useState<'all' | 'today' | '7d' | '30d'>('all');
+  const [editingTagsSessionId, setEditingTagsSessionId] = useState<string | null>(null);
+  const [tagDraft, setTagDraft] = useState('');
 
   // Keyboard shortcuts (must be after all useState declarations)
   useEffect(() => {
@@ -186,7 +182,7 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
   // Load persisted history on first mount
   useEffect(() => {
     if (historyLoaded) return;
-    const stored = loadSessions();
+    const stored = loadChatSessions();
     setSessions(stored);
     if (stored.length > 0 && !activeSessionId) {
       // Resume most recent session
@@ -199,16 +195,9 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
 
   const persistCurrentSession = useCallback((msgs: ChatMessage[], id: string | null) => {
     if (!id || msgs.length === 0) return;
-    const title = generateTitle(msgs);
     setSessions((prev) => {
-      const updated = prev.map((s) =>
-        s.id === id ? { ...s, title, messages: msgs, createdAt: Date.now() } : s,
-      );
-      // If it's a new session not yet in the list, prepend it
-      if (!prev.some((s) => s.id === id)) {
-        updated.unshift({ id, title, messages: msgs, createdAt: Date.now() });
-      }
-      saveSessions(updated);
+      const updated = upsertChatSession(prev, id, msgs);
+      saveChatSessions(updated);
       return updated;
     });
   }, []);
@@ -253,7 +242,7 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
     );
   }, []);
 
-  const handleSend = async (content: string, files?: { name: string; content: string; previewUrl?: string }[]) => {
+  const handleSend = async (content: string, files?: AttachedFile[]) => {
     if (loading) return;
     abortControllerRef.current?.abort();
     const abortController = new AbortController();
@@ -261,13 +250,9 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
 
     // Append file context to the message
     let augmentedContent = content;
-    if (files && files.length > 0) {
-      const fileBlock = files
-        .map((f) => {
-          const body = f.previewUrl ? `[Image: ${f.name}]` : `\`\`\`\n${f.content.slice(0, 5000)}\n\`\`\``;
-          return `--- File: ${f.name} ---\n${body}\n---`;
-        })
-        .join('\n\n');
+    const attachments = toChatAttachments(files);
+    const fileBlock = formatTextAttachmentBlock(attachments);
+    if (fileBlock) {
       augmentedContent = content
         ? `${content}\n\n${fileBlock}`
         : `Please analyze these files:\n\n${fileBlock}`;
@@ -278,7 +263,7 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
       ? messages.slice(0, -1)
       : messages;
 
-    const userMessage = makeMessage('user', content);
+    const userMessage = makeMessage('user', content || formatAttachmentDisplayText(attachments));
     const nextMessages = [...cleanedMessages, userMessage];
     setMessages(nextMessages);
     setLoading(true);
@@ -321,6 +306,7 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
         context: effectiveContext,
         navigate: (href) => router.push(href),
         abortSignal: abortController.signal,
+        attachments,
         chatSettings: chatSettings.provider !== 'auto' ? chatSettings : undefined,
         onStream: (chunk: string) => {
           accumulated += chunk;
@@ -358,6 +344,8 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
         result.error ? 'error' : 'sent',
       );
       assistantMessage.id = assistantId;
+      assistantMessage.provider = result.provider ?? (chatSettings.provider !== 'auto' ? chatSettings.provider : undefined);
+      assistantMessage.model = result.model ?? (chatSettings.provider !== 'auto' ? chatSettings.model : undefined);
       // Attach tool calls to the assistant message for display
       (assistantMessage as any).toolCalls = result.toolCalls || toolCalls;
 
@@ -421,7 +409,7 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
   const handleDeleteSession = (sessionId: string) => {
     setSessions((prev) => {
       const next = prev.filter((s) => s.id !== sessionId);
-      saveSessions(next);
+      saveChatSessions(next);
       return next;
     });
     if (activeSessionId === sessionId) {
@@ -430,29 +418,47 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
     }
   };
 
-  // Export current conversation as Markdown
+  const handleEditSessionTags = (session: StoredChatSession) => {
+    setEditingTagsSessionId(session.id);
+    setTagDraft((session.tags ?? []).join(', '));
+  };
+
+  const handleSaveSessionTags = (sessionId: string) => {
+    const tags = tagDraft
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean)
+      .slice(0, 12);
+    setSessions((prev) => {
+      const next = prev.map((session) =>
+        session.id === sessionId ? { ...session, tags } : session,
+      );
+      saveChatSessions(next);
+      return next;
+    });
+    setEditingTagsSessionId(null);
+    setTagDraft('');
+  };
+
+  // Export current conversation as feature-notes Markdown.
   const handleExport = useCallback(() => {
     if (messages.length === 0) return;
     const title = generateTitle(messages);
-    const markdown = [
-      `# ${title}`,
-      '',
-      `Exported: ${new Date().toISOString()}`,
-      '',
-      ...messages.map((m) => {
-        const role = m.role === 'user' ? '**You**' : '**AI**';
-        const time = new Date(m.createdAt).toLocaleString();
-        return `### ${role} — ${time}\n\n${m.content}\n`;
-      }),
-    ].join('\n');
+    const markdown = formatChatAsFeatureNotes({
+      title,
+      messages,
+      projectName: initialChatContext?.selectedProject?.config.project.name,
+      featureId: initialChatContext?.selectedFeature?.id,
+      tags: sessions.find((session) => session.id === activeSessionId)?.tags,
+    });
     const blob = new Blob([markdown], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${title.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, '_').slice(0, 40)}.md`;
+    a.download = `${title.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, '_').slice(0, 40)}-feature-notes.md`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [messages]);
+  }, [activeSessionId, initialChatContext?.selectedFeature?.id, initialChatContext?.selectedProject?.config.project.name, messages, sessions]);
 
   // Start Talk: create a new session and focus input
   const handleStartTalk = useCallback(() => {
@@ -471,6 +477,26 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
     // Simulate Enter key press to trigger the existing send logic
     textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
   }, []);
+
+  const filteredSessions = sessions.filter((session) => {
+    const query = sessionSearch.trim().toLowerCase();
+    const now = Date.now();
+    const ageMs = now - session.createdAt;
+    const inSelectedTimeRange =
+      sessionTimeFilter === 'all' ||
+      (sessionTimeFilter === 'today' && new Date(session.createdAt).toDateString() === new Date(now).toDateString()) ||
+      (sessionTimeFilter === '7d' && ageMs <= 7 * 24 * 60 * 60 * 1000) ||
+      (sessionTimeFilter === '30d' && ageMs <= 30 * 24 * 60 * 60 * 1000);
+    if (!inSelectedTimeRange) return false;
+    if (!query) return true;
+    return (
+      session.title.toLowerCase().includes(query) ||
+      (session.tags ?? []).some((tag) => tag.toLowerCase().includes(query)) ||
+      session.messages.some((message) =>
+        `${message.content} ${message.provider ?? ''} ${message.model ?? ''}`.toLowerCase().includes(query),
+      )
+    );
+  });
 
   return (
     <div className={clsx('flex gap-0 lg:gap-4', embedded ? 'h-full min-h-0' : 'h-[calc(100vh-var(--pm-topbar-h,48px)-40px)]')}>
@@ -513,21 +539,60 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
           </div>
         </div>
 
+        <div className="border-b border-stone-200/15 px-2 py-2">
+          <label className="flex h-8 items-center gap-2 rounded border border-stone-200/15 bg-stone-950/60 px-2 text-stone-500 focus-within:border-amber-200/35 focus-within:text-amber-200">
+            <Search size={12} className="shrink-0" />
+            <input
+              value={sessionSearch}
+              onChange={(event) => setSessionSearch(event.target.value)}
+              placeholder="Search sessions"
+              className="min-w-0 flex-1 bg-transparent text-[11px] text-stone-200 outline-none placeholder:text-stone-600"
+              aria-label="Search sessions"
+            />
+          </label>
+          <div className="mt-1 grid grid-cols-4 gap-1">
+            {[
+              ['all', 'All'],
+              ['today', 'Today'],
+              ['7d', '7d'],
+              ['30d', '30d'],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setSessionTimeFilter(value as typeof sessionTimeFilter)}
+                className={[
+                  'h-6 rounded border px-1 text-[10px] transition-colors',
+                  sessionTimeFilter === value
+                    ? 'border-amber-200/35 bg-amber-500/12 text-amber-100'
+                    : 'border-stone-200/10 text-stone-500 hover:text-stone-300',
+                ].join(' ')}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Session list */}
         <div className="flex-1 overflow-y-auto">
           {sessions.length === 0 ? (
             <p className="px-3 pt-4 text-[10px] leading-relaxed text-stone-500">
               {t.chat.noConversations}
             </p>
+          ) : filteredSessions.length === 0 ? (
+            <p className="px-3 pt-4 text-[10px] leading-relaxed text-stone-500">
+              No saved sessions match this search.
+            </p>
           ) : (
             <div className="space-y-0.5 p-1.5">
-              {sessions.map((session) => {
+              {filteredSessions.map((session) => {
                 const active = session.id === activeSessionId;
                 return (
                   <div
                     key={session.id}
                     className={[
-                      'group flex items-start gap-1 rounded px-2 py-1.5 text-[11px] transition-colors',
+                      'group relative flex items-start gap-1 rounded px-2 py-1.5 text-[11px] transition-colors',
                       active
                         ? 'bg-stone-200/10 text-stone-100'
                         : 'text-stone-400 hover:bg-white/[0.04] hover:text-stone-200',
@@ -540,6 +605,20 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
                       title={session.title}
                     >
                       {session.title}
+                      {(session.tags?.length ?? 0) > 0 && (
+                        <span className="mt-1 block truncate text-[9px] text-stone-500">
+                          {session.tags?.map((tag) => `#${tag}`).join(' ')}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleEditSessionTags(session)}
+                      className="shrink-0 rounded p-0.5 text-stone-600 opacity-0 transition-opacity hover:text-amber-200 group-hover:opacity-100"
+                      aria-label="Edit session tags"
+                      title="Edit tags"
+                    >
+                      <Tag size={11} />
                     </button>
                     <button
                       type="button"
@@ -549,6 +628,37 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
                     >
                       <Trash2 size={11} />
                     </button>
+                    {editingTagsSessionId === session.id && (
+                      <div className="absolute left-2 right-2 top-full z-10 mt-1 rounded border border-stone-200/15 bg-stone-950 p-2 shadow-xl">
+                        <input
+                          value={tagDraft}
+                          onChange={(event) => setTagDraft(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') handleSaveSessionTags(session.id);
+                            if (event.key === 'Escape') setEditingTagsSessionId(null);
+                          }}
+                          aria-label="Session tags"
+                          placeholder="tag-a, tag-b"
+                          className="h-7 w-full rounded border border-stone-200/15 bg-black/30 px-2 text-[11px] text-stone-100 outline-none placeholder:text-stone-600 focus:border-amber-200/35"
+                        />
+                        <div className="mt-1 flex justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setEditingTagsSessionId(null)}
+                            className="rounded px-2 py-1 text-[10px] text-stone-500 hover:text-stone-300"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSaveSessionTags(session.id)}
+                            className="rounded border border-amber-200/25 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-100"
+                          >
+                            Save tags
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}

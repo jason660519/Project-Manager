@@ -1074,6 +1074,17 @@ struct AnthropicMessage {
     content: serde_json::Value,
 }
 
+#[derive(Deserialize, Clone)]
+struct ChatAttachment {
+    name: String,
+    #[serde(rename = "type")]
+    mime_type: String,
+    size: u64,
+    content: Option<String>,
+    #[serde(rename = "dataUrl")]
+    data_url: Option<String>,
+}
+
 #[derive(Serialize)]
 struct AnthropicResponse {
     content: String,
@@ -1081,6 +1092,436 @@ struct AnthropicResponse {
     input_tokens: u32,
     #[serde(rename = "outputTokens")]
     output_tokens: u32,
+}
+
+struct StoredChatProviderSpec {
+    api_kind: &'static str,
+    base_url: Option<&'static str>,
+    keychain_key: &'static str,
+    default_model: &'static str,
+    env_names: &'static [&'static str],
+}
+
+fn stored_chat_provider_spec(provider: &str) -> Option<StoredChatProviderSpec> {
+    match provider {
+        "anthropic" => Some(StoredChatProviderSpec {
+            api_kind: "anthropic",
+            base_url: None,
+            keychain_key: "anthropic-api-key",
+            default_model: "claude-sonnet-4-6",
+            env_names: &["ANTHROPIC_API_KEY", "CLAUDE_API_KEY"],
+        }),
+        "openai" => Some(StoredChatProviderSpec {
+            api_kind: "openai-compatible",
+            base_url: Some("https://api.openai.com/v1"),
+            keychain_key: "openai-api-key",
+            default_model: "gpt-4o",
+            env_names: &["OPENAI_API_KEY"],
+        }),
+        "gemini" => Some(StoredChatProviderSpec {
+            api_kind: "gemini",
+            base_url: None,
+            keychain_key: "gemini-api-key",
+            default_model: "gemini-2.5-flash",
+            env_names: &["GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY"],
+        }),
+        "deepseek" => Some(StoredChatProviderSpec {
+            api_kind: "openai-compatible",
+            base_url: Some("https://api.deepseek.com/v1"),
+            keychain_key: "deepseek-api-key",
+            default_model: "deepseek-v4-pro",
+            env_names: &["DEEPSEEK_API_KEY"],
+        }),
+        "grok" => Some(StoredChatProviderSpec {
+            api_kind: "openai-compatible",
+            base_url: Some("https://api.x.ai/v1"),
+            keychain_key: "grok-api-key",
+            default_model: "grok-4.3",
+            env_names: &["GROK_API_KEY", "XAI_API_KEY"],
+        }),
+        "kimi" => Some(StoredChatProviderSpec {
+            api_kind: "openai-compatible",
+            base_url: Some("https://api.moonshot.ai/v1"),
+            keychain_key: "kimi-api-key",
+            default_model: "kimi-k2.6",
+            env_names: &["KIMI_API_KEY", "MOONSHOT_API_KEY"],
+        }),
+        "openrouter" => Some(StoredChatProviderSpec {
+            api_kind: "openai-compatible",
+            base_url: Some("https://openrouter.ai/api/v1"),
+            keychain_key: "openrouter-api-key",
+            default_model: "anthropic/claude-3.5-sonnet",
+            env_names: &["OPENROUTER_API_KEY"],
+        }),
+        "perplexity" => Some(StoredChatProviderSpec {
+            api_kind: "openai-compatible",
+            base_url: Some("https://api.perplexity.ai"),
+            keychain_key: "perplexity-api-key",
+            default_model: "sonar",
+            env_names: &["PERPLEXITY_API_KEY"],
+        }),
+        "together" => Some(StoredChatProviderSpec {
+            api_kind: "openai-compatible",
+            base_url: Some("https://api.together.xyz/v1"),
+            keychain_key: "together-api-key",
+            default_model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            env_names: &["TOGETHER_API_KEY"],
+        }),
+        "zhipu" => Some(StoredChatProviderSpec {
+            api_kind: "openai-compatible",
+            base_url: Some("https://api.z.ai/api/paas/v4"),
+            keychain_key: "zhipu-api-key",
+            default_model: "glm-4-plus",
+            env_names: &["ZHIPU_API_KEY"],
+        }),
+        "qwen" => Some(StoredChatProviderSpec {
+            api_kind: "openai-compatible",
+            base_url: Some("https://dashscope.aliyuncs.com/compatible-mode/v1"),
+            keychain_key: "qwen-api-key",
+            default_model: "qwen-plus",
+            env_names: &["QWEN_API_KEY", "DASHSCOPE_API_KEY"],
+        }),
+        "huggingface" => Some(StoredChatProviderSpec {
+            api_kind: "openai-compatible",
+            base_url: Some("https://router.huggingface.co/v1"),
+            keychain_key: "huggingface-api-key",
+            default_model: "meta-llama/Llama-3.1-8B-Instruct",
+            env_names: &["HUGGINGFACE_API_KEY", "HF_TOKEN"],
+        }),
+        "ollama-cloud" => Some(StoredChatProviderSpec {
+            api_kind: "openai-compatible",
+            base_url: Some("https://ollama.com/v1"),
+            keychain_key: "ollama-cloud-api-key",
+            default_model: "gpt-oss:120b",
+            env_names: &["OLLAMA_API_KEY"],
+        }),
+        "ollama-local" => Some(StoredChatProviderSpec {
+            api_kind: "openai-compatible",
+            base_url: Some("http://localhost:11434/v1"),
+            keychain_key: "ollama-local-api-key",
+            default_model: "llama3.2",
+            env_names: &[],
+        }),
+        _ => None,
+    }
+}
+
+fn resolve_stored_chat_provider_key(
+    provider: &str,
+    spec: &StoredChatProviderSpec,
+) -> Result<String, String> {
+    if provider == "ollama-local" {
+        return Ok("ollama-local".to_string());
+    }
+
+    if let Some(raw) = get_secret(
+        "projectmanager".to_string(),
+        "llm-provider-keys".to_string(),
+    )? {
+        if let Ok(map) = serde_json::from_str::<HashMap<String, String>>(&raw) {
+            if let Some(value) = map.get(provider) {
+                if !value.trim().is_empty() {
+                    return Ok(value.trim().to_string());
+                }
+            }
+        }
+    }
+
+    if let Some(value) = get_secret("projectmanager".to_string(), spec.keychain_key.to_string())? {
+        if !value.trim().is_empty() {
+            return Ok(value.trim().to_string());
+        }
+    }
+
+    for env_name in spec.env_names {
+        if let Ok(value) = std::env::var(env_name) {
+            if !value.trim().is_empty() {
+                return Ok(value.trim().to_string());
+            }
+        }
+    }
+
+    Err(format!("{} not configured", spec.keychain_key))
+}
+
+fn message_text(content: &serde_json::Value) -> String {
+    match content {
+        serde_json::Value::String(value) => value.clone(),
+        _ => content.to_string(),
+    }
+}
+
+fn parse_base64_data_url(data_url: &str) -> Option<(String, String)> {
+    let rest = data_url.strip_prefix("data:")?;
+    let (media_type, data) = rest.split_once(";base64,")?;
+    if media_type.is_empty() || data.is_empty() {
+        return None;
+    }
+    Some((media_type.to_string(), data.to_string()))
+}
+
+fn image_attachment_data(
+    attachments: &Option<Vec<ChatAttachment>>,
+) -> Vec<(String, String, String)> {
+    attachments
+        .as_ref()
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|attachment| {
+                    if !attachment.mime_type.to_lowercase().starts_with("image/") {
+                        return None;
+                    }
+                    let data_url = attachment.data_url.as_ref()?;
+                    let (media_type, data) = parse_base64_data_url(data_url)?;
+                    Some((media_type, data, data_url.clone()))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn last_user_message_index(messages: &[&AnthropicMessage]) -> Option<usize> {
+    messages.iter().rposition(|message| message.role == "user")
+}
+
+/// Key-blind native chat entrypoint for the packaged Tauri app. The renderer
+/// passes provider/model/messages only; Rust resolves the stored provider key.
+#[tauri::command]
+async fn call_stored_chat_provider(
+    provider: String,
+    model: Option<String>,
+    max_tokens: u32,
+    messages: Vec<AnthropicMessage>,
+    system_prompt: Option<String>,
+    temperature: Option<f32>,
+    attachments: Option<Vec<ChatAttachment>>,
+) -> Result<AnthropicResponse, String> {
+    let spec = stored_chat_provider_spec(&provider)
+        .ok_or_else(|| format!("Unsupported provider: {provider}"))?;
+    let api_key = resolve_stored_chat_provider_key(&provider, &spec)?;
+    let model = model.unwrap_or_else(|| spec.default_model.to_string());
+    let sys = system_prompt.unwrap_or_else(|| "You are the Project Manager AI assistant.".to_string());
+    let client = reqwest::Client::new();
+    let images = image_attachment_data(&attachments);
+
+    match spec.api_kind {
+        "anthropic" => {
+            let filtered_messages: Vec<&AnthropicMessage> = messages
+                .iter()
+                .filter(|m| m.role != "system")
+                .collect();
+            let last_user_index = if images.is_empty() {
+                None
+            } else {
+                last_user_message_index(&filtered_messages)
+            };
+            let provider_messages: Vec<serde_json::Value> = filtered_messages
+                .iter()
+                .enumerate()
+                .map(|(index, message)| {
+                    let content = if Some(index) == last_user_index {
+                        let text = message_text(&message.content);
+                        let mut parts = vec![serde_json::json!({
+                            "type": "text",
+                            "text": if text.is_empty() { "Please analyze the attached image." } else { text.as_str() },
+                        })];
+                        for (media_type, data, _) in &images {
+                            parts.push(serde_json::json!({
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": media_type,
+                                    "data": data,
+                                },
+                            }));
+                        }
+                        serde_json::Value::Array(parts)
+                    } else {
+                        serde_json::json!(message_text(&message.content))
+                    };
+                    serde_json::json!({
+                        "role": message.role,
+                        "content": content,
+                    })
+                })
+                .collect();
+            let mut body = serde_json::json!({
+                "model": model,
+                "max_tokens": max_tokens,
+                "system": sys,
+                "messages": provider_messages,
+            });
+            if let Some(temp) = temperature {
+                if let Some(obj) = body.as_object_mut() {
+                    obj.insert("temperature".to_string(), serde_json::json!(temp));
+                }
+            }
+            let res = client
+                .post("https://api.anthropic.com/v1/messages")
+                .header("x-api-key", &api_key)
+                .header("anthropic-version", "2023-06-01")
+                .header("content-type", "application/json")
+                .json(&body)
+                .send()
+                .await
+                .map_err(|e| format!("Request failed: {e}"))?;
+            if !res.status().is_success() {
+                let status = res.status();
+                let text = res.text().await.unwrap_or_default();
+                return Err(format!("Anthropic API {status}: {text}"));
+            }
+            let raw: serde_json::Value = res.json().await.map_err(|e| format!("Parse error: {e}"))?;
+            let content = raw["content"][0]["text"].as_str().unwrap_or("").to_string();
+            let input_tokens = raw["usage"]["input_tokens"].as_u64().unwrap_or(0) as u32;
+            let output_tokens = raw["usage"]["output_tokens"].as_u64().unwrap_or(0) as u32;
+            Ok(AnthropicResponse { content, input_tokens, output_tokens })
+        }
+        "gemini" => {
+            let filtered_messages: Vec<&AnthropicMessage> = messages
+                .iter()
+                .filter(|m| m.role != "system")
+                .collect();
+            let last_user_index = if images.is_empty() {
+                None
+            } else {
+                last_user_message_index(&filtered_messages)
+            };
+            let contents: Vec<serde_json::Value> = filtered_messages
+                .iter()
+                .enumerate()
+                .map(|(index, m)| {
+                    let role = if m.role == "assistant" { "model" } else { &m.role };
+                    let mut parts = vec![serde_json::json!({ "text": message_text(&m.content) })];
+                    if Some(index) == last_user_index {
+                        for (media_type, data, _) in &images {
+                            parts.push(serde_json::json!({
+                                "inline_data": {
+                                    "mime_type": media_type,
+                                    "data": data,
+                                },
+                            }));
+                        }
+                    }
+                    serde_json::json!({
+                        "role": role,
+                        "parts": parts,
+                    })
+                })
+                .collect();
+            let mut generation_config = serde_json::json!({ "maxOutputTokens": max_tokens });
+            if let Some(temp) = temperature {
+                if let Some(obj) = generation_config.as_object_mut() {
+                    obj.insert("temperature".to_string(), serde_json::json!(temp));
+                }
+            }
+            let body = serde_json::json!({
+                "system_instruction": { "parts": [{ "text": sys }] },
+                "contents": contents,
+                "generationConfig": generation_config,
+            });
+            let url = format!(
+                "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+            );
+            let res = client
+                .post(&url)
+                .header("x-goog-api-key", &api_key)
+                .header("content-type", "application/json")
+                .json(&body)
+                .send()
+                .await
+                .map_err(|e| format!("Request failed: {e}"))?;
+            if !res.status().is_success() {
+                let status = res.status();
+                let text = res.text().await.unwrap_or_default();
+                return Err(format!("Gemini API {status}: {text}"));
+            }
+            let raw: serde_json::Value = res.json().await.map_err(|e| format!("Parse error: {e}"))?;
+            let content = raw["candidates"][0]["content"]["parts"][0]["text"]
+                .as_str()
+                .unwrap_or("")
+                .to_string();
+            let input_tokens = raw["usageMetadata"]["promptTokenCount"].as_u64().unwrap_or(0) as u32;
+            let output_tokens = raw["usageMetadata"]["candidatesTokenCount"].as_u64().unwrap_or(0) as u32;
+            Ok(AnthropicResponse { content, input_tokens, output_tokens })
+        }
+        "openai-compatible" => {
+            let base_url = spec.base_url.ok_or_else(|| format!("Provider {provider} missing base URL"))?;
+            let is_openai_reasoning = provider == "openai"
+                && (model.trim().starts_with('o') || model.trim().starts_with("gpt-5"));
+            let mut provider_messages = Vec::new();
+            provider_messages.push(serde_json::json!({
+                "role": if is_openai_reasoning { "developer" } else { "system" },
+                "content": sys,
+            }));
+            let filtered_messages: Vec<&AnthropicMessage> = messages
+                .iter()
+                .filter(|m| m.role != "system")
+                .collect();
+            let last_user_index = if images.is_empty() {
+                None
+            } else {
+                last_user_message_index(&filtered_messages)
+            };
+            for (index, message) in filtered_messages.iter().enumerate() {
+                let content = if Some(index) == last_user_index {
+                    let text = message_text(&message.content);
+                    let mut parts = vec![serde_json::json!({
+                        "type": "text",
+                        "text": if text.is_empty() { "Please analyze the attached image." } else { text.as_str() },
+                    })];
+                    for (_, _, data_url) in &images {
+                        parts.push(serde_json::json!({
+                            "type": "image_url",
+                            "image_url": { "url": data_url },
+                        }));
+                    }
+                    serde_json::Value::Array(parts)
+                } else {
+                    serde_json::json!(message_text(&message.content))
+                };
+                provider_messages.push(serde_json::json!({
+                    "role": message.role,
+                    "content": content,
+                }));
+            }
+            let mut body = serde_json::json!({
+                "model": model,
+                "messages": provider_messages,
+            });
+            if let Some(obj) = body.as_object_mut() {
+                obj.insert(
+                    if is_openai_reasoning { "max_completion_tokens" } else { "max_tokens" }.to_string(),
+                    serde_json::json!(max_tokens),
+                );
+                if !is_openai_reasoning {
+                    if let Some(temp) = temperature {
+                        obj.insert("temperature".to_string(), serde_json::json!(temp));
+                    }
+                }
+            }
+            let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
+            let res = client
+                .post(&url)
+                .bearer_auth(&api_key)
+                .header("content-type", "application/json")
+                .json(&body)
+                .send()
+                .await
+                .map_err(|e| format!("Request failed: {e}"))?;
+            if !res.status().is_success() {
+                let status = res.status();
+                let text = res.text().await.unwrap_or_default();
+                return Err(format!("{provider} API {status}: {text}"));
+            }
+            let raw: serde_json::Value = res.json().await.map_err(|e| format!("Parse error: {e}"))?;
+            let content = raw["choices"][0]["message"]["content"].as_str().unwrap_or("").to_string();
+            let input_tokens = raw["usage"]["prompt_tokens"].as_u64().unwrap_or(0) as u32;
+            let output_tokens = raw["usage"]["completion_tokens"].as_u64().unwrap_or(0) as u32;
+            Ok(AnthropicResponse { content, input_tokens, output_tokens })
+        }
+        _ => Err(format!("Unsupported provider kind: {}", spec.api_kind)),
+    }
 }
 
 /// Call any OpenAI-compatible chat-completions endpoint (OpenAI itself,
@@ -5221,6 +5662,7 @@ pub fn run() {
             call_openai,
             call_openai_compatible,
             call_gemini,
+            call_stored_chat_provider,
             validate_provider_key,
             revalidate_provider_key,
             watch_config,

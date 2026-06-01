@@ -28,6 +28,7 @@ const VIEW_LABELS: Record<ViewId, string> = {
   documentation:       'Documentation',
   'company-standards': 'Company Standards',
   keys:                'Keys',
+  'ai-sdks':           'AI SDKs',
   chat:                'AI Assistant',
   'keyboard-shortcuts': 'Keyboard Shortcuts',
   settings:            'Settings',

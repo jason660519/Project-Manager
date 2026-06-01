@@ -6,6 +6,12 @@ import {
   openAiCompatibleChatCompletionsUrl,
   resolveChatProviderApiKey,
 } from '../../../../lib/chat/providerRouting';
+import {
+  buildAnthropicMessages,
+  buildGeminiContents,
+  buildOpenAiMessages,
+} from '../../../../lib/chat/providerPayloads';
+import type { ChatAttachment } from '../../../../lib/chat/types';
 
 interface ChatApiMessage {
   role: 'user' | 'assistant' | 'system';
@@ -20,8 +26,7 @@ interface RequestBody {
   model?: string;
   /** Custom system prompt override. Omit to use the default. */
   systemPrompt?: string;
-  /** API key passed from the client (loaded from Keychain/localStorage). */
-  apiKey?: string;
+  attachments?: ChatAttachment[];
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -75,10 +80,10 @@ async function* streamProvider(
   model: string,
   messages: ChatApiMessage[],
   systemPrompt?: string,
-  clientApiKey?: string,
+  attachments?: ChatAttachment[],
   signal?: AbortSignal,
 ): AsyncGenerator<string> {
-  const apiKey = resolveChatProviderApiKey(provider, clientApiKey);
+  const apiKey = resolveChatProviderApiKey(provider);
   const providerSpec = getChatProviderSpec(provider);
   const sys = systemPrompt || getSystemPrompt();
 
@@ -96,7 +101,7 @@ async function* streamProvider(
           max_tokens: 4096,
           stream: true,
           system: sys,
-          messages: messages.filter((m) => m.role !== 'system'),
+          messages: buildAnthropicMessages(messages, attachments),
         }),
         signal,
       });
@@ -108,11 +113,7 @@ async function* streamProvider(
     }
 
     case 'gemini': {
-      const contents: { role: string; parts: { text: string }[] }[] = [];
-      for (const msg of messages) {
-        if (msg.role === 'system') continue;
-        contents.push({ role: msg.role === 'assistant' ? 'model' : 'user', parts: [{ text: msg.content }] });
-      }
+      const contents = buildGeminiContents(messages, attachments);
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
         {
@@ -147,7 +148,7 @@ async function* streamProvider(
           model,
           max_tokens: 4096,
           stream: true,
-          messages: [{ role: 'system', content: sys }, ...messages],
+          messages: buildOpenAiMessages('system', sys, messages, attachments),
         }),
         signal,
       });
@@ -209,20 +210,17 @@ export async function POST(request: NextRequest) {
 
   const systemPrompt = body.systemPrompt;
 
-  // When the client provides a specific API key (loaded from Keychain),
-  // only try the user-requested provider — the key is provider-specific.
   const errors: string[] = [];
   const userProvider = body.provider && body.provider !== 'auto' ? body.provider : undefined;
   const providersToTry = buildChatProviderChain({
     model: body.model,
     userProvider,
-    hasClientApiKey: Boolean(body.apiKey),
   });
 
   for (const provider of providersToTry) {
     const model = body.model || getDefaultChatModel(provider);
     try {
-      const gen = streamProvider(provider, model, body.messages, systemPrompt, body.apiKey, request.signal);
+      const gen = streamProvider(provider, model, body.messages, systemPrompt, body.attachments, request.signal);
       const iterator = gen[Symbol.asyncIterator]();
       const first = await iterator.next();
       async function* withFirst(): AsyncGenerator<string> {

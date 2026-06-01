@@ -25,6 +25,7 @@ export const VIEW_DOCS_SLUG: Record<ViewId, string | null> = {
   'cron-jobs': 'features/cron-jobs',
   logs: 'features/logs',
   keys: 'features/keys',
+  'ai-sdks': 'features/ai-sdks',
   documentation: 'features/documentation',
   'company-standards': 'features/company-standards',
   chat: 'features/chat',

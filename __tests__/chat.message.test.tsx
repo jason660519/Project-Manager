@@ -24,4 +24,20 @@ describe('ChatMessage', () => {
     expect(pre).toBeInTheDocument();
     expect(pre!.textContent).toContain('npm test');
   });
+
+  it('renders assistant provider and model metadata', () => {
+    render(
+      <ChatMessage
+        message={{
+          id: 'm1',
+          role: 'assistant',
+          content: 'hello',
+          createdAt: 1,
+          provider: 'openai',
+          model: 'gpt-4o',
+        }}
+      />,
+    );
+    expect(screen.getByLabelText(/assistant message/i)).toHaveTextContent('openai · gpt-4o');
+  });
 });

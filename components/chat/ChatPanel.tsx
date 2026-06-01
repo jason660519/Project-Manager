@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { sendChatMessage, buildTerminalToolContext } from '../../lib/chat/chatAgent';
 import { buildToolContextForExecution, executeConfirmedToolCall } from '../../lib/chat/executeConfirmedTool';
 import { resolveToolCallStatusFromResult } from '../../lib/chat/toolCallDisplay';
-import type { ChatContext, ChatMessage } from '../../lib/chat/types';
+import type { ChatAttachment, ChatContext, ChatMessage } from '../../lib/chat/types';
 import { useI18n } from '../../lib/i18n';
 import { ChatInput, type AttachedFile, type ChatInputApi } from './ChatInput';
 import {
@@ -20,6 +20,12 @@ import { QuickActions } from './QuickActions';
 import { ThinkingIndicator } from './ThinkingIndicator';
 import { ToolCallGroup } from './ToolCallCard';
 import type { ToolCallDisplay } from './ToolCallCard';
+import {
+  loadChatSessions,
+  saveChatSessions,
+  upsertChatSession,
+} from '../../lib/chat/sessionStorage';
+import { formatAttachmentDisplayText, formatTextAttachmentBlock } from '../../lib/chat/multimodal';
 
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -32,6 +38,18 @@ interface ChatPanelProps {
 }
 
 type XmuxSelectedElementPayload = XmuxSelectedElementSnippetPayload;
+const PANEL_ACTIVE_SESSION_KEY = 'projectManager:chat-panel-active-session';
+
+function toChatAttachments(files?: AttachedFile[]): ChatAttachment[] | undefined {
+  if (!files?.length) return undefined;
+  return files.map((file) => ({
+    name: file.name,
+    type: file.type,
+    size: file.size,
+    content: file.content || undefined,
+    dataUrl: file.previewUrl,
+  }));
+}
 
 function makeMessage(role: ChatMessage['role'], content: string, status?: ChatMessage['status']): ChatMessage {
   return {
@@ -55,6 +73,7 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen, docked
     toggleOpen?.(false);
   }, [toggleOpen]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [thinkingActive, setThinkingActive] = useState(false);
@@ -80,6 +99,25 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen, docked
         setChatSettings({ provider: s.provider || 'auto', model: s.model || '', systemPrompt: s.systemPrompt || '' });
       }
     } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const sessions = loadChatSessions();
+    if (sessions.length === 0) return;
+    const savedActiveId = window.localStorage.getItem(PANEL_ACTIVE_SESSION_KEY);
+    const session = sessions.find((item) => item.id === savedActiveId) ?? sessions[0];
+    setActiveSessionId(session.id);
+    setMessages(session.messages);
+  }, []);
+
+  const persistPanelSession = useCallback((nextMessages: ChatMessage[], sessionId: string | null) => {
+    if (typeof window === 'undefined' || nextMessages.length === 0) return;
+    const id = sessionId ?? `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    if (!sessionId) setActiveSessionId(id);
+    window.localStorage.setItem(PANEL_ACTIVE_SESSION_KEY, id);
+    const sessions = upsertChatSession(loadChatSessions(), id, nextMessages);
+    saveChatSessions(sessions);
   }, []);
 
   useEffect(() => {
@@ -148,13 +186,9 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen, docked
 
     // Augment message with file context
     let augmentedContent = content;
-    if (files && files.length > 0) {
-      const fileBlock = files
-        .map((f) => {
-          const body = f.previewUrl ? `[Image: ${f.name}]` : `\`\`\`\n${f.content.slice(0, 5000)}\n\`\`\``;
-          return `--- File: ${f.name} ---\n${body}\n---`;
-        })
-        .join('\n\n');
+    const attachments = toChatAttachments(files);
+    const fileBlock = formatTextAttachmentBlock(attachments);
+    if (fileBlock) {
       augmentedContent = content
         ? `${content}\n\n${fileBlock}`
         : `Please analyze these files:\n\n${fileBlock}`;
@@ -165,14 +199,22 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen, docked
       ? messages.slice(0, -1)
       : messages;
 
-    const userMessage = makeMessage('user', content);
+    const userMessage = makeMessage('user', content || formatAttachmentDisplayText(attachments));
     const nextMessages = [...cleanedMessages, userMessage];
     setMessages(nextMessages);
     setLoading(true);
 
+    let sessionId = activeSessionId;
+    if (!sessionId) {
+      sessionId = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      setActiveSessionId(sessionId);
+      if (typeof window !== 'undefined') window.localStorage.setItem(PANEL_ACTIVE_SESSION_KEY, sessionId);
+    }
+
     const assistantId = `assistant-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const placeholder = makeMessage('assistant', '');
     placeholder.id = assistantId;
+    let accumulated = '';
 
     // Show placeholder immediately for streaming
     setMessages((prev) => [...prev, placeholder]);
@@ -183,13 +225,13 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen, docked
       setThinkingText('');
       setToolCalls([]);
 
-      let accumulated = '';
       const result = await sendChatMessage({
         content: augmentedContent,
         history: nextMessages,
         context,
         navigate: (href) => router.push(href),
         abortSignal: abortController.signal,
+        attachments,
         onStream: (chunk: string) => {
           accumulated += chunk;
           setMessages((prev) =>
@@ -216,15 +258,20 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen, docked
       const finalContent = result.content || accumulated;
       const assistantMessage = makeMessage('assistant', finalContent, result.error ? 'error' : 'sent');
       assistantMessage.id = assistantId;
+      assistantMessage.provider = result.provider ?? (chatSettings.provider !== 'auto' ? chatSettings.provider : undefined);
+      assistantMessage.model = result.model ?? (chatSettings.provider !== 'auto' ? chatSettings.model : undefined);
       (assistantMessage as any).toolCalls = result.toolCalls || toolCalls;
+      const finalMessages = [...nextMessages, assistantMessage];
       setMessages((prev) => {
         const withoutPlaceholder = prev.filter((m) => m.id !== assistantId);
         return [...withoutPlaceholder, assistantMessage];
       });
+      persistPanelSession(finalMessages, sessionId);
     } catch (error) {
       if ((error as Error).name === 'AbortError' || abortController.signal.aborted) {
-        const cancelledMessage = makeMessage('assistant', 'Response stopped. Partial output was preserved.', 'sent');
+        const cancelledMessage = makeMessage('assistant', accumulated || 'Response stopped. Partial output was preserved.', 'sent');
         cancelledMessage.id = assistantId;
+        const finalMessages = [...nextMessages, cancelledMessage];
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId
@@ -232,8 +279,12 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen, docked
               : m,
           ),
         );
+        persistPanelSession(finalMessages, sessionId);
         return;
       }
+      const errorMessage = makeMessage('assistant', t.chat.error, 'error');
+      errorMessage.id = assistantId;
+      persistPanelSession([...nextMessages, errorMessage], sessionId);
       setMessages((prev) =>
         prev.map((m) => (m.id === assistantId ? { ...m, content: t.chat.error, status: 'error' as const } : m)),
       );
@@ -244,7 +295,7 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen, docked
       setThinkingActive(false);
       setLoading(false);
     }
-  }, [loading, messages, context, router, chatSettings, t.chat.error]);
+  }, [activeSessionId, loading, messages, context, router, chatSettings, persistPanelSession, t.chat.error]);
 
   const handleCancelResponse = useCallback(() => {
     abortControllerRef.current?.abort();

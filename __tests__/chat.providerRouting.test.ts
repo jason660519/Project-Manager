@@ -13,11 +13,14 @@ describe('chat provider routing', () => {
     expect(openAiCompatibleChatCompletionsUrl('ollama-local')).toBe('http://localhost:11434/v1/chat/completions');
   });
 
-  it('keeps client-api-key routing pinned to the user-selected provider', () => {
+  it('keeps explicit provider first while preserving server-side fallback routing', () => {
     expect(buildChatProviderChain({
       userProvider: 'openrouter',
       model: 'openai/gpt-4o',
-      hasClientApiKey: true,
-    })).toEqual(['openrouter']);
+    })[0]).toBe('openrouter');
+    expect(buildChatProviderChain({
+      userProvider: 'openrouter',
+      model: 'openai/gpt-4o',
+    })).toContain('openai');
   });
 });

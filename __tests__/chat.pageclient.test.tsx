@@ -173,4 +173,81 @@ describe('ChatPageClient', () => {
     // After deletion, should show empty message again
     expect(screen.getByText(/No conversations yet/i)).toBeInTheDocument();
   });
+
+  it('filters saved sessions by title and message content', async () => {
+    const sessions = [
+      {
+        id: 'alpha',
+        title: 'Architecture Notes',
+        messages: [{ id: 'm1', role: 'user' as const, content: 'ADR boundary', createdAt: Date.now() }],
+        createdAt: Date.now(),
+      },
+      {
+        id: 'beta',
+        title: 'Release Chat',
+        messages: [{ id: 'm2', role: 'assistant' as const, content: 'provider metadata', createdAt: Date.now(), provider: 'openai', model: 'gpt-4o' }],
+        createdAt: Date.now() - 1000,
+        tags: ['release'],
+      },
+    ];
+    localStorageMock.setItem('projectManager:chat-sessions', JSON.stringify(sessions));
+
+    const user = userEvent.setup();
+    renderWithI18n(<ChatPageClient />);
+
+    await user.type(screen.getByLabelText(/search sessions/i), 'metadata');
+
+    expect(screen.queryByText('Architecture Notes')).not.toBeInTheDocument();
+    expect(screen.getByText('Release Chat')).toBeInTheDocument();
+  });
+
+  it('filters saved sessions by time range', async () => {
+    const now = Date.now();
+    const sessions = [
+      {
+        id: 'recent',
+        title: 'Recent Chat',
+        messages: [{ id: 'm1', role: 'user' as const, content: 'fresh', createdAt: now }],
+        createdAt: now,
+      },
+      {
+        id: 'old',
+        title: 'Old Chat',
+        messages: [{ id: 'm2', role: 'user' as const, content: 'stale', createdAt: now - 40 * 24 * 60 * 60 * 1000 }],
+        createdAt: now - 40 * 24 * 60 * 60 * 1000,
+      },
+    ];
+    localStorageMock.setItem('projectManager:chat-sessions', JSON.stringify(sessions));
+
+    const user = userEvent.setup();
+    renderWithI18n(<ChatPageClient />);
+
+    await user.click(screen.getByRole('button', { name: '30d' }));
+
+    expect(screen.getByText('Recent Chat')).toBeInTheDocument();
+    expect(screen.queryByText('Old Chat')).not.toBeInTheDocument();
+  });
+
+  it('edits saved session tags and makes them searchable', async () => {
+    const sessions = [{
+      id: 'tagged',
+      title: 'Taggable Chat',
+      messages: [{ id: 'm1', role: 'user' as const, content: 'hello', createdAt: Date.now() }],
+      createdAt: Date.now(),
+    }];
+    localStorageMock.setItem('projectManager:chat-sessions', JSON.stringify(sessions));
+
+    const user = userEvent.setup();
+    renderWithI18n(<ChatPageClient />);
+
+    await user.click(screen.getByRole('button', { name: /edit session tags/i }));
+    await user.type(screen.getByPlaceholderText('tag-a, tag-b'), 'security, runtime');
+    await user.click(screen.getByRole('button', { name: /save tags/i }));
+
+    const stored = JSON.parse(localStorageMock.getItem('projectManager:chat-sessions') ?? '[]');
+    expect(stored[0].tags).toEqual(['security', 'runtime']);
+
+    await user.type(screen.getByLabelText(/search sessions/i), 'runtime');
+    expect(screen.getByText('Taggable Chat')).toBeInTheDocument();
+  });
 });

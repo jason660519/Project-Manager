@@ -25,6 +25,7 @@ This folder contains operational engineering documentation for Project Manager. 
 9. [hermes-agent-plugin.md](./hermes-agent-plugin.md)
 10. [openclaw-plugin.md](./openclaw-plugin.md)
 11. [verification-runbook.md](./verification-runbook.md)
+12. [ai-sdks-store.md](./ai-sdks-store.md)
 
 ## 3. Ownership Map
 
@@ -40,6 +41,7 @@ This folder contains operational engineering documentation for Project Manager. 
 | Project-scoped Hermes Agent install and plugin toggle | `scripts/install-hermes-agent.sh`, `scripts/hermes-agent.sh`, `.project-manager/vendor/hermes-agent/`, `lib/storage/plugins.ts` | [hermes-agent-plugin.md](./hermes-agent-plugin.md) |
 | Project-scoped OpenClaw install, gateway, update, rollback, and plugin toggle | `scripts/install-openclaw.sh`, `scripts/openclaw.sh`, `scripts/update-openclaw.sh`, `scripts/rollback-openclaw.sh`, `.project-manager/vendor/openclaw/`, `lib/storage/plugins.ts` | [openclaw-plugin.md](./openclaw-plugin.md) |
 | Pre-handoff checks and release verification | `package.json`, `scripts/*`, `src-tauri/Cargo.toml` | [verification-runbook.md](./verification-runbook.md) |
+| AI SDK parameter config store, normalization, validation | `lib/aiSdks/*`, `app/ui/views/AiSdksView.tsx`, `app/ui/views/AiSdks/*`, `.project-manager/ai-sdks.json` | [ai-sdks-store.md](./ai-sdks-store.md) |
 
 ## 4. Documentation Rule
 
@@ -66,6 +68,7 @@ Update the relevant document whenever an implementation change changes a command
 9. [hermes-agent-plugin.md](./hermes-agent-plugin.md)
 10. [openclaw-plugin.md](./openclaw-plugin.md)
 11. [verification-runbook.md](./verification-runbook.md)
+12. [ai-sdks-store.md](./ai-sdks-store.md)
 
 ## 3. 責任對照
 
@@ -81,6 +84,7 @@ Update the relevant document whenever an implementation change changes a command
 | Project-scoped Hermes Agent 安裝與 plugin toggle | `scripts/install-hermes-agent.sh`, `scripts/hermes-agent.sh`, `.project-manager/vendor/hermes-agent/`, `lib/storage/plugins.ts` | [hermes-agent-plugin.md](./hermes-agent-plugin.md) |
 | Project-scoped OpenClaw 安裝、gateway、更新、回滾與 plugin toggle | `scripts/install-openclaw.sh`, `scripts/openclaw.sh`, `scripts/update-openclaw.sh`, `scripts/rollback-openclaw.sh`, `.project-manager/vendor/openclaw/`, `lib/storage/plugins.ts` | [openclaw-plugin.md](./openclaw-plugin.md) |
 | 交付前檢查與 release verification | `package.json`, `scripts/*`, `src-tauri/Cargo.toml` | [verification-runbook.md](./verification-runbook.md) |
+| AI SDK 參數設定儲存、正規化與驗證 | `lib/aiSdks/*`, `app/ui/views/AiSdksView.tsx`, `app/ui/views/AiSdks/*`, `.project-manager/ai-sdks.json` | [ai-sdks-store.md](./ai-sdks-store.md) |
 
 ## 4. 文件維護規則
 

@@ -4,19 +4,19 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-06-01T01:29:06.988Z",
+    "generatedAt": "2026-06-01T02:28:53.090Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
     "manifestAudience": "internal",
-    "totalDocuments": 85,
+    "totalDocuments": 86,
     "totalFolders": 13,
     "publicDocuments": 28,
-    "internalDocuments": 56,
+    "internalDocuments": 57,
     "restrictedDocuments": 1,
     "publishableDocuments": 12,
-    "reviewRequiredDocuments": 48,
-    "warningCount": 109
+    "reviewRequiredDocuments": 49,
+    "warningCount": 111
   },
   "folders": [
     {
@@ -26,7 +26,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "sourcePath": "docs",
       "label": "All Docs",
       "title": "Documentation",
-      "summary": "85 documentation files indexed from docs.",
+      "summary": "86 documentation files indexed from docs.",
       "parentSlug": null,
       "folderSlugs": [
         "architecture",
@@ -44,14 +44,14 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       ],
       "classificationCounts": {
         "public": 28,
-        "internal": 56,
+        "internal": 57,
         "restricted": 1
       },
       "publishableCount": 12,
-      "reviewRequiredCount": 48,
+      "reviewRequiredCount": 49,
       "visibilityCounts": {
         "public": 28,
-        "internal": 56,
+        "internal": 57,
         "restricted": 1
       },
       "warnings": [
@@ -217,6 +217,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "parentSlug": "",
       "folderSlugs": [],
       "docIds": [
+        "engineering/ai-sdks-store",
         "engineering/document-classification-standard",
         "engineering/documentation-site-sync",
         "engineering/hermes-agent-plugin",
@@ -238,20 +239,20 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       ],
       "classificationCounts": {
         "public": 0,
-        "internal": 18,
+        "internal": 19,
         "restricted": 0
       },
       "publishableCount": 0,
-      "reviewRequiredCount": 11,
+      "reviewRequiredCount": 12,
       "visibilityCounts": {
         "public": 0,
-        "internal": 18,
+        "internal": 19,
         "restricted": 0
       },
       "warnings": [
         "Mentions secrets, tokens, or credentials",
-        "Mentions roadmap, pricing, investor, or strategy material",
         "Mentions local key storage",
+        "Mentions roadmap, pricing, investor, or strategy material",
         "Mentions execution or command policy",
         "Mentions local service ports"
       ]
@@ -1176,6 +1177,41 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "updatedAt": "2026-05-14T22:27:27.000Z"
     },
     {
+      "id": "engineering/ai-sdks-store",
+      "slug": "engineering/ai-sdks-store",
+      "route": "/documentation/engineering/ai-sdks-store",
+      "sourcePath": "docs/engineering/ai-sdks-store.md",
+      "folderSlug": "engineering",
+      "folderPath": "docs/engineering",
+      "title": "AI SDKs Parameter Store",
+      "summary": "The **AI SDKs** view (left nav, below **Keys**) lets users configure the tunable request parameters of each LLM provider's models — temperature, top_p, max tokens, penalties, etc. It is a...",
+      "content": "# AI SDKs Parameter Store\n\n> Status: Active\n> Last updated: 2026-06-01\n> Primary files: `lib/aiSdks/catalog.ts`, `lib/aiSdks/store.ts`, `lib/aiSdks/sheetSlugs.ts`, `app/ui/views/AiSdksView.tsx`, `app/ui/views/AiSdks/*`\n\n---\n\n## Purpose\n\nThe **AI SDKs** view (left nav, below **Keys**) lets users configure the tunable\nrequest parameters of each LLM provider's models — temperature, top_p, max\ntokens, penalties, etc. It is a multi-sheet workstation view: one bottom sheet\ntab per provider, each rendering a wide editable table.\n\nThis document describes where that configuration lives and how it is normalized\nand validated. **API keys are out of scope** — they remain in the OS keychain\nvia the Keys flow (see [security-and-secrets.md](./security-and-secrets.md)).\nThis view only ever reads/writes non-secret parameter values.\n\n## Data sources\n\n| Concern | Source of truth |\n| --- | --- |\n| Provider list + official names + model ids | `lib/keys/llmProviders.ts` (reused, never duplicated) |\n| Per-provider parameter columns (type / range / default / unit / description) | `lib/aiSdks/catalog.ts` → `PARAM_CATALOGS`, keyed by `apiKind` |\n| Default model classification (LLM / VLM / Coding Agent) | `inferModelType()` heuristic; user-overridable |\n| User edits (param values, custom models, custom categories) | `.project-manager/ai-sdks.json` (Tauri) or `localStorage` (browser dev) |\n\nThe parameter surface is keyed by **wire protocol** (`apiKind`): `anthropic`,\n`gemini`, and `openai-compatible` providers each get the parameter set their SDK\naccepts. Adding a new provider to `llmProviders.ts` automatically gives it a\nsheet and the parameter columns for its `apiKind` — no edits here required.\n\n## Persistence\n\nThe store holds only the user's **deltas**. The effective value of any cell is\n`override ?? spec.default`, computed at render time against the static catalog.\n\n- **Tauri** → `<projectRoot>/.project-manager/ai-sdks.json`, read/written via the\n  generic `read_config` / `write_config` Rust commands (typed wrappers\n  `readJsonFile` / `writeJsonFile` in `lib/bridge/index.ts`). These **skip**\n  `migrateConfig` — this file carries its own `schemaVersion` and is independent\n  of the canonical `config.json` (so no ADR-002 schemaVersion bump was needed).\n- **Browser dev** (`next dev`) → `localStorage` key\n  `projectManager.aiSdks.store.v1`, mirroring `KeysContext`.\n\n`schemaVersion` for `ai-sdks.json` is defined by `AI_SDKS_SCHEMA_VERSION` in\n`lib/aiSdks/store.ts`. Bump it (and extend `normalizeStore`) on any breaking\nchange to the file shape.\n\n### File shape (`schemaVersion: 1`)\n\n```jsonc\n{\n  \"schemaVersion\": 1,\n  \"models\": {\n    \"openai:gpt-4o\": { \"params\": { \"temperature\": 0.3 }, \"modelType\": \"LLM\", \"enabled\": true }\n  },\n  \"customModels\": [{ \"id\": \"openai:my-ft\", \"providerId\": \"openai\", \"model\": \"my-ft\" }],\n  \"customCategories\": [\"Embeddings\"]\n}\n```\n\n## Normalization & validation\n\n- `normalizeStore(raw)` is defensive: it tolerates any on-disk shape, drops\n  non-primitive param values and unknown structures, dedupes custom models by\n  `id` and categories by value, and **never throws**. It performs *structural*\n  normalization only — a stringy numeric value is preserved so that\n  `validateParam` can flag it (no silent value loss).\n- `validateParam(spec, value)` enforces type, numeric min/max (clamping out of\n  range), integer-ness (rounding), and enum membership. An empty value maps to\n  `null` (unset → falls back to the spec default).\n- The view aggregates per-provider validation errors into a red sheet-tab badge.\n\n## Recovery & failure modes\n\n- A missing `ai-sdks.json` on first run is the expected case and yields an empty\n  store, not an error.\n- A genuine read failure surfaces a non-blocking banner with a *Recover\n  defaults* action; a write failure flips the header save indicator to *Save\n  failed* with the underlying message (Iron Rule: zero silent failures).\n- Malformed `localStorage` view-preference state is normalized by\n  `useArenaTablePrefs`, never crashing the table.\n\n## Maintenance rule\n\nUpdate this document whenever the `ai-sdks.json` shape, its `schemaVersion`, the\nparameter catalogs, or the validation contract change.\n",
+      "contentHash": "4de7ec586367451b",
+      "readingMinutes": 3,
+      "classification": "internal",
+      "classificationSource": "policy",
+      "classificationConfidence": 0.95,
+      "classificationReason": "Engineering runbooks and implementation contracts are internal by default.",
+      "matchedPolicyRule": "CLS-INTERNAL-ENGINEERING",
+      "publish": false,
+      "reviewStatus": "ai-classified",
+      "needsReview": true,
+      "visibility": "internal",
+      "audience": [
+        "engineers",
+        "operators"
+      ],
+      "tags": [
+        "engineering",
+        "table"
+      ],
+      "warnings": [
+        "Mentions secrets, tokens, or credentials",
+        "Mentions local key storage"
+      ],
+      "updatedAt": "2026-06-01T02:28:14.809Z"
+    },
+    {
       "id": "engineering/document-classification-standard",
       "slug": "engineering/document-classification-standard",
       "route": "/documentation/engineering/document-classification-standard",
@@ -1479,8 +1515,8 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "folderPath": "docs/engineering",
       "title": "Project Manager Engineering Documentation",
       "summary": "This folder contains operational engineering documentation for Project Manager. Product documents explain what the app should do; these documents explain how the current implementation is...",
-      "content": "# Project Manager Engineering Documentation\n\n> Status: Active  \n> Last updated: 2026-05-23  \n> Audience: AI engineers and maintainers\n\n---\n\n## English Version\n\n## 1. Purpose\n\nThis folder contains operational engineering documentation for Project Manager. Product documents explain what the app should do; these documents explain how the current implementation is wired and what must be kept stable when changing it.\n\n## 2. Read Order\n\n1. [../file-naming-standards.md](../file-naming-standards.md)\n2. [runtime-bridge.md](./runtime-bridge.md)\n3. [storage-and-schema.md](./storage-and-schema.md)\n4. [ingestion-pipeline.md](./ingestion-pipeline.md)\n5. [security-and-secrets.md](./security-and-secrets.md)\n6. [table-standards.md](./table-standards.md)\n7. [document-classification-standard.md](./document-classification-standard.md)\n8. [documentation-site-sync.md](./documentation-site-sync.md)\n9. [hermes-agent-plugin.md](./hermes-agent-plugin.md)\n10. [openclaw-plugin.md](./openclaw-plugin.md)\n11. [verification-runbook.md](./verification-runbook.md)\n\n## 3. Ownership Map\n\n| Topic | Primary Files | Document |\n| --- | --- | --- |\n| Tauri commands, browser fallbacks, event contracts | `src-tauri/src/lib.rs`, `lib/bridge/index.ts`, `app/api/*` | [runtime-bridge.md](./runtime-bridge.md) |\n| Project list, selected project, schema migration | `lib/storage/*`, `schema/project-manager.schema.json`, `config/samples/*` | [storage-and-schema.md](./storage-and-schema.md) |\n| Markdown import and AI-assisted spec import | `lib/ingestion/*`, `app/ui/views/IngestionView.tsx` | [ingestion-pipeline.md](./ingestion-pipeline.md) |\n| API keys, provider keys, GitHub token, API call boundary | `lib/storage/plugins.ts`, `lib/bridge/index.ts`, `src-tauri/src/lib.rs`, `app/api/anthropic/route.ts` | [security-and-secrets.md](./security-and-secrets.md) |\n| Table interaction, label contracts, sorting behavior, dashboard document-link cells, workstation viewport rules | `app/project-progress-dashboard/_components/PhaseTable.tsx`, `app/project-progress-dashboard/_lib/columns.tsx`, `app/project-progress-dashboard/_lib/pathLinks.tsx`, `app/ui/views/Plugins/PluginsHubView.tsx`, `app/ui/views/Plugins/_shared/IntegrationsTable.tsx`, `components/table/TableCore.tsx` | [table-standards.md](./table-standards.md) |\n| Document classification, public/internal/restricted gates, and public publish policy | `scripts/sync-documentation-site.mjs`, `docs/**/*.md` frontmatter | [document-classification-standard.md](./document-classification-standard.md) |\n| Static documentation website sync, generated routes, and publication classification metadata | `scripts/sync-documentation-site.mjs`, `lib/generated/documentation-site-internal.ts`, `lib/generated/documentation-site-public.ts`, `app/documentation/[[...slug]]/page.tsx`, `app/ui/views/DocumentationView.tsx` | [documentation-site-sync.md](./documentation-site-sync.md) |\n| Project-scoped Hermes Agent install and plugin toggle | `scripts/install-hermes-agent.sh`, `scripts/hermes-agent.sh`, `.project-manager/vendor/hermes-agent/`, `lib/storage/plugins.ts` | [hermes-agent-plugin.md](./hermes-agent-plugin.md) |\n| Project-scoped OpenClaw install, gateway, update, rollback, and plugin toggle | `scripts/install-openclaw.sh`, `scripts/openclaw.sh`, `scripts/update-openclaw.sh`, `scripts/rollback-openclaw.sh`, `.project-manager/vendor/openclaw/`, `lib/storage/plugins.ts` | [openclaw-plugin.md](./openclaw-plugin.md) |\n| Pre-handoff checks and release verification | `package.json`, `scripts/*`, `src-tauri/Cargo.toml` | [verification-runbook.md](./verification-runbook.md) |\n\n## 4. Documentation Rule\n\nUpdate the relevant document whenever an implementation change changes a command signature, persisted shape, storage key, parser behavior, secret boundary, or verification requirement.\n\n---\n\n## 中文版本\n\n## 1. 目的\n\n此目錄保存 Project Manager 的工程技術文件。產品文件說明 app 應該做什麼；本目錄說明目前實作如何接線，以及修改時哪些 contract 不能破壞。\n\n## 2. 建議閱讀順序\n\n1. [../file-naming-standards.md](../file-naming-standards.md)\n2. [runtime-bridge.md](./runtime-bridge.md)\n3. [storage-and-schema.md](./storage-and-schema.md)\n4. [ingestion-pipeline.md](./ingestion-pipeline.md)\n5. [security-and-secrets.md](./security-and-secrets.md)\n6. [table-standards.md](./table-standards.md)\n7. [document-classification-standard.md](./document-classification-standard.md)\n8. [documentation-site-sync.md](./documentation-site-sync.md)\n9. [hermes-agent-plugin.md](./hermes-agent-plugin.md)\n10. [openclaw-plugin.md](./openclaw-plugin.md)\n11. [verification-runbook.md](./verification-runbook.md)\n\n## 3. 責任對照\n\n| 主題 | 主要檔案 | 文件 |\n| --- | --- | --- |\n| Tauri commands、browser fallbacks、event contracts | `src-tauri/src/lib.rs`, `lib/bridge/index.ts`, `app/api/*` | [runtime-bridge.md](./runtime-bridge.md) |\n| Project list、selected project、schema migration | `lib/storage/*`, `schema/project-manager.schema.json`, `config/samples/*` | [storage-and-schema.md](./storage-and-schema.md) |\n| Markdown import 與 AI-assisted spec import | `lib/ingestion/*`, `app/ui/views/IngestionView.tsx` | [ingestion-pipeline.md](./ingestion-pipeline.md) |\n| API keys、provider keys、GitHub token、API call boundary | `lib/storage/plugins.ts`, `lib/bridge/index.ts`, `src-tauri/src/lib.rs`, `app/api/anthropic/route.ts` | [security-and-secrets.md](./security-and-secrets.md) |\n| Table 互動、label contracts、排序行為、dashboard 文件連結欄位與 workstation 視窗版面規則 | `app/project-progress-dashboard/_components/PhaseTable.tsx`, `app/project-progress-dashboard/_lib/columns.tsx`, `app/project-progress-dashboard/_lib/pathLinks.tsx`, `app/ui/views/Plugins/PluginsHubView.tsx`, `app/ui/views/Plugins/_shared/IntegrationsTable.tsx`, `components/table/TableCore.tsx` | [table-standards.md](./table-standards.md) |\n| 文件分類、public/internal/restricted gates 與 public publish policy | `scripts/sync-documentation-site.mjs`, `docs/**/*.md` frontmatter | [document-classification-standard.md](./document-classification-standard.md) |\n| 靜態 Documentation website sync、generated routes 與 publication classification metadata | `scripts/sync-documentation-site.mjs`, `lib/generated/documentation-site-internal.ts`, `lib/generated/documentation-site-public.ts`, `app/documentation/[[...slug]]/page.tsx`, `app/ui/views/DocumentationView.tsx` | [documentation-site-sync.md](./documentation-site-sync.md) |\n| Project-scoped Hermes Agent 安裝與 plugin toggle | `scripts/install-hermes-agent.sh`, `scripts/hermes-agent.sh`, `.project-manager/vendor/hermes-agent/`, `lib/storage/plugins.ts` | [hermes-agent-plugin.md](./hermes-agent-plugin.md) |\n| Project-scoped OpenClaw 安裝、gateway、更新、回滾與 plugin toggle | `scripts/install-openclaw.sh`, `scripts/openclaw.sh`, `scripts/update-openclaw.sh`, `scripts/rollback-openclaw.sh`, `.project-manager/vendor/openclaw/`, `lib/storage/plugins.ts` | [openclaw-plugin.md](./openclaw-plugin.md) |\n| 交付前檢查與 release verification | `package.json`, `scripts/*`, `src-tauri/Cargo.toml` | [verification-runbook.md](./verification-runbook.md) |\n\n## 4. 文件維護規則\n\n只要實作變更 command signature、persisted shape、storage key、parser behavior、secret boundary 或 verification requirement，就要更新對應文件。\n",
-      "contentHash": "aaf59521c7abdb7e",
+      "content": "# Project Manager Engineering Documentation\n\n> Status: Active  \n> Last updated: 2026-05-23  \n> Audience: AI engineers and maintainers\n\n---\n\n## English Version\n\n## 1. Purpose\n\nThis folder contains operational engineering documentation for Project Manager. Product documents explain what the app should do; these documents explain how the current implementation is wired and what must be kept stable when changing it.\n\n## 2. Read Order\n\n1. [../file-naming-standards.md](../file-naming-standards.md)\n2. [runtime-bridge.md](./runtime-bridge.md)\n3. [storage-and-schema.md](./storage-and-schema.md)\n4. [ingestion-pipeline.md](./ingestion-pipeline.md)\n5. [security-and-secrets.md](./security-and-secrets.md)\n6. [table-standards.md](./table-standards.md)\n7. [document-classification-standard.md](./document-classification-standard.md)\n8. [documentation-site-sync.md](./documentation-site-sync.md)\n9. [hermes-agent-plugin.md](./hermes-agent-plugin.md)\n10. [openclaw-plugin.md](./openclaw-plugin.md)\n11. [verification-runbook.md](./verification-runbook.md)\n12. [ai-sdks-store.md](./ai-sdks-store.md)\n\n## 3. Ownership Map\n\n| Topic | Primary Files | Document |\n| --- | --- | --- |\n| Tauri commands, browser fallbacks, event contracts | `src-tauri/src/lib.rs`, `lib/bridge/index.ts`, `app/api/*` | [runtime-bridge.md](./runtime-bridge.md) |\n| Project list, selected project, schema migration | `lib/storage/*`, `schema/project-manager.schema.json`, `config/samples/*` | [storage-and-schema.md](./storage-and-schema.md) |\n| Markdown import and AI-assisted spec import | `lib/ingestion/*`, `app/ui/views/IngestionView.tsx` | [ingestion-pipeline.md](./ingestion-pipeline.md) |\n| API keys, provider keys, GitHub token, API call boundary | `lib/storage/plugins.ts`, `lib/bridge/index.ts`, `src-tauri/src/lib.rs`, `app/api/anthropic/route.ts` | [security-and-secrets.md](./security-and-secrets.md) |\n| Table interaction, label contracts, sorting behavior, dashboard document-link cells, workstation viewport rules | `app/project-progress-dashboard/_components/PhaseTable.tsx`, `app/project-progress-dashboard/_lib/columns.tsx`, `app/project-progress-dashboard/_lib/pathLinks.tsx`, `app/ui/views/Plugins/PluginsHubView.tsx`, `app/ui/views/Plugins/_shared/IntegrationsTable.tsx`, `components/table/TableCore.tsx` | [table-standards.md](./table-standards.md) |\n| Document classification, public/internal/restricted gates, and public publish policy | `scripts/sync-documentation-site.mjs`, `docs/**/*.md` frontmatter | [document-classification-standard.md](./document-classification-standard.md) |\n| Static documentation website sync, generated routes, and publication classification metadata | `scripts/sync-documentation-site.mjs`, `lib/generated/documentation-site-internal.ts`, `lib/generated/documentation-site-public.ts`, `app/documentation/[[...slug]]/page.tsx`, `app/ui/views/DocumentationView.tsx` | [documentation-site-sync.md](./documentation-site-sync.md) |\n| Project-scoped Hermes Agent install and plugin toggle | `scripts/install-hermes-agent.sh`, `scripts/hermes-agent.sh`, `.project-manager/vendor/hermes-agent/`, `lib/storage/plugins.ts` | [hermes-agent-plugin.md](./hermes-agent-plugin.md) |\n| Project-scoped OpenClaw install, gateway, update, rollback, and plugin toggle | `scripts/install-openclaw.sh`, `scripts/openclaw.sh`, `scripts/update-openclaw.sh`, `scripts/rollback-openclaw.sh`, `.project-manager/vendor/openclaw/`, `lib/storage/plugins.ts` | [openclaw-plugin.md](./openclaw-plugin.md) |\n| Pre-handoff checks and release verification | `package.json`, `scripts/*`, `src-tauri/Cargo.toml` | [verification-runbook.md](./verification-runbook.md) |\n| AI SDK parameter config store, normalization, validation | `lib/aiSdks/*`, `app/ui/views/AiSdksView.tsx`, `app/ui/views/AiSdks/*`, `.project-manager/ai-sdks.json` | [ai-sdks-store.md](./ai-sdks-store.md) |\n\n## 4. Documentation Rule\n\nUpdate the relevant document whenever an implementation change changes a command signature, persisted shape, storage key, parser behavior, secret boundary, or verification requirement.\n\n---\n\n## 中文版本\n\n## 1. 目的\n\n此目錄保存 Project Manager 的工程技術文件。產品文件說明 app 應該做什麼；本目錄說明目前實作如何接線，以及修改時哪些 contract 不能破壞。\n\n## 2. 建議閱讀順序\n\n1. [../file-naming-standards.md](../file-naming-standards.md)\n2. [runtime-bridge.md](./runtime-bridge.md)\n3. [storage-and-schema.md](./storage-and-schema.md)\n4. [ingestion-pipeline.md](./ingestion-pipeline.md)\n5. [security-and-secrets.md](./security-and-secrets.md)\n6. [table-standards.md](./table-standards.md)\n7. [document-classification-standard.md](./document-classification-standard.md)\n8. [documentation-site-sync.md](./documentation-site-sync.md)\n9. [hermes-agent-plugin.md](./hermes-agent-plugin.md)\n10. [openclaw-plugin.md](./openclaw-plugin.md)\n11. [verification-runbook.md](./verification-runbook.md)\n12. [ai-sdks-store.md](./ai-sdks-store.md)\n\n## 3. 責任對照\n\n| 主題 | 主要檔案 | 文件 |\n| --- | --- | --- |\n| Tauri commands、browser fallbacks、event contracts | `src-tauri/src/lib.rs`, `lib/bridge/index.ts`, `app/api/*` | [runtime-bridge.md](./runtime-bridge.md) |\n| Project list、selected project、schema migration | `lib/storage/*`, `schema/project-manager.schema.json`, `config/samples/*` | [storage-and-schema.md](./storage-and-schema.md) |\n| Markdown import 與 AI-assisted spec import | `lib/ingestion/*`, `app/ui/views/IngestionView.tsx` | [ingestion-pipeline.md](./ingestion-pipeline.md) |\n| API keys、provider keys、GitHub token、API call boundary | `lib/storage/plugins.ts`, `lib/bridge/index.ts`, `src-tauri/src/lib.rs`, `app/api/anthropic/route.ts` | [security-and-secrets.md](./security-and-secrets.md) |\n| Table 互動、label contracts、排序行為、dashboard 文件連結欄位與 workstation 視窗版面規則 | `app/project-progress-dashboard/_components/PhaseTable.tsx`, `app/project-progress-dashboard/_lib/columns.tsx`, `app/project-progress-dashboard/_lib/pathLinks.tsx`, `app/ui/views/Plugins/PluginsHubView.tsx`, `app/ui/views/Plugins/_shared/IntegrationsTable.tsx`, `components/table/TableCore.tsx` | [table-standards.md](./table-standards.md) |\n| 文件分類、public/internal/restricted gates 與 public publish policy | `scripts/sync-documentation-site.mjs`, `docs/**/*.md` frontmatter | [document-classification-standard.md](./document-classification-standard.md) |\n| 靜態 Documentation website sync、generated routes 與 publication classification metadata | `scripts/sync-documentation-site.mjs`, `lib/generated/documentation-site-internal.ts`, `lib/generated/documentation-site-public.ts`, `app/documentation/[[...slug]]/page.tsx`, `app/ui/views/DocumentationView.tsx` | [documentation-site-sync.md](./documentation-site-sync.md) |\n| Project-scoped Hermes Agent 安裝與 plugin toggle | `scripts/install-hermes-agent.sh`, `scripts/hermes-agent.sh`, `.project-manager/vendor/hermes-agent/`, `lib/storage/plugins.ts` | [hermes-agent-plugin.md](./hermes-agent-plugin.md) |\n| Project-scoped OpenClaw 安裝、gateway、更新、回滾與 plugin toggle | `scripts/install-openclaw.sh`, `scripts/openclaw.sh`, `scripts/update-openclaw.sh`, `scripts/rollback-openclaw.sh`, `.project-manager/vendor/openclaw/`, `lib/storage/plugins.ts` | [openclaw-plugin.md](./openclaw-plugin.md) |\n| 交付前檢查與 release verification | `package.json`, `scripts/*`, `src-tauri/Cargo.toml` | [verification-runbook.md](./verification-runbook.md) |\n| AI SDK 參數設定儲存、正規化與驗證 | `lib/aiSdks/*`, `app/ui/views/AiSdksView.tsx`, `app/ui/views/AiSdks/*`, `.project-manager/ai-sdks.json` | [ai-sdks-store.md](./ai-sdks-store.md) |\n\n## 4. 文件維護規則\n\n只要實作變更 command signature、persisted shape、storage key、parser behavior、secret boundary 或 verification requirement，就要更新對應文件。\n",
+      "contentHash": "cba8965667095cbb",
       "readingMinutes": 3,
       "classification": "internal",
       "classificationSource": "policy",
@@ -1502,7 +1538,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "warnings": [
         "Mentions secrets, tokens, or credentials"
       ],
-      "updatedAt": "2026-05-22T22:08:32.000Z"
+      "updatedAt": "2026-06-01T02:28:53.090Z"
     },
     {
       "id": "engineering/runtime-bridge",
@@ -3428,6 +3464,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
     "archive/archived-20260512-05-adr-tauri",
     "deployment/readme",
     "design/shared-ai-desktop-style",
+    "engineering/ai-sdks-store",
     "engineering/document-classification-standard",
     "engineering/documentation-site-sync",
     "engineering/hermes-agent-plugin",
