@@ -10,6 +10,10 @@ import React, {
 } from 'react';
 import type { LlmProviderId } from '../../../../lib/keys/llmProviders';
 import type { KeysTab } from '../../../../lib/keys/sheetSlugs';
+import type {
+  CodingCandidateRow,
+  CodingCandidateState,
+} from '../../../../lib/keys/codingCandidates';
 import {
   loadAllProviderMetadata,
   loadValidatedModelSupportSummary,
@@ -58,6 +62,7 @@ interface PersistedKeysState {
   activeTab: KeysTab;
   llmState: ArenaState;
   vlmState: VlmArenaState;
+  codingState: CodingCandidateState;
 }
 
 interface KeysContextType {
@@ -69,6 +74,9 @@ interface KeysContextType {
 
   vlmState: VlmArenaState;
   setVlmState: React.Dispatch<React.SetStateAction<VlmArenaState>>;
+
+  codingState: CodingCandidateState;
+  setCodingState: React.Dispatch<React.SetStateAction<CodingCandidateState>>;
 
   providerMetadata: ProviderMetadataMap;
   validatedModelSupport: ValidatedModelSupportSummary | null;
@@ -108,6 +116,12 @@ const defaultVlmState: VlmArenaState = {
   imageDataUrl: null,
   imageDetail: 'auto',
 };
+
+const defaultCodingState: CodingCandidateState = {
+  rows: [],
+};
+
+const MAX_CODING_CANDIDATES = 20;
 
 const KEYS_STATE_STORAGE_KEY = 'projectManager:keys-state:v1';
 
@@ -178,6 +192,27 @@ function sanitizeVlmState(value: unknown, fallback: VlmArenaState): VlmArenaStat
   };
 }
 
+function sanitizeCodingState(value: unknown, fallback: CodingCandidateState): CodingCandidateState {
+  if (!isRecord(value)) return fallback;
+  const rawRows = Array.isArray(value.rows) ? value.rows : [];
+  const rows = rawRows
+    .map((item) => {
+      if (!isRecord(item)) return null;
+      const provider = typeof item.provider === 'string' ? (item.provider as LlmProviderId) : null;
+      const model = typeof item.model === 'string' ? item.model : null;
+      if (!provider || !model) return null;
+      return {
+        provider,
+        model,
+        note: typeof item.note === 'string' ? item.note : '',
+        enabled: typeof item.enabled === 'boolean' ? item.enabled : true,
+      };
+    })
+    .filter((item): item is CodingCandidateRow => item !== null)
+    .slice(0, MAX_CODING_CANDIDATES);
+  return { rows };
+}
+
 function normalizeDefaultLlmUserPrompt(userPrompt: string): string {
   return LEGACY_DEFAULT_LLM_USER_PROMPTS.has(userPrompt) ? DEFAULT_LLM_USER_PROMPT : userPrompt;
 }
@@ -200,6 +235,7 @@ function loadPersistedKeysState(): PersistedKeysState | null {
         userPrompt: normalizeDefaultLlmUserPrompt(llmState.userPrompt),
       },
       vlmState: sanitizeVlmState(parsed.vlmState, defaultVlmState),
+      codingState: sanitizeCodingState(parsed.codingState, defaultCodingState),
     };
   } catch {
     return null;
@@ -219,6 +255,9 @@ export function KeysProvider({
   const [activeTab, setActiveTab] = useState<KeysTab>(initialTab);
   const [llmState, setLlmState] = useState<ArenaState>(persistedState?.llmState ?? defaultLlmState);
   const [vlmState, setVlmState] = useState<VlmArenaState>(persistedState?.vlmState ?? defaultVlmState);
+  const [codingState, setCodingState] = useState<CodingCandidateState>(
+    persistedState?.codingState ?? defaultCodingState,
+  );
   const [providerMetadata, setProviderMetadata] = useState<ProviderMetadataMap>(() =>
     loadAllProviderMetadata(),
   );
@@ -241,12 +280,13 @@ export function KeysProvider({
         activeTab,
         llmState,
         vlmState,
+        codingState,
       };
       window.localStorage.setItem(KEYS_STATE_STORAGE_KEY, JSON.stringify(payload));
     } catch {
       // Ignore persistence failures (quota/private mode) without breaking UI.
     }
-  }, [activeTab, llmState, vlmState]);
+  }, [activeTab, llmState, vlmState, codingState]);
 
   const validatedLlmProviders = useMemo(() => {
     const all = listLlmProviders();
@@ -275,6 +315,8 @@ export function KeysProvider({
         setLlmState,
         vlmState,
         setVlmState,
+        codingState,
+        setCodingState,
         providerMetadata,
         validatedModelSupport,
         validatedLlmProviders,

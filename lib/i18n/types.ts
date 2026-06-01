@@ -759,6 +759,25 @@ export interface Translations {
         };
       };
     };
+    coding: {
+      tableTitle: string;
+      addCandidate: string;
+      emptyNoRows: string;
+      notePlaceholder: string;
+      deleteRowTitle: string;
+      moveUpTitle: string;
+      moveDownTitle: string;
+      countLabel: string;
+      columns: {
+        id: string;
+        no: string;
+        active: string;
+        provider: string;
+        model: string;
+        note: string;
+        actions: string;
+      };
+    };
   };
   codeEditor: {
     title: string;

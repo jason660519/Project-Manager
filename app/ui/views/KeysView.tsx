@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bot, Image, KeyRound } from 'lucide-react';
+import { Bot, Code2, Image, KeyRound } from 'lucide-react';
 import {
   KeysProvider,
   useKeysContext,
@@ -15,6 +15,8 @@ import {
 import { ApiKeyValidationSheet } from './Keys/ApiKeyValidationSheet';
 import { LlmArenaSheet } from './Keys/LlmArenaSheet';
 import { VlmArenaSheet } from './Keys/VlmArenaSheet';
+import { CodingAgentCandidateSheet } from './Keys/CodingAgentCandidateSheet';
+import { useI18n } from '../../../lib/i18n';
 import { WorkstationFrame } from '../../../components/layout/WorkstationFrame';
 import {
   BottomSheetTabs,
@@ -31,7 +33,8 @@ function KeysViewContent({
   initialSheet: KeysSheetSlug;
 }) {
   const router = useRouter();
-  const { activeTab, setActiveTab, llmState, vlmState } = useKeysContext();
+  const { t } = useI18n();
+  const { activeTab, setActiveTab, llmState, vlmState, codingState } = useKeysContext();
   const [isTauri, setIsTauri] = useState(false);
   const tabs: ReadonlyArray<SheetTabItem<KeysTab>> = [
     {
@@ -53,6 +56,13 @@ function KeysViewContent({
       icon: <Image size={14} />,
       badge: vlmState.selectedModels.length,
       title: 'VLM Arena model rows',
+    },
+    {
+      key: 'coding_agent_candidate',
+      label: t.keysArena.coding.tableTitle,
+      icon: <Code2 size={14} />,
+      badge: codingState.rows.length,
+      title: t.keysArena.coding.tableTitle,
     },
   ];
 
@@ -105,6 +115,11 @@ function KeysViewContent({
       </div>
       <div className={activeTab === 'vlm_arena' ? 'h-full overflow-hidden p-4' : 'hidden'}>
         <VlmArenaSheet />
+      </div>
+      <div
+        className={activeTab === 'coding_agent_candidate' ? 'h-full overflow-hidden p-4' : 'hidden'}
+      >
+        <CodingAgentCandidateSheet />
       </div>
     </WorkstationFrame>
   );
