@@ -5,8 +5,15 @@ import path from 'node:path';
 const root = process.cwd();
 const cjkPattern = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
 const sourceExtensions = new Set(['.ts', '.tsx']);
-const scanRoots = ['app/ui/views/Keys'];
 const allowLineMarker = 'i18n-allow-cjk';
+
+const scanFiles = [
+  'app/ui/views/Keys/KeysProviderTable.tsx',
+];
+
+const scanRoots = [
+  'components/ui',
+];
 
 function walk(dir, files = []) {
   if (!fs.existsSync(dir)) return files;
@@ -21,12 +28,17 @@ function walk(dir, files = []) {
   return files;
 }
 
-function isArenaSource(filePath) {
-  const ext = path.extname(filePath);
-  return sourceExtensions.has(ext) && /Arena/.test(path.basename(filePath));
+function isSource(filePath) {
+  return sourceExtensions.has(path.extname(filePath));
 }
 
-const files = scanRoots.flatMap((scanRoot) => walk(path.join(root, scanRoot))).filter(isArenaSource);
+const files = Array.from(
+  new Set([
+    ...scanFiles.map((filePath) => path.join(root, filePath)),
+    ...scanRoots.flatMap((scanRoot) => walk(path.join(root, scanRoot))).filter(isSource),
+  ]),
+).filter((filePath) => fs.existsSync(filePath));
+
 const hits = [];
 
 for (const filePath of files) {
@@ -40,11 +52,12 @@ for (const filePath of files) {
 }
 
 if (hits.length > 0) {
-  console.error('[P1] Arena UI source contains hard-coded CJK text. Move visible copy to lib/i18n/*.');
+  console.error('[P1] UI source contains hard-coded CJK text in guarded surfaces.');
+  console.error('Move visible copy to lib/i18n/*, or add an explicit i18n-allow-cjk marker for approved test/domain content.');
   for (const hit of hits) {
     console.error(`${hit.relPath}:${hit.line}: ${hit.text}`);
   }
   process.exit(1);
 }
 
-console.log(`Arena UI i18n check passed (${files.length} files scanned).`);
+console.log(`UI i18n check passed (${files.length} files scanned).`);

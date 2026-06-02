@@ -129,6 +129,7 @@ import {
   BottomSheetTabs,
   type SheetTabItem,
 } from '../../../../components/sheets/BottomSheetTabs';
+import { useInAppAlert, useInAppConfirm } from '../../../../components/ui/InAppDialog';
 import {
   IntegrationsTable,
   DEFAULT_VISIBILITY,
@@ -180,6 +181,8 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
   const pmRoot = resolveProjectManagerRepoRoot(pmRepoRoot);
   const { t } = useI18n();
   const router = useRouter();
+  const confirmAction = useInAppConfirm();
+  const botTokenAlert = useInAppAlert();
   const activeSheet: IntegrationSheet = normalizeIntegrationSheet(initialSheet ?? SYSTEM_INSTALLED_APPS_SHEET);
   const [pluginsFilter, setPluginsFilter] = useState<PluginsFilter>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -1231,10 +1234,15 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
   );
 
   const handleChannelDelete = useCallback(
-    (channelId: string) => {
+    async (channelId: string) => {
       const target = channelCatalogRef.current.channels.find((c) => c.id === channelId);
       if (!target) return;
-      if (typeof window !== 'undefined' && !window.confirm(`Delete channel "${target.label}"?`)) return;
+      const confirmed = await confirmAction.open({
+        title: 'Delete channel',
+        message: `Delete channel "${target.label}"?`,
+        confirmLabel: 'Delete',
+      });
+      if (!confirmed) return;
       deleteChannelSecrets(
         channelId,
         PLATFORM_CREDS[target.platform].filter((f) => f.secret).map((f) => f.key),
@@ -1250,14 +1258,19 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
       setSelectedRow(null);
       refreshManual();
     },
-    [],
+    [confirmAction],
   );
 
-  const handleChannelClearLog = useCallback((channelId: string) => {
-    if (typeof window !== 'undefined' && !window.confirm('Clear this channel\'s activity log?')) return;
+  const handleChannelClearLog = useCallback(async (channelId: string) => {
+    const confirmed = await confirmAction.open({
+      title: 'Clear activity log',
+      message: 'Clear this channel\'s activity log?',
+      confirmLabel: 'Clear',
+    });
+    if (!confirmed) return;
     clearChannelActivity(channelId);
     setRecentMessages((prev) => prev.filter((e) => e.channelId !== channelId));
-  }, []);
+  }, [confirmAction]);
 
   const handleCommandMappingUpdate = useCallback(
     (
@@ -1287,12 +1300,17 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
   );
 
   const handleCommandMappingDelete = useCallback(
-    (mappingId: string) => {
+    async (mappingId: string) => {
       if (DEFAULT_COMMAND_MAPPING_IDS.has(mappingId)) return;
       const current = channelCatalogRef.current;
       const target = current.commandMappings.find((m) => m.id === mappingId);
       if (!target) return;
-      if (typeof window !== 'undefined' && !window.confirm(`Delete command "${target.trigger}"?`)) return;
+      const confirmed = await confirmAction.open({
+        title: 'Delete command',
+        message: `Delete command "${target.trigger}"?`,
+        confirmLabel: 'Delete',
+      });
+      if (!confirmed) return;
       const nextCatalog: ChannelCatalog = {
         ...current,
         commandMappings: current.commandMappings.filter((m) => m.id !== mappingId),
@@ -1302,7 +1320,7 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
       setSelectedRow(null);
       refreshManual();
     },
-    [],
+    [confirmAction],
   );
 
   const handleCommandMappingAdd = useCallback(
@@ -1344,7 +1362,10 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
   const handleChannelStartPoll = async (channel: import('../../../../lib/types/channels').ChannelConfig) => {
     const botToken = getChannelSecret(channel.id, 'botToken');
     if (!botToken) {
-      alert('Set the Bot Token first.');
+      await botTokenAlert.open({
+        title: 'Bot token required',
+        message: 'Set the Bot Token first.',
+      });
       return;
     }
     const allowedRaw = channel.credentials.allowedChatIds ?? '';
@@ -2097,7 +2118,12 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
         onRunRuntimeCommand={handleRunRuntimeCommand}
         onSkillUninstall={async (path) => {
           if (!skillsDir) return;
-          if (typeof window !== 'undefined' && !window.confirm(t.plugins.deleteSkillConfirm.replace('{path}', path))) return;
+          const confirmed = await confirmAction.open({
+            title: 'Delete skill',
+            message: t.plugins.deleteSkillConfirm.replace('{path}', path),
+            confirmLabel: 'Delete',
+          });
+          if (!confirmed) return;
           await skillUninstall(path, skillsDir);
           await loadSkills();
           setSelectedRow(null);
@@ -2168,6 +2194,8 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
         runningKind={scanActionKind}
         onClose={() => setScanReport(null)}
       />
+      {confirmAction.dialog}
+      {botTokenAlert.dialog}
     </>
   );
 }

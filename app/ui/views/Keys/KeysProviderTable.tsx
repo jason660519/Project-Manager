@@ -511,9 +511,11 @@ function DeleteProviderConfirmDialog({
 
 function KeyValueCell({
   row,
+  copy,
   onUpdateKey,
 }: {
   row: KeysRowData;
+  copy: KeysValidationTableCopy;
   onUpdateKey: (provider: ProviderSpec, apiKey: string) => Promise<void>;
 }) {
   const [draft, setDraft] = useState('');
@@ -525,11 +527,11 @@ function KeyValueCell({
   const submit = async () => {
     if (saving) return;
     if (!trimmed) {
-      setFeedback({ kind: 'error', message: '請輸入 API Key' });
+      setFeedback({ kind: 'error', message: copy.keyValueEditor.required });
       return;
     }
     if (row.provider.validatePattern && !row.provider.validatePattern.test(trimmed)) {
-      setFeedback({ kind: 'error', message: 'API Key 格式不符合此 provider 的預設規則' });
+      setFeedback({ kind: 'error', message: copy.keyValueEditor.patternMismatch });
       return;
     }
 
@@ -539,7 +541,7 @@ function KeyValueCell({
       await onUpdateKey(row.provider, trimmed);
       setDraft('');
       setRevealed(false);
-      setFeedback({ kind: 'ok', message: '更新成功' });
+      setFeedback({ kind: 'ok', message: copy.keyValueEditor.updated });
     } catch (error) {
       setFeedback({
         kind: 'error',
@@ -573,8 +575,8 @@ function KeyValueCell({
         />
         <button
           type="button"
-          aria-label={revealed ? '隱藏API Key' : '顯示API Key'}
-          title={revealed ? '隱藏API Key' : '顯示API Key'}
+          aria-label={revealed ? copy.keyValueEditor.hide : copy.keyValueEditor.show}
+          title={revealed ? copy.keyValueEditor.hide : copy.keyValueEditor.show}
           disabled={saving}
           onClick={() => setRevealed((value) => !value)}
           className="relative z-10 inline-flex h-7 w-7 shrink-0 scroll-mt-16 items-center justify-center border border-stone-200/18 text-stone-300 hover:bg-stone-200/8 disabled:cursor-not-allowed disabled:opacity-40"
@@ -583,8 +585,8 @@ function KeyValueCell({
         </button>
         <button
           type="button"
-          aria-label="更新API Key"
-          title="更新API Key"
+          aria-label={copy.keyValueEditor.update}
+          title={copy.keyValueEditor.update}
           disabled={saving || !trimmed}
           onClick={() => void submit()}
           className="relative z-10 inline-flex h-7 w-7 shrink-0 scroll-mt-16 items-center justify-center border border-emerald-200/30 text-emerald-100 hover:bg-emerald-100/10 disabled:cursor-not-allowed disabled:border-stone-200/15 disabled:text-stone-500"
@@ -836,7 +838,7 @@ export function KeysProviderTable({
       }),
       columnHelper.accessor((row) => row.active, {
         id: 'col-active',
-        header: '是否採用 (Active)',
+        header: copy.columns.active,
         size: API_KEYS_DEFAULT_SIZING['col-active'],
         cell: (info) => (
           <ActiveCell
@@ -904,7 +906,7 @@ export function KeysProviderTable({
         id: 'col-key-value',
         header: copy.columns.keyValue,
         size: API_KEYS_DEFAULT_SIZING['col-key-value'],
-        cell: (info) => <KeyValueCell row={info.row.original} onUpdateKey={onUpdateKey} />,
+        cell: (info) => <KeyValueCell row={info.row.original} copy={copy} onUpdateKey={onUpdateKey} />,
       }),
       columnHelper.accessor((row) => row.status, {
         id: 'col-status',

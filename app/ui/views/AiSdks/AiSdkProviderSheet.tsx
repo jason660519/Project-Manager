@@ -65,6 +65,7 @@ import {
   useAiSdksTablePrefs,
   type RowDensity,
 } from './useAiSdksTablePrefs';
+import { useInAppPrompt } from '../../../../components/ui/InAppDialog';
 
 type AiSdksCopy = Translations['aiSdks'];
 
@@ -119,6 +120,7 @@ export function AiSdkProviderSheet({
   onAddCategory,
   onRestoreProviderDefaults,
 }: AiSdkProviderSheetProps) {
+  const resizePrompt = useInAppPrompt();
   const specs = useMemo(() => getParamSpecs(providerId), [providerId]);
 
   const rows = useMemo<AiSdkRow[]>(() => {
@@ -235,12 +237,13 @@ export function AiSdkProviderSheet({
   };
   const restoreRow = (rowId: string) =>
     setHiddenRowIds((prev) => prev.filter((id) => id !== rowId));
-  const promptResizeRow = (rowId: string) => {
+  const promptResizeRow = async (rowId: string) => {
     const current = rowHeightById[rowId] ?? DENSITY_ROW_HEIGHT[density];
-    const input = window.prompt(
-      replacePlaceholder(copy.menu.resizeRowPrompt, { min: MIN_ROW_HEIGHT, max: MAX_ROW_HEIGHT }),
-      String(current),
-    );
+    const input = await resizePrompt.open({
+      title: copy.menu.resizeRow,
+      message: replacePlaceholder(copy.menu.resizeRowPrompt, { min: MIN_ROW_HEIGHT, max: MAX_ROW_HEIGHT }),
+      defaultValue: String(current),
+    });
     if (input === null) return;
     const parsed = Number(input);
     if (!Number.isFinite(parsed)) return;
@@ -263,7 +266,7 @@ export function AiSdkProviderSheet({
               hiddenRowIds={hiddenRowIds}
               rowLabelById={(id) => rows.find((r) => r.id === id)?.model ?? id}
               onViewDetails={() => setSelectedId(info.row.original.id)}
-              onResizeRow={() => promptResizeRow(info.row.original.id)}
+              onResizeRow={() => void promptResizeRow(info.row.original.id)}
               onHideRow={() => hideRow(info.row.original.id)}
               onRestoreRow={restoreRow}
               onRestoreAllRows={() => setHiddenRowIds([])}
@@ -409,12 +412,13 @@ export function AiSdkProviderSheet({
     const idx = freezeCandidateIds.indexOf(columnId);
     if (idx >= 0) setFrozenColumnIds(freezeCandidateIds.slice(0, idx + 1));
   };
-  const promptResizeColumn = (columnId: string) => {
+  const promptResizeColumn = async (columnId: string) => {
     const current = columnSizing[columnId] ?? defaultSizing[columnId] ?? 150;
-    const input = window.prompt(
-      replacePlaceholder(copy.menu.resizeColumnPrompt, { min: MIN_COLUMN_WIDTH, max: MAX_COLUMN_WIDTH }),
-      String(current),
-    );
+    const input = await resizePrompt.open({
+      title: copy.menu.resizeColumn,
+      message: replacePlaceholder(copy.menu.resizeColumnPrompt, { min: MIN_COLUMN_WIDTH, max: MAX_COLUMN_WIDTH }),
+      defaultValue: String(current),
+    });
     if (input === null) return;
     const parsed = Number(input);
     if (!Number.isFinite(parsed)) return;
@@ -459,7 +463,7 @@ export function AiSdkProviderSheet({
       );
       items.push({ key: 'sep-filter', separator: true });
     }
-    items.push({ key: 'resize', label: m.resizeColumn, onSelect: () => promptResizeColumn(columnId) });
+    items.push({ key: 'resize', label: m.resizeColumn, onSelect: () => void promptResizeColumn(columnId) });
     items.push({ key: 'freeze', label: m.freezeThrough, icon: <Snowflake size={12} />, onSelect: () => freezeThrough(columnId) });
     items.push({
       key: 'hide',
@@ -861,6 +865,7 @@ export function AiSdkProviderSheet({
           </div>
         </aside>
       )}
+      {resizePrompt.dialog}
     </div>
   );
 }

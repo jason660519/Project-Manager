@@ -33,6 +33,7 @@ import {
 } from '../../../lib/bridge';
 import { PROVIDERS } from '../../../lib/keys/registry';
 import { OAuthDeviceModal } from '../../ui/views/_components/OAuthDeviceModal';
+import { useInAppPrompt } from '../../../components/ui/InAppDialog';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -1624,6 +1625,7 @@ function IssuesTable({
   hiddenRowKeys,
   onHiddenRowKeysChange,
 }: IssuesTableProps) {
+  const resizePrompt = useInAppPrompt();
   const visibleColumns = ISSUE_COLUMN_DEFS.filter((column) => !hiddenColumnIds.includes(column.id) || column.id === 'col-id');
   const leftOffsets = visibleColumns.reduce<Record<IssueColumnId, number>>((acc, column, index) => {
     const previous = visibleColumns[index - 1];
@@ -1727,15 +1729,21 @@ function IssuesTable({
                   onClick={() => toggleSort(column)}
                   onContextMenu={(e) => {
                     e.preventDefault();
-                    const raw = window.prompt('Resize column width in px. Enter 0 to hide this column.', String(columnWidths[column.id] ?? column.width));
-                    if (raw == null) return;
-                    const value = Number(raw);
-                    if (!Number.isFinite(value)) return;
-                    if (value === 0) {
-                      if (column.id !== 'col-id') onHiddenColumnIdsChange((prev) => Array.from(new Set([...prev, column.id])));
-                      return;
-                    }
-                    onColumnWidthsChange((prev) => ({ ...prev, [column.id]: Math.max(56, Math.min(640, value)) }));
+                    void (async () => {
+                      const raw = await resizePrompt.open({
+                        title: 'Resize column',
+                        message: 'Resize column width in px. Enter 0 to hide this column.',
+                        defaultValue: String(columnWidths[column.id] ?? column.width),
+                      });
+                      if (raw == null) return;
+                      const value = Number(raw);
+                      if (!Number.isFinite(value)) return;
+                      if (value === 0) {
+                        if (column.id !== 'col-id') onHiddenColumnIdsChange((prev) => Array.from(new Set([...prev, column.id])));
+                        return;
+                      }
+                      onColumnWidthsChange((prev) => ({ ...prev, [column.id]: Math.max(56, Math.min(640, value)) }));
+                    })();
                   }}
                 >
                   <span className={clsx('inline-flex items-center gap-1', column.sortable && 'cursor-pointer hover:text-stone-200')}>
@@ -1797,6 +1805,7 @@ function IssuesTable({
           )}
         </tbody>
       </table>
+      {resizePrompt.dialog}
     </div>
   );
 }

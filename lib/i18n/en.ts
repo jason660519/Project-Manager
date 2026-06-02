@@ -149,6 +149,7 @@ export const en: Translations = {
     table: {
       columns: {
         provider: 'Provider',
+        active: 'Active',
         category: 'Category',
         apiKeyPage: 'API Key',
         usage: 'Usage',
@@ -207,6 +208,14 @@ export const en: Translations = {
         delete: 'Delete',
         deleteCustomRow: 'Delete custom row',
         hideProviderRow: 'Hide provider row',
+      },
+      keyValueEditor: {
+        required: 'Enter an API key',
+        patternMismatch: "API key does not match this provider's expected format",
+        updated: 'Key updated',
+        show: 'Show API key',
+        hide: 'Hide API key',
+        update: 'Update API key',
       },
       live: 'live',
       moreModels: '+{count} more',
@@ -611,7 +620,13 @@ export const en: Translations = {
       allPlanes: 'All execution planes',
       clearResults: 'Clear Results',
       addModel: 'Add Model',
-      runAll: 'Run All',
+      runAll: 'Test ALL',
+      activityFilter: {
+        label: 'Activity filter',
+        activity: 'Activity',
+        inactivity: 'Inactivity',
+        all: 'All',
+      },
       emptyNoModels: 'No model rows yet. Add a model to start the LLM evaluation.',
       emptyNoFilteredRows: 'No rows match the current filters.',
       noOutput: 'No output yet',

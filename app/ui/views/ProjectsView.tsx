@@ -38,6 +38,7 @@ import {
   X,
 } from 'lucide-react';
 import { hasProviderKey } from '../../../lib/keys/loadProviderKey';
+import { useInAppPrompt } from '../../../components/ui/InAppDialog';
 import {
   ALL_LLM_PROVIDERS,
   type LlmProviderId,
@@ -204,6 +205,7 @@ export function ProjectsView({
   onSyncFromDesktop,
   runHistory,
 }: ProjectsViewProps) {
+  const resizePrompt = useInAppPrompt();
   const [showAddModal, setShowAddModal] = useState(false);
   const [addMode, setAddMode] = useState<'local' | 'github'>('local');
   /** Folder path used by the AI Scan flow. */
@@ -1581,15 +1583,21 @@ export function ProjectsView({
                     onClick={header.column.getCanSort() ? header.column.getToggleSortingHandler() : undefined}
                     onContextMenu={(e) => {
                       e.preventDefault();
-                      const raw = window.prompt('Resize column width in px. Enter 0 to hide this column.', String(header.column.getSize()));
-                      if (raw == null) return;
-                      const value = Number(raw);
-                      if (!Number.isFinite(value)) return;
-                      if (value === 0) {
-                        if (header.column.id !== 'col-id') header.column.toggleVisibility(false);
-                        return;
-                      }
-                      setColumnSizing((prev) => ({ ...prev, [header.column.id]: Math.max(56, Math.min(640, value)) }));
+                      void (async () => {
+                        const raw = await resizePrompt.open({
+                          title: 'Resize column',
+                          message: 'Resize column width in px. Enter 0 to hide this column.',
+                          defaultValue: String(header.column.getSize()),
+                        });
+                        if (raw == null) return;
+                        const value = Number(raw);
+                        if (!Number.isFinite(value)) return;
+                        if (value === 0) {
+                          if (header.column.id !== 'col-id') header.column.toggleVisibility(false);
+                          return;
+                        }
+                        setColumnSizing((prev) => ({ ...prev, [header.column.id]: Math.max(56, Math.min(640, value)) }));
+                      })();
                     }}
                     className={`px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400 ${
                       header.column.getCanSort() ? 'cursor-pointer select-none hover:text-stone-200' : ''
@@ -2122,6 +2130,7 @@ export function ProjectsView({
           </div>
         </div>
       )}
+      {resizePrompt.dialog}
     </div>
   );
 }

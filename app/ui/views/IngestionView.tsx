@@ -5,6 +5,7 @@ import { CheckCircle2, FileInput, Upload, X } from 'lucide-react';
 import { Feature, FeatureStatus, ProjectConfig } from '../../../lib/types';
 import { parseMarkdown } from '../../../lib/ingestion/parseMarkdown';
 import { callAnthropic, getSecret } from '../../../lib/bridge';
+import { useInAppAlert } from '../../../components/ui/InAppDialog';
 
 // Mirrors KeysView's storage convention so AI ingestion uses the user's saved key.
 const KEYCHAIN_SERVICE = 'projectmanager';
@@ -114,6 +115,7 @@ export function IngestionView({ project, onImportFeatures }: IngestionViewProps)
   const [fileName, setFileName] = useState('');
   const [draftFeatures, setDraftFeatures] = useState<Feature[]>([]);
   const [parseMethod, setParseMethod] = useState<'md' | 'ai' | 'mock'>('mock');
+  const unsupportedFileAlert = useInAppAlert();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isTauri, setIsTauri] = useState(false);
@@ -125,7 +127,10 @@ export function IngestionView({ project, onImportFeatures }: IngestionViewProps)
   const processFile = async (file: File) => {
     const allowed = ['.docx', '.xlsx', '.md'];
     if (!allowed.some((ext) => file.name.toLowerCase().endsWith(ext))) {
-      alert('Only .docx, .xlsx, .md files are supported.');
+      await unsupportedFileAlert.open({
+        title: 'Unsupported file type',
+        message: 'Only .docx, .xlsx, .md files are supported.',
+      });
       return;
     }
 
@@ -207,6 +212,7 @@ export function IngestionView({ project, onImportFeatures }: IngestionViewProps)
 
   return (
     <div className="max-w-2xl space-y-6">
+      {unsupportedFileAlert.dialog}
       <div>
         <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">
           Spec Ingestion

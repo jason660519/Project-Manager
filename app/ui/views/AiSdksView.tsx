@@ -17,6 +17,7 @@ import { Boxes, Download, Lock, Unlock, Upload } from 'lucide-react';
 
 import { WorkstationFrame } from '../../../components/layout/WorkstationFrame';
 import { BottomSheetTabs, type SheetTabItem } from '../../../components/sheets/BottomSheetTabs';
+import { useInAppConfirm } from '../../../components/ui/InAppDialog';
 import { listLlmProviders, type LlmProviderId } from '../../../lib/keys/llmProviders';
 import { useI18n } from '../../../lib/i18n';
 import {
@@ -76,6 +77,7 @@ export function AiSdksView({
   const router = useRouter();
   const { t } = useI18n();
   const copy = t.aiSdks;
+  const importConfirm = useInAppConfirm();
   const providers = useMemo(() => listLlmProviders(), []);
 
   const [store, setStore] = useState<AiSdksConfig>(emptyAiSdksConfig);
@@ -228,7 +230,13 @@ export function AiSdksView({
         setNotice(copy.importUnrecognized);
         return;
       }
-      const merge = window.confirm(copy.importMergePrompt);
+      const merge = await importConfirm.open({
+        title: 'Import AI SDKs config',
+        message: copy.importMergePrompt,
+        confirmLabel: 'Merge',
+        cancelLabel: 'Replace',
+        tone: 'neutral',
+      });
       setStore((prev) =>
         merge
           ? {
@@ -384,6 +392,7 @@ export function AiSdksView({
           />
         </div>
       ))}
+      {importConfirm.dialog}
     </WorkstationFrame>
   );
 }

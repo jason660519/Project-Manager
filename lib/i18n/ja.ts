@@ -150,6 +150,7 @@ export const ja: Translations = {
     table: {
       columns: {
         provider: 'Provider',
+        active: 'Active',
         category: 'カテゴリ',
         apiKeyPage: 'API キー',
         usage: '使用量',
@@ -208,6 +209,14 @@ export const ja: Translations = {
         delete: '削除',
         deleteCustomRow: 'カスタム行を削除',
         hideProviderRow: 'Provider 行を非表示',
+      },
+      keyValueEditor: {
+        required: 'API キーを入力してください',
+        patternMismatch: 'API キーがこの Provider の想定形式と一致しません',
+        updated: 'キーを更新しました',
+        show: 'API キーを表示',
+        hide: 'API キーを非表示',
+        update: 'API キーを更新',
       },
       live: 'live',
       moreModels: '+{count} 件',
@@ -613,7 +622,13 @@ export const ja: Translations = {
       allPlanes: 'All execution planes',
       clearResults: 'Clear Results',
       addModel: 'Add Model',
-      runAll: 'Run All',
+      runAll: 'Test ALL',
+      activityFilter: {
+        label: 'Activity filter',
+        activity: 'Activity',
+        inactivity: 'Inactivity',
+        all: 'All',
+      },
       emptyNoModels: 'No model rows yet. Add a model to start the LLM evaluation.',
       emptyNoFilteredRows: 'No rows match the current filters.',
       noOutput: 'No output yet',

@@ -151,7 +151,7 @@ describe('KeysProviderTable', () => {
     expect(keyVarNameIndex).toBeLessThan(keyValueIndex);
     expect(screen.getByText('OPENAI_API_KEY')).toBeInTheDocument();
     expect(screen.getByLabelText('OpenAI Key Value')).toHaveAttribute('placeholder', 'sk-••••vDYA');
-    expect(screen.getByRole('button', { name: '更新API Key' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Update API key' })).toBeInTheDocument();
   });
 
   it('updates a key value from the cell editor and clears the draft on success', async () => {
@@ -161,7 +161,7 @@ describe('KeysProviderTable', () => {
     fireEvent.change(screen.getByLabelText('OpenAI Key Value'), {
       target: { value: `sk-${'a'.repeat(40)}` },
     });
-    fireEvent.click(screen.getByRole('button', { name: '更新API Key' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Update API key' }));
 
     await waitFor(() => expect(onUpdateKey).toHaveBeenCalledTimes(1));
     expect(onUpdateKey).toHaveBeenCalledWith(
@@ -169,7 +169,7 @@ describe('KeysProviderTable', () => {
       `sk-${'a'.repeat(40)}`,
     );
     expect(screen.getByLabelText('OpenAI Key Value')).toHaveValue('');
-    expect(screen.getByText('更新成功')).toBeInTheDocument();
+    expect(screen.getByText('Key updated')).toBeInTheDocument();
   });
 
   it('keeps key values hidden by default and lets the user temporarily reveal them', () => {
@@ -178,12 +178,12 @@ describe('KeysProviderTable', () => {
     const input = screen.getByLabelText('OpenAI Key Value');
     expect(input).toHaveAttribute('type', 'password');
 
-    fireEvent.click(screen.getByRole('button', { name: '顯示API Key' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show API key' }));
 
     expect(input).toHaveAttribute('type', 'text');
-    expect(screen.getByRole('button', { name: '隱藏API Key' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hide API key' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '隱藏API Key' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hide API key' }));
 
     expect(input).toHaveAttribute('type', 'password');
   });
@@ -195,10 +195,10 @@ describe('KeysProviderTable', () => {
     fireEvent.change(screen.getByLabelText('OpenAI Key Value'), {
       target: { value: 'not-an-openai-key' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '更新API Key' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Update API key' }));
 
     expect(onUpdateKey).not.toHaveBeenCalled();
-    expect(screen.getByText('API Key 格式不符合此 provider 的預設規則')).toBeInTheDocument();
+    expect(screen.getByText("API key does not match this provider's expected format")).toBeInTheDocument();
   });
 
   it('disables editing while saving and preserves the draft on update failure', async () => {
@@ -212,10 +212,10 @@ describe('KeysProviderTable', () => {
     fireEvent.change(screen.getByLabelText('OpenAI Key Value'), {
       target: { value },
     });
-    fireEvent.click(screen.getByRole('button', { name: '更新API Key' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Update API key' }));
 
     await waitFor(() => expect(screen.getByLabelText('OpenAI Key Value')).toBeDisabled());
-    expect(screen.getByRole('button', { name: '更新API Key' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Update API key' })).toBeDisabled();
 
     rejectUpdate(new Error('Provider 401'));
 

@@ -18,6 +18,7 @@ import { useI18n } from '../../../lib/i18n';
 import { formatSecretsStorageLabel } from '../../../lib/keys/secretsStorageLabel';
 import { WorkstationFrame } from '../../../components/layout/WorkstationFrame';
 import { BottomSheetTabs, type SheetTabItem } from '../../../components/sheets/BottomSheetTabs';
+import { useInAppPrompt } from '../../../components/ui/InAppDialog';
 import {
   exportAiCliPresetAllowlistJson,
   getAiCliPresetAllowlist,
@@ -172,11 +173,13 @@ function ActionButton({
 
 export function SettingsView() {
   const { t } = useI18n();
+  const jsonPrompt = useInAppPrompt();
   const [activeSheet, setActiveSheet] = useState<SettingsSheetKey>('system-tray');
   const [trayEnabled, setTrayEnabled] = useState(false);
   const [isTauri, setIsTauri] = useState(false);
   const [secretsBackend, setSecretsBackend] = useState('localStorage');
   const [aiCliPresetDraft, setAiCliPresetDraft] = useState('');
+  const [systemCliNotice, setSystemCliNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const tauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -216,24 +219,36 @@ export function SettingsView() {
     if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
       try {
         await navigator.clipboard.writeText(json);
-        if (typeof window !== 'undefined') window.alert(t.settingsView.presetCopied);
+        setSystemCliNotice(t.settingsView.presetCopied);
         return;
       } catch {
-        // Fall back to prompt below.
+        // Fall back to the in-app copy dialog below.
       }
     }
-    if (typeof window !== 'undefined') window.prompt(t.settingsView.copyPresetPrompt, json);
+    await jsonPrompt.open({
+      title: 'Copy preset JSON',
+      message: t.settingsView.copyPresetPrompt,
+      defaultValue: json,
+      confirmLabel: 'Close',
+      multiline: true,
+    });
   };
 
-  const handleImportAiCliPreset = () => {
-    if (typeof window === 'undefined') return;
-    const input = window.prompt(t.settingsView.importPresetPrompt, '[]');
+  const handleImportAiCliPreset = async () => {
+    const input = await jsonPrompt.open({
+      title: 'Import preset JSON',
+      message: t.settingsView.importPresetPrompt,
+      defaultValue: '[]',
+      confirmLabel: 'Import',
+      multiline: true,
+    });
     if (!input) return;
     try {
       const imported = importAiCliPresetAllowlistJson(input);
       setAiCliPresetDraft(imported.join('\n'));
+      setSystemCliNotice(null);
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : t.settingsView.importPresetInvalid);
+      setSystemCliNotice(err instanceof Error ? err.message : t.settingsView.importPresetInvalid);
     }
   };
 
@@ -388,7 +403,7 @@ export function SettingsView() {
           >
             {t.settingsView.exportJson}
           </ActionButton>
-          <ActionButton onClick={handleImportAiCliPreset} icon={<Upload size={13} />}>
+          <ActionButton onClick={() => void handleImportAiCliPreset()} icon={<Upload size={13} />}>
             {t.settingsView.importJson}
           </ActionButton>
           <ActionButton
@@ -478,6 +493,11 @@ export function SettingsView() {
               </SettingsStatusBadge>
             }
           />
+          {systemCliNotice && (
+            <div className="border-b border-stone-200/10 px-4 py-2 text-[11px] text-amber-100/80">
+              {systemCliNotice}
+            </div>
+          )}
           <SettingsRowsTable rows={systemCliRows} />
         </SheetPanel>
       )}
@@ -492,6 +512,7 @@ export function SettingsView() {
           <KeyboardShortcutsView embedded />
         </SheetPanel>
       )}
+      {jsonPrompt.dialog}
     </WorkstationFrame>
   );
 }

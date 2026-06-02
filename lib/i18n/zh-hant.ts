@@ -149,6 +149,7 @@ export const zhHant: Translations = {
     table: {
       columns: {
         provider: 'Provider',
+        active: '是否採用',
         category: '分類',
         apiKeyPage: 'API 金鑰',
         usage: '用量',
@@ -207,6 +208,14 @@ export const zhHant: Translations = {
         delete: '刪除',
         deleteCustomRow: '刪除自訂列',
         hideProviderRow: '隱藏 Provider 列',
+      },
+      keyValueEditor: {
+        required: '請輸入 API Key',
+        patternMismatch: 'API Key 格式不符合此 Provider 的預設規則',
+        updated: '更新成功',
+        show: '顯示 API Key',
+        hide: '隱藏 API Key',
+        update: '更新 API Key',
       },
       live: '即時',
       moreModels: '+{count} 個',
@@ -612,7 +621,13 @@ export const zhHant: Translations = {
       allPlanes: '全部運算面',
       clearResults: '清除結果',
       addModel: '新增模型',
-      runAll: '全測',
+      runAll: 'Test ALL',
+      activityFilter: {
+        label: 'Activity filter',
+        activity: 'Activity',
+        inactivity: 'Inactivity',
+        all: 'All',
+      },
       emptyNoModels: '目前沒有模型列。先按「新增模型」，再開始 LLM 能力評測。',
       emptyNoFilteredRows: '沒有符合目前篩選條件的列。',
       noOutput: '尚無輸出',

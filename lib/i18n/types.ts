@@ -147,6 +147,7 @@ export interface Translations {
     table: {
       columns: {
         provider: string;
+        active: string;
         category: string;
         apiKeyPage: string;
         usage: string;
@@ -205,6 +206,14 @@ export interface Translations {
         delete: string;
         deleteCustomRow: string;
         hideProviderRow: string;
+      };
+      keyValueEditor: {
+        required: string;
+        patternMismatch: string;
+        updated: string;
+        show: string;
+        hide: string;
+        update: string;
       };
       live: string;
       moreModels: string;
@@ -618,6 +627,12 @@ export interface Translations {
       clearResults: string;
       addModel: string;
       runAll: string;
+      activityFilter: {
+        label: string;
+        activity: string;
+        inactivity: string;
+        all: string;
+      };
       emptyNoModels: string;
       emptyNoFilteredRows: string;
       noOutput: string;

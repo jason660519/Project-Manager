@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { fireEvent, render } from '@testing-library/react';
 import { LlmArenaMatrixTable } from '../app/ui/views/Keys/LlmArenaMatrixTable';
 import { en } from '../lib/i18n/en';
-import type { ArenaModelSpec } from '../app/ui/views/Keys/useArenaChat';
+import type { ArenaModelSpec, ArenaResult } from '../app/ui/views/Keys/useArenaChat';
 
 /**
  * Regression: the LLM Arena test-prompt <textarea> must keep focus across
@@ -37,7 +37,6 @@ function Harness() {
       isRunning={false}
       runningIndexes={new Set()}
       userPrompt=""
-      enabledByIndex={{}}
       evaluationByIndex={{}}
       noteByIndex={{}}
       promptOverrideByIndex={promptOverrideByIndex}
@@ -50,7 +49,6 @@ function Harness() {
       onRunSingleRow={() => {}}
       onRemoveModel={() => {}}
       onUpdateModel={() => {}}
-      onToggleEnabled={() => {}}
       onEvaluationChange={() => {}}
       onNoteChange={() => {}}
       // Fresh closure each render — this identity change is what used to rebuild columns.
@@ -83,5 +81,60 @@ describe('LlmArenaMatrixTable prompt focus', () => {
     expect(after).toBe(textarea);
     expect(document.activeElement).toBe(textarea);
     expect(after.value).toBe('abc');
+  });
+
+  it('filters rows by activity state from the second-column dropdown', () => {
+    const selectedModels: ArenaModelSpec[] = [
+      { provider: 'openai', model: 'gpt-active' },
+      { provider: 'openai', model: 'gpt-inactive' },
+    ];
+    const activeResult: ArenaResult = {
+      provider: 'openai',
+      model: 'gpt-active',
+      content: 'completed output',
+      latencyMs: 42,
+      timestamp: Date.now(),
+    };
+
+    const { container, getByLabelText } = render(
+      <LlmArenaMatrixTable
+        copy={en.keysArena.llm}
+        commonCopy={en.keysArena.common}
+        selectedModels={selectedModels}
+        providers={[{ id: 'openai', label: 'OpenAI', availableModels: ['gpt-active', 'gpt-inactive'] }]}
+        results={{ 'openai-gpt-active': activeResult }}
+        isRunning={false}
+        runningIndexes={new Set()}
+        userPrompt="prompt"
+        evaluationByIndex={{}}
+        noteByIndex={{}}
+        promptOverrideByIndex={{}}
+        historyByResultKey={{}}
+        onClearAll={() => {}}
+        onAddModel={() => {}}
+        onImportModels={() => {}}
+        onMoveModel={() => {}}
+        onRunSelectedRows={() => {}}
+        onRunSingleRow={() => {}}
+        onRemoveModel={() => {}}
+        onUpdateModel={() => {}}
+        onEvaluationChange={() => {}}
+        onNoteChange={() => {}}
+        onRowPromptChange={() => {}}
+        onOpenDetail={() => {}}
+      />,
+    );
+
+    const rows = () => container.querySelectorAll('tbody tr');
+    expect(rows()).toHaveLength(2);
+
+    fireEvent.change(getByLabelText('Activity filter'), { target: { value: 'activity' } });
+    expect(rows()).toHaveLength(1);
+
+    fireEvent.change(getByLabelText('Activity filter'), { target: { value: 'inactivity' } });
+    expect(rows()).toHaveLength(1);
+
+    fireEvent.change(getByLabelText('Activity filter'), { target: { value: 'all' } });
+    expect(rows()).toHaveLength(2);
   });
 });

@@ -149,6 +149,7 @@ export const zh: Translations = {
     table: {
       columns: {
         provider: 'Provider',
+        active: '是否采用',
         category: '分类',
         apiKeyPage: 'API 密钥',
         usage: '用量',
@@ -207,6 +208,14 @@ export const zh: Translations = {
         delete: '删除',
         deleteCustomRow: '删除自定义行',
         hideProviderRow: '隐藏 Provider 行',
+      },
+      keyValueEditor: {
+        required: '请输入 API Key',
+        patternMismatch: 'API Key 格式不符合此 Provider 的默认规则',
+        updated: '更新成功',
+        show: '显示 API Key',
+        hide: '隐藏 API Key',
+        update: '更新 API Key',
       },
       live: '实时',
       moreModels: '+{count} 个',
@@ -612,7 +621,13 @@ export const zh: Translations = {
       allPlanes: 'All execution planes',
       clearResults: 'Clear Results',
       addModel: 'Add Model',
-      runAll: 'Run All',
+      runAll: 'Test ALL',
+      activityFilter: {
+        label: 'Activity filter',
+        activity: 'Activity',
+        inactivity: 'Inactivity',
+        all: 'All',
+      },
       emptyNoModels: 'No model rows yet. Add a model to start the LLM evaluation.',
       emptyNoFilteredRows: 'No rows match the current filters.',
       noOutput: 'No output yet',

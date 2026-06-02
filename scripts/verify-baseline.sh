@@ -38,6 +38,7 @@ maybe_standards_check
 run npm run docs:check
 run node scripts/check-static-export-hygiene.mjs
 run node scripts/check-native-dialogs.mjs
+run node scripts/check-ui-i18n.mjs
 run npm test
 
 if command -v cargo >/dev/null 2>&1; then

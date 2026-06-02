@@ -43,6 +43,7 @@ import {
 } from '../../../lib/bridge';
 import { getProjectsRepository } from '../../../lib/storage';
 import type { Feature, FeatureStatus, ProjectEntry } from '../../../lib/types';
+import { useInAppAlert } from '../../../components/ui/InAppDialog';
 
 // ── Platform metadata ─────────────────────────────────────────────────────────
 
@@ -1016,6 +1017,7 @@ export function ChannelsView() {
   const [catalog, setCatalog] = useState<ChannelCatalog>({ channels: [], commandMappings: [] });
   const [pollStatuses, setPollStatuses] = useState<Map<string, TelegramPollStatus>>(new Map());
   const [recentMessages, setRecentMessages] = useState<TelegramMessagePayload[]>([]);
+  const botTokenAlert = useInAppAlert();
 
   // Keep a ref to the latest catalog so the message handler closure can route
   // without re-subscribing each time the catalog mutates.
@@ -1070,7 +1072,10 @@ export function ChannelsView() {
   const handleStartPoll = useCallback(async (channel: ChannelConfig) => {
     const botToken = getChannelSecret(channel.id, 'botToken');
     if (!botToken) {
-      alert('Set the Bot Token first (Edit → Bot Token).');
+      await botTokenAlert.open({
+        title: 'Bot token required',
+        message: 'Set the Bot Token first (Edit -> Bot Token).',
+      });
       return;
     }
     const allowedRaw = channel.credentials.allowedChatIds ?? '';
@@ -1095,7 +1100,7 @@ export function ChannelsView() {
         }),
       );
     }
-  }, []);
+  }, [botTokenAlert]);
 
   const handleStopPoll = useCallback(async (channelId: string) => {
     await telegramStopPoll(channelId);
@@ -1103,6 +1108,7 @@ export function ChannelsView() {
 
   return (
     <div className="max-w-3xl space-y-6">
+      {botTokenAlert.dialog}
       <div>
         <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">Channels</h1>
         <p className="mt-1 text-xs text-stone-400">

@@ -6,6 +6,7 @@ import type { PhaseTablePrefs } from '../types';
 import type { ColumnDef, ColumnHandlers } from '../_lib/columns';
 import type { PhaseRow } from '../_lib/phaseRows';
 import { CategoryColumnFilter, type CategoryColumnFilterProps } from './CategoryColumnFilter';
+import { useInAppPrompt } from '../../../components/ui/InAppDialog';
 
 interface PhaseTableProps {
   rows: PhaseRow[];
@@ -18,6 +19,7 @@ interface PhaseTableProps {
 }
 
 export function PhaseTable({ rows, columns, prefs, patch, handlers, categoryFilter, onRowClick }: PhaseTableProps) {
+  const resizePrompt = useInAppPrompt();
   const [contextMenu, setContextMenu] = useState<
     | { type: 'column'; x: number; y: number; columnId: string; originalIndex: number; visibleIndex: number }
     | { type: 'row'; x: number; y: number; rowKey: string }
@@ -102,8 +104,12 @@ export function PhaseTable({ rows, columns, prefs, patch, handlers, categoryFilt
     patch({ hiddenColumnIds: Array.from(new Set([...prefs.hiddenColumnIds, columnId])) });
   }, [patch, prefs.hiddenColumnIds, visibleColumns]);
 
-  const resizeColumn = useCallback((originalIndex: number, columnId: string) => {
-    const raw = window.prompt('Resize column width in px. Enter 0 to hide this column.', String(prefs.colWidths[originalIndex] ?? 120));
+  const resizeColumn = useCallback(async (originalIndex: number, columnId: string) => {
+    const raw = await resizePrompt.open({
+      title: 'Resize column',
+      message: 'Resize column width in px. Enter 0 to hide this column.',
+      defaultValue: String(prefs.colWidths[originalIndex] ?? 120),
+    });
     if (raw == null) return;
     const nextValue = Number(raw);
     if (!Number.isFinite(nextValue)) return;
@@ -114,15 +120,19 @@ export function PhaseTable({ rows, columns, prefs, patch, handlers, categoryFilt
     const next = [...prefs.colWidths];
     next[originalIndex] = Math.max(56, Math.min(640, nextValue));
     patch({ colWidths: next });
-  }, [hideColumn, patch, prefs.colWidths]);
+  }, [hideColumn, patch, prefs.colWidths, resizePrompt]);
 
-  const resizeRows = useCallback(() => {
-    const raw = window.prompt('Resize row height in px. Enter 0 to hide rows individually from row menu.', String(prefs.rowHeight));
+  const resizeRows = useCallback(async () => {
+    const raw = await resizePrompt.open({
+      title: 'Resize rows',
+      message: 'Resize row height in px. Enter 0 to hide rows individually from row menu.',
+      defaultValue: String(prefs.rowHeight),
+    });
     if (raw == null) return;
     const nextValue = Number(raw);
     if (!Number.isFinite(nextValue) || nextValue === 0) return;
     patch({ rowHeight: Math.max(28, Math.min(160, nextValue)) });
-  }, [patch, prefs.rowHeight]);
+  }, [patch, prefs.rowHeight, resizePrompt]);
 
   const restoreHiddenColumns = useCallback(() => {
     patch({ hiddenColumnIds: [] });
@@ -269,7 +279,7 @@ export function PhaseTable({ rows, columns, prefs, patch, handlers, categoryFilt
               <button type="button" className="block w-full px-2 py-1.5 text-left hover:bg-white/10" onClick={() => { toggleSort(contextMenu.columnId); setContextMenu(null); }}>
                 Sort / reset sort
               </button>
-              <button type="button" className="block w-full px-2 py-1.5 text-left hover:bg-white/10" onClick={() => { resizeColumn(contextMenu.originalIndex, contextMenu.columnId); setContextMenu(null); }}>
+              <button type="button" className="block w-full px-2 py-1.5 text-left hover:bg-white/10" onClick={() => { void resizeColumn(contextMenu.originalIndex, contextMenu.columnId); setContextMenu(null); }}>
                 Resize column
               </button>
               <button type="button" className="block w-full px-2 py-1.5 text-left hover:bg-white/10" onClick={() => { patch({ frozenDataColCount: contextMenu.visibleIndex + 1 }); setContextMenu(null); }}>
@@ -286,7 +296,7 @@ export function PhaseTable({ rows, columns, prefs, patch, handlers, categoryFilt
             </>
           ) : (
             <>
-              <button type="button" className="block w-full px-2 py-1.5 text-left hover:bg-white/10" onClick={() => { resizeRows(); setContextMenu(null); }}>
+              <button type="button" className="block w-full px-2 py-1.5 text-left hover:bg-white/10" onClick={() => { void resizeRows(); setContextMenu(null); }}>
                 Resize rows
               </button>
               <button type="button" className="block w-full px-2 py-1.5 text-left hover:bg-white/10" onClick={() => { handlers.onToggleHideRow(contextMenu.rowKey); setContextMenu(null); }}>
@@ -301,6 +311,7 @@ export function PhaseTable({ rows, columns, prefs, patch, handlers, categoryFilt
           )}
         </div>
       )}
+      {resizePrompt.dialog}
     </div>
   );
 }

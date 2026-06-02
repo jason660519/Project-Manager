@@ -85,7 +85,6 @@ interface LlmArenaMatrixTableProps {
   isRunning: boolean;
   runningIndexes: Set<number>;
   userPrompt: string;
-  enabledByIndex: Record<number, boolean>;
   evaluationByIndex: Record<number, EvaluationLevel>;
   noteByIndex: Record<number, string>;
   promptOverrideByIndex: Record<number, string>;
@@ -98,7 +97,6 @@ interface LlmArenaMatrixTableProps {
   onRunSingleRow: (index: number) => void;
   onRemoveModel: (index: number) => void;
   onUpdateModel: (index: number, providerId: string, modelId: string) => void;
-  onToggleEnabled: (index: number, enabled: boolean) => void;
   onEvaluationChange: (index: number, level: EvaluationLevel) => void;
   onNoteChange: (index: number, note: string) => void;
   onRowPromptChange: (index: number, value: string) => void;
@@ -106,10 +104,10 @@ interface LlmArenaMatrixTableProps {
 }
 
 const col = createColumnHelper<LlmArenaTableRow>();
-const LLM_STORAGE_KEY = 'projectManager.keys.llmArena.tablePrefs.v1';
+const LLM_STORAGE_KEY = 'projectManager.keys.llmArena.tablePrefs.v2';
 const LLM_COLUMN_IDS = [
   'col-no',
-  'col-test',
+  'col-activity-filter',
   'col-provider',
   'col-model',
   'col-effective-model',
@@ -132,7 +130,7 @@ const LLM_COLUMN_IDS = [
 
 const LLM_DEFAULT_SIZING: Record<string, number> = {
   'col-no': 72,
-  'col-test': 72,
+  'col-activity-filter': 124,
   'col-provider': 170,
   'col-model': 260,
   'col-effective-model': 240,
@@ -157,7 +155,7 @@ const LLM_PRESETS: ArenaTablePreset[] = [
   {
     id: 'full',
     label: 'Full',
-    frozenColumnIds: ['col-no', 'col-test', 'col-provider', 'col-model'],
+    frozenColumnIds: ['col-no', 'col-activity-filter', 'col-provider', 'col-model'],
   },
   {
     id: 'run-review',
@@ -193,7 +191,6 @@ export function LlmArenaMatrixTable({
   isRunning,
   runningIndexes,
   userPrompt,
-  enabledByIndex,
   evaluationByIndex,
   noteByIndex,
   promptOverrideByIndex,
@@ -206,7 +203,6 @@ export function LlmArenaMatrixTable({
   onRunSingleRow,
   onRemoveModel,
   onUpdateModel,
-  onToggleEnabled,
   onEvaluationChange,
   onNoteChange,
   onRowPromptChange,
@@ -214,12 +210,13 @@ export function LlmArenaMatrixTable({
 }: LlmArenaMatrixTableProps) {
   const [searchText, setSearchText] = useState('');
   const [category, setCategory] = useState<'all' | 'vendor_saas' | 'on_prem' | 'unknown'>('all');
+  const [activityFilter, setActivityFilter] = useState<'all' | 'activity' | 'inactivity'>('all');
   const [sorting, setSorting] = useState<SortingState>([]);
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const columnOptions = useMemo(
     () => [
       { id: 'col-no', label: 'No', freezable: true },
-      { id: 'col-test', label: copy.columns.test, freezable: true },
+      { id: 'col-activity-filter', label: copy.activityFilter.label, freezable: true },
       { id: 'col-provider', label: copy.columns.provider, freezable: true },
       { id: 'col-model', label: copy.columns.model, freezable: true },
       { id: 'col-effective-model', label: 'Requested / Effective', hideable: true, freezable: true },
@@ -254,7 +251,7 @@ export function LlmArenaMatrixTable({
     storageKey: LLM_STORAGE_KEY,
     columnIds: LLM_COLUMN_IDS,
     defaultSizing: LLM_DEFAULT_SIZING,
-    defaultFrozenColumnIds: ['col-no', 'col-test', 'col-provider', 'col-model'],
+    defaultFrozenColumnIds: ['col-no', 'col-activity-filter', 'col-provider', 'col-model'],
   });
 
   const rows = useMemo<LlmArenaTableRow[]>(
@@ -277,7 +274,10 @@ export function LlmArenaMatrixTable({
     const keyword = searchText.trim().toLowerCase();
     return rows.filter((row) => {
       const plane = inferExecutionPlane(row.spec.provider);
+      const isActive = runningIndexes.has(row.index) || row.historyCount > 0 || Boolean(row.result) || Boolean(row.resultRow);
       if (category !== 'all' && plane !== category) return false;
+      if (activityFilter === 'activity' && !isActive) return false;
+      if (activityFilter === 'inactivity' && isActive) return false;
       if (!keyword) return true;
       const searchBlob = [
         row.spec.provider,
@@ -291,7 +291,7 @@ export function LlmArenaMatrixTable({
         .toLowerCase();
       return searchBlob.includes(keyword);
     });
-  }, [rows, searchText, category, copy]);
+  }, [rows, searchText, category, activityFilter, runningIndexes, copy]);
 
   // Volatile per-row state + handlers are read through a ref so the `columns`
   // memo need not list them as deps. Rebuilding `columns` changes every cell
@@ -300,13 +300,11 @@ export function LlmArenaMatrixTable({
   // <input>, dropping focus on every keystroke. Stable columns + ref reads keep
   // focus while still rendering live values.
   const liveRef = useLiveRef({
-    enabledByIndex,
     evaluationByIndex,
     noteByIndex,
     promptOverrideByIndex,
     runningIndexes,
     userPrompt,
-    onToggleEnabled,
     onEvaluationChange,
     onNoteChange,
     onRowPromptChange,
@@ -325,19 +323,45 @@ export function LlmArenaMatrixTable({
         size: LLM_DEFAULT_SIZING['col-no'],
         cell: ({ row }) => <span className="font-mono text-xs text-stone-300">{row.original.index + 1}</span>,
       }),
-      col.accessor((row) => liveRef.current.enabledByIndex[row.index] !== false, {
-        id: 'col-test',
-        header: copy.columns.test,
-        size: LLM_DEFAULT_SIZING['col-test'],
-        cell: ({ row }) => (
-          <input
-            type="checkbox"
-            checked={liveRef.current.enabledByIndex[row.original.index] !== false}
-            onChange={(event) => liveRef.current.onToggleEnabled(row.original.index, event.target.checked)}
+      col.accessor((row) => (
+        liveRef.current.runningIndexes.has(row.index) || row.historyCount > 0 || Boolean(row.result) || Boolean(row.resultRow)
+          ? 'activity'
+          : 'inactivity'
+      ), {
+        id: 'col-activity-filter',
+        enableSorting: false,
+        header: () => (
+          <select
+            aria-label={copy.activityFilter.label}
+            value={activityFilter}
+            onChange={(event) => setActivityFilter(event.target.value as typeof activityFilter)}
             onClick={(event) => event.stopPropagation()}
-            className="h-3.5 w-3.5 accent-emerald-400"
-          />
+            className="h-7 w-full border border-stone-200/18 bg-[rgb(var(--pm-input))] px-2 text-[11px] normal-case tracking-[0] text-stone-200 outline-none focus:ring-1 focus:ring-emerald-400/50"
+          >
+            <option value="activity" className="bg-stone-900">{copy.activityFilter.activity}</option>
+            <option value="inactivity" className="bg-stone-900">{copy.activityFilter.inactivity}</option>
+            <option value="all" className="bg-stone-900">{copy.activityFilter.all}</option>
+          </select>
         ),
+        size: LLM_DEFAULT_SIZING['col-activity-filter'],
+        cell: ({ row }) => {
+          const isActive =
+            liveRef.current.runningIndexes.has(row.original.index) ||
+            row.original.historyCount > 0 ||
+            Boolean(row.original.result) ||
+            Boolean(row.original.resultRow);
+          return (
+            <span
+              className={`inline-flex rounded-sm px-2 py-0.5 text-[10px] font-semibold ${
+                isActive
+                  ? 'bg-emerald-500/14 text-emerald-200'
+                  : 'bg-stone-500/14 text-stone-400'
+              }`}
+            >
+              {isActive ? copy.activityFilter.activity : copy.activityFilter.inactivity}
+            </span>
+          );
+        },
       }),
       col.accessor((row) => row.spec.provider, {
         id: 'col-provider',
@@ -677,7 +701,7 @@ export function LlmArenaMatrixTable({
     // (locale copy, provider list, row count). Volatile per-row state + handlers
     // are read via liveRef inside the cells, so `columns` stays referentially
     // stable across keystrokes and the inputs never remount.
-    [copy, commonCopy, providers, selectedModels.length],
+    [copy, commonCopy, providers, selectedModels.length, activityFilter],
   );
 
   const table = useReactTable({
@@ -830,7 +854,7 @@ export function LlmArenaMatrixTable({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div className="pm-scroll min-h-0 flex-1 overflow-auto">
         <table className="border-collapse text-left" style={{ width: table.getTotalSize() }}>
           <thead className="sticky top-0 z-10 border-b border-stone-200/12 bg-stone-900">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -841,15 +865,19 @@ export function LlmArenaMatrixTable({
                     className={`relative select-none border-r border-stone-200/10 px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400 ${frozenClass(header.column.id, true)}`}
                     style={cellStyle(header.column.id)}
                   >
-                    <button
-                      type="button"
-                      onClick={header.column.getToggleSortingHandler()}
-                      disabled={!header.column.getCanSort()}
-                      className="flex w-full items-center justify-between gap-2 text-left disabled:cursor-default"
-                    >
-                      <span className="truncate">{flexRender(header.column.columnDef.header, header.getContext())}</span>
-                      <SortMarker value={header.column.getIsSorted()} />
-                    </button>
+                    {header.column.id === 'col-activity-filter' ? (
+                      flexRender(header.column.columnDef.header, header.getContext())
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={header.column.getToggleSortingHandler()}
+                        disabled={!header.column.getCanSort()}
+                        className="flex w-full items-center justify-between gap-2 text-left disabled:cursor-default"
+                      >
+                        <span className="truncate">{flexRender(header.column.columnDef.header, header.getContext())}</span>
+                        <SortMarker value={header.column.getIsSorted()} />
+                      </button>
+                    )}
                     {header.column.getCanResize() && (
                       <button
                         type="button"

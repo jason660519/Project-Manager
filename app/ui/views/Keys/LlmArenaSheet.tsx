@@ -59,7 +59,6 @@ export function LlmArenaSheet() {
   const { runComparison, results, clearResults } = useArenaChat('pm.arena.llm.results');
   const allProviders = validatedLlmProviders;
   const seenResultTimestampRef = useRef<Record<string, number>>({});
-  const [enabledByIndex, setEnabledByIndex] = useState<Record<number, boolean>>({});
   const [evaluationByIndex, setEvaluationByIndex] = useState<Record<number, EvaluationLevel>>({});
   const [noteByIndex, setNoteByIndex] = useState<Record<number, string>>({});
   const [promptOverrideByIndex, setPromptOverrideByIndex] = useState<Record<number, string>>({});
@@ -100,18 +99,6 @@ export function LlmArenaSheet() {
   }, [providersSignature, allProviders.length, setLlmState]);
 
   useEffect(() => {
-    setEnabledByIndex((prev) => {
-      const next = { ...prev };
-      llmState.selectedModels.forEach((_, index) => {
-        if (typeof next[index] !== 'boolean') next[index] = true;
-      });
-      Object.keys(next).forEach((key) => {
-        const index = Number(key);
-        if (Number.isFinite(index) && index >= llmState.selectedModels.length) delete next[index];
-      });
-      return next;
-    });
-
     setEvaluationByIndex((prev) => {
       const next = { ...prev };
       llmState.selectedModels.forEach((_, index) => {
@@ -240,7 +227,6 @@ export function LlmArenaSheet() {
       ...prev,
       selectedModels: prev.selectedModels.filter((_, i) => i !== index)
     }));
-    setEnabledByIndex((prev) => removeIndexedRecord(prev, index, length));
     setEvaluationByIndex((prev) => removeIndexedRecord(prev, index, length));
     setNoteByIndex((prev) => removeIndexedRecord(prev, index, length));
     setPromptOverrideByIndex((prev) => removeIndexedRecord(prev, index, length));
@@ -259,7 +245,6 @@ export function LlmArenaSheet() {
       ...prev,
       selectedModels: models.slice(0, 10),
     }));
-    setEnabledByIndex({});
     setEvaluationByIndex({});
     setNoteByIndex({});
     setPromptOverrideByIndex({});
@@ -272,7 +257,6 @@ export function LlmArenaSheet() {
       ...prev,
       selectedModels: moveItem(prev.selectedModels, fromIndex, toIndex),
     }));
-    setEnabledByIndex((prev) => moveIndexedRecord(prev, fromIndex, toIndex, length));
     setEvaluationByIndex((prev) => moveIndexedRecord(prev, fromIndex, toIndex, length));
     setNoteByIndex((prev) => moveIndexedRecord(prev, fromIndex, toIndex, length));
     setPromptOverrideByIndex((prev) => moveIndexedRecord(prev, fromIndex, toIndex, length));
@@ -309,10 +293,7 @@ export function LlmArenaSheet() {
 
   const runSelectedRows = async () => {
     if (!llmState.userPrompt.trim()) return;
-    const enabledIndexes = llmState.selectedModels
-      .map((_, index) => index)
-      .filter((index) => enabledByIndex[index] !== false);
-    await Promise.allSettled(enabledIndexes.map(runSingleRow));
+    await Promise.allSettled(llmState.selectedModels.map((_, index) => runSingleRow(index)));
   };
 
   const handleClearAll = () => {
@@ -398,7 +379,6 @@ export function LlmArenaSheet() {
         isRunning={runningIndexes.size > 0}
         runningIndexes={runningIndexes}
         userPrompt={llmState.userPrompt}
-        enabledByIndex={enabledByIndex}
         evaluationByIndex={evaluationByIndex}
         noteByIndex={noteByIndex}
         promptOverrideByIndex={promptOverrideByIndex}
@@ -411,7 +391,6 @@ export function LlmArenaSheet() {
         onRunSingleRow={(index) => void runSingleRow(index)}
         onRemoveModel={removeModel}
         onUpdateModel={updateModel}
-        onToggleEnabled={(index, enabled) => setEnabledByIndex((prev) => ({ ...prev, [index]: enabled }))}
         onEvaluationChange={(index, level) => setEvaluationByIndex((prev) => ({ ...prev, [index]: level }))}
         onNoteChange={(index, note) => setNoteByIndex((prev) => ({ ...prev, [index]: note }))}
         onRowPromptChange={handleRowPromptChange}
