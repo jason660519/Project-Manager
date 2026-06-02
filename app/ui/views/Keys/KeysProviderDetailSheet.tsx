@@ -112,6 +112,7 @@ export function KeysProviderDetailSheet({
   const [phase, setPhase] = useState<Phase>('idle');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [feedback, setFeedback] = useState<{ kind: 'ok' | 'fail'; msg: string } | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   useEffect(() => {
     if (phase === 'idle') {
@@ -136,6 +137,7 @@ export function KeysProviderDetailSheet({
     setShow(false);
     setMeta(loadProviderMetadata(provider.id));
     setFeedback(null);
+    setConfirmClear(false);
     setPhase('idle');
     loadProviderSecret(provider)
       .then((v) => {
@@ -299,18 +301,13 @@ export function KeysProviderDetailSheet({
 
   const handleClear = useCallback(async () => {
     if (!provider) return;
-    if (
-      typeof window !== 'undefined' &&
-      !window.confirm(`Clear the ${provider.label} key?`)
-    ) {
-      return;
-    }
     setFeedback(null);
     setPhase('clearing');
     try {
       await clearProviderKey(provider);
       setValue('');
       setSavedValue('');
+      setConfirmClear(false);
       setFeedback({ kind: 'ok', msg: 'Key cleared' });
     } catch (e: unknown) {
       console.error(`[KeysSheet] clearProviderKey(${provider.id}) threw:`, e);
@@ -426,7 +423,7 @@ export function KeysProviderDetailSheet({
               )}
               {hasKey && (
                 <button
-                  onClick={() => void handleClear()}
+                  onClick={() => setConfirmClear(true)}
                   disabled={busy}
                   className="ml-auto inline-flex items-center gap-1.5 px-3 py-2 text-[11px] text-stone-500 hover:text-rose-400 transition-colors disabled:opacity-40"
                 >
@@ -516,6 +513,49 @@ export function KeysProviderDetailSheet({
             </section>
           )}
         </div>
+        {confirmClear && (
+          <div
+            role="presentation"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4"
+            onClick={busy ? undefined : () => setConfirmClear(false)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="keys-clear-provider-title"
+              className="w-full max-w-md border border-stone-200/18 bg-[rgb(var(--pm-panel))] shadow-2xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="border-b border-stone-200/12 px-4 py-3">
+                <h3 id="keys-clear-provider-title" className="text-sm font-semibold text-stone-100">
+                  Clear API key
+                </h3>
+                <p className="mt-2 text-xs leading-5 text-stone-400">
+                  Clear the {provider.label} key? Validation metadata will also be removed.
+                </p>
+              </div>
+              <div className="flex items-center justify-end gap-2 px-4 py-3">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setConfirmClear(false)}
+                  className="border border-stone-200/18 px-3 py-2 text-[11px] uppercase tracking-[0.14em] text-stone-300 hover:bg-stone-200/8 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void handleClear()}
+                  className="inline-flex min-w-[100px] items-center justify-center gap-1.5 border border-rose-300/35 bg-rose-950/30 px-3 py-2 text-[11px] uppercase tracking-[0.14em] text-rose-100 hover:bg-rose-950/45 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {phase === 'clearing' ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                  Clear
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

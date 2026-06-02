@@ -1352,6 +1352,36 @@ export interface AnthropicResponse {
   model?: string;
 }
 
+export interface LlmRouteCandidate {
+  provider: string;
+  model?: string;
+}
+
+export interface LlmRouteAttempt {
+  provider: string;
+  model: string;
+  status: 'success' | 'failed' | 'skipped_cooldown';
+  errorReason?: string;
+  cooldownUntil?: string;
+}
+
+export interface LlmRouteDecision {
+  routeDecisionId: string;
+  modelAlias: string;
+  taskClass?: string;
+  strategy: string;
+  selectedProvider: string;
+  selectedModel: string;
+  degraded: boolean;
+  attempts: LlmRouteAttempt[];
+}
+
+export interface RoutedLlmResponse extends AnthropicResponse {
+  provider: string;
+  model: string;
+  routeDecision: LlmRouteDecision;
+}
+
 export async function callAnthropic(opts: {
   apiKey: string;
   model?: string;
@@ -1476,6 +1506,33 @@ export async function callStoredChatProvider(opts: {
   return invoke<AnthropicResponse>('call_stored_chat_provider', {
     provider: opts.provider,
     model: opts.model ?? null,
+    maxTokens: opts.maxTokens ?? 4096,
+    messages: opts.messages,
+    systemPrompt: opts.systemPrompt ?? null,
+    temperature: opts.temperature ?? null,
+    attachments: opts.attachments ?? null,
+  });
+}
+
+export async function callLlmRouted(opts: {
+  modelAlias?: 'pm-fast' | 'pm-code' | 'pm-reasoning' | 'pm-local' | string;
+  taskClass?: string;
+  provider?: string;
+  model?: string;
+  candidates?: LlmRouteCandidate[];
+  maxTokens?: number;
+  messages: AnthropicMessage[];
+  systemPrompt?: string;
+  temperature?: number;
+  attachments?: StoredChatAttachment[];
+}): Promise<RoutedLlmResponse> {
+  if (!isTauri()) throw new Error('callLlmRouted requires Tauri runtime');
+  return invoke<RoutedLlmResponse>('call_llm_routed', {
+    modelAlias: opts.modelAlias ?? null,
+    taskClass: opts.taskClass ?? null,
+    provider: opts.provider ?? null,
+    model: opts.model ?? null,
+    candidates: opts.candidates ?? null,
     maxTokens: opts.maxTokens ?? 4096,
     messages: opts.messages,
     systemPrompt: opts.systemPrompt ?? null,

@@ -40,4 +40,31 @@ describe('ChatMessage', () => {
     );
     expect(screen.getByLabelText(/assistant message/i)).toHaveTextContent('openai · gpt-4o');
   });
+
+  it('renders route decision metadata', () => {
+    render(
+      <ChatMessage
+        message={{
+          id: 'm1',
+          role: 'assistant',
+          content: 'hello',
+          createdAt: 1,
+          routeDecision: {
+            routeDecisionId: 'route-1',
+            modelAlias: 'pm-code',
+            taskClass: 'chat',
+            strategy: 'ordered_fallback',
+            selectedProvider: 'openai',
+            selectedModel: 'gpt-4o-mini',
+            degraded: false,
+            attempts: [
+              { provider: 'anthropic', model: 'claude', status: 'skipped_cooldown', errorReason: 'cooldown' },
+              { provider: 'openai', model: 'gpt-4o-mini', status: 'success' },
+            ],
+          },
+        }}
+      />,
+    );
+    expect(screen.getByLabelText(/assistant message/i)).toHaveTextContent('Route openai · gpt-4o-mini · 2 attempts · 1 cooldown skip');
+  });
 });

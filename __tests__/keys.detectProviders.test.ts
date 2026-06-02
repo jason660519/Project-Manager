@@ -50,4 +50,42 @@ describe('detectProviders', () => {
     expect(detected[0].provider.id).toBe('openai');
     expect(detected[0].envKey).toBe('MY_OPENAI_KEY');
   });
+
+  it('detects new provider keys from generated provider aliases', () => {
+    const entries = parseEnvText([
+      `MISTRAL_AI_API_KEY=sk-mistral-${'m'.repeat(30)}`,
+      `COHERE_TRIAL_KEY=cohere-trial-${'c'.repeat(30)}`,
+      `AZURE_OPENAI_API_KEY=${'a'.repeat(32)}`,
+      `GROQ_API_KEY=gsk_${'g'.repeat(32)}`,
+    ].join('\n'));
+
+    const detected = detectProviders(entries);
+    const byProvider = new Map(detected.map((item) => [item.provider.id, item]));
+
+    expect(byProvider.get('mistral')?.envKey).toBe('MISTRAL_AI_API_KEY');
+    expect(byProvider.get('mistral')?.matchSource).toBe('generated');
+    expect(byProvider.get('cohere')?.envKey).toBe('COHERE_TRIAL_KEY');
+    expect(byProvider.get('cohere')?.matchSource).toBe('generated');
+    expect(byProvider.get('azure-openai')?.envKey).toBe('AZURE_OPENAI_API_KEY');
+    expect(byProvider.get('azure-openai')?.matchSource).toBe('explicit');
+    expect(byProvider.get('groq')?.envKey).toBe('GROQ_API_KEY');
+    expect(byProvider.get('groq')?.matchSource).toBe('explicit');
+  });
+
+  it('reports credential-like env vars that no enabled provider matched', async () => {
+    const { findUndetectedProviderEnvKeys } = await import('../lib/keys/detectProviders');
+    const entries = parseEnvText([
+      `OPENAI_API_KEY=sk-${'b'.repeat(40)}`,
+      'FUTURE_PROVIDER_API_KEY=future-test-key',
+    ].join('\n'));
+    const detected = detectProviders(entries);
+
+    expect(findUndetectedProviderEnvKeys(entries, detected)).toEqual([
+      {
+        key: 'FUTURE_PROVIDER_API_KEY',
+        line: 2,
+        reason: 'No enabled provider alias matched this credential-like env var.',
+      },
+    ]);
+  });
 });

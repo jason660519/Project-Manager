@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, FileText, Loader2, RefreshCw, Upload, X } from 'lucide-react';
 import { parseEnvText } from '../../../../lib/keys/envParser';
-import { detectProviders, type DetectedKey } from '../../../../lib/keys/detectProviders';
+import {
+  detectProviders,
+  findUndetectedProviderEnvKeys,
+  type DetectedKey,
+  type UndetectedEnvKey,
+} from '../../../../lib/keys/detectProviders';
 import { PROVIDERS, type ProviderSpec } from '../../../../lib/keys/registry';
 import { saveProviderSecret } from '../../../../lib/keys/keychain';
 import { revalidateStoredKey } from '../../../../lib/keys/validation';
@@ -169,10 +174,27 @@ export function EnvImportModal({
     return scanFiles.find((f) => f.path === scanSelectedPath)?.content ?? '';
   }, [tab, pasteText, scanFiles, scanSelectedPath]);
 
+  const parsedEntries = useMemo(() => parseEnvText(sourceText), [sourceText]);
+  const detectionProviders = useMemo(
+    () => buildDetectionProviders(providerProfile),
+    [providerProfile],
+  );
   const detected: DetectedKey[] = useMemo(() => {
     if (!sourceText.trim()) return [];
-    return detectProviders(parseEnvText(sourceText), buildDetectionProviders(providerProfile));
-  }, [providerProfile, sourceText]);
+    return detectProviders(parsedEntries, detectionProviders);
+  }, [detectionProviders, parsedEntries, sourceText]);
+  const undetectedEnvKeys: UndetectedEnvKey[] = useMemo(() => {
+    if (!sourceText.trim()) return [];
+    return findUndetectedProviderEnvKeys(parsedEntries, detected, detectionProviders);
+  }, [detected, detectionProviders, parsedEntries, sourceText]);
+
+  useEffect(() => {
+    if (undetectedEnvKeys.length === 0) return;
+    console.warn('[keys.envImport] credential-like env vars were not matched to enabled providers', {
+      count: undetectedEnvKeys.length,
+      keys: undetectedEnvKeys.map((item) => ({ key: item.key, line: item.line, reason: item.reason })),
+    });
+  }, [undetectedEnvKeys]);
 
   // Default-check every detected entry whenever the source changes.
   useEffect(() => {
@@ -366,7 +388,14 @@ GITHUB_TOKEN=github_token_..."
                   <p className="mt-1 text-[11px] text-stone-500">
                     PM looks for variables named ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, GITHUB_TOKEN, and other registered provider keys.
                   </p>
+                  {undetectedEnvKeys.length > 0 && (
+                    <UndetectedEnvKeyNotice items={undetectedEnvKeys} />
+                  )}
                 </div>
+              )}
+
+              {detected.length > 0 && undetectedEnvKeys.length > 0 && (
+                <UndetectedEnvKeyNotice items={undetectedEnvKeys} />
               )}
 
               {scanFiles.length > 0 && (
@@ -498,6 +527,29 @@ function TabButton({
     >
       {children}
     </button>
+  );
+}
+
+function UndetectedEnvKeyNotice({ items }: { items: UndetectedEnvKey[] }) {
+  const visible = items.slice(0, 6);
+  return (
+    <div className="mt-3 border border-amber-300/25 bg-amber-300/5 px-3 py-2">
+      <div className="flex items-start gap-2">
+        <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-200" />
+        <div className="min-w-0">
+          <p className="text-[11px] text-amber-100">
+            {items.length} credential-like env var{items.length === 1 ? '' : 's'} did not match an enabled provider.
+          </p>
+          <p className="mt-1 text-[10px] text-stone-500">
+            {visible.map((item) => `${item.key} (line ${item.line})`).join(', ')}
+            {items.length > visible.length ? ` +${items.length - visible.length} more` : ''}
+          </p>
+          <p className="mt-1 text-[10px] text-stone-500">
+            Open Providers to add an alias or enable the matching provider.
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -39,6 +39,22 @@ function formatTime(ts: number): string {
   return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${time}`;
 }
 
+function routeSummary(message: ChatMessageType): string | null {
+  const decision = message.routeDecision;
+  if (!decision) return null;
+  const attempts = decision.attempts.length;
+  const selected = decision.selectedProvider
+    ? `${decision.selectedProvider}${decision.selectedModel ? ` · ${decision.selectedModel}` : ''}`
+    : null;
+  const skipped = decision.attempts.filter((attempt) => attempt.status === 'skipped_cooldown').length;
+  const parts = [
+    selected ? `Route ${selected}` : 'Route unresolved',
+    `${attempts} attempt${attempts === 1 ? '' : 's'}`,
+  ];
+  if (skipped > 0) parts.push(`${skipped} cooldown skip${skipped === 1 ? '' : 's'}`);
+  return parts.join(' · ');
+}
+
 interface ChatMessageProps {
   message: ChatMessageType;
 }
@@ -46,6 +62,7 @@ interface ChatMessageProps {
 export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
+  const route = !isUser ? routeSummary(message) : null;
 
   const handleCopy = async () => {
     try {
@@ -84,6 +101,11 @@ export function ChatMessage({ message }: ChatMessageProps) {
         {!isUser && (message.provider || message.model) && (
           <span className="min-w-0 truncate rounded border border-stone-200/10 bg-white/[0.03] px-1 py-0.5 text-[9px] text-stone-400/70">
             {[message.provider, message.model].filter(Boolean).join(' · ')}
+          </span>
+        )}
+        {route && (
+          <span className="hidden min-w-0 truncate rounded border border-emerald-200/10 bg-emerald-500/8 px-1 py-0.5 text-[9px] text-emerald-100/60 sm:inline">
+            {route}
           </span>
         )}
         {!isUser && message.content && (

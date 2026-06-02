@@ -44,6 +44,7 @@ export const DEFAULT_PROVIDER_ORDER: ProviderOrderEntry[] = ALL_LLM_PROVIDERS.ma
 );
 
 const STORAGE_KEY = 'projectManager-llm-provider-order';
+const PROVIDER_ORDER_CHANGED_EVENT = 'pm:provider-order-changed';
 
 function isValidProvider(id: unknown): id is LlmProviderId {
   return typeof id === 'string' && (ALL_LLM_PROVIDERS as readonly string[]).includes(id);
@@ -97,9 +98,40 @@ export async function saveProviderOrder(order: ProviderOrderEntry[]): Promise<vo
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(order));
+    window.dispatchEvent(new CustomEvent(PROVIDER_ORDER_CHANGED_EVENT));
   } catch {
     /* ignore quota / private-mode failures */
   }
+}
+
+export function subscribeProviderOrderChanges(listener: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === STORAGE_KEY) listener();
+  };
+
+  window.addEventListener(PROVIDER_ORDER_CHANGED_EVENT, listener);
+  window.addEventListener('storage', handleStorage);
+
+  return () => {
+    window.removeEventListener(PROVIDER_ORDER_CHANGED_EVENT, listener);
+    window.removeEventListener('storage', handleStorage);
+  };
+}
+
+export async function setProviderActiveInOrder(
+  provider: LlmProviderId,
+  active: boolean,
+): Promise<void> {
+  const order = await loadProviderOrder();
+  const idx = order.findIndex((entry) => entry.provider === provider);
+  if (idx === -1) return;
+  if (order[idx].enabled === active) return;
+  const next = order.map((entry, i) => (
+    i === idx ? { ...entry, enabled: active } : entry
+  ));
+  await saveProviderOrder(next);
 }
 
 /**

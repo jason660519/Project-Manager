@@ -154,6 +154,8 @@ export const en: Translations = {
         usage: 'Usage',
         docs: 'Docs',
         key: 'Key',
+        keyVarName: 'Key Var Name',
+        keyValue: 'Key Value',
         status: 'Status',
         models: 'Models',
         availableModels: 'Available models',

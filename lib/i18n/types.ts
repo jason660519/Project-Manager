@@ -152,6 +152,8 @@ export interface Translations {
         usage: string;
         docs: string;
         key: string;
+        keyVarName: string;
+        keyValue: string;
         status: string;
         models: string;
         availableModels: string;

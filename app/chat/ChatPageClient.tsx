@@ -1,6 +1,6 @@
 'use client';
 
-import { Bot, ChevronDown, Download, MessageSquareText, Mic, Search, Send, Square, Tag, Trash2 } from 'lucide-react';
+import { Bot, ChevronDown, Download, KeyRound, MessageSquareText, Mic, Search, Send, Square, Tag, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -47,6 +47,27 @@ function makeMessage(role: ChatMessage['role'], content: string, status?: ChatMe
 
 function generateTitle(messages: ChatMessage[]): string {
   return generateChatSessionTitle(messages);
+}
+
+function summarizeChatError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  const compact = raw.replace(/\s+/g, ' ').trim();
+  if (!compact) return 'Unknown chat error.';
+  return compact.length > 420 ? `${compact.slice(0, 417)}...` : compact;
+}
+
+function formatChatErrorContent(error: unknown): string {
+  const summary = summarizeChatError(error);
+  const needsKeySetup = /missing api key|no api key|keychain|stored key|auth|unauthorized|forbidden|401|403/i.test(summary);
+  return [
+    'Sorry, the chat request failed.',
+    '',
+    `Reason: ${summary}`,
+    '',
+    needsKeySetup
+      ? 'Next step: open Keys and add or re-validate an API key for the provider you want to use.'
+      : 'Next step: check the selected provider/model, then retry. If Auto route is enabled, the router will skip temporarily cooled-down providers.',
+  ].join('\n');
 }
 
 function CurrentSessionMessages({
@@ -142,6 +163,10 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
     model: '',
     systemPrompt: '',
   });
+  const routeSummary =
+    chatSettings.provider === 'auto'
+      ? 'Auto route'
+      : `${chatSettings.provider}${chatSettings.model ? ` · ${chatSettings.model}` : ''}`;
 
   // Side toggles
   const [showHistory, setShowHistory] = useState(true);
@@ -346,6 +371,7 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
       assistantMessage.id = assistantId;
       assistantMessage.provider = result.provider ?? (chatSettings.provider !== 'auto' ? chatSettings.provider : undefined);
       assistantMessage.model = result.model ?? (chatSettings.provider !== 'auto' ? chatSettings.model : undefined);
+      assistantMessage.routeDecision = result.routeDecision;
       // Attach tool calls to the assistant message for display
       (assistantMessage as any).toolCalls = result.toolCalls || toolCalls;
 
@@ -358,9 +384,13 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
         'assistant',
         stopped
           ? accumulated || 'Response stopped. Partial output was preserved.'
-          : 'Sorry, something went wrong. Please try again.',
+          : formatChatErrorContent(error),
         stopped ? 'sent' : 'error',
       );
+      if (!stopped && chatSettings.provider !== 'auto') {
+        errorMessage.provider = chatSettings.provider;
+        errorMessage.model = chatSettings.model;
+      }
       const finalMessages = [...nextMessages, errorMessage];
       setMessages(finalMessages);
       persistCurrentSession(finalMessages, sessionId);
@@ -700,6 +730,28 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
 
           {/* Action buttons */}
           <div className="flex items-center gap-1">
+            <div className="hidden items-center gap-1.5 border-r border-stone-200/10 pr-2 md:flex">
+              <span
+                className="max-w-[220px] truncate rounded border border-emerald-200/15 bg-emerald-500/8 px-2 py-1 text-[10px] text-emerald-100/80"
+                title={routeSummary}
+              >
+                {routeSummary}
+              </span>
+              <button
+                type="button"
+                onClick={() => router.push('/keys')}
+                className="flex h-7 items-center gap-1 rounded border border-stone-200/15 px-2 text-[10px] text-stone-400 transition-colors hover:border-emerald-200/25 hover:text-emerald-100"
+                title="Configure provider API keys"
+              >
+                <KeyRound size={11} />
+                <span>Keys</span>
+              </button>
+              <ChatSettings
+                current={chatSettings}
+                onChange={(s) => setChatSettings(s)}
+                variant="pill"
+              />
+            </div>
             {/* New Session */}
             <button
               type="button"

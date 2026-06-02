@@ -24,6 +24,11 @@ import {
 } from '../../../../lib/keys/providerMetadata';
 import { listLlmProviders } from '../../../../lib/keys/llmProviders';
 import {
+  loadProviderOrder,
+  subscribeProviderOrderChanges,
+  type ProviderOrderEntry,
+} from '../../../../lib/keys/providerOrder';
+import {
   LLM_ARENA_EVALUATION_CONFIG,
   sanitizeLlmArenaNumber,
   type LlmArenaScoringProfile,
@@ -264,12 +269,28 @@ export function KeysProvider({
   const [validatedModelSupport, setValidatedModelSupport] = useState<ValidatedModelSupportSummary | null>(
     () => loadValidatedModelSupportSummary(),
   );
+  const [providerOrder, setProviderOrder] = useState<ProviderOrderEntry[]>([]);
 
   useEffect(() => {
     return subscribeProviderMetadataChanges(() => {
       setProviderMetadata(loadAllProviderMetadata());
       setValidatedModelSupport(loadValidatedModelSupportSummary());
     });
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const refreshProviderOrder = () => {
+      void loadProviderOrder().then((order) => {
+        if (!cancelled) setProviderOrder(order);
+      });
+    };
+    refreshProviderOrder();
+    const unsubscribe = subscribeProviderOrderChanges(refreshProviderOrder);
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -290,8 +311,10 @@ export function KeysProvider({
 
   const validatedLlmProviders = useMemo(() => {
     const all = listLlmProviders();
+    const activeByProvider = new Map(providerOrder.map((entry) => [entry.provider, entry.enabled]));
     return all
       .map((provider) => {
+        if (activeByProvider.get(provider.id) === false) return null;
         const meta = providerMetadata[provider.id];
         if (meta?.status !== 'ok') return null;
         const deduped = mergeCuratedAndDynamicModels(provider.availableModels, meta.dynamicModels);
@@ -304,7 +327,7 @@ export function KeysProvider({
         };
       })
       .filter((p) => p !== null);
-  }, [providerMetadata]);
+  }, [providerMetadata, providerOrder]);
 
   return (
     <KeysContext.Provider

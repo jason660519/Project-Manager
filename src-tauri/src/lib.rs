@@ -1074,6 +1074,7 @@ struct AnthropicMessage {
     content: serde_json::Value,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Clone)]
 struct ChatAttachment {
     name: String,
@@ -1085,13 +1086,73 @@ struct ChatAttachment {
     data_url: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 struct AnthropicResponse {
     content: String,
     #[serde(rename = "inputTokens")]
     input_tokens: u32,
     #[serde(rename = "outputTokens")]
     output_tokens: u32,
+}
+
+#[derive(Serialize)]
+struct LlmRouteAttempt {
+    provider: String,
+    model: String,
+    status: String,
+    #[serde(rename = "errorReason", skip_serializing_if = "Option::is_none")]
+    error_reason: Option<String>,
+    #[serde(rename = "cooldownUntil", skip_serializing_if = "Option::is_none")]
+    cooldown_until: Option<String>,
+}
+
+#[derive(Serialize)]
+struct LlmRouteDecision {
+    #[serde(rename = "routeDecisionId")]
+    route_decision_id: String,
+    #[serde(rename = "modelAlias")]
+    model_alias: String,
+    #[serde(rename = "taskClass", skip_serializing_if = "Option::is_none")]
+    task_class: Option<String>,
+    strategy: String,
+    #[serde(rename = "selectedProvider")]
+    selected_provider: String,
+    #[serde(rename = "selectedModel")]
+    selected_model: String,
+    #[serde(rename = "degraded")]
+    degraded: bool,
+    attempts: Vec<LlmRouteAttempt>,
+}
+
+#[derive(Serialize)]
+struct RoutedLlmResponse {
+    content: String,
+    #[serde(rename = "inputTokens")]
+    input_tokens: u32,
+    #[serde(rename = "outputTokens")]
+    output_tokens: u32,
+    provider: String,
+    model: String,
+    #[serde(rename = "routeDecision")]
+    route_decision: LlmRouteDecision,
+}
+
+#[derive(Deserialize, Clone)]
+struct LlmRouteCandidate {
+    provider: String,
+    model: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct LlmRouterCooldown {
+    #[serde(rename = "cooldownUntilUnix")]
+    cooldown_until_unix: u64,
+    reason: String,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+struct LlmRouterState {
+    cooldowns: HashMap<String, LlmRouterCooldown>,
 }
 
 struct StoredChatProviderSpec {
@@ -1242,6 +1303,161 @@ fn resolve_stored_chat_provider_key(
     }
 
     Err(format!("{} not configured", spec.keychain_key))
+}
+
+fn llm_router_state_path() -> Result<PathBuf, String> {
+    let home = std::env::var("HOME").map_err(|_| "Cannot resolve HOME for router state".to_string())?;
+    Ok(PathBuf::from(home).join(".project-manager").join("llm-router-state.json"))
+}
+
+async fn read_llm_router_state() -> LlmRouterState {
+    let path = match llm_router_state_path() {
+        Ok(path) => path,
+        Err(_) => return LlmRouterState::default(),
+    };
+    match tokio::fs::read_to_string(path).await {
+        Ok(raw) => serde_json::from_str::<LlmRouterState>(&raw).unwrap_or_default(),
+        Err(_) => LlmRouterState::default(),
+    }
+}
+
+async fn write_llm_router_state(state: &LlmRouterState) -> Result<(), String> {
+    let path = llm_router_state_path()?;
+    if let Some(parent) = path.parent() {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| format!("Cannot create router state dir: {e}"))?;
+    }
+    let raw = serde_json::to_string_pretty(state)
+        .map_err(|e| format!("Cannot serialize router state: {e}"))?;
+    tokio::fs::write(path, raw)
+        .await
+        .map_err(|e| format!("Cannot write router state: {e}"))
+}
+
+fn unix_now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
+fn deployment_id(provider: &str, model: &str) -> String {
+    format!("{provider}:{model}")
+}
+
+fn is_missing_key_error(error: &str) -> bool {
+    let e = error.to_lowercase();
+    e.contains("not configured") || e.contains("missing") || e.contains("keychain")
+}
+
+fn is_key_invalid_error(error: &str) -> bool {
+    let e = error.to_lowercase();
+    e.contains("401") || e.contains("403") || e.contains("unauthorized") || e.contains("authentication")
+}
+
+fn cooldown_seconds_for_error(error: &str) -> Option<u64> {
+    let e = error.to_lowercase();
+    if is_missing_key_error(&e) || is_key_invalid_error(&e) {
+        return None;
+    }
+    if e.contains("429") || e.contains("rate limit") {
+        return Some(60);
+    }
+    if e.contains("timeout") || e.contains("timed out") || e.contains("408") {
+        return Some(30);
+    }
+    if e.contains("500") || e.contains("502") || e.contains("503") || e.contains("504") {
+        return Some(120);
+    }
+    None
+}
+
+fn normalize_model_alias(model_alias: Option<String>, task_class: &Option<String>) -> String {
+    if let Some(alias) = model_alias {
+        let trimmed = alias.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+
+    match task_class.as_deref().unwrap_or("").to_lowercase().as_str() {
+        "scan" | "report" | "daily-report" | "summary" | "classify" => "pm-fast".to_string(),
+        "debug" | "code" | "implementation" | "test" | "tdd" => "pm-code".to_string(),
+        "architecture" | "plan" | "planning" | "reasoning" | "review" => "pm-reasoning".to_string(),
+        "local" | "local-only" => "pm-local".to_string(),
+        _ => "pm-code".to_string(),
+    }
+}
+
+fn default_candidates_for_alias(alias: &str) -> Vec<LlmRouteCandidate> {
+    match alias {
+        "pm-fast" => vec![
+            LlmRouteCandidate { provider: "deepseek".to_string(), model: None },
+            LlmRouteCandidate { provider: "openai".to_string(), model: Some("gpt-4o-mini".to_string()) },
+            LlmRouteCandidate { provider: "gemini".to_string(), model: Some("gemini-2.5-flash".to_string()) },
+            LlmRouteCandidate { provider: "ollama-local".to_string(), model: None },
+        ],
+        "pm-reasoning" => vec![
+            LlmRouteCandidate { provider: "anthropic".to_string(), model: None },
+            LlmRouteCandidate { provider: "openai".to_string(), model: None },
+            LlmRouteCandidate { provider: "gemini".to_string(), model: Some("gemini-2.5-pro".to_string()) },
+            LlmRouteCandidate { provider: "openrouter".to_string(), model: None },
+        ],
+        "pm-local" => vec![
+            LlmRouteCandidate { provider: "ollama-local".to_string(), model: None },
+        ],
+        _ => vec![
+            LlmRouteCandidate { provider: "anthropic".to_string(), model: None },
+            LlmRouteCandidate { provider: "openai".to_string(), model: None },
+            LlmRouteCandidate { provider: "openrouter".to_string(), model: None },
+            LlmRouteCandidate { provider: "deepseek".to_string(), model: None },
+            LlmRouteCandidate { provider: "gemini".to_string(), model: None },
+        ],
+    }
+}
+
+fn build_route_candidates(
+    alias: &str,
+    provider: Option<String>,
+    model: Option<String>,
+    candidates: Option<Vec<LlmRouteCandidate>>,
+) -> Vec<LlmRouteCandidate> {
+    let mut out = Vec::new();
+    if let Some(provider) = provider {
+        if !provider.trim().is_empty() {
+            out.push(LlmRouteCandidate {
+                provider: provider.trim().to_string(),
+                model: model.clone().filter(|m| !m.trim().is_empty()),
+            });
+        }
+    }
+
+    if let Some(candidates) = candidates {
+        out.extend(
+            candidates
+                .into_iter()
+                .filter(|c| !c.provider.trim().is_empty())
+                .map(|c| LlmRouteCandidate {
+                    provider: c.provider.trim().to_string(),
+                    model: c.model.filter(|m| !m.trim().is_empty()),
+                }),
+        );
+    } else {
+        out.extend(default_candidates_for_alias(alias));
+    }
+
+    let mut seen = std::collections::HashSet::new();
+    out.into_iter()
+        .filter(|candidate| {
+            let key = format!(
+                "{}:{}",
+                candidate.provider,
+                candidate.model.clone().unwrap_or_default()
+            );
+            seen.insert(key)
+        })
+        .collect()
 }
 
 fn message_text(content: &serde_json::Value) -> String {
@@ -1522,6 +1738,157 @@ async fn call_stored_chat_provider(
         }
         _ => Err(format!("Unsupported provider kind: {}", spec.api_kind)),
     }
+}
+
+/// PM-native local LLM router. This is intentionally thinner than a hosted
+/// gateway: it keeps secrets Rust-side, applies a deterministic fallback chain,
+/// and stores only non-sensitive local cooldown metadata.
+#[tauri::command]
+async fn call_llm_routed(
+    model_alias: Option<String>,
+    task_class: Option<String>,
+    provider: Option<String>,
+    model: Option<String>,
+    candidates: Option<Vec<LlmRouteCandidate>>,
+    max_tokens: u32,
+    messages: Vec<AnthropicMessage>,
+    system_prompt: Option<String>,
+    temperature: Option<f32>,
+    attachments: Option<Vec<ChatAttachment>>,
+) -> Result<RoutedLlmResponse, String> {
+    let alias = normalize_model_alias(model_alias, &task_class);
+    let route_candidates = build_route_candidates(&alias, provider, model, candidates);
+    if route_candidates.is_empty() {
+        return Err(format!("No route candidates configured for alias {alias}"));
+    }
+
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let route_decision_id = format!("route-{nanos}");
+    let mut state = read_llm_router_state().await;
+    let now = unix_now_secs();
+    state
+        .cooldowns
+        .retain(|_, cooldown| cooldown.cooldown_until_unix > now);
+
+    let mut attempts: Vec<LlmRouteAttempt> = Vec::new();
+    let mut state_changed = false;
+    let mut last_error: Option<String> = None;
+
+    for candidate in route_candidates {
+        let Some(spec) = stored_chat_provider_spec(&candidate.provider) else {
+            let error = format!("Unsupported provider: {}", candidate.provider);
+            attempts.push(LlmRouteAttempt {
+                provider: candidate.provider,
+                model: candidate.model.unwrap_or_default(),
+                status: "failed".to_string(),
+                error_reason: Some(error.clone()),
+                cooldown_until: None,
+            });
+            last_error = Some(error);
+            continue;
+        };
+
+        let candidate_model = candidate
+            .model
+            .clone()
+            .unwrap_or_else(|| spec.default_model.to_string());
+        let dep_id = deployment_id(&candidate.provider, &candidate_model);
+
+        if let Some(cooldown) = state.cooldowns.get(&dep_id) {
+            if cooldown.cooldown_until_unix > now {
+                attempts.push(LlmRouteAttempt {
+                    provider: candidate.provider.clone(),
+                    model: candidate_model.clone(),
+                    status: "skipped_cooldown".to_string(),
+                    error_reason: Some(cooldown.reason.clone()),
+                    cooldown_until: Some(iso8601_from_unix_secs(cooldown.cooldown_until_unix)),
+                });
+                continue;
+            }
+        }
+
+        match call_stored_chat_provider(
+            candidate.provider.clone(),
+            Some(candidate_model.clone()),
+            max_tokens,
+            messages.clone(),
+            system_prompt.clone(),
+            temperature,
+            attachments.clone(),
+        )
+        .await
+        {
+            Ok(response) => {
+                if state_changed {
+                    let _ = write_llm_router_state(&state).await;
+                }
+                attempts.push(LlmRouteAttempt {
+                    provider: candidate.provider.clone(),
+                    model: candidate_model.clone(),
+                    status: "success".to_string(),
+                    error_reason: None,
+                    cooldown_until: None,
+                });
+                let degraded = attempts.len() > 1;
+                return Ok(RoutedLlmResponse {
+                    content: response.content,
+                    input_tokens: response.input_tokens,
+                    output_tokens: response.output_tokens,
+                    provider: candidate.provider.clone(),
+                    model: candidate_model.clone(),
+                    route_decision: LlmRouteDecision {
+                        route_decision_id,
+                        model_alias: alias,
+                        task_class,
+                        strategy: "deterministic-fallback-v1".to_string(),
+                        selected_provider: candidate.provider,
+                        selected_model: candidate_model,
+                        degraded,
+                        attempts,
+                    },
+                });
+            }
+            Err(error) => {
+                let cooldown_seconds = cooldown_seconds_for_error(&error);
+                let cooldown_until = cooldown_seconds.map(|seconds| now + seconds);
+                if let Some(cooldown_until_unix) = cooldown_until {
+                    state.cooldowns.insert(
+                        dep_id,
+                        LlmRouterCooldown {
+                            cooldown_until_unix,
+                            reason: error.clone(),
+                        },
+                    );
+                    state_changed = true;
+                }
+                attempts.push(LlmRouteAttempt {
+                    provider: candidate.provider,
+                    model: candidate_model,
+                    status: "failed".to_string(),
+                    error_reason: Some(error.clone()),
+                    cooldown_until: cooldown_until.map(iso8601_from_unix_secs),
+                });
+                last_error = Some(error);
+            }
+        }
+    }
+
+    if state_changed {
+        let _ = write_llm_router_state(&state).await;
+    }
+
+    let summary = attempts
+        .iter()
+        .map(|a| format!("{}:{}={}", a.provider, a.model, a.status))
+        .collect::<Vec<_>>()
+        .join(", ");
+    Err(format!(
+        "LLM router exhausted alias {alias}. Attempts: {summary}. Last error: {}",
+        last_error.unwrap_or_else(|| "no callable deployment".to_string())
+    ))
 }
 
 /// Call any OpenAI-compatible chat-completions endpoint (OpenAI itself,
@@ -5663,6 +6030,7 @@ pub fn run() {
             call_openai_compatible,
             call_gemini,
             call_stored_chat_provider,
+            call_llm_routed,
             validate_provider_key,
             revalidate_provider_key,
             watch_config,

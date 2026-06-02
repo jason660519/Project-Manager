@@ -154,6 +154,8 @@ export const zh: Translations = {
         usage: '用量',
         docs: '文档',
         key: '密钥',
+        keyVarName: 'Key Var Name',
+        keyValue: 'Key Value',
         status: '状态',
         models: '模型',
         availableModels: '可用模型',

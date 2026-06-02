@@ -1,4 +1,5 @@
 import type { AnyAdapterConfig, CompletedRun, Feature, ProjectEntry, ViewId } from '../types';
+import type { LlmRouteDecision } from '../bridge';
 
 export type ChatRole = 'user' | 'assistant' | 'system';
 
@@ -10,6 +11,7 @@ export interface ChatMessage {
   status?: 'sent' | 'loading' | 'error';
   provider?: string;
   model?: string;
+  routeDecision?: LlmRouteDecision;
 }
 
 export interface ChatAttachment {
@@ -74,4 +76,5 @@ export interface SendChatMessageResult {
   }>;
   provider?: string;
   model?: string;
+  routeDecision?: LlmRouteDecision;
 }

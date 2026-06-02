@@ -26,6 +26,7 @@ interface ChatSettingsProps {
   onChange: (settings: ChatSettingsData) => void;
   /** Project root for reading the AI SDKs candidate models (Tauri); omit in browser dev. */
   projectRoot?: string;
+  variant?: 'icon' | 'pill';
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -62,7 +63,7 @@ export function saveChatSettings(settings: ChatSettingsData) {
 
 const ALL_PROVIDERS = listLlmProviders();
 
-export function ChatSettings({ current, onChange, projectRoot }: ChatSettingsProps) {
+export function ChatSettings({ current, onChange, projectRoot, variant = 'icon' }: ChatSettingsProps) {
   const modelListId = useId();
   const [open, setOpen] = useState(false);
   const [provider, setProvider] = useState(current.provider);
@@ -133,6 +134,10 @@ export function ChatSettings({ current, onChange, projectRoot }: ChatSettingsPro
       : currentSpec
         ? currentSpec.label
         : provider;
+  const activeRouteSummary =
+    provider === 'auto'
+      ? 'Auto route'
+      : `${activeProviderLabel}${model ? ` · ${model}` : ''}`;
   const modelHelper = currentSpec
     ? currentSpec.modelSource === 'validated'
       ? `${models.length} model suggestions from the curated catalogue and latest model refresh. You can still type another model ID.`
@@ -170,18 +175,24 @@ export function ChatSettings({ current, onChange, projectRoot }: ChatSettingsPro
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Chat settings"
-        className={`flex items-center gap-1 rounded px-1.5 py-1 text-[10px] transition-colors ${
-          provider !== 'auto'
-            ? 'text-amber-300/80 hover:text-amber-200'
-            : 'text-stone-500 hover:text-stone-300'
-        }`}
-        title="Chat settings"
+        aria-label={variant === 'pill' ? 'Provider / Model settings' : 'Chat settings'}
+        className={
+          variant === 'pill'
+            ? 'flex h-7 items-center gap-1.5 rounded border border-stone-200/15 px-2 text-[10px] text-stone-300 transition-colors hover:border-amber-200/25 hover:text-amber-100'
+            : `flex items-center gap-1 rounded px-1.5 py-1 text-[10px] transition-colors ${
+                provider !== 'auto'
+                  ? 'text-amber-300/80 hover:text-amber-200'
+                  : 'text-stone-500 hover:text-stone-300'
+              }`
+        }
+        title="Provider / model settings"
       >
         <Settings2 size={12} />
-        {provider !== 'auto' && (
+        {variant === 'pill' ? (
+          <span className="max-w-[180px] truncate">Provider / Model</span>
+        ) : provider !== 'auto' && (
           <span className="hidden max-w-[120px] truncate sm:inline">
-            {activeProviderLabel}{model ? ` · ${model}` : ''}
+            {activeRouteSummary}
           </span>
         )}
       </button>

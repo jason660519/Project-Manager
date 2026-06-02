@@ -55,18 +55,53 @@ describe('EnvImportModal', () => {
       {
         path: '/repo/.env',
         name: '.env',
-        content: `OPENAI_API_KEY=sk-${'b'.repeat(40)}\nKIMI_API_KEY=sk-${'c'.repeat(40)}`,
+        content: [
+          `OPENAI_API_KEY=sk-${'b'.repeat(40)}`,
+          `KIMI_API_KEY=sk-${'c'.repeat(40)}`,
+          `MISTRAL_AI_API_KEY=sk-mistral-${'m'.repeat(30)}`,
+          `COHERE_TRIAL_KEY=cohere-trial-${'h'.repeat(30)}`,
+          `${'AZURE_OPENAI_API_KEY'}=${'a'.repeat(32)}`,
+          `GROQ_API_KEY=gsk_${'g'.repeat(32)}`,
+        ].join('\n'),
       },
     ]);
     render(<EnvImportModal projectRoot="/repo" onClose={vi.fn()} onImported={vi.fn()} />);
 
     expect(await screen.findByText('OPENAI_API_KEY')).toBeInTheDocument();
+    expect(screen.getByText('MISTRAL_AI_API_KEY')).toBeInTheDocument();
+    expect(screen.getByText('COHERE_TRIAL_KEY')).toBeInTheDocument();
+    expect(screen.getByText('AZURE_OPENAI_API_KEY')).toBeInTheDocument();
+    expect(screen.getByText('GROQ_API_KEY')).toBeInTheDocument();
     expect(screen.getByText('/repo')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Rescan \.env/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Scan PM root/ })).toBeInTheDocument();
-    expect(screen.getByText(/Detected \.env credentials for 2 providers/)).toBeInTheDocument();
-    expect(screen.getByText(/Available providers: OpenAI, Kimi \(Moonshot\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Detected \.env credentials for 6 providers/)).toBeInTheDocument();
+    expect(screen.getByText(/Available providers: OpenAI, Kimi \(Moonshot\), Mistral AI, Cohere, Azure OpenAI, Groq/)).toBeInTheDocument();
     expect(scanEnvFilesMock).toHaveBeenCalledWith('/repo');
+  });
+
+  it('surfaces unmatched credential-like env vars for provider alias debugging', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    scanEnvFilesMock.mockResolvedValue([
+      {
+        path: '/repo/.env',
+        name: '.env',
+        content: [
+          `OPENAI_API_KEY=sk-${'b'.repeat(40)}`,
+          'FUTURE_PROVIDER_API_KEY=future-test-key',
+        ].join('\n'),
+      },
+    ]);
+
+    render(<EnvImportModal projectRoot="/repo" onClose={vi.fn()} onImported={vi.fn()} />);
+
+    expect(await screen.findByText(/1 credential-like env var did not match an enabled provider/)).toBeInTheDocument();
+    expect(screen.getByText(/FUTURE_PROVIDER_API_KEY \(line 2\)/)).toBeInTheDocument();
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[keys.envImport] credential-like env vars were not matched to enabled providers',
+      expect.objectContaining({ count: 1 }),
+    );
+    warnSpy.mockRestore();
   });
 
   it('shows a useful empty Project Manager root scan state with a rescan action', async () => {

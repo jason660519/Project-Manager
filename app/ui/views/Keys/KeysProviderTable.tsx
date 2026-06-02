@@ -24,13 +24,17 @@ import {
   CheckCircle2,
   Cog,
   DollarSign,
+  Eye,
+  EyeOff,
   KeyRound,
   Loader2,
   Plus,
   RefreshCw,
   RotateCcw,
+  Save,
   ShieldQuestion,
   Snowflake,
+  Trash2,
 } from 'lucide-react';
 import {
   createColumnHelper,
@@ -57,8 +61,10 @@ type ProviderDisplayCategory = 'model_factory' | 'model_channel' | 'local_model'
 type KeysValidationTableCopy = Translations['keysValidation']['table'];
 
 export interface KeysRowData {
+  rowId: string;
   provider: ProviderSpec;
   isCustom?: boolean;
+  active: boolean;
   hasKey: boolean;
   maskedKey: string | null;
   status: KeysRowStatus;
@@ -77,6 +83,9 @@ interface KeysProviderTableProps {
   onAddRow: () => void;
   onRestoreDefaultProviders: () => void;
   onPatchCustomProvider: (providerId: string, patch: Partial<ProviderSpec>) => void;
+  onUpdateProviderActive: (provider: ProviderSpec, active: boolean) => Promise<void>;
+  onDeleteProvider: (provider: ProviderSpec) => Promise<void>;
+  onUpdateKey: (provider: ProviderSpec, apiKey: string) => Promise<void>;
   onRefreshModels: (provider: ProviderSpec) => void;
   refreshingProviderIds: Set<string>;
   onShowAllRows: () => void;
@@ -86,21 +95,29 @@ interface KeysProviderTableProps {
 const columnHelper = createColumnHelper<KeysRowData>();
 const API_KEYS_STORAGE_KEY = 'projectManager.keys.apiKeyValidation.tablePrefs.v1';
 const API_KEYS_COLUMN_IDS = [
+  'col-id',
+  'col-active',
   'col-provider',
   'col-category',
-  'col-key',
+  'col-key-var-name',
+  'col-key-value',
   'col-status',
   'col-model-list',
   'col-last-validated',
+  'col-actions',
 ];
 
 const API_KEYS_DEFAULT_SIZING: Record<string, number> = {
+  'col-id': 260,
+  'col-active': 96,
   'col-provider': 300,
   'col-category': 130,
-  'col-key': 180,
+  'col-key-var-name': 180,
+  'col-key-value': 180,
   'col-status': 210,
   'col-model-list': 310,
   'col-last-validated': 150,
+  'col-actions': 96,
 };
 
 function assertNever(value: never): never {
@@ -361,6 +378,235 @@ function getProviderDisplayCategoryLabel(provider: ProviderSpec, copy: KeysValid
   }
 }
 
+function defaultKeyVarName(provider: ProviderSpec): string {
+  return provider.envVarNames[0] ?? provider.keychainKey;
+}
+
+function ActiveCell({
+  row,
+  onUpdateProviderActive,
+}: {
+  row: KeysRowData;
+  onUpdateProviderActive: (provider: ProviderSpec, active: boolean) => Promise<void>;
+}) {
+  const [saving, setSaving] = useState(false);
+  const toggle = async (checked: boolean) => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await onUpdateProviderActive(row.provider, checked);
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <label
+      className="inline-flex items-center gap-2 text-[11px] text-stone-300"
+      onClick={(event) => event.stopPropagation()}
+      title={row.active ? 'Active provider' : 'Inactive provider'}
+    >
+      <input
+        type="checkbox"
+        checked={row.active}
+        disabled={saving}
+        aria-label={`Active: ${row.provider.label}`}
+        onChange={(event) => void toggle(event.target.checked)}
+        className="h-4 w-4 accent-emerald-400 disabled:cursor-not-allowed disabled:opacity-45"
+      />
+      <span className={row.active ? 'text-emerald-300/90' : 'text-stone-500'}>
+        {row.active ? 'Active' : 'Off'}
+      </span>
+    </label>
+  );
+}
+
+function DeleteProviderCell({
+  row,
+  copy,
+  onRequestDelete,
+}: {
+  row: KeysRowData;
+  copy: KeysValidationTableCopy;
+  onRequestDelete: (row: KeysRowData) => void;
+}) {
+  const label = row.isCustom ? copy.actions.deleteCustomRow : copy.actions.hideProviderRow;
+  return (
+    <button
+      type="button"
+      aria-label={`${label}: ${row.provider.label}`}
+      title={label}
+      onClick={(event) => {
+        event.stopPropagation();
+        onRequestDelete(row);
+      }}
+      className="inline-flex h-7 items-center gap-1.5 border border-rose-300/25 px-2 text-[11px] text-rose-200 hover:bg-rose-950/35 disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      <Trash2 size={12} />
+      {copy.actions.delete}
+    </button>
+  );
+}
+
+function DeleteProviderConfirmDialog({
+  row,
+  copy,
+  deleting,
+  onCancel,
+  onConfirm,
+}: {
+  row: KeysRowData;
+  copy: KeysValidationTableCopy;
+  deleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const title = row.isCustom ? copy.actions.deleteCustomRow : copy.actions.hideProviderRow;
+  const message = row.isCustom
+    ? `Delete ${row.provider.label}? This clears its saved key and validation metadata.`
+    : `Remove ${row.provider.label} from this list? This hides the row, turns Active off, and clears its saved key and validation metadata.`;
+  return (
+    <div
+      role="presentation"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4"
+      onClick={deleting ? undefined : onCancel}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="keys-delete-provider-title"
+        className="w-full max-w-md border border-stone-200/18 bg-[rgb(var(--pm-panel))] shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="border-b border-stone-200/12 px-4 py-3">
+          <h3 id="keys-delete-provider-title" className="text-sm font-semibold text-stone-100">
+            {title}
+          </h3>
+          <p className="mt-2 text-xs leading-5 text-stone-400">
+            {message}
+          </p>
+        </div>
+        <div className="flex items-center justify-end gap-2 px-4 py-3">
+          <button
+            type="button"
+            disabled={deleting}
+            onClick={onCancel}
+            className="border border-stone-200/18 px-3 py-2 text-[11px] uppercase tracking-[0.14em] text-stone-300 hover:bg-stone-200/8 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={deleting}
+            onClick={onConfirm}
+            className="inline-flex min-w-[110px] items-center justify-center gap-1.5 border border-rose-300/35 bg-rose-950/30 px-3 py-2 text-[11px] uppercase tracking-[0.14em] text-rose-100 hover:bg-rose-950/45 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+            {copy.actions.delete}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KeyValueCell({
+  row,
+  onUpdateKey,
+}: {
+  row: KeysRowData;
+  onUpdateKey: (provider: ProviderSpec, apiKey: string) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState('');
+  const [revealed, setRevealed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState<{ kind: 'ok' | 'error'; message: string } | null>(null);
+  const trimmed = draft.trim();
+
+  const submit = async () => {
+    if (saving) return;
+    if (!trimmed) {
+      setFeedback({ kind: 'error', message: '請輸入 API Key' });
+      return;
+    }
+    if (row.provider.validatePattern && !row.provider.validatePattern.test(trimmed)) {
+      setFeedback({ kind: 'error', message: 'API Key 格式不符合此 provider 的預設規則' });
+      return;
+    }
+
+    setSaving(true);
+    setFeedback(null);
+    try {
+      await onUpdateKey(row.provider, trimmed);
+      setDraft('');
+      setRevealed(false);
+      setFeedback({ kind: 'ok', message: '更新成功' });
+    } catch (error) {
+      setFeedback({
+        kind: 'error',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="min-w-[220px]" onClick={(event) => event.stopPropagation()}>
+      <div className="flex items-center gap-1.5">
+        <input
+          type={revealed ? 'text' : 'password'}
+          value={draft}
+          disabled={saving}
+          placeholder={row.maskedKey ?? 'Paste API key'}
+          aria-label={`${row.provider.label} Key Value`}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            setFeedback(null);
+          }}
+          onKeyDown={(event) => {
+            if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+              event.preventDefault();
+              void submit();
+            }
+          }}
+          className="relative z-10 h-7 min-w-0 scroll-mt-16 flex-1 border border-stone-200/18 bg-[rgb(var(--pm-input))] px-2 font-mono text-[11px] text-stone-100 outline-none placeholder:text-stone-500 focus:ring-1 focus:ring-emerald-400/50 disabled:cursor-not-allowed disabled:opacity-50"
+        />
+        <button
+          type="button"
+          aria-label={revealed ? '隱藏API Key' : '顯示API Key'}
+          title={revealed ? '隱藏API Key' : '顯示API Key'}
+          disabled={saving}
+          onClick={() => setRevealed((value) => !value)}
+          className="relative z-10 inline-flex h-7 w-7 shrink-0 scroll-mt-16 items-center justify-center border border-stone-200/18 text-stone-300 hover:bg-stone-200/8 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {revealed ? <EyeOff size={12} /> : <Eye size={12} />}
+        </button>
+        <button
+          type="button"
+          aria-label="更新API Key"
+          title="更新API Key"
+          disabled={saving || !trimmed}
+          onClick={() => void submit()}
+          className="relative z-10 inline-flex h-7 w-7 shrink-0 scroll-mt-16 items-center justify-center border border-emerald-200/30 text-emerald-100 hover:bg-emerald-100/10 disabled:cursor-not-allowed disabled:border-stone-200/15 disabled:text-stone-500"
+        >
+          {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+        </button>
+      </div>
+      {feedback && (
+        <p
+          role={feedback.kind === 'ok' ? 'status' : 'alert'}
+          className={`mt-1 truncate text-[10px] ${
+            feedback.kind === 'ok' ? 'text-emerald-300/85' : 'text-rose-300'
+          }`}
+          title={feedback.message}
+        >
+          {feedback.message}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function EditableTextCell({
   value,
   onCommit,
@@ -468,6 +714,9 @@ export function KeysProviderTable({
   onAddRow,
   onRestoreDefaultProviders,
   onPatchCustomProvider,
+  onUpdateProviderActive,
+  onDeleteProvider,
+  onUpdateKey,
   onRefreshModels,
   refreshingProviderIds,
   onShowAllRows,
@@ -475,10 +724,13 @@ export function KeysProviderTable({
 }: KeysProviderTableProps) {
   const [searchText, setSearchText] = useState('');
   const [providerFilter, setProviderFilter] = useState('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [categoryFilter, setCategoryFilter] = useState<'all' | ProviderDisplayCategory>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | KeysRowStatus>('all');
   const [modelFilter, setModelFilter] = useState('all');
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [deleteTarget, setDeleteTarget] = useState<KeysRowData | null>(null);
+  const [deleteInFlight, setDeleteInFlight] = useState(false);
   const {
     columnSizing,
     setColumnSizing,
@@ -491,12 +743,13 @@ export function KeysProviderTable({
     storageKey: API_KEYS_STORAGE_KEY,
     columnIds: API_KEYS_COLUMN_IDS,
     defaultSizing: API_KEYS_DEFAULT_SIZING,
-    defaultFrozenColumnIds: ['col-provider'],
+    defaultFrozenColumnIds: ['col-id'],
   });
 
   const restoreFilterDefaults = () => {
     setSearchText('');
     setProviderFilter('all');
+    setActiveFilter('all');
     setCategoryFilter('all');
     setStatusFilter('all');
     setModelFilter('all');
@@ -507,6 +760,17 @@ export function KeysProviderTable({
   const handleRestoreDefaultProviders = () => {
     restoreFilterDefaults();
     onRestoreDefaultProviders();
+  };
+
+  const confirmDeleteTarget = async () => {
+    if (!deleteTarget || deleteInFlight) return;
+    setDeleteInFlight(true);
+    try {
+      await onDeleteProvider(deleteTarget.provider);
+      setDeleteTarget(null);
+    } finally {
+      setDeleteInFlight(false);
+    }
   };
 
   const providerFilterOptions = useMemo(
@@ -531,26 +795,56 @@ export function KeysProviderTable({
     const keyword = searchText.trim().toLowerCase();
     return rows.filter((row) => {
       if (providerFilter !== 'all' && row.provider.id !== providerFilter) return false;
+      if (activeFilter === 'active' && !row.active) return false;
+      if (activeFilter === 'inactive' && row.active) return false;
       const displayCategory = getProviderDisplayCategory(row.provider);
       if (categoryFilter !== 'all' && displayCategory !== categoryFilter) return false;
       if (statusFilter !== 'all' && row.status !== statusFilter) return false;
       if (modelFilter !== 'all' && !row.models.includes(modelFilter)) return false;
       if (!keyword) return true;
       return [
+        row.rowId,
+        row.active ? 'active' : 'inactive',
         row.provider.id,
         row.provider.label,
         displayCategory,
         getProviderDisplayCategoryLabel(row.provider, copy),
+        defaultKeyVarName(row.provider),
+        row.provider.keychainKey,
         row.maskedKey ?? '',
         row.status,
         row.models.join(' '),
         row.errorReason ?? '',
       ].join('\n').toLowerCase().includes(keyword);
     });
-  }, [copy, rows, searchText, providerFilter, categoryFilter, statusFilter, modelFilter]);
+  }, [copy, rows, searchText, providerFilter, activeFilter, categoryFilter, statusFilter, modelFilter]);
 
   const columns = useMemo(
     () => [
+      columnHelper.accessor((row) => row.rowId, {
+        id: 'col-id',
+        header: 'ID',
+        size: API_KEYS_DEFAULT_SIZING['col-id'],
+        cell: (info) => (
+          <span
+            className="block truncate font-mono text-[11px] text-stone-300"
+            title={`${info.getValue()} · ${info.row.original.provider.id}`}
+          >
+            {info.getValue()}
+          </span>
+        ),
+      }),
+      columnHelper.accessor((row) => row.active, {
+        id: 'col-active',
+        header: '是否採用 (Active)',
+        size: API_KEYS_DEFAULT_SIZING['col-active'],
+        cell: (info) => (
+          <ActiveCell
+            row={info.row.original}
+            onUpdateProviderActive={onUpdateProviderActive}
+          />
+        ),
+      }),
       columnHelper.accessor((row) => row.provider.label, {
         id: 'col-provider',
         header: copy.columns.provider,
@@ -581,18 +875,36 @@ export function KeysProviderTable({
           );
         },
       }),
-      columnHelper.accessor((row) => row.maskedKey, {
-        id: 'col-key',
-        header: copy.columns.key,
-        size: API_KEYS_DEFAULT_SIZING['col-key'],
+      columnHelper.accessor((row) => defaultKeyVarName(row.provider), {
+        id: 'col-key-var-name',
+        header: copy.columns.keyVarName,
+        size: API_KEYS_DEFAULT_SIZING['col-key-var-name'],
         cell: (info) => {
-          const masked = info.getValue();
-          return masked ? (
-            <span className="font-mono text-xs text-stone-300">{masked}</span>
-          ) : (
-            <span className="text-xs text-stone-500">—</span>
+          const original = info.row.original;
+          if (original.isCustom) {
+            return (
+              <EditableTextCell
+                value={info.getValue()}
+                placeholder="CUSTOM_PROVIDER_API_KEY"
+                onCommit={(keyVarName) => onPatchCustomProvider(original.provider.id, { envVarNames: [keyVarName] })}
+              />
+            );
+          }
+          return (
+            <span
+              className="font-mono text-[11px] text-stone-300"
+              title={original.provider.envVarNames.join(', ') || info.getValue()}
+            >
+              {info.getValue()}
+            </span>
           );
         },
+      }),
+      columnHelper.accessor((row) => row.maskedKey, {
+        id: 'col-key-value',
+        header: copy.columns.keyValue,
+        size: API_KEYS_DEFAULT_SIZING['col-key-value'],
+        cell: (info) => <KeyValueCell row={info.row.original} onUpdateKey={onUpdateKey} />,
       }),
       columnHelper.accessor((row) => row.status, {
         id: 'col-status',
@@ -631,8 +943,29 @@ export function KeysProviderTable({
           );
         },
       }),
+      columnHelper.display({
+        id: 'col-actions',
+        header: copy.columns.actions,
+        size: API_KEYS_DEFAULT_SIZING['col-actions'],
+        enableSorting: false,
+        cell: (info) => (
+          <DeleteProviderCell
+            row={info.row.original}
+            copy={copy}
+            onRequestDelete={setDeleteTarget}
+          />
+        ),
+      }),
     ],
-    [copy, onPatchCustomProvider, onRefreshModels, refreshingProviderIds],
+    [
+      copy,
+      onDeleteProvider,
+      onPatchCustomProvider,
+      onRefreshModels,
+      onUpdateKey,
+      onUpdateProviderActive,
+      refreshingProviderIds,
+    ],
   );
 
   const table = useReactTable({
@@ -696,6 +1029,20 @@ export function KeysProviderTable({
           onChange={setProviderFilter}
           options={providerFilterOptions}
           ariaLabel={copy.filters.provider}
+        />
+      );
+    }
+    if (columnId === 'col-active') {
+      return (
+        <FilterSelect
+          value={activeFilter}
+          onChange={(value) => setActiveFilter(value as typeof activeFilter)}
+          options={[
+            { value: 'all', label: 'All' },
+            { value: 'active', label: 'Active' },
+            { value: 'inactive', label: 'Inactive' },
+          ]}
+          ariaLabel="Active filter"
         />
       );
     }
@@ -838,7 +1185,7 @@ export function KeysProviderTable({
                 {row.getVisibleCells().map((cell) => (
                   <td
                     key={cell.id}
-                    className={`relative isolate border-r border-stone-200/10 px-4 py-3 align-middle text-sm text-stone-300 ${frozenClass(cell.column.id)}`}
+                    className={`relative isolate border-r border-stone-200/10 px-4 py-3 align-middle text-sm text-stone-300 ${cell.column.id === 'col-key-value' ? 'z-10' : ''} ${frozenClass(cell.column.id)}`}
                     style={cellStyle(cell.column.id)}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -860,6 +1207,17 @@ export function KeysProviderTable({
           </tbody>
         </table>
       </div>
+      {deleteTarget && (
+        <DeleteProviderConfirmDialog
+          row={deleteTarget}
+          copy={copy}
+          deleting={deleteInFlight}
+          onCancel={() => {
+            if (!deleteInFlight) setDeleteTarget(null);
+          }}
+          onConfirm={() => void confirmDeleteTarget()}
+        />
+      )}
     </div>
   );
 }

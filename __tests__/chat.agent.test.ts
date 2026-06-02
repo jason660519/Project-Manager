@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { sendChatMessage } from '../lib/chat/chatAgent';
 import type { ChatContext } from '../lib/chat/types';
-import { callStoredChatProvider, isTauriRuntime, killProcess, spawnAgent } from '../lib/bridge';
+import { callLlmRouted, isTauriRuntime, killProcess, spawnAgent } from '../lib/bridge';
 import { createRuntimeAdapterFromConfig } from '../lib/adapters/registry';
 
 // Mock global fetch so AI chat API fallback doesn't throw in tests
@@ -12,10 +12,21 @@ const mockFetch = vi.fn().mockResolvedValue({
 vi.stubGlobal('fetch', mockFetch);
 
 vi.mock('../lib/bridge', () => ({
-  callStoredChatProvider: vi.fn().mockResolvedValue({
+  callLlmRouted: vi.fn().mockResolvedValue({
     content: 'Hello from native stored-key chat!',
     inputTokens: 1,
     outputTokens: 2,
+    provider: 'openai',
+    model: 'gpt-4o',
+    routeDecision: {
+      routeDecisionId: 'route-test',
+      modelAlias: 'pm-code',
+      strategy: 'deterministic-fallback-v1',
+      selectedProvider: 'openai',
+      selectedModel: 'gpt-4o',
+      degraded: false,
+      attempts: [],
+    },
   }),
   isTauriRuntime: vi.fn().mockReturnValue(false),
   killProcess: vi.fn().mockResolvedValue(undefined),
@@ -285,12 +296,13 @@ describe('sendChatMessage', () => {
     });
 
     expect(result.error).toBeFalsy();
-    expect(callStoredChatProvider).toHaveBeenCalledWith(expect.objectContaining({
+    expect(callLlmRouted).toHaveBeenCalledWith(expect.objectContaining({
       provider: 'openai',
       model: 'gpt-4o',
     }));
     expect(mockFetch).not.toHaveBeenCalledWith('/api/chat', expect.anything());
     expect(result.content).toContain('native stored-key chat');
+    expect(result.routeDecision?.routeDecisionId).toBe('route-test');
   });
 
   it('passes image attachments through the Tauri stored-key bridge', async () => {
@@ -311,7 +323,7 @@ describe('sendChatMessage', () => {
       ],
     });
 
-    expect(callStoredChatProvider).toHaveBeenCalledWith(expect.objectContaining({
+    expect(callLlmRouted).toHaveBeenCalledWith(expect.objectContaining({
       provider: 'openai',
       attachments: [{
         name: 'screen.png',

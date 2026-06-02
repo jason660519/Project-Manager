@@ -5,7 +5,7 @@ import {
 import {
   onAgentExit,
   onAgentStdout,
-  callStoredChatProvider,
+  callLlmRouted,
   isTauriRuntime,
   killProcess,
   spawnAgent,
@@ -665,7 +665,7 @@ async function callChatApi(
   chatSettingsOverride?: { provider: string; model: string; systemPrompt: string },
   abortSignal?: AbortSignal,
   attachments?: SendChatMessageRequest['attachments'],
-): Promise<Pick<SendChatMessageResult, 'content' | 'provider' | 'model'>> {
+): Promise<Pick<SendChatMessageResult, 'content' | 'provider' | 'model' | 'routeDecision'>> {
   // Build messages array WITHOUT system prompt (passed separately via systemPrompt field)
   const systemPrompt = chatSettingsOverride?.systemPrompt || buildSystemPrompt(context);
   const messages: { role: 'user' | 'assistant'; content: string }[] = [];
@@ -703,9 +703,10 @@ async function callChatApi(
   chatPayload.systemPrompt = systemPrompt;
 
   if (isTauriRuntime()) {
-    const provider = providerConfig.provider || 'deepseek';
-    const nativeResult = await callStoredChatProvider({
-      provider,
+    const nativeResult = await callLlmRouted({
+      modelAlias: 'pm-code',
+      taskClass: 'chat',
+      provider: providerConfig.provider,
       model: providerConfig.model,
       maxTokens: 4096,
       messages,
@@ -715,8 +716,9 @@ async function callChatApi(
     if (onStream && nativeResult.content) onStream(nativeResult.content);
     return {
       content: nativeResult.content,
-      provider: nativeResult.provider ?? provider,
-      model: nativeResult.model ?? providerConfig.model,
+      provider: nativeResult.provider,
+      model: nativeResult.model,
+      routeDecision: nativeResult.routeDecision,
     };
   }
 
@@ -887,6 +889,7 @@ interface AgentStreamResult {
   toolCalls: Array<{ id: string; name: string; arguments: Record<string, unknown>; result?: string; error?: boolean }>;
   provider?: string;
   model?: string;
+  routeDecision?: SendChatMessageResult['routeDecision'];
 }
 
 export function buildTerminalToolContext(projectRoot: string): {
@@ -978,9 +981,10 @@ async function callAgentApi(
   if (providerConfig.model) payload.model = providerConfig.model;
 
   if (isTauriRuntime()) {
-    const provider = providerConfig.provider || 'deepseek';
-    const nativeResult = await callStoredChatProvider({
-      provider,
+    const nativeResult = await callLlmRouted({
+      modelAlias: 'pm-reasoning',
+      taskClass: 'agent-chat',
+      provider: providerConfig.provider,
       model: providerConfig.model,
       maxTokens: 8192,
       messages,
@@ -991,8 +995,9 @@ async function callAgentApi(
     return {
       content: nativeResult.content,
       toolCalls: [],
-      provider: nativeResult.provider ?? provider,
-      model: nativeResult.model ?? providerConfig.model,
+      provider: nativeResult.provider,
+      model: nativeResult.model,
+      routeDecision: nativeResult.routeDecision,
     };
   }
 
@@ -1133,6 +1138,7 @@ export async function sendChatMessage(
           toolCalls: result.toolCalls.length > 0 ? result.toolCalls : undefined,
           provider: result.provider,
           model: result.model,
+          routeDecision: result.routeDecision,
         };
       }
     } catch (error) {

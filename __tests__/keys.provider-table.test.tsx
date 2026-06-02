@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -32,22 +32,27 @@ function rowFixture(overrides: Partial<KeysRowData> = {}, providerPatch: Partial
     lastValidatedAt: null,
     errorReason: null,
     ...overrides,
+    rowId: overrides.rowId ?? `00000000-0000-5000-8000-${provider.id.padEnd(12, '0').slice(0, 12)}`,
+    active: overrides.active ?? true,
   };
 }
 
 function renderTable(props: Partial<React.ComponentProps<typeof KeysProviderTable>> = {}) {
   return render(
     <KeysProviderTable
-      rows={[rowFixture()]}
-      onRowClick={vi.fn()}
-      onAddRow={vi.fn()}
-      onRestoreDefaultProviders={vi.fn()}
-      onPatchCustomProvider={vi.fn()}
-      onRefreshModels={vi.fn()}
-      refreshingProviderIds={new Set()}
-      onShowAllRows={vi.fn()}
-      copy={en.keysValidation.table}
-      {...props}
+      rows={props.rows ?? [rowFixture()]}
+      onRowClick={props.onRowClick ?? vi.fn()}
+      onAddRow={props.onAddRow ?? vi.fn()}
+      onRestoreDefaultProviders={props.onRestoreDefaultProviders ?? vi.fn()}
+      onPatchCustomProvider={props.onPatchCustomProvider ?? vi.fn()}
+      onUpdateProviderActive={props.onUpdateProviderActive ?? vi.fn().mockResolvedValue(undefined)}
+      onDeleteProvider={props.onDeleteProvider ?? vi.fn().mockResolvedValue(undefined)}
+      onUpdateKey={props.onUpdateKey ?? vi.fn()}
+      onRefreshModels={props.onRefreshModels ?? vi.fn()}
+      refreshingProviderIds={props.refreshingProviderIds ?? new Set()}
+      onShowAllRows={props.onShowAllRows ?? vi.fn()}
+      copy={props.copy ?? en.keysValidation.table}
+      hiddenBuiltInCount={props.hiddenBuiltInCount}
     />,
   );
 }
@@ -126,6 +131,99 @@ describe('KeysProviderTable', () => {
     expect(screen.queryByRole('button', { name: /Import/i })).not.toBeInTheDocument();
   });
 
+  it('renders key var name before key value without changing masked key display', () => {
+    renderTable({
+      rows: [
+        rowFixture({
+          hasKey: true,
+          maskedKey: 'sk-••••vDYA',
+        }),
+      ],
+    });
+
+    const headers = Array.from(document.querySelectorAll('thead th'))
+      .map((header) => header.textContent ?? '');
+    const keyVarNameIndex = headers.findIndex((text) => text.includes('Key Var Name'));
+    const keyValueIndex = headers.findIndex((text) => text.includes('Key Value'));
+
+    expect(keyVarNameIndex).toBeGreaterThan(-1);
+    expect(keyValueIndex).toBeGreaterThan(-1);
+    expect(keyVarNameIndex).toBeLessThan(keyValueIndex);
+    expect(screen.getByText('OPENAI_API_KEY')).toBeInTheDocument();
+    expect(screen.getByLabelText('OpenAI Key Value')).toHaveAttribute('placeholder', 'sk-••••vDYA');
+    expect(screen.getByRole('button', { name: '更新API Key' })).toBeInTheDocument();
+  });
+
+  it('updates a key value from the cell editor and clears the draft on success', async () => {
+    const onUpdateKey = vi.fn().mockResolvedValue(undefined);
+    renderTable({ onUpdateKey });
+
+    fireEvent.change(screen.getByLabelText('OpenAI Key Value'), {
+      target: { value: `sk-${'a'.repeat(40)}` },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '更新API Key' }));
+
+    await waitFor(() => expect(onUpdateKey).toHaveBeenCalledTimes(1));
+    expect(onUpdateKey).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'openai' }),
+      `sk-${'a'.repeat(40)}`,
+    );
+    expect(screen.getByLabelText('OpenAI Key Value')).toHaveValue('');
+    expect(screen.getByText('更新成功')).toBeInTheDocument();
+  });
+
+  it('keeps key values hidden by default and lets the user temporarily reveal them', () => {
+    renderTable();
+
+    const input = screen.getByLabelText('OpenAI Key Value');
+    expect(input).toHaveAttribute('type', 'password');
+
+    fireEvent.click(screen.getByRole('button', { name: '顯示API Key' }));
+
+    expect(input).toHaveAttribute('type', 'text');
+    expect(screen.getByRole('button', { name: '隱藏API Key' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '隱藏API Key' }));
+
+    expect(input).toHaveAttribute('type', 'password');
+  });
+
+  it('validates key format before sending the update request', () => {
+    const onUpdateKey = vi.fn();
+    renderTable({ onUpdateKey });
+
+    fireEvent.change(screen.getByLabelText('OpenAI Key Value'), {
+      target: { value: 'not-an-openai-key' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '更新API Key' }));
+
+    expect(onUpdateKey).not.toHaveBeenCalled();
+    expect(screen.getByText('API Key 格式不符合此 provider 的預設規則')).toBeInTheDocument();
+  });
+
+  it('disables editing while saving and preserves the draft on update failure', async () => {
+    let rejectUpdate: (error: Error) => void = () => undefined;
+    const onUpdateKey = vi.fn(() => new Promise<void>((_resolve, reject) => {
+      rejectUpdate = reject;
+    }));
+    renderTable({ onUpdateKey });
+
+    const value = `sk-${'b'.repeat(40)}`;
+    fireEvent.change(screen.getByLabelText('OpenAI Key Value'), {
+      target: { value },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '更新API Key' }));
+
+    await waitFor(() => expect(screen.getByLabelText('OpenAI Key Value')).toBeDisabled());
+    expect(screen.getByRole('button', { name: '更新API Key' })).toBeDisabled();
+
+    rejectUpdate(new Error('Provider 401'));
+
+    await waitFor(() => expect(screen.getByText('Provider 401')).toBeInTheDocument());
+    expect(screen.getByLabelText('OpenAI Key Value')).not.toBeDisabled();
+    expect(screen.getByLabelText('OpenAI Key Value')).toHaveValue(value);
+  });
+
   it('freezes the first N visible columns from the numeric freeze control', () => {
     renderTable();
 
@@ -182,6 +280,56 @@ describe('KeysProviderTable', () => {
     expect(onAddRow).toHaveBeenCalledTimes(1);
   });
 
+  it('toggles provider active state without triggering row selection', async () => {
+    const onUpdateProviderActive = vi.fn().mockResolvedValue(undefined);
+    const onRowClick = vi.fn();
+    const row = rowFixture({}, { id: 'openai', label: 'OpenAI' });
+    renderTable({ rows: [row], onUpdateProviderActive, onRowClick });
+
+    fireEvent.click(screen.getByLabelText('Active: OpenAI'));
+
+    await waitFor(() => expect(onUpdateProviderActive).toHaveBeenCalledWith(row.provider, false));
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+
+  it('filters inactive providers from the active column header filter', () => {
+    renderTable({
+      rows: [
+        rowFixture({ active: true }, { id: 'openai', label: 'OpenAI' }),
+        rowFixture({ active: false }, { id: 'anthropic', label: 'Anthropic' }),
+      ],
+    });
+
+    fireEvent.change(screen.getByLabelText('Active filter'), {
+      target: { value: 'inactive' },
+    });
+
+    const renderedRows = Array.from(document.querySelectorAll('tbody tr'));
+    expect(renderedRows.some((row) => row.textContent?.includes('Anthropic'))).toBe(true);
+    expect(renderedRows.some((row) => row.textContent?.includes('OpenAI'))).toBe(false);
+  });
+
+  it('uses an in-app confirmation dialog before deleting a provider row', async () => {
+    const onDeleteProvider = vi.fn().mockResolvedValue(undefined);
+    const onRowClick = vi.fn();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
+      throw new Error('window.confirm should not be used in Project Manager UI');
+    });
+    const row = rowFixture({ isCustom: true }, { id: 'custom-provider-1', label: 'Custom Provider 1' });
+    renderTable({ rows: [row], onDeleteProvider, onRowClick });
+
+    fireEvent.click(screen.getByRole('button', { name: /Delete custom row: Custom Provider 1/i }));
+
+    expect(screen.getByRole('dialog', { name: 'Delete custom row' })).toBeInTheDocument();
+    expect(onDeleteProvider).not.toHaveBeenCalled();
+    expect(confirmSpy).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /^Delete$/i }));
+
+    await waitFor(() => expect(onDeleteProvider).toHaveBeenCalledWith(row.provider));
+    expect(onRowClick).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
   it('refreshes one provider model list without triggering row selection', () => {
     const onRefreshModels = vi.fn();
     const onRowClick = vi.fn();
@@ -228,6 +376,11 @@ describe('KeysProviderTable', () => {
     fireEvent.blur(labelInput);
 
     expect(onPatchCustomProvider).toHaveBeenCalledWith(row.provider.id, { label: 'Updated Provider' });
+    const keyVarInput = screen.getByDisplayValue('OPENAI_API_KEY');
+    fireEvent.change(keyVarInput, { target: { value: 'BUSINESS_API_TOKEN' } });
+    fireEvent.blur(keyVarInput);
+
+    expect(onPatchCustomProvider).toHaveBeenCalledWith(row.provider.id, { envVarNames: ['BUSINESS_API_TOKEN'] });
     expect(screen.getByRole('link', { name: 'Official API key page' })).toHaveAttribute(
       'href',
       'https://keys.example.com',

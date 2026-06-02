@@ -70,6 +70,13 @@ describe('ChatPageClient', () => {
     expect(screen.getByText('AI Assistant')).toBeInTheDocument();
   });
 
+  it('shows the active route and provider setup entry points', () => {
+    renderWithI18n(<ChatPageClient />);
+    expect(screen.getByText('Auto route')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /keys/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /provider \/ model/i })).toBeInTheDocument();
+  });
+
   it('shows empty history message when no sessions exist', () => {
     renderWithI18n(<ChatPageClient />);
     expect(screen.getByText(/No conversations yet/i)).toBeInTheDocument();
@@ -117,6 +124,21 @@ describe('ChatPageClient', () => {
     expect(screen.getByText(/I am the assistant/i)).toBeInTheDocument();
   });
 
+  it('shows the real chat failure reason and key setup guidance', async () => {
+    const user = userEvent.setup();
+    mockSendChatMessage.mockRejectedValueOnce(new Error('All route candidates failed: anthropic/claude missing API key'));
+    renderWithI18n(<ChatPageClient />);
+
+    const textarea = screen.getByPlaceholderText('Ask me anything...');
+    await user.type(textarea, 'Hello!');
+    await user.keyboard('{Enter}');
+
+    await new Promise((r) => setTimeout(r, 100));
+    expect(screen.getByText(/chat request failed/i)).toBeInTheDocument();
+    expect(screen.getByText(/anthropic\/claude missing API key/i)).toBeInTheDocument();
+    expect(screen.getByText(/open Keys and add or re-validate/i)).toBeInTheDocument();
+  });
+
   it('lets the console chat pick a validated provider model before sending', async () => {
     const user = userEvent.setup();
     localStorageMock.setItem(
@@ -132,7 +154,7 @@ describe('ChatPageClient', () => {
     renderWithI18n(<ChatPageClient />);
 
     await user.click(screen.getAllByRole('button', { name: /chat settings/i })[0]);
-    await user.selectOptions(screen.getByLabelText(/provider/i), 'openai');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Provider' }), 'openai');
 
     const modelInput = screen.getByLabelText(/model id/i);
     expect(modelInput).toHaveValue('gpt-4o');

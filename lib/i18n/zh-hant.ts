@@ -154,6 +154,8 @@ export const zhHant: Translations = {
         usage: '用量',
         docs: '文件',
         key: '金鑰',
+        keyVarName: 'Key Var Name',
+        keyValue: 'Key Value',
         status: '狀態',
         models: '模型',
         availableModels: '可用模型',

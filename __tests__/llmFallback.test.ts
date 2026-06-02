@@ -11,7 +11,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { callLlmWithFallback, isModelNotFoundError } from '../lib/bridge';
+import { callLlmRouted, callLlmWithFallback, isModelNotFoundError } from '../lib/bridge';
 
 // ── @tauri-apps/api/core mock ─────────────────────────────────────────────────
 // The bridge imports `invoke` lazily inside every async function via
@@ -331,6 +331,73 @@ describe('callLlmWithFallback', () => {
       providerId: 'nonexistent-provider',
       outcome: 'failed',
       error: 'Unknown provider',
+    });
+  });
+});
+
+describe('callLlmRouted', () => {
+  beforeEach(() => {
+    mockInvoke.mockReset();
+    enableTauri();
+  });
+
+  afterEach(() => {
+    disableTauri();
+  });
+
+  it('throws when not in Tauri runtime', async () => {
+    disableTauri();
+    await expect(
+      callLlmRouted({
+        modelAlias: 'pm-code',
+        messages: MESSAGES,
+      }),
+    ).rejects.toThrow(/Tauri/);
+  });
+
+  it('passes alias, explicit first candidate, and custom candidates to Rust', async () => {
+    mockInvoke.mockResolvedValue({
+      content: 'routed',
+      inputTokens: 3,
+      outputTokens: 4,
+      provider: 'openai',
+      model: 'gpt-4o',
+      routeDecision: {
+        routeDecisionId: 'route-test',
+        modelAlias: 'pm-code',
+        strategy: 'deterministic-fallback-v1',
+        selectedProvider: 'openai',
+        selectedModel: 'gpt-4o',
+        degraded: false,
+        attempts: [{ provider: 'openai', model: 'gpt-4o', status: 'success' }],
+      },
+    });
+
+    const result = await callLlmRouted({
+      modelAlias: 'pm-code',
+      taskClass: 'chat',
+      provider: 'openai',
+      model: 'gpt-4o',
+      candidates: [{ provider: 'anthropic', model: 'claude-sonnet-4-6' }],
+      messages: MESSAGES,
+      maxTokens: 1234,
+      systemPrompt: 'system',
+      temperature: 0.2,
+    });
+
+    expect(result.provider).toBe('openai');
+    expect(result.routeDecision.routeDecisionId).toBe('route-test');
+    expect(mockInvoke).toHaveBeenCalledWith('call_llm_routed', {
+      modelAlias: 'pm-code',
+      taskClass: 'chat',
+      provider: 'openai',
+      model: 'gpt-4o',
+      candidates: [{ provider: 'anthropic', model: 'claude-sonnet-4-6' }],
+      maxTokens: 1234,
+      messages: MESSAGES,
+      systemPrompt: 'system',
+      temperature: 0.2,
+      attachments: null,
     });
   });
 });

@@ -155,6 +155,8 @@ export const ja: Translations = {
         usage: '使用量',
         docs: 'ドキュメント',
         key: 'キー',
+        keyVarName: 'Key Var Name',
+        keyValue: 'Key Value',
         status: 'ステータス',
         models: 'モデル',
         availableModels: '利用可能なモデル',
