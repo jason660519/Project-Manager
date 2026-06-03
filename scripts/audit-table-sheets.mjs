@@ -15,10 +15,14 @@ const REPORT_PATH = 'docs/engineering/table-sheet-inventory.md';
 
 const MODULE_RULES = [
   [/app\/project-progress-dashboard\//, 'Project Progress Dashboard'],
+  [/app\/ui\/views\/KeysView\.tsx$/, 'Keys'],
+  [/app\/ui\/views\/AiSdksView\.tsx$/, 'AI SDKs'],
   [/app\/ui\/views\/Keys\//, 'Keys'],
   [/app\/ui\/views\/AiSdks\//, 'AI SDKs'],
   [/app\/ui\/views\/Plugins\//, 'Integrations Hub'],
+  [/app\/ui\/views\/EngineersView\.tsx$/, 'Engineers'],
   [/app\/ui\/views\/Engineers\//, 'Engineers'],
+  [/app\/ui\/views\/XmuxView\.tsx$/, 'Workspace'],
   [/app\/ui\/views\/ProjectsView\.tsx$/, 'Projects'],
   [/app\/ui\/views\/SettingsView\.tsx$/, 'Settings'],
   [/app\/ui\/views\/KeyboardShortcutsView\.tsx$/, 'Settings'],
@@ -29,6 +33,14 @@ const MODULE_RULES = [
 ];
 
 const CLASSIFICATION_RULES = [
+  [/app\/project-progress-dashboard\/ProjectProgressClient\.tsx$/, 'sheet-wrapper'],
+  [/app\/ui\/views\/KeysView\.tsx$/, 'sheet-wrapper'],
+  [/app\/ui\/views\/AiSdksView\.tsx$/, 'sheet-wrapper'],
+  [/app\/ui\/views\/Plugins\/PluginsHubView\.tsx$/, 'sheet-wrapper'],
+  [/app\/ui\/views\/EngineersView\.tsx$/, 'sheet-wrapper'],
+  [/app\/ui\/views\/XmuxView\.tsx$/, 'workspace-tabs'],
+  [/app\/ai_assistants\/AIAssistantsConsoleClient\.tsx$/, 'sheet-wrapper'],
+  [/app\/project-progress-dashboard\/_components\/SheetTabs\.tsx$/, 'sheet-tab-primitive'],
   [/components\/table\/datasheet\//, 'shared-primitive'],
   [/components\/table\/TableCore\.tsx$/, 'simple'],
   [/app\/project-progress-dashboard\/_components\/PhaseTable\.tsx$/, 'basic'],
@@ -38,7 +50,6 @@ const CLASSIFICATION_RULES = [
   [/app\/ui\/views\/Plugins\/ConnectSheet\.tsx$/, 'read-only/detail'],
   [/app\/ui\/views\/SettingsView\.tsx$/, 'simple'],
   [/app\/ui\/views\/KeyboardShortcutsView\.tsx$/, 'read-only'],
-  [/app\/ai_assistants\/AIAssistantsConsoleClient\.tsx$/, 'mixed-simple'],
   [/app\/ui\/views\/FeaturesView\.tsx$/, 'simple-wrapper'],
   [/app\/ui\/DashboardClient\.tsx$/, 'simple-wrapper'],
 ];
@@ -51,6 +62,14 @@ const BASIC_REQUIREMENTS = [
   ['hidden columns recovery', /Hidden cols|hiddenColumn|columnVisibility/i],
   ['visible table scrollbar', /pm-scroll|DataTableShell/],
   ['empty or filtered-empty state', /No rows match|filteredEmpty|empty|noProviders|noProvidersMatch|copy\.empty/i],
+];
+
+const SHEET_WRAPPER_REQUIREMENTS = [
+  ['WorkstationFrame page frame', /<WorkstationFrame\b/],
+  ['bottomTabs slot', /bottomTabs\s*=/],
+  ['bottom sheet tabs', /<BottomSheetTabs\b|<SheetTabs\b/],
+  ['reorderable sheet tabs', /reorderable|<SheetTabs\b/],
+  ['table-owned scrolling', /scrollChildren=\{false\}/],
 ];
 
 function parseArgs(argv) {
@@ -100,12 +119,15 @@ function inferredClassification(path) {
   return CLASSIFICATION_RULES.find(([pattern]) => pattern.test(path))?.[1] ?? 'unclassified';
 }
 
-function hasTableSurface(content) {
-  return /useReactTable|DataTableShell|TableCore|<table\b/.test(content);
+function hasTableSurface(path, content) {
+  if (/useReactTable|DataTableShell|TableCore|<table\b/.test(content)) return true;
+  return path.startsWith('app/') && /<WorkstationFrame\b|<BottomSheetTabs\b|<SheetTabs\b/.test(content);
 }
 
 function implementationKind(content) {
   const kinds = [];
+  if (/<WorkstationFrame\b/.test(content)) kinds.push('WorkstationFrame');
+  if (/<BottomSheetTabs\b|<SheetTabs\b/.test(content)) kinds.push('BottomSheetTabs');
   if (/useReactTable/.test(content)) kinds.push('TanStack');
   if (/DataTableShell/.test(content)) kinds.push('DataTableShell');
   if (/TableCore/.test(content)) kinds.push('TableCore');
@@ -138,6 +160,12 @@ function auditSurface(path, content) {
 
   if (classification === 'basic') {
     for (const [label, pattern] of BASIC_REQUIREMENTS) {
+      if (!pattern.test(content)) findings.push(`Missing static signal: ${label}`);
+    }
+  }
+
+  if (classification === 'sheet-wrapper') {
+    for (const [label, pattern] of SHEET_WRAPPER_REQUIREMENTS) {
       if (!pattern.test(content)) findings.push(`Missing static signal: ${label}`);
     }
   }
@@ -205,6 +233,17 @@ function markdownReport(surfaces) {
   if (warnings.length === 0) lines.push('None.');
   else for (const warning of warnings) lines.push(`- ${warning}`);
 
+  const routes = Array.from(new Set(surfaces.map((surface) => surface.route).filter(Boolean))).sort();
+  lines.push(
+    '',
+    '## Static Test Report',
+    '',
+    `- Inventory source: ${surfaces.length} source-detected table/sheet surfaces under \`app/\` and \`components/\`.`,
+    `- Basic sheet checks: ${BASIC_REQUIREMENTS.map(([label]) => label).join(', ')}.`,
+    `- Sheet wrapper checks: ${SHEET_WRAPPER_REQUIREMENTS.map(([label]) => label).join(', ')}.`,
+    `- Routes requiring UI smoke when changed: ${routes.join(', ')}.`,
+  );
+
   lines.push(
     '',
     '## Required Dynamic Verification',
@@ -225,7 +264,7 @@ function main() {
   const files = SCAN_ROOTS.flatMap((root) => walk(join(ROOT, root)));
   const surfaces = files
     .map((file) => [rel(file), readFileSync(file, 'utf8')])
-    .filter(([, content]) => hasTableSurface(content))
+    .filter(([path, content]) => hasTableSurface(path, content))
     .filter(([path]) => !path.startsWith('lib/generated/'))
     .map(([path, content]) => auditSurface(path, content))
     .sort((a, b) => a.module.localeCompare(b.module) || a.path.localeCompare(b.path));

@@ -953,7 +953,6 @@ export type FontZoomShortcutPayload = {
 };
 export type UnlistenFn = () => void;
 
-/** Idempotent Tauri event teardown — avoids Runtime TypeError when unlisten races Strict Mode or async subscribe. */
 export function safeUnlisten(unlisten: UnlistenFn | undefined): void {
   if (!unlisten) return;
   try {
@@ -981,9 +980,6 @@ export function onAgentExit(cb: (p: AgentExitPayload) => void): Promise<Unlisten
   return listen<AgentExitPayload>('agent-exit', cb);
 }
 
-/**
- * Subscribe to agent stdout/stderr/exit once. Use in React effects with `cancelled` guard + cleanup.
- */
 export async function subscribeAgentProcessEvents(handlers: {
   onStdout: (payload: AgentStdioPayload) => void;
   onStderr: (payload: AgentStdioPayload) => void;

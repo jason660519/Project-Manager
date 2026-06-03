@@ -1,8 +1,16 @@
 import type { TerminalOperationalBoundaries } from './types';
 
+function isSafeAssistantId(value: string): boolean {
+  return /^[A-Za-z0-9_-]+$/.test(value);
+}
+
 export function terminalBoundariesSidecarPath(projectRoot: string, assistantId: string): string {
   const root = projectRoot.replace(/\/+$/, '');
-  return `${root}/.project-manager/assistants/${assistantId}/terminal-boundaries.json`;
+  const id = assistantId.trim();
+  if (!isSafeAssistantId(id)) {
+    throw new Error('Invalid assistantId');
+  }
+  return `${root}/.project-manager/assistants/${id}/terminal-boundaries.json`;
 }
 
 export async function saveTerminalBoundariesSidecar(
@@ -14,6 +22,9 @@ export async function saveTerminalBoundariesSidecar(
   const trimmedId = assistantId.trim();
   if (!trimmedRoot || !trimmedId) {
     throw new Error('saveTerminalBoundariesSidecar: projectRoot and assistantId are required');
+  }
+  if (!isSafeAssistantId(trimmedId)) {
+    throw new Error('saveTerminalBoundariesSidecar: invalid assistantId');
   }
 
   const payload = JSON.stringify(
@@ -45,7 +56,7 @@ export async function loadTerminalBoundariesSidecar(
 ): Promise<TerminalOperationalBoundaries | null> {
   const trimmedRoot = projectRoot.trim();
   const trimmedId = assistantId.trim();
-  if (!trimmedRoot || !trimmedId) return null;
+  if (!trimmedRoot || !trimmedId || !isSafeAssistantId(trimmedId)) return null;
 
   if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
     try {
@@ -58,9 +69,11 @@ export async function loadTerminalBoundariesSidecar(
   }
 
   const url = new URL('/api/assistants/terminal-boundaries', typeof window !== 'undefined' ? window.location.origin : 'http://localhost:43187');
-  url.searchParams.set('projectRoot', trimmedRoot);
-  url.searchParams.set('assistantId', trimmedId);
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectRoot: trimmedRoot, assistantId: trimmedId }),
+  });
   if (res.status === 404) return null;
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };

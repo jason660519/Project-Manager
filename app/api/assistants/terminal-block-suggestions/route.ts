@@ -6,11 +6,59 @@ import { terminalBlockSuggestionsSidecarPath } from '../../../../lib/ai-assistan
 
 export const dynamic = 'force-static';
 
+function isSafeAssistantId(value: string): boolean {
+  return /^[A-Za-z0-9_-]+$/.test(value);
+}
+
 export async function GET(request: NextRequest) {
-  const projectRoot = request.nextUrl.searchParams.get('projectRoot')?.trim() ?? '';
-  const assistantId = request.nextUrl.searchParams.get('assistantId')?.trim() ?? '';
+  const searchParams = new URL(request.url).searchParams;
+  const projectRoot =
+    searchParams.get('projectRoot')?.trim() ??
+    request.headers.get('x-project-root')?.trim() ??
+    '';
+  const assistantId =
+    searchParams.get('assistantId')?.trim() ??
+    request.headers.get('x-assistant-id')?.trim() ??
+    '';
   if (!projectRoot || !assistantId) {
     return NextResponse.json({ error: 'projectRoot and assistantId are required' }, { status: 400 });
+  }
+  if (!projectRoot.startsWith('/')) {
+    return NextResponse.json({ error: 'projectRoot must be an absolute path' }, { status: 400 });
+  }
+  if (!isSafeAssistantId(assistantId)) {
+    return NextResponse.json({ error: 'assistantId contains invalid characters' }, { status: 400 });
+  }
+
+  const path = terminalBlockSuggestionsSidecarPath(projectRoot, assistantId);
+  if (!existsSync(path)) {
+    return NextResponse.json({ suggestions: [] });
+  }
+
+  try {
+    const raw = readFileSync(path, 'utf-8');
+    const suggestions = JSON.parse(raw) as TerminalBlockSuggestion[];
+    return NextResponse.json({ suggestions: Array.isArray(suggestions) ? suggestions : [] });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to read suggestions' },
+      { status: 500 },
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const body = await request.json().catch(() => null);
+  const projectRoot = typeof body?.projectRoot === 'string' ? body.projectRoot.trim() : '';
+  const assistantId = typeof body?.assistantId === 'string' ? body.assistantId.trim() : '';
+  if (!projectRoot || !assistantId) {
+    return NextResponse.json({ error: 'projectRoot and assistantId are required' }, { status: 400 });
+  }
+  if (!projectRoot.startsWith('/')) {
+    return NextResponse.json({ error: 'projectRoot must be an absolute path' }, { status: 400 });
+  }
+  if (!isSafeAssistantId(assistantId)) {
+    return NextResponse.json({ error: 'assistantId contains invalid characters' }, { status: 400 });
   }
 
   const path = terminalBlockSuggestionsSidecarPath(projectRoot, assistantId);
@@ -38,6 +86,12 @@ export async function PUT(request: NextRequest) {
 
   if (!projectRoot || !assistantId || !Array.isArray(suggestions)) {
     return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+  }
+  if (!projectRoot.startsWith('/')) {
+    return NextResponse.json({ error: 'projectRoot must be an absolute path' }, { status: 400 });
+  }
+  if (!isSafeAssistantId(assistantId)) {
+    return NextResponse.json({ error: 'assistantId contains invalid characters' }, { status: 400 });
   }
 
   try {
