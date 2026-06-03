@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ChatInput } from '../components/chat/ChatInput';
@@ -13,13 +13,15 @@ describe('ChatInput', () => {
     expect(onSend).toHaveBeenCalledWith('hello', undefined);
   });
 
-  it('does not send while an IME composition is active', () => {
+  it('does not send while an IME composition is active or immediately after candidate confirmation', () => {
+    vi.useFakeTimers();
     const onSend = vi.fn();
     render(<ChatInput placeholder="Ask" sendLabel="Send" loadingLabel="Thinking" loading={false} onSend={onSend} />);
     const input = screen.getByPlaceholderText('Ask');
 
     fireEvent.change(input, { target: { value: '測' } });
     fireEvent.compositionStart(input);
+    fireEvent.compositionUpdate(input);
     fireEvent.keyDown(input, { key: 'Enter' });
 
     expect(onSend).not.toHaveBeenCalled();
@@ -27,7 +29,37 @@ describe('ChatInput', () => {
     fireEvent.compositionEnd(input);
     fireEvent.keyDown(input, { key: 'Enter' });
 
+    expect(onSend).not.toHaveBeenCalled();
+
+    act(() => {
+      vi.advanceTimersByTime(31);
+    });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
     expect(onSend).toHaveBeenCalledWith('測', undefined);
+    vi.useRealTimers();
+  });
+
+  it('does not submit Enter events marked as IME composition by the browser', () => {
+    const onSend = vi.fn();
+    render(<ChatInput placeholder="Ask" sendLabel="Send" loadingLabel="Thinking" loading={false} onSend={onSend} />);
+    const input = screen.getByPlaceholderText('Ask');
+
+    fireEvent.change(input, { target: { value: '中' } });
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 229, which: 229 });
+
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it('preserves Shift+Enter as a non-submit input shortcut', () => {
+    const onSend = vi.fn();
+    render(<ChatInput placeholder="Ask" sendLabel="Send" loadingLabel="Thinking" loading={false} onSend={onSend} />);
+    const input = screen.getByPlaceholderText('Ask');
+
+    fireEvent.change(input, { target: { value: 'line one' } });
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: true });
+
+    expect(onSend).not.toHaveBeenCalled();
   });
 
   it('does not send whitespace', async () => {
@@ -40,10 +72,8 @@ describe('ChatInput', () => {
 
   it('disables send while loading', () => {
     render(<ChatInput placeholder="Ask" sendLabel="Send" loadingLabel="Thinking" loading onSend={vi.fn()} />);
-    // Now there are 2 buttons: file attach + send. Only send is disabled.
     const buttons = screen.getAllByRole('button');
-    expect(buttons.length).toBe(2);
-    // The send button is the last one (disabled)
+    expect(buttons.length).toBe(1);
     expect(buttons[buttons.length - 1]).toBeDisabled();
   });
 

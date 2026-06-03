@@ -53,8 +53,15 @@ import {
 } from '../../../../lib/keys/providerMetadata';
 import type { Translations } from '../../../../lib/i18n';
 import {
+  MAX_COLUMN_WIDTH,
+  MAX_ROW_HEIGHT,
+  MIN_COLUMN_WIDTH,
+  MIN_ROW_HEIGHT,
   useArenaTablePrefs,
 } from './ArenaTableViewControls';
+import type { TableMenuItem } from '../AiSdks/TableMenu';
+import { COL_ID_COLUMN_HEADER } from '../../../../components/table/colId';
+import { useInAppAlert, useInAppPrompt } from '../../../../components/ui/InAppDialog';
 
 export type KeysRowStatus = 'verified' | 'configured' | 'not_set' | 'failed';
 type ProviderDisplayCategory = 'model_factory' | 'model_channel' | 'local_model' | 'integration';
@@ -104,7 +111,6 @@ const API_KEYS_COLUMN_IDS = [
   'col-status',
   'col-model-list',
   'col-last-validated',
-  'col-actions',
 ];
 
 const API_KEYS_DEFAULT_SIZING: Record<string, number> = {
@@ -117,11 +123,62 @@ const API_KEYS_DEFAULT_SIZING: Record<string, number> = {
   'col-status': 210,
   'col-model-list': 310,
   'col-last-validated': 150,
-  'col-actions': 96,
 };
+const API_KEYS_ROW_HEIGHT = 54;
 
 function assertNever(value: never): never {
   throw new Error(`Unhandled KeysRowStatus: ${String(value)}`);
+}
+
+function clampPixelValue(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, Math.round(value)));
+}
+
+function parsePixelValue(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function textWidthEstimate(value: unknown) {
+  const text = String(value ?? '');
+  return Math.min(MAX_COLUMN_WIDTH, Math.max(MIN_COLUMN_WIDTH, text.length * 8 + 48));
+}
+
+function rowHeightEstimate(values: unknown[]) {
+  const longest = values.reduce<number>((max, value) => Math.max(max, String(value ?? '').length), 0);
+  const lines = Math.max(1, Math.ceil(longest / 42));
+  return clampPixelValue(30 + lines * 18, MIN_ROW_HEIGHT, MAX_ROW_HEIGHT);
+}
+
+const CONTEXT_MENU_MARGIN = 8;
+const CONTEXT_MENU_WIDTH = 220;
+const CONTEXT_MENU_ITEM_HEIGHT = 30;
+const CONTEXT_MENU_SEPARATOR_HEIGHT = 9;
+const CONTEXT_MENU_VERTICAL_PADDING = 8;
+
+function estimateContextMenuHeight(items: TableMenuItem[]) {
+  return items.reduce(
+    (height, item) =>
+      height + ('separator' in item ? CONTEXT_MENU_SEPARATOR_HEIGHT : CONTEXT_MENU_ITEM_HEIGHT),
+    CONTEXT_MENU_VERTICAL_PADDING,
+  );
+}
+
+function getSafeContextMenuPosition(clientX: number, clientY: number, items: TableMenuItem[]) {
+  if (typeof window === 'undefined') return { x: clientX, y: clientY };
+
+  const maxX = Math.max(CONTEXT_MENU_MARGIN, window.innerWidth - CONTEXT_MENU_WIDTH - CONTEXT_MENU_MARGIN);
+  const maxY = Math.max(
+    CONTEXT_MENU_MARGIN,
+    window.innerHeight - estimateContextMenuHeight(items) - CONTEXT_MENU_MARGIN,
+  );
+
+  return {
+    x: Math.max(CONTEXT_MENU_MARGIN, Math.min(clientX, maxX)),
+    y: Math.max(CONTEXT_MENU_MARGIN, Math.min(clientY, maxY)),
+  };
 }
 
 function StatusRefreshButton({
@@ -420,33 +477,6 @@ function ActiveCell({
   );
 }
 
-function DeleteProviderCell({
-  row,
-  copy,
-  onRequestDelete,
-}: {
-  row: KeysRowData;
-  copy: KeysValidationTableCopy;
-  onRequestDelete: (row: KeysRowData) => void;
-}) {
-  const label = row.isCustom ? copy.actions.deleteCustomRow : copy.actions.hideProviderRow;
-  return (
-    <button
-      type="button"
-      aria-label={`${label}: ${row.provider.label}`}
-      title={label}
-      onClick={(event) => {
-        event.stopPropagation();
-        onRequestDelete(row);
-      }}
-      className="inline-flex h-7 items-center gap-1.5 border border-rose-300/25 px-2 text-[11px] text-rose-200 hover:bg-rose-950/35 disabled:cursor-not-allowed disabled:opacity-40"
-    >
-      <Trash2 size={12} />
-      {copy.actions.delete}
-    </button>
-  );
-}
-
 function DeleteProviderConfirmDialog({
   row,
   copy,
@@ -724,6 +754,8 @@ export function KeysProviderTable({
   onShowAllRows,
   copy,
 }: KeysProviderTableProps) {
+  const resizePrompt = useInAppPrompt();
+  const resizeAlert = useInAppAlert();
   const [searchText, setSearchText] = useState('');
   const [providerFilter, setProviderFilter] = useState('all');
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive'>('all');
@@ -733,6 +765,12 @@ export function KeysProviderTable({
   const [sorting, setSorting] = useState<SortingState>([]);
   const [deleteTarget, setDeleteTarget] = useState<KeysRowData | null>(null);
   const [deleteInFlight, setDeleteInFlight] = useState(false);
+  const [contextMenu, setContextMenu] = useState<
+    | { type: 'column'; columnId: string; x: number; y: number }
+    | { type: 'row'; rowId: string; x: number; y: number }
+    | null
+  >(null);
+  const rowIds = useMemo(() => rows.map((row) => row.rowId), [rows]);
   const {
     columnSizing,
     setColumnSizing,
@@ -740,12 +778,16 @@ export function KeysProviderTable({
     setColumnVisibility,
     frozenColumnIds,
     setFrozenColumnIds,
+    rowHeightById,
+    setRowHeight,
+    setAllRowHeights,
     resetPrefs,
   } = useArenaTablePrefs({
     storageKey: API_KEYS_STORAGE_KEY,
     columnIds: API_KEYS_COLUMN_IDS,
     defaultSizing: API_KEYS_DEFAULT_SIZING,
     defaultFrozenColumnIds: ['col-id'],
+    rowIds,
   });
 
   const restoreFilterDefaults = () => {
@@ -757,6 +799,147 @@ export function KeysProviderTable({
     setModelFilter('all');
     setSorting([]);
     resetPrefs();
+  };
+
+  const showInvalidPixelValue = (min: number, max: number) => {
+    const message = replacePlaceholder(copy.menu.invalidPixelValue, { min, max });
+    resizeAlert.open({
+      title: message,
+      message,
+    });
+  };
+
+  const setColumnWidth = (columnId: string, width: number) => {
+    setColumnSizing((prev) => ({
+      ...prev,
+      [columnId]: clampPixelValue(width, MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH),
+    }));
+  };
+
+  const promptResizeColumn = async (columnId: string) => {
+    const input = await resizePrompt.open({
+      title: copy.menu.resizeColumn,
+      message: replacePlaceholder(copy.menu.resizeColumnPrompt, {
+        min: MIN_COLUMN_WIDTH,
+        max: MAX_COLUMN_WIDTH,
+      }),
+      defaultValue: String(columnSizing[columnId] ?? API_KEYS_DEFAULT_SIZING[columnId] ?? 160),
+    });
+    if (input === null) return;
+    const parsed = parsePixelValue(input);
+    if (parsed === null) {
+      showInvalidPixelValue(MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH);
+      return;
+    }
+    if (parsed === 0) {
+      setColumnVisibility((prev) => ({ ...prev, [columnId]: false }));
+      return;
+    }
+    setColumnWidth(columnId, parsed);
+  };
+
+  const promptResizeAllColumns = async () => {
+    const input = await resizePrompt.open({
+      title: copy.menu.resizeAllColumns,
+      message: replacePlaceholder(copy.menu.resizeAllColumnsPrompt, {
+        min: MIN_COLUMN_WIDTH,
+        max: MAX_COLUMN_WIDTH,
+      }),
+      defaultValue: '160',
+    });
+    if (input === null) return;
+    const parsed = parsePixelValue(input);
+    if (parsed === null) {
+      showInvalidPixelValue(MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH);
+      return;
+    }
+    const nextWidth = clampPixelValue(parsed, MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH);
+    setColumnSizing(Object.fromEntries(API_KEYS_COLUMN_IDS.map((id) => [id, nextWidth])));
+  };
+
+  const autoFitAllColumns = () => {
+    const headerLabels = new Map(
+      API_KEYS_COLUMN_IDS.map((id) => [id, String(table.getColumn(id)?.columnDef.header ?? id)]),
+    );
+    setColumnSizing(Object.fromEntries(API_KEYS_COLUMN_IDS.map((id) => {
+      const cells = rows.map((row) => {
+        switch (id) {
+          case 'col-id':
+            return row.rowId;
+          case 'col-active':
+            return row.active ? 'Active' : 'Inactive';
+          case 'col-provider':
+            return row.provider.label;
+          case 'col-category':
+            return getProviderDisplayCategoryLabel(row.provider, copy);
+          case 'col-key-var-name':
+            return defaultKeyVarName(row.provider);
+          case 'col-key-value':
+            return row.maskedKey ?? 'Paste API key';
+          case 'col-status':
+            return row.status;
+          case 'col-model-list':
+            return row.models.join(', ');
+          case 'col-last-validated':
+            return row.lastValidatedAt ? formatRelativeTime(row.lastValidatedAt) : '';
+          default:
+            return '';
+        }
+      });
+      return [id, clampPixelValue(Math.max(textWidthEstimate(headerLabels.get(id)), ...cells.map(textWidthEstimate)), MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH)];
+    })));
+  };
+
+  const promptResizeRow = async (rowId: string) => {
+    const input = await resizePrompt.open({
+      title: copy.menu.resizeRow,
+      message: replacePlaceholder(copy.menu.resizeRowPrompt, {
+        min: MIN_ROW_HEIGHT,
+        max: MAX_ROW_HEIGHT,
+      }),
+      defaultValue: String(rowHeightById[rowId] ?? API_KEYS_ROW_HEIGHT),
+    });
+    if (input === null) return;
+    const parsed = parsePixelValue(input);
+    if (parsed === null) {
+      showInvalidPixelValue(MIN_ROW_HEIGHT, MAX_ROW_HEIGHT);
+      return;
+    }
+    setRowHeight(rowId, parsed);
+  };
+
+  const promptResizeAllRows = async () => {
+    const input = await resizePrompt.open({
+      title: copy.menu.resizeAllRows,
+      message: replacePlaceholder(copy.menu.resizeAllRowsPrompt, {
+        min: MIN_ROW_HEIGHT,
+        max: MAX_ROW_HEIGHT,
+      }),
+      defaultValue: String(API_KEYS_ROW_HEIGHT),
+    });
+    if (input === null) return;
+    const parsed = parsePixelValue(input);
+    if (parsed === null) {
+      showInvalidPixelValue(MIN_ROW_HEIGHT, MAX_ROW_HEIGHT);
+      return;
+    }
+    const nextHeight = clampPixelValue(parsed, MIN_ROW_HEIGHT, MAX_ROW_HEIGHT);
+    setAllRowHeights(Object.fromEntries(rows.map((row) => [row.rowId, nextHeight])));
+  };
+
+  const autoFitAllRows = () => {
+    setAllRowHeights(Object.fromEntries(rows.map((row) => [
+      row.rowId,
+      rowHeightEstimate([
+        row.rowId,
+        row.provider.label,
+        getProviderDisplayCategoryLabel(row.provider, copy),
+        defaultKeyVarName(row.provider),
+        row.status,
+        row.models.join(', '),
+        row.errorReason ?? '',
+      ]),
+    ])));
   };
 
   const handleRestoreDefaultProviders = () => {
@@ -825,7 +1008,7 @@ export function KeysProviderTable({
     () => [
       columnHelper.accessor((row) => row.rowId, {
         id: 'col-id',
-        header: 'ID',
+        header: COL_ID_COLUMN_HEADER,
         size: API_KEYS_DEFAULT_SIZING['col-id'],
         cell: (info) => (
           <span
@@ -945,23 +1128,9 @@ export function KeysProviderTable({
           );
         },
       }),
-      columnHelper.display({
-        id: 'col-actions',
-        header: copy.columns.actions,
-        size: API_KEYS_DEFAULT_SIZING['col-actions'],
-        enableSorting: false,
-        cell: (info) => (
-          <DeleteProviderCell
-            row={info.row.original}
-            copy={copy}
-            onRequestDelete={setDeleteTarget}
-          />
-        ),
-      }),
     ],
     [
       copy,
-      onDeleteProvider,
       onPatchCustomProvider,
       onRefreshModels,
       onUpdateKey,
@@ -1011,7 +1180,7 @@ export function KeysProviderTable({
 
   const frozenClass = (columnId: string, header = false) => (
     frozenVisibleIds.includes(columnId)
-      ? `${header ? 'z-30' : 'z-20'} bg-[rgb(var(--pm-rail))]/95 ${lastFrozenId === columnId ? 'shadow-[8px_0_14px_-12px_rgba(255,255,255,0.5)]' : ''}`
+      ? `${header ? 'z-50' : 'z-20'} bg-[rgb(var(--pm-rail))]/95 ${lastFrozenId === columnId ? 'shadow-[8px_0_14px_-12px_rgba(255,255,255,0.5)]' : ''}`
       : ''
   );
 
@@ -1093,8 +1262,97 @@ export function KeysProviderTable({
     return null;
   };
 
+  const freezeThrough = (columnId: string) => {
+    const idx = freezeCandidateIds.indexOf(columnId);
+    if (idx >= 0) setFrozenColumnIds(freezeCandidateIds.slice(0, idx + 1));
+  };
+
+  const columnMenuItems = (columnId: string): TableMenuItem[] => {
+    const column = table.getColumn(columnId);
+    const items: TableMenuItem[] = [];
+    if (column?.getCanSort()) {
+      items.push({ key: 'sort-asc', label: copy.menu.sortAsc, onSelect: () => column.toggleSorting(false) });
+      items.push({ key: 'sort-desc', label: copy.menu.sortDesc, onSelect: () => column.toggleSorting(true) });
+      items.push({ key: 'sort-reset', label: copy.menu.resetSort, onSelect: () => column.clearSorting() });
+      items.push({ key: 'sep-sort', separator: true });
+    }
+    items.push({ key: 'resize-column', label: copy.menu.resizeColumn, onSelect: () => void promptResizeColumn(columnId) });
+    items.push({ key: 'resize-all-columns', label: copy.menu.resizeAllColumns, onSelect: () => void promptResizeAllColumns() });
+    items.push({ key: 'auto-fit-columns', label: copy.menu.autoFitAllColumns, onSelect: autoFitAllColumns });
+    items.push({
+      key: 'reset-column-width',
+      label: copy.menu.resetColumnWidth,
+      onSelect: () => setColumnWidth(columnId, API_KEYS_DEFAULT_SIZING[columnId] ?? 160),
+    });
+    items.push({ key: 'sep-resize', separator: true });
+    items.push({ key: 'freeze', label: copy.menu.freezeThrough, onSelect: () => freezeThrough(columnId) });
+    items.push({
+      key: 'hide',
+      label: copy.menu.hideColumn,
+      disabled: table.getVisibleLeafColumns().length <= 1,
+      onSelect: () => setColumnVisibility((prev) => ({ ...prev, [columnId]: false })),
+    });
+    items.push({ key: 'reset-view', label: copy.menu.resetView, onSelect: restoreFilterDefaults });
+    return items;
+  };
+
+  const rowById = useMemo(() => new Map(rows.map((row) => [row.rowId, row])), [rows]);
+
+  const rowMenuItems = (rowId: string): TableMenuItem[] => {
+    const row = rowById.get(rowId);
+    return [
+      { key: 'view', label: copy.menu.viewProvider, onSelect: () => row && onRowClick(row.provider) },
+      { key: 'resize-row', label: copy.menu.resizeRow, onSelect: () => void promptResizeRow(rowId) },
+      { key: 'resize-all-rows', label: copy.menu.resizeAllRows, onSelect: () => void promptResizeAllRows() },
+      { key: 'auto-fit-rows', label: copy.menu.autoFitAllRows, onSelect: autoFitAllRows },
+      {
+        key: 'reset-row-height',
+        label: copy.menu.resetRowHeight,
+        onSelect: () => setRowHeight(rowId, API_KEYS_ROW_HEIGHT),
+      },
+      { key: 'sep-row', separator: true },
+      {
+        key: 'delete-row',
+        label: copy.actions.delete,
+        icon: <Trash2 size={12} />,
+        danger: true,
+        onSelect: () => {
+          if (row) setDeleteTarget(row);
+        },
+      },
+    ];
+  };
+
+  const startRowResizeDrag = (event: React.MouseEvent<HTMLButtonElement>, rowId: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const startY = event.clientY;
+    const startHeight = rowHeightById[rowId] ?? API_KEYS_ROW_HEIGHT;
+    const onMove = (moveEvent: MouseEvent) => {
+      setRowHeight(rowId, startHeight + moveEvent.clientY - startY);
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const contextMenuItems = contextMenu
+    ? contextMenu.type === 'column'
+      ? columnMenuItems(contextMenu.columnId)
+      : rowMenuItems(contextMenu.rowId)
+    : [];
+  const contextColumnId = contextMenu?.type === 'column' ? contextMenu.columnId : null;
+  const contextRowId = contextMenu?.type === 'row' ? contextMenu.rowId : null;
+  const contextTargetClass = 'outline outline-1 -outline-offset-1 outline-emerald-300/45 bg-emerald-500/10';
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72">
+    <div
+      className="flex min-h-0 flex-1 flex-col border border-stone-200/15 bg-[rgb(var(--pm-panel))]/72"
+      onClick={() => setContextMenu(null)}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200/12 bg-white/[0.02] px-4 py-3">
         <h2 className="shrink-0 text-sm font-medium uppercase tracking-[0.16em] text-stone-100">
           {copy.controls.title}
@@ -1143,15 +1401,29 @@ export function KeysProviderTable({
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-auto">
-        <table className="border-collapse text-left" style={{ width: table.getTotalSize() }}>
-          <thead className="sticky top-0 z-10 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
+        <table className="table-fixed border-collapse text-left" style={{ width: table.getTotalSize() }}>
+          <thead className="sticky top-0 z-40 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
                   <th
                     key={header.id}
-                    className={`relative select-none border-r border-stone-200/10 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-400 ${frozenClass(header.column.id, true)}`}
+                    data-context-target={contextColumnId === header.column.id ? 'column' : undefined}
+                    className={`relative overflow-hidden select-none border-r border-stone-200/10 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-400 ${frozenClass(header.column.id, true)} ${
+                      contextColumnId === header.column.id ? contextTargetClass : ''
+                    }`}
                     style={cellStyle(header.column.id)}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      const items = columnMenuItems(header.column.id);
+                      const position = getSafeContextMenuPosition(event.clientX, event.clientY, items);
+                      setContextMenu({
+                        type: 'column',
+                        columnId: header.column.id,
+                        x: position.x,
+                        y: position.y,
+                      });
+                    }}
                   >
                     <button
                       type="button"
@@ -1166,7 +1438,7 @@ export function KeysProviderTable({
                     {header.column.getCanResize() && (
                       <button
                         type="button"
-                        aria-label={`Resize ${String(header.column.columnDef.header ?? header.column.id)}`}
+                        aria-label={`${copy.menu.resizeColumn} ${String(header.column.columnDef.header ?? header.column.id)}`}
                         onMouseDown={header.getResizeHandler()}
                         onTouchStart={header.getResizeHandler()}
                         className="absolute right-0 top-0 h-full w-2 cursor-col-resize border-r border-transparent hover:border-emerald-300/70 focus-visible:border-emerald-300"
@@ -1182,15 +1454,50 @@ export function KeysProviderTable({
               <tr
                 key={row.id}
                 onClick={() => onRowClick(row.original.provider)}
-                className="cursor-pointer border-b border-stone-200/10 transition-colors hover:bg-white/[0.045]"
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  const items = rowMenuItems(row.original.rowId);
+                  const position = getSafeContextMenuPosition(event.clientX, event.clientY, items);
+                  setContextMenu({
+                    type: 'row',
+                    rowId: row.original.rowId,
+                    x: position.x,
+                    y: position.y,
+                  });
+                }}
+                data-context-target={contextRowId === row.original.rowId ? 'row' : undefined}
+                className={`cursor-pointer border-b border-stone-200/10 transition-colors hover:bg-white/[0.045] ${
+                  contextRowId === row.original.rowId ? 'bg-emerald-500/8' : ''
+                }`}
+                style={{ height: rowHeightById[row.original.rowId] ?? API_KEYS_ROW_HEIGHT }}
               >
-                {row.getVisibleCells().map((cell) => (
+                {row.getVisibleCells().map((cell, cellIndex) => (
                   <td
                     key={cell.id}
-                    className={`relative isolate border-r border-stone-200/10 px-4 py-3 align-middle text-sm text-stone-300 ${cell.column.id === 'col-key-value' ? 'z-10' : ''} ${frozenClass(cell.column.id)}`}
+                    data-context-target={
+                      contextRowId === row.original.rowId
+                        ? 'row'
+                        : contextColumnId === cell.column.id
+                          ? 'column'
+                          : undefined
+                    }
+                    className={`relative isolate overflow-hidden border-r border-stone-200/10 px-4 py-3 align-middle text-sm text-stone-300 ${frozenClass(cell.column.id)} ${
+                      contextRowId === row.original.rowId || contextColumnId === cell.column.id
+                        ? contextTargetClass
+                        : ''
+                    }`}
                     style={cellStyle(cell.column.id)}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    {cellIndex === 0 && (
+                      <button
+                        type="button"
+                        aria-label={`${copy.menu.resizeRow}: ${row.original.provider.label}`}
+                        title={copy.menu.resizeRow}
+                        onMouseDown={(event) => startRowResizeDrag(event, row.original.rowId)}
+                        className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize border-b border-transparent hover:border-emerald-300/70 focus-visible:border-emerald-300"
+                      />
+                    )}
                   </td>
                 ))}
               </tr>
@@ -1209,6 +1516,43 @@ export function KeysProviderTable({
           </tbody>
         </table>
       </div>
+      {contextMenu && (
+        <div
+          role="menu"
+          aria-label={contextMenu.type === 'column' ? copy.menu.column : copy.menu.row}
+          className="fixed z-50 min-w-[220px] border border-stone-200/20 bg-[rgb(var(--pm-panel))] py-1 text-xs text-stone-200 shadow-xl"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          {contextMenuItems.map((item) =>
+            'separator' in item ? (
+              <div key={item.key} role="separator" className="my-1 border-t border-stone-200/12" />
+            ) : (
+              <button
+                key={item.key}
+                type="button"
+                role="menuitem"
+                disabled={item.disabled}
+                onClick={() => {
+                  if (item.disabled) return;
+                  item.onSelect();
+                  setContextMenu(null);
+                }}
+                className={`flex w-full items-center gap-2 px-3 py-1.5 text-left disabled:cursor-not-allowed disabled:opacity-40 ${
+                  item.danger
+                    ? 'text-rose-200 hover:bg-rose-500/15'
+                    : 'text-stone-200 hover:bg-white/[0.06]'
+                }`}
+              >
+                <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center text-stone-400">
+                  {item.icon ?? (item.checked ? '✓' : null)}
+                </span>
+                <span className="flex-1 truncate">{item.label}</span>
+              </button>
+            ),
+          )}
+        </div>
+      )}
       {deleteTarget && (
         <DeleteProviderConfirmDialog
           row={deleteTarget}
@@ -1220,6 +1564,8 @@ export function KeysProviderTable({
           onConfirm={() => void confirmDeleteTarget()}
         />
       )}
+      {resizePrompt.dialog}
+      {resizeAlert.dialog}
     </div>
   );
 }

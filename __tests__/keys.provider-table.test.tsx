@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -10,6 +10,8 @@ import { PROVIDERS } from '../lib/keys/registry';
 import type { ProviderSpec } from '../lib/keys/registry';
 import { en } from '../lib/i18n/en';
 import { zhHant } from '../lib/i18n/zh-hant';
+
+const API_KEYS_STORAGE_KEY = 'projectManager.keys.apiKeyValidation.tablePrefs.v1';
 
 function rowFixture(overrides: Partial<KeysRowData> = {}, providerPatch: Partial<ProviderSpec> = {}): KeysRowData {
   const provider = {
@@ -72,6 +74,7 @@ describe('KeysProviderTable', () => {
     expect(screen.queryByRole('columnheader', { name: 'Docs' })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: 'Models' })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: 'Model list' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
 
     expect(screen.getByLabelText('Model list: Catalogue')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Official API key page' })).toHaveAttribute(
@@ -233,6 +236,139 @@ describe('KeysProviderTable', () => {
     expect(freezeInput).toHaveValue(2);
   });
 
+  it('lets Freeze through this column reset the boundary on an already frozen column', () => {
+    renderTable();
+
+    const freezeInput = screen.getByLabelText('Freeze cols');
+    fireEvent.change(freezeInput, { target: { value: '3' } });
+    expect(freezeInput).toHaveValue(3);
+
+    fireEvent.contextMenu(screen.getByRole('columnheader', { name: /Active/i }), { clientX: 80, clientY: 90 });
+    fireEvent.click(screen.getByRole('menuitem', { name: /Freeze through this column/i }));
+
+    expect(freezeInput).toHaveValue(2);
+  });
+
+  it('resizes the right-clicked column from the column context menu', async () => {
+    renderTable();
+
+    const providerHeader = screen.getByRole('columnheader', { name: /Provider/i });
+    fireEvent.contextMenu(providerHeader, { clientX: 80, clientY: 90 });
+    fireEvent.click(screen.getByRole('menuitem', { name: /Resize this column/i }));
+    fireEvent.change(within(screen.getByRole('dialog', { name: /Resize this column/i })).getByRole('textbox'), { target: { value: '222' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+    await waitFor(() => {
+      const saved = JSON.parse(window.localStorage.getItem(API_KEYS_STORAGE_KEY) ?? '{}');
+      expect(saved.columnSizing['col-provider']).toBe(222);
+    });
+  });
+
+  it('clips cell content inside resized column boxes instead of overflowing into neighboring columns', () => {
+    renderTable();
+
+    expect(document.querySelector('table')).toHaveClass('table-fixed');
+    for (const header of Array.from(document.querySelectorAll('thead th'))) {
+      expect(header).toHaveClass('overflow-hidden');
+    }
+    for (const cell of Array.from(document.querySelectorAll('tbody td'))) {
+      expect(cell).toHaveClass('overflow-hidden');
+    }
+  });
+
+  it('keeps sticky headers layered above body cells while scrolling', () => {
+    renderTable();
+
+    expect(document.querySelector('thead')).toHaveClass('z-40');
+    expect(document.querySelector('thead th')).toHaveClass('z-50');
+    const firstFrozenBodyCell = document.querySelector('tbody td');
+    expect(firstFrozenBodyCell).toHaveClass('z-20');
+    expect(screen.getByLabelText('OpenAI Key Value').closest('td')).not.toHaveClass('z-10');
+  });
+
+  it('shows an in-app error for invalid column width input', async () => {
+    renderTable();
+
+    fireEvent.contextMenu(screen.getByRole('columnheader', { name: /Provider/i }), { clientX: 80, clientY: 90 });
+    fireEvent.click(screen.getByRole('menuitem', { name: /Resize this column/i }));
+    fireEvent.change(within(screen.getByRole('dialog', { name: /Resize this column/i })).getByRole('textbox'), { target: { value: 'not-a-number' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+    expect(await screen.findByRole('alertdialog', { name: /Enter a number between 56 and 720 pixels/i })).toBeInTheDocument();
+  });
+
+  it('resizes all rows from the row context menu and persists row heights', async () => {
+    renderTable({
+      rows: [
+        rowFixture({}, { id: 'openai', label: 'OpenAI' }),
+        rowFixture({}, { id: 'anthropic', label: 'Anthropic' }),
+      ],
+    });
+
+    const openAiRow = Array.from(document.querySelectorAll('tbody tr'))
+      .find((row) => row.textContent?.includes('OpenAI'));
+    expect(openAiRow).not.toBeNull();
+    fireEvent.contextMenu(openAiRow as HTMLElement, { clientX: 90, clientY: 120 });
+    fireEvent.click(screen.getByRole('menuitem', { name: /Resize all rows/i }));
+    fireEvent.change(within(screen.getByRole('dialog', { name: /Resize all rows/i })).getByRole('textbox'), { target: { value: '88' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+    await waitFor(() => {
+      const saved = JSON.parse(window.localStorage.getItem(API_KEYS_STORAGE_KEY) ?? '{}');
+      expect(Object.values(saved.rowHeightById)).toEqual([88, 88]);
+    });
+  });
+
+  it('keeps the row context menu inside the viewport near the bottom edge', () => {
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 240 });
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 320 });
+    renderTable({
+      rows: [
+        rowFixture({}, { id: 'openai', label: 'OpenAI' }),
+        rowFixture({}, { id: 'github', label: 'GitHub Personal Access Token' }),
+      ],
+    });
+
+    const githubRow = Array.from(document.querySelectorAll('tbody tr'))
+      .find((row) => row.textContent?.includes('GitHub Personal Access Token'));
+    expect(githubRow).not.toBeNull();
+
+    fireEvent.contextMenu(githubRow as HTMLElement, { clientX: 260, clientY: 226 });
+
+    const menu = screen.getByRole('menu', { name: 'Row options' });
+    expect(Number.parseFloat(menu.style.top)).toBeLessThan(226);
+    expect(Number.parseFloat(menu.style.left)).toBeLessThan(260);
+    expect(Number.parseFloat(menu.style.top)).toBeGreaterThanOrEqual(8);
+    expect(Number.parseFloat(menu.style.left)).toBeGreaterThanOrEqual(8);
+  });
+
+  it('highlights the row or column targeted by the open context menu', () => {
+    renderTable({
+      rows: [
+        rowFixture({}, { id: 'openai', label: 'OpenAI' }),
+        rowFixture({}, { id: 'github', label: 'GitHub Personal Access Token' }),
+      ],
+    });
+
+    const githubRow = Array.from(document.querySelectorAll('tbody tr'))
+      .find((row) => row.textContent?.includes('GitHub Personal Access Token'));
+    expect(githubRow).not.toBeNull();
+
+    fireEvent.contextMenu(githubRow as HTMLElement, { clientX: 90, clientY: 120 });
+
+    expect(githubRow).toHaveAttribute('data-context-target', 'row');
+    expect(githubRow?.querySelectorAll('[data-context-target="row"]').length).toBeGreaterThan(0);
+
+    fireEvent.click(document.body);
+    fireEvent.contextMenu(screen.getByRole('columnheader', { name: /Provider/i }), { clientX: 80, clientY: 90 });
+
+    expect(screen.getByRole('columnheader', { name: /Provider/i })).toHaveAttribute(
+      'data-context-target',
+      'column',
+    );
+    expect(document.querySelectorAll('tbody td[data-context-target="column"]').length).toBeGreaterThan(0);
+  });
+
   it('filters providers by the product-facing provider category', () => {
     renderTable({
       rows: [
@@ -309,7 +445,7 @@ describe('KeysProviderTable', () => {
     expect(renderedRows.some((row) => row.textContent?.includes('OpenAI'))).toBe(false);
   });
 
-  it('uses an in-app confirmation dialog before deleting a provider row', async () => {
+  it('uses the row context menu and an in-app confirmation dialog before deleting a provider row', async () => {
     const onDeleteProvider = vi.fn().mockResolvedValue(undefined);
     const onRowClick = vi.fn();
     const confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => {
@@ -318,7 +454,10 @@ describe('KeysProviderTable', () => {
     const row = rowFixture({ isCustom: true }, { id: 'custom-provider-1', label: 'Custom Provider 1' });
     renderTable({ rows: [row], onDeleteProvider, onRowClick });
 
-    fireEvent.click(screen.getByRole('button', { name: /Delete custom row: Custom Provider 1/i }));
+    const customRow = screen.getByDisplayValue('Custom Provider 1').closest('tr');
+    expect(customRow).not.toBeNull();
+    fireEvent.contextMenu(customRow as HTMLElement, { clientX: 90, clientY: 120 });
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Delete$/i }));
 
     expect(screen.getByRole('dialog', { name: 'Delete custom row' })).toBeInTheDocument();
     expect(onDeleteProvider).not.toHaveBeenCalled();

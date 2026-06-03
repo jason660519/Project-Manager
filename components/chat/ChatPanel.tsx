@@ -16,7 +16,7 @@ import {
 } from '../../lib/xmux/selectedElementSnippet';
 import { ChatMessage as ChatMessageView } from './ChatMessage';
 import { ChatSettings } from './ChatSettings';
-import { QuickActions } from './QuickActions';
+import { QuickActionsPanel } from './QuickActions';
 import { ThinkingIndicator } from './ThinkingIndicator';
 import { ToolCallGroup } from './ToolCallCard';
 import type { ToolCallDisplay } from './ToolCallCard';
@@ -438,20 +438,23 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen, docked
           onCancel={handleCancelResponse}
           onSetValueRef={setInputValueRef}
           onInputApiRef={inputApiRef}
-          beforeArea={
-            <QuickActions
-              onAction={(template) => {
-                setInputValueRef.current?.(template);
-              }}
-            />
-          }
-          afterArea={
+          afterArea={(attachments) => (
             <ChatSettings
               current={chatSettings}
               onChange={handleSettingsChange}
               projectRoot={context.selectedProject?.config.project.root}
+              placement="top"
+              attachmentCount={attachments.count}
+              attachmentPanel={attachments.panel}
+              quickActionsPanel={
+                <QuickActionsPanel
+                  onAction={(template) => {
+                    setInputValueRef.current?.(template);
+                  }}
+                />
+              }
             />
-          }
+          )}
         />
       </div>
     </div>

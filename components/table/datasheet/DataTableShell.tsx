@@ -38,15 +38,15 @@ export function DataTableShell<TData>({
 }) {
   const rowModel = table.getRowModel();
   return (
-    <div className="min-h-0 flex-1 overflow-auto">
-      <table className="border-collapse text-left" style={{ width: table.getTotalSize() }}>
-        <thead className={`sticky top-0 z-10 border-b border-stone-200/12 ${theadClassName}`}>
+    <div className="pm-scroll min-h-0 flex-1 overflow-auto">
+      <table className="table-fixed border-collapse text-left" style={{ width: table.getTotalSize() }}>
+        <thead className={`sticky top-0 z-40 border-b border-stone-200/12 ${theadClassName}`}>
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
                 <th
                   key={header.id}
-                  className={`relative select-none border-r border-stone-200/10 font-semibold text-stone-400 ${headerClassName} ${frozen.frozenClass(
+                  className={`relative overflow-hidden select-none border-r border-stone-200/10 font-semibold text-stone-400 ${headerClassName} ${frozen.frozenClass(
                     header.column.id,
                     true,
                   )}`}
@@ -99,7 +99,7 @@ export function DataTableShell<TData>({
               {row.getVisibleCells().map((cell) => (
                 <td
                   key={cell.id}
-                  className={`relative isolate border-r border-stone-200/10 align-middle text-sm text-stone-300 ${cellClassName} ${frozen.frozenClass(
+                  className={`relative isolate overflow-hidden border-r border-stone-200/10 align-middle text-sm text-stone-300 ${cellClassName} ${frozen.frozenClass(
                     cell.column.id,
                   )}`}
                   style={frozen.cellStyle(cell.column.id)}

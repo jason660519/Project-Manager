@@ -52,9 +52,20 @@ cd /Volumes/KLEVV-4T-1/Project-Manager
 ./start_project_manager.sh aux       # Only opens helper tabs for Hermes/OpenClaw/Ollama/Open WebUI/ComfyUI
 ./start_project_manager.sh install   # Forces dependency checks and installation
 ./start_project_manager.sh update    # Updates npm packages and rebuilds Rust
+./start_project_manager.sh restart   # Cleans old PM tabs/processes, then starts a fresh desktop app
 ```
 
 > If Port 43187 is occupied, use `PROJECT_MANAGER_FORCE_KILL_PORT=1 ./start_project_manager.sh start` to take over.
+
+For post-test manual QA, use the automated reset wrapper:
+
+```bash
+npm run test:restart-pm      # npm test, then clean/restart Project Manager
+npm run verify:restart-pm    # verify:baseline, then clean/restart Project Manager
+npm run pm:restart           # skip tests and just reset the local PM test environment
+```
+
+By default, the desktop startup path now performs a clean start: it closes old Project Manager browser tabs on port `43187`, stops stale Tauri/Next.js processes, confirms the port is free, then starts the new desktop app. The post-test reset also waits for the dashboard route to become healthy, performs a final stability check, and opens a fresh browser tab. Set `PROJECT_MANAGER_SKIP_BROWSER_CLEANUP=1` if you need to preserve existing browser tabs, or `PROJECT_MANAGER_REUSE_EXISTING=1` if you intentionally want to reuse an already running local app.
 
 The `all` option opens the following tools:
 

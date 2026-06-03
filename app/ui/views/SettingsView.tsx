@@ -64,7 +64,7 @@ function SettingsRowsTable({ rows }: { rows: SettingsRow[] }) {
   return (
     <div className="overflow-x-auto bg-transparent">
       <table className="w-full min-w-[760px] border-collapse text-left">
-        <thead className="sticky top-0 z-10 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
+        <thead className="sticky top-0 z-40 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
           <tr>
             <th className="w-[28%] px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">
               Setting

@@ -62,7 +62,7 @@ export function getFrozenColumnLayout<TData>(
 
   const frozenClass = (columnId: string, header = false) =>
     frozenVisibleIds.includes(columnId)
-      ? `${header ? 'z-30' : 'z-20'} bg-[rgb(var(--pm-rail))]/95 ${
+      ? `${header ? 'z-50' : 'z-20'} bg-[rgb(var(--pm-rail))]/95 ${
           lastFrozenId === columnId ? 'shadow-[8px_0_14px_-12px_rgba(255,255,255,0.5)]' : ''
         }`
       : '';

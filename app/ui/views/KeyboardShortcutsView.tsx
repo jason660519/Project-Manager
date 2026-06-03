@@ -84,7 +84,7 @@ export function KeyboardShortcutsView({ embedded = false }: { embedded?: boolean
   const table = (
     <div className="overflow-x-auto bg-transparent">
       <table className="w-full min-w-[820px] border-collapse text-left text-xs">
-        <thead className="sticky top-0 z-10 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))] uppercase tracking-[0.12em] text-stone-400">
+        <thead className="sticky top-0 z-40 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))] uppercase tracking-[0.12em] text-stone-400">
           <tr>
             <th className="w-[18%] px-4 py-3 font-semibold">Group</th>
             <th className="w-[24%] px-4 py-3 font-semibold">Keys</th>

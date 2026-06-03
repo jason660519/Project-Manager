@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { clsx } from 'clsx';
+import { COL_ID_COLUMN_HEADER } from '../../../components/table/colId';
 import type { AnyAdapterConfig, EngineerRole, GithubIssue, IDEId } from '../../../lib/types';
 import {
   fetchGithubIssueComments,
@@ -91,7 +92,7 @@ const ISSUES_TABLE_PREFS_KEY = 'projectManager.progressDashboard.issuesTable.v2'
 const GITHUB_PROVIDER = PROVIDERS.find((provider) => provider.id === 'github') ?? null;
 const ISSUE_COLUMN_DEFS = [
   { id: 'col-select', label: 'Sel', width: 44, sortable: false },
-  { id: 'col-id', label: 'ID', width: 88, sortable: true },
+  { id: 'col-id', label: COL_ID_COLUMN_HEADER, width: 88, sortable: true },
   { id: 'col-project', label: 'Project', width: 132, sortable: true },
   { id: 'col-title', label: 'Title', width: 320, sortable: true },
   { id: 'col-status', label: 'Status', width: 88, sortable: true },
@@ -1704,12 +1705,12 @@ function IssuesTable({
     }
   };
   return (
-    <div className="relative max-h-[55vh] overflow-auto border border-stone-200/15 bg-[rgb(var(--pm-rail))]/70">
+    <div className="pm-scroll relative max-h-[55vh] overflow-auto border border-stone-200/15 bg-[rgb(var(--pm-rail))]/70">
       <table
-        className="w-full border-collapse text-left"
+        className="w-full table-fixed border-collapse text-left"
         style={{ minWidth: visibleColumns.reduce((sum, column) => sum + (columnWidths[column.id] ?? column.width), 0) }}
       >
-        <thead className="sticky top-0 z-10 bg-[rgb(var(--pm-rail))]">
+        <thead className="sticky top-0 z-40 bg-[rgb(var(--pm-rail))]">
           <tr>
             {visibleColumns.map((column, index) => {
               const isFrozen = index < frozenCount;
@@ -1717,13 +1718,13 @@ function IssuesTable({
               return (
                 <TH
                   key={column.id}
-                  className="relative"
+                  className="relative overflow-hidden"
                   style={{
                     width: columnWidths[column.id] ?? column.width,
                     minWidth: columnWidths[column.id] ?? column.width,
                     position: isFrozen ? 'sticky' : undefined,
                     left: isFrozen ? leftOffsets[column.id] : undefined,
-                    zIndex: isFrozen ? 30 : undefined,
+                    zIndex: isFrozen ? 50 : undefined,
                     background: 'rgb(var(--pm-rail))',
                   }}
                   onClick={() => toggleSort(column)}
@@ -1786,7 +1787,7 @@ function IssuesTable({
                       height: rowHeight,
                       position: isFrozen ? 'sticky' : undefined,
                       left: isFrozen ? leftOffsets[column.id] : undefined,
-                      zIndex: isFrozen ? 10 : undefined,
+                      zIndex: isFrozen ? 20 : undefined,
                       background: isFrozen ? 'rgb(var(--pm-rail))' : undefined,
                     }}
                   >
@@ -1825,7 +1826,7 @@ function TH({
 }) {
   return (
     <th
-      className={clsx('px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-stone-400', className)}
+      className={clsx('overflow-hidden px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-stone-400', className)}
       style={style}
       onClick={onClick}
       onContextMenu={onContextMenu}
@@ -1837,7 +1838,7 @@ function TH({
 
 function TD({ className, children, style }: { className?: string; children: ReactNode; style?: CSSProperties }) {
   return (
-    <td className={clsx('px-3 py-2 text-xs', className)} style={style}>
+    <td className={clsx('overflow-hidden px-3 py-2 text-xs', className)} style={style}>
       {children}
     </td>
   );

@@ -64,6 +64,7 @@ import {
   migrateConfig,
   resolveConfigPath,
 } from '../../../lib/storage';
+import { COL_ID_COLUMN_HEADER } from '../../../components/table/colId';
 import { CompletedRun, ProjectManagerConfig, Feature, ProjectEntry } from '../../../lib/types';
 import { PostImportScanDialog } from './_components/PostImportScanDialog';
 
@@ -980,7 +981,7 @@ export function ProjectsView({
       }),
       columnHelper.accessor((project) => project.id, {
         id: 'col-id',
-        header: 'ID',
+        header: COL_ID_COLUMN_HEADER,
         size: 140,
         cell: ({ getValue }) => (
           <span className="block max-w-[160px] truncate font-mono text-[11px] text-stone-300" title={getValue()}>
@@ -1572,9 +1573,9 @@ export function ProjectsView({
       </div>
 
       {/* Projects table */}
-      <div className="min-h-0 overflow-auto border border-stone-200/12 bg-[rgb(var(--pm-panel))]/72">
-        <table className="w-full min-w-[1320px] border-collapse text-left text-sm">
-          <thead className="sticky top-0 z-20 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
+      <div className="pm-scroll min-h-0 overflow-auto border border-stone-200/12 bg-[rgb(var(--pm-panel))]/72">
+        <table className="w-full table-fixed min-w-[1320px] border-collapse text-left text-sm">
+          <thead className="sticky top-0 z-40 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
@@ -1599,7 +1600,7 @@ export function ProjectsView({
                         setColumnSizing((prev) => ({ ...prev, [header.column.id]: Math.max(56, Math.min(640, value)) }));
                       })();
                     }}
-                    className={`px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400 ${
+                    className={`overflow-hidden px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400 ${
                       header.column.getCanSort() ? 'cursor-pointer select-none hover:text-stone-200' : ''
                     }`}
                     style={{
@@ -1609,7 +1610,7 @@ export function ProjectsView({
                       left: visibleProjectColumns.findIndex((column) => column.id === header.column.id) < frozenProjectCols
                         ? projectLeftOffsets[visibleProjectColumns.findIndex((column) => column.id === header.column.id)]
                         : undefined,
-                      zIndex: visibleProjectColumns.findIndex((column) => column.id === header.column.id) < frozenProjectCols ? 30 : undefined,
+                      zIndex: visibleProjectColumns.findIndex((column) => column.id === header.column.id) < frozenProjectCols ? 50 : undefined,
                       background: 'rgb(var(--pm-panel))',
                     }}
                   >
@@ -1675,14 +1676,14 @@ export function ProjectsView({
                       return (
                       <td
                         key={cell.id}
-                        className="px-3 py-3 align-middle text-sm text-stone-300"
+                        className="overflow-hidden px-3 py-3 align-middle text-sm text-stone-300"
                         style={{
                           width: cell.column.getSize(),
                           minWidth: cell.column.getSize(),
                           height: projectsTablePrefs.rowHeight,
                           position: isFrozen ? 'sticky' : undefined,
                           left: isFrozen ? projectLeftOffsets[visibleIndex] : undefined,
-                          zIndex: isFrozen ? 10 : undefined,
+                          zIndex: isFrozen ? 20 : undefined,
                           background: isFrozen ? 'rgb(var(--pm-panel))' : undefined,
                         }}
                       >
