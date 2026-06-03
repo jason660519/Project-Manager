@@ -808,7 +808,13 @@ function createChatAbortError(): DOMException {
   return new DOMException('Chat request aborted', 'AbortError');
 }
 
-function waitForAgentOutput(pid: number, abortSignal?: AbortSignal): Promise<string> {
+// Correlate agent events by spawnToken (unique, monotonic), not the reusable
+// PID (ADR-014). `pid` is still needed to kill the process on abort.
+function waitForAgentOutput(
+  pid: number,
+  spawnToken: number,
+  abortSignal?: AbortSignal,
+): Promise<string> {
   if (pid === 0 || typeof window === 'undefined') {
     return Promise.resolve(
       '已將任務發送到已配置的專案 Agent。瀏覽器 dry-run 模式下沒有即時輸出。',
@@ -857,13 +863,13 @@ function waitForAgentOutput(pid: number, abortSignal?: AbortSignal): Promise<str
     abortSignal?.addEventListener('abort', abort, { once: true });
 
     void onAgentStdout((payload: AgentStdioPayload) => {
-      if (payload.pid === pid) lines.push(payload.line);
+      if (payload.spawnToken === spawnToken) lines.push(payload.line);
     }).then((unlisten) => {
       unStdout = unlisten;
     });
 
     void onAgentExit((payload: AgentExitPayload) => {
-      if (payload.pid !== pid) return;
+      if (payload.spawnToken !== spawnToken) return;
       const output = lines.join('\n').trim();
       if (payload.code === 0) finish(output || '完成。');
       else finish(output || `Agent 退出，exit code: ${payload.code}。`);
@@ -1184,12 +1190,12 @@ export async function sendChatMessage(
       }
     }
 
-    const pid = await spawnAgent({
+    const { pid, spawnToken } = await spawnAgent({
       command: result.command,
       args: result.args,
       workingDir: project.config.project.root,
     });
-    const agentOutput = await waitForAgentOutput(pid, request.abortSignal);
+    const agentOutput = await waitForAgentOutput(pid, spawnToken, request.abortSignal);
     if (agentOutput.includes('Agent exited with code') && !agentOutput.includes('code 0')) {
       try {
         const apiContent = await callChatApi(

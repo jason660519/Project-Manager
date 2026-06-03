@@ -7,8 +7,8 @@ import React from 'react';
 // ── Mock complex external deps ────────────────────────────────────────────────
 
 const killProcessMock = vi.fn().mockResolvedValue(undefined);
-const spawnAgentMock = vi.fn().mockResolvedValue(12345);
-let agentExitHandler: ((event: { pid: number; code: number }) => void) | null = null;
+const spawnAgentMock = vi.fn().mockResolvedValue({ pid: 12345, spawnToken: 12345 });
+let agentExitHandler: ((event: { pid: number; spawnToken: number; code: number }) => void) | null = null;
 
 vi.mock('../lib/bridge', () => ({
   augmentArgsWithMcp: vi.fn().mockResolvedValue([]),
@@ -103,14 +103,14 @@ describe('TaskDispatchModal [kill confirmation]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     agentExitHandler = null;
-    spawnAgentMock.mockResolvedValue(12345);
+    spawnAgentMock.mockResolvedValue({ pid: 12345, spawnToken: 12345 });
   });
 
   it('shows pending preparation before PID, then live output after spawn', async () => {
     const user = userEvent.setup();
-    let resolveSpawn: ((pid: number) => void) | null = null;
+    let resolveSpawn: ((result: { pid: number; spawnToken: number }) => void) | null = null;
     spawnAgentMock.mockImplementationOnce(
-      () => new Promise<number>((resolve) => {
+      () => new Promise<{ pid: number; spawnToken: number }>((resolve) => {
         resolveSpawn = resolve;
       }),
     );
@@ -129,7 +129,7 @@ describe('TaskDispatchModal [kill confirmation]', () => {
     expect(screen.queryByText(/PID 12345/)).not.toBeInTheDocument();
 
     await act(async () => {
-      resolveSpawn?.(12345);
+      resolveSpawn?.({ pid: 12345, spawnToken: 12345 });
     });
 
     expect(screen.getByText('W: PID 12345')).toBeInTheDocument();
@@ -150,7 +150,7 @@ describe('TaskDispatchModal [kill confirmation]', () => {
     expect(await screen.findByText('Live Output')).toBeInTheDocument();
 
     act(() => {
-      agentExitHandler?.({ pid: 12345, code: 0 });
+      agentExitHandler?.({ pid: 12345, spawnToken: 12345, code: 0 });
     });
 
     expect(screen.getByText('Execution Log')).toBeInTheDocument();
@@ -172,7 +172,7 @@ describe('TaskDispatchModal [kill confirmation]', () => {
     expect(await screen.findByText('Live Output')).toBeInTheDocument();
 
     act(() => {
-      agentExitHandler?.({ pid: 12345, code: 1 });
+      agentExitHandler?.({ pid: 12345, spawnToken: 12345, code: 1 });
     });
 
     expect(screen.getByText('Execution Log')).toBeInTheDocument();

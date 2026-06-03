@@ -76,9 +76,23 @@ interface TaskDispatchModalProps {
 
 type RolePhase = 'idle' | 'pending' | 'running' | 'done' | 'error';
 
+// An agent event that arrived before its spawn token was claimed (Rust emits
+// stdout/exit before returning the token — ADR-014). Staged, then replayed.
+type PendingAgentEvent =
+  | { kind: 'stdout'; pid: number; line: string }
+  | { kind: 'exit'; pid: number; code: number };
+
+// Bounds the pre-claim staging map so events for unrelated tokens (other
+// concurrent dispatches) can't accumulate before our token is claimed.
+const PENDING_EVENT_CAP = 64;
+
 interface RoleRunState {
   phase: RolePhase;
+  /** OS PID — retained for kill_process and PID display only. */
   activePid: number | null;
+  /** Spawn token — the correlation key for this role's agent events. PID reuse
+   *  can't cross-correlate because tokens are unique (see ADR-014). */
+  activeToken: number | null;
 }
 
 interface LogEntry {
@@ -181,9 +195,9 @@ export function TaskDispatchModal({
 
   // ── Per-role run state ────────────────────────────────────────────────────
   const [runStates, setRunStates] = useState<Record<HarnessTaskRole, RoleRunState>>({
-    planner: { phase: 'idle', activePid: null },
-    worker: { phase: 'idle', activePid: null },
-    evaluator: { phase: 'idle', activePid: null },
+    planner: { phase: 'idle', activePid: null, activeToken: null },
+    worker: { phase: 'idle', activePid: null, activeToken: null },
+    evaluator: { phase: 'idle', activePid: null, activeToken: null },
   });
 
   // ── Merged log panel ──────────────────────────────────────────────────────
@@ -350,17 +364,17 @@ export function TaskDispatchModal({
         if (!result.success || !result.command || !result.args) {
           throw new Error(result.message ?? `Unable to build command for ${adapter.name}`);
         }
-        const pid = await spawnAgent({ command: result.command, args: result.args, workingDir: projectRoot });
+        const { pid } = await spawnAgent({ command: result.command, args: result.args, workingDir: projectRoot });
         setLogs((prev) => [...prev, { role, line: `── ${ROLE_SHORT[role]} opened ${adapter.name} (PID ${pid}) ──` }]);
         onExecuted({ success: true, message: `${adapter.name} opened (PID: ${pid})`, command: result.command, args: result.args, dryRun: false, pid });
       } catch (err) {
         setLogs((prev) => [...prev, { role, line: `Error: ${err}` }]);
-        setRunStates((prev) => ({ ...prev, [role]: { phase: 'error' as const, activePid: null } }));
+        setRunStates((prev) => ({ ...prev, [role]: { phase: 'error' as const, activePid: null, activeToken: null } }));
       }
       return;
     }
 
-    setRunStates((prev) => ({ ...prev, [role]: { phase: 'pending' as const, activePid: null } }));
+    setRunStates((prev) => ({ ...prev, [role]: { phase: 'pending' as const, activePid: null, activeToken: null } }));
 
     try {
       const runtimeAdapter = createRuntimeAdapterFromConfig(adapter);
@@ -375,39 +389,78 @@ export function TaskDispatchModal({
       const { command, args: baseArgs } = result;
       const args = await augmentArgsWithMcp(command, baseArgs, collectEnabledMcpServers(projectRoot));
 
-      const unStdout = await onAgentStdout(({ pid: eventPid, line }) => {
-        setRunStates((cur) => {
-          if (cur[role].activePid !== null && eventPid !== cur[role].activePid) return cur;
-          return cur;
-        });
+      // Listeners are registered before the spawn resolves, so the token isn't
+      // known yet. Rust starts the stdout/exit emit tasks BEFORE returning the
+      // token (ADR-014), so this run's events can arrive first. Stage anything
+      // that lands before the token is claimed and replay it afterwards — a fast
+      // process must not lose its early output or, worse, its exit (which would
+      // strand the role in "running"). Correlate by token, never the reusable PID.
+      let activeSpawnToken: number | null = null;
+      const staged = new Map<number, PendingAgentEvent[]>();
+      const stage = (token: number, event: PendingAgentEvent) => {
+        const queue = staged.get(token);
+        if (queue) {
+          queue.push(event);
+          return;
+        }
+        staged.set(token, [event]);
+        if (staged.size > PENDING_EVENT_CAP) {
+          // Evict the oldest token that carries NO exit — never drop a staged
+          // exit, or the run it belongs to (possibly this role's own, racing the
+          // spawn invoke) would strand in "running". stdout-only floods from
+          // unrelated tokens are cosmetic and safe to shed.
+          for (const [tok, q] of staged) {
+            if (tok === token) continue;
+            if (!q.some((e) => e.kind === 'exit')) {
+              staged.delete(tok);
+              break;
+            }
+          }
+        }
+      };
+
+      const applyStdout = (eventPid: number, line: string) => {
         setLogs((prev) => [...prev, { role, line }]);
         onRunLog?.(eventPid, line);
-      });
+      };
 
-      const unExit = await onAgentExit(({ pid: exitPid, code }) => {
-        setRunStates((cur) => {
-          if (cur[role].activePid !== null && exitPid !== cur[role].activePid) return cur;
-          const succeeded = code === 0;
-          const nextAssignments = { ...(feature.harnessAssignments ?? {}) };
-          nextAssignments[role] = {
-            ...nextAssignments[role],
-            activePid: undefined,
-            status: succeeded ? 'done' : 'error',
-          };
-          onFeatureUpdate?.(feature.id, { harnessAssignments: nextAssignments });
-          return { ...cur, [role]: { phase: (succeeded ? 'done' : 'error') as RolePhase, activePid: null } };
-        });
+      const applyExit = (exitPid: number, code: number) => {
+        const succeeded = code === 0;
+        const nextAssignments = { ...(feature.harnessAssignments ?? {}) };
+        nextAssignments[role] = {
+          ...nextAssignments[role],
+          activePid: undefined,
+          status: succeeded ? 'done' : 'error',
+        };
+        onFeatureUpdate?.(feature.id, { harnessAssignments: nextAssignments });
+        setRunStates((cur) => ({
+          ...cur,
+          [role]: { phase: (succeeded ? 'done' : 'error') as RolePhase, activePid: null, activeToken: null },
+        }));
         setLogs((prev) => [...prev, { role, line: `\n── ${ROLE_SHORT[role]} exited (PID ${exitPid}, code ${code}) ──` }]);
         onRunEnd?.(exitPid, code);
         if (role === 'worker') {
           onFeatureUpdate?.(feature.id, { assignedTo: undefined, assignedAt: undefined });
         }
+      };
+
+      const unStdout = await onAgentStdout(({ pid: eventPid, spawnToken: eventToken, line }) => {
+        if (activeSpawnToken === null) { stage(eventToken, { kind: 'stdout', pid: eventPid, line }); return; }
+        if (eventToken !== activeSpawnToken) return;
+        applyStdout(eventPid, line);
+      });
+
+      const unExit = await onAgentExit(({ pid: exitPid, spawnToken: exitToken, code }) => {
+        if (activeSpawnToken === null) { stage(exitToken, { kind: 'exit', pid: exitPid, code }); return; }
+        if (exitToken !== activeSpawnToken) return;
+        applyExit(exitPid, code);
       });
 
       unlistenRefs.current.push(unStdout, unExit);
 
-      const pid = await spawnAgent({ command, args, workingDir: projectRoot });
-      setRunStates((prev) => ({ ...prev, [role]: { phase: 'running' as const, activePid: pid } }));
+      const { pid, spawnToken } = await spawnAgent({ command, args, workingDir: projectRoot });
+      activeSpawnToken = spawnToken;
+      setRunStates((prev) => ({ ...prev, [role]: { phase: 'running' as const, activePid: pid, activeToken: spawnToken } }));
       onRunStart?.(pid, feature.id, feature.name, command, args);
 
       const nextAssignments = { ...(feature.harnessAssignments ?? {}) };
@@ -419,9 +472,20 @@ export function TaskDispatchModal({
       onFeatureUpdate?.(feature.id, { harnessAssignments: nextAssignments });
 
       onExecuted({ success: true, message: `${adapter.name} started (PID: ${pid})`, command, args, dryRun: false, pid });
+
+      // Replay events that beat the token claim. Running state + onRunStart are
+      // set above first, so a staged exit lands as done/error, not overwritten.
+      const pending = staged.get(spawnToken);
+      staged.clear();
+      if (pending) {
+        for (const event of pending) {
+          if (event.kind === 'stdout') applyStdout(event.pid, event.line);
+          else applyExit(event.pid, event.code);
+        }
+      }
     } catch (err) {
       setLogs((prev) => [...prev, { role, line: `Error: ${err}` }]);
-      setRunStates((prev) => ({ ...prev, [role]: { phase: 'error' as const, activePid: null } }));
+      setRunStates((prev) => ({ ...prev, [role]: { phase: 'error' as const, activePid: null, activeToken: null } }));
     }
   }, [adapters, buildAssignmentPatch, buildDagWorkflowSelection, buildExecutionPrompt, configByRole, feature, onExecuted, onFeatureUpdate, onRunEnd, onRunLog, onRunStart, projectRoot]);
 
@@ -446,7 +510,7 @@ export function TaskDispatchModal({
     await killProcess(killConfirmPid);
     for (const role of ROLES) {
       if (runStates[role].activePid === killConfirmPid) {
-        setRunStates((prev) => ({ ...prev, [role]: { phase: 'error' as const, activePid: null } }));
+        setRunStates((prev) => ({ ...prev, [role]: { phase: 'error' as const, activePid: null, activeToken: null } }));
         setLogs((prev) => [...prev, { role, line: `── ${ROLE_SHORT[role]} killed (PID ${killConfirmPid}) ──` }]);
       }
     }

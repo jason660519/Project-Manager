@@ -11,7 +11,16 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::{AppHandle, Emitter, Manager};
+
+/// Process-global, monotonically increasing spawn-token source. Each
+/// `spawn_agent` call claims the next value so the renderer can correlate
+/// `agent-stdout` / `agent-stderr` / `agent-exit` events to a run by token
+/// instead of the reusable OS PID. Starts at 1 so the browser-mode fallback
+/// can use 0 as a sentinel "no token". Resets on process restart, which is
+/// fine: tokens only correlate live events to live awaits within one session.
+static SPAWN_TOKEN: AtomicU64 = AtomicU64::new(1);
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
 use tokio::sync::{oneshot, Mutex};
 
@@ -20,12 +29,19 @@ use tokio::sync::{oneshot, Mutex};
 #[derive(Serialize, Clone)]
 struct StdioEvent {
     pid: u32,
+    /// Process-unique, monotonically increasing token issued by `spawn_agent`.
+    /// The renderer correlates events to a run by this token, never the
+    /// reusable OS PID (see `spawn_agent` for the race this closes).
+    #[serde(rename = "spawnToken")]
+    spawn_token: u64,
     line: String,
 }
 
 #[derive(Serialize, Clone)]
 struct ExitEvent {
     pid: u32,
+    #[serde(rename = "spawnToken")]
+    spawn_token: u64,
     code: i32,
 }
 
@@ -894,21 +910,34 @@ async fn scan_projects(root: String) -> Result<Vec<String>, String> {
     Ok(found)
 }
 
+/// Returned by `spawn_agent`. `pid` is the OS PID (used for `kill_process` and
+/// display); `spawn_token` is the process-unique correlation key the renderer
+/// matches events against — it is never reused, so a recycled OS PID can't
+/// replay a stale exit onto an unrelated run.
+#[derive(Serialize, Clone)]
+struct SpawnAgentResult {
+    pid: u32,
+    #[serde(rename = "spawnToken")]
+    spawn_token: u64,
+}
+
 /// Spawn an agent or IDE process.
 ///
-/// Emits events to all windows:
-///   `agent-stdout`  { pid, line }
-///   `agent-stderr`  { pid, line }
-///   `agent-exit`    { pid, code }
+/// Emits events to all windows, each stamped with the run's `spawnToken`:
+///   `agent-stdout`  { pid, spawnToken, line }
+///   `agent-stderr`  { pid, spawnToken, line }
+///   `agent-exit`    { pid, spawnToken, code }
 ///
-/// Returns the PID so the frontend can track and kill the process.
+/// Returns `{ pid, spawnToken }`. The renderer correlates events by
+/// `spawnToken` (unique, monotonic) rather than the reusable PID; `pid` is
+/// retained for `kill_process` and display.
 #[tauri::command]
 async fn spawn_agent(
     app: AppHandle,
     command: String,
     args: Vec<String>,
     working_dir: String,
-) -> Result<u32, String> {
+) -> Result<SpawnAgentResult, String> {
     let mut child = tokio::process::Command::new(&command)
         .args(&args)
         .current_dir(&working_dir)
@@ -918,6 +947,9 @@ async fn spawn_agent(
         .map_err(|e| format!("Failed to spawn `{command}`: {e}"))?;
 
     let pid = child.id().ok_or("Process exited immediately before PID could be read")?;
+    // Claim this run's correlation token before wiring the IO/wait tasks so
+    // every emitted event carries it.
+    let spawn_token = SPAWN_TOKEN.fetch_add(1, Ordering::Relaxed);
 
     // Stream stdout
     if let Some(stdout) = child.stdout.take() {
@@ -925,7 +957,7 @@ async fn spawn_agent(
         tokio::spawn(async move {
             let mut lines = tokio::io::BufReader::new(stdout).lines();
             while let Ok(Some(line)) = lines.next_line().await {
-                let _ = app_handle.emit("agent-stdout", StdioEvent { pid, line });
+                let _ = app_handle.emit("agent-stdout", StdioEvent { pid, spawn_token, line });
             }
         });
     }
@@ -936,7 +968,7 @@ async fn spawn_agent(
         tokio::spawn(async move {
             let mut lines = tokio::io::BufReader::new(stderr).lines();
             while let Ok(Some(line)) = lines.next_line().await {
-                let _ = app_handle.emit("agent-stderr", StdioEvent { pid, line });
+                let _ = app_handle.emit("agent-stderr", StdioEvent { pid, spawn_token, line });
             }
         });
     }
@@ -945,11 +977,11 @@ async fn spawn_agent(
     tokio::spawn(async move {
         if let Ok(status) = child.wait().await {
             let code = status.code().unwrap_or(-1);
-            let _ = app.emit("agent-exit", ExitEvent { pid, code });
+            let _ = app.emit("agent-exit", ExitEvent { pid, spawn_token, code });
         }
     });
 
-    Ok(pid)
+    Ok(SpawnAgentResult { pid, spawn_token })
 }
 
 /// Call the Anthropic Messages API from the Rust layer so the API key never

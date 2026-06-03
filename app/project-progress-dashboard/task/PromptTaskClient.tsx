@@ -159,7 +159,7 @@ function PromptTaskEditor({ row }: { row: ResolvedRow }) {
     const startedAt = new Date().toISOString();
     try {
       const bridge = await import('../../../lib/bridge');
-      const pid = await bridge.spawnAgent({
+      const { pid } = await bridge.spawnAgent({
         command: selectedAgent.command,
         args,
         workingDir: row.projectRoot,

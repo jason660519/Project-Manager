@@ -12,7 +12,7 @@ vi.mock('../lib/bridge', () => ({
   onAgentExit: vi.fn().mockResolvedValue(vi.fn()),
   onAgentStdout: vi.fn().mockResolvedValue(vi.fn()),
   readFile: vi.fn().mockResolvedValue('mock spec content'),
-  spawnAgent: vi.fn().mockResolvedValue(12345),
+  spawnAgent: vi.fn().mockResolvedValue({ pid: 12345, spawnToken: 12345 }),
   spawnTerminal: vi.fn().mockResolvedValue(undefined),
 }));
 
