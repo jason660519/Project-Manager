@@ -241,6 +241,11 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
   // Keyed by token; bounded by GATE_EXIT_CACHE_CAP. Token uniqueness — not a
   // timing window — is what makes cross-correlation impossible.
   const gateExitCodesRef = useRef<Map<number, number>>(new Map());
+  // True only while a standards-gate spawn is awaiting its token. The global
+  // listener stages UNCLAIMED exits only in this window, so dispatch-process
+  // exits (handled by the dispatch modals' own listeners) never fill the gate
+  // cache and can't FIFO-evict the gate's own staged exit under batch load.
+  const gateSpawnPendingRef = useRef(false);
   const [gatePhases, setGatePhases] = useState<Partial<Record<StandardsGateId, GateRunPhase>>>({});
   const [gateRunAllProgress, setGateRunAllProgress] = useState<GateRunAllProgress | null>(null);
   const [gateRunMessage, setGateRunMessage] = useState<string | null>(null);
@@ -831,11 +836,12 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
           // exit-emitting task before returning the token, so a fast gate's
           // agent-exit can arrive before spawnStandardsGateRun resolves. Stage
           // it by token so the gate claim can reconcile instead of hanging.
-          // Unlike the old PID scheme this needs no timing-window guard: tokens
-          // are unique and monotonic, so a stale exit can never be drained by an
-          // unrelated run. Unclaimed dispatch-process exits also land here but
-          // are harmless — they're bounded by GATE_EXIT_CACHE_CAP and never match
-          // a future token.
+          // Only stage while a gate spawn is in flight: outside that window an
+          // unclaimed token is a dispatch process the modals handle themselves,
+          // and staging it here would just pressure the bounded cache and risk
+          // FIFO-evicting the gate's own exit under batch load. Token uniqueness
+          // (not a timing window) is what makes the staged code safe to replay.
+          if (!gateSpawnPendingRef.current) return;
           const codes = gateExitCodesRef.current;
           codes.set(spawnToken, code);
           if (codes.size > GATE_EXIT_CACHE_CAP) {
@@ -881,10 +887,13 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
       }
       setGateRunMessage(null);
       setGatePhases((phases) => ({ ...phases, [gateId]: 'running' }));
+      gateSpawnPendingRef.current = true;
       try {
         const result = await spawnStandardsGateRun(gateId, root, isTauri);
         // Claim the token so the global listener routes this gate's events.
         gateProcessTokensRef.current.add(result.spawnToken);
+        // Token claimed: close the staging window so later dispatch exits aren't cached.
+        gateSpawnPendingRef.current = false;
         handleRunStart(result.pid, result.featureId, result.featureName, result.command, result.args);
         // The exit may have already fired before we claimed the token (Rust emits
         // agent-exit before returning it). Drain the cache now that the run
@@ -899,6 +908,7 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
           await waitForGateProcessExit(result.spawnToken);
         }
       } catch (e) {
+        gateSpawnPendingRef.current = false;
         setGateRunMessage(formatStandardsGateRunError(e, standardsGateLabels));
         setGatePhases((phases) => ({
           ...phases,
@@ -944,10 +954,13 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
       });
       setGatePhases((phases) => ({ ...phases, [gate.id]: 'running' }));
 
+      gateSpawnPendingRef.current = true;
       try {
         const result = await spawnStandardsGateRun(gate.id, root, isTauri);
         // Claim the token and drain any exit that fired first (see handleRunStandardsGate).
         gateProcessTokensRef.current.add(result.spawnToken);
+        // Token claimed: close the staging window so later dispatch exits aren't cached.
+        gateSpawnPendingRef.current = false;
         handleRunStart(result.pid, result.featureId, result.featureName, result.command, result.args);
         const earlyExit = gateExitCodesRef.current.get(result.spawnToken);
         let code: number;
@@ -971,6 +984,7 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
           break;
         }
       } catch (e) {
+        gateSpawnPendingRef.current = false;
         setGateRunMessage(formatStandardsGateRunError(e, standardsGateLabels));
         setGatePhases((phases) => ({
           ...phases,
