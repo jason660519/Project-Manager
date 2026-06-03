@@ -54,17 +54,22 @@ Do **not** proceed to Step B on findings that cite an older SHA — they are rep
 Run the **`check-pr`** analysis for the PR: fetch unresolved threads (inline + review summaries + issue comments), failing checks, and run the PM-invariant scan (bridge wrapper + capability entry, ADR-002/003/004, zero silent failures, table/sheet `WorkstationFrame`, static-export). Categorize each as actionable / informational / already-addressed.
 
 ```bash
-# unresolved, current (not outdated) threads
+# unresolved, current (not outdated) threads — PAGINATE: a PR can have >100
+# threads, and missing later pages would make Step C falsely report "clean".
 gh api graphql -f query='
-query { repository(owner:"jason660519",name:"Project-Manager"){ pullRequest(number:<PR>){
-  reviewThreads(first:100){ nodes{ id isResolved isOutdated
-    comments(first:1){ nodes{ databaseId author{login} path line body } } } } } } }'
+query($cursor: String) { repository(owner:"jason660519",name:"Project-Manager"){ pullRequest(number:<PR>){
+  reviewThreads(first:100, after:$cursor){
+    pageInfo{ hasNextPage endCursor }
+    nodes{ id isResolved isOutdated
+      comments(first:1){ nodes{ databaseId author{login} path line body } } } } } } }'
+# If pageInfo.hasNextPage is true, repeat with -f cursor=<endCursor> and union
+# the nodes before evaluating convergence (same as the check-pr skill).
 ```
 
 ### Step C — Exit conditions (check BEFORE fixing)
 
 Stop the loop and report if **any**:
-- **Converged:** zero unresolved current threads **AND** `verify` = pass **AND** `GitGuardian` = pass. ✅
+- **Converged:** zero unresolved current threads **across all pages** (Step B must have drained `hasNextPage`) **AND** `verify` = pass **AND** `GitGuardian` = pass. ✅
 - **Cap reached:** `iteration > max`. Report remaining findings.
 - **Churn / no progress:** the only findings this round are the **same class** already fixed in a prior round (fingerprint in `seenFindings`) — the loop is oscillating. **Stop and escalate to the human** with the recurring finding; do not keep patching the same spot. (On this repo the FIFO-eviction / spawn-token-race class recurred many times — recognize that pattern and surface it instead of looping forever.)
 
