@@ -69,7 +69,7 @@ query($cursor: String) { repository(owner:"jason660519",name:"Project-Manager"){
 ### Step C — Exit conditions (check BEFORE fixing)
 
 Stop the loop and report if **any**:
-- **Converged:** zero unresolved current threads **across all pages** (Step B must have drained `hasNextPage`) **AND** `verify` = pass **AND** `GitGuardian` = pass. ✅
+- **Converged:** zero unresolved current threads **across all pages** (Step B must have drained `hasNextPage`) **AND** `verify` = pass **AND** `GitGuardian Security Checks` = pass. ✅ (Use the exact check names as reported by `gh pr checks`.)
 - **Cap reached:** `iteration > max`. Report remaining findings.
 - **Churn / no progress:** the only findings this round are the **same class** already fixed in a prior round (fingerprint in `seenFindings`) — the loop is oscillating. **Stop and escalate to the human** with the recurring finding; do not keep patching the same spot. (On this repo the FIFO-eviction / spawn-token-race class recurred many times — recognize that pattern and surface it instead of looping forever.)
 
@@ -100,7 +100,7 @@ git add <specific files>   # never `git add -A` blindly — keep artifacts out
 git commit -m "fix: address PR review feedback (loop iteration N)"
 git push
 ```
-End the commit message with the `Co-Authored-By: Claude` trailer.
+End the commit message with the repo's standard trailer (model + noreply email), e.g. `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>` — same footer the `ship` skill uses.
 
 ### Step G — Reply + resolve the threads you addressed
 
@@ -133,7 +133,7 @@ If someone else pushed (a colleague or a parallel session may share this branch/
 pr-review-loop complete — PR #<n> "<title>"
   Iterations:   <k>/<max>
   Converged:    yes | no (cap | churn | colleague-active)
-  Checks:       verify ✓  GitGuardian ✓
+  Checks:       verify ✓  GitGuardian Security Checks ✓
   Threads:      <resolved> resolved → <remaining> unresolved
   Fixed:        <one line per finding + commit>
   Next:         clean — ready for `ship` | <remaining findings + why>
