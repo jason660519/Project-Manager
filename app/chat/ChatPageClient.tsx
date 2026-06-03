@@ -8,7 +8,7 @@ import { useI18n } from '../../lib/i18n';
 import { ChatInput, type AttachedFile } from '../../components/chat/ChatInput';
 import { ChatMessage as ChatMessageView } from '../../components/chat/ChatMessage';
 import { ChatSettings } from '../../components/chat/ChatSettings';
-import { QuickActions } from '../../components/chat/QuickActions';
+import { QuickActionsPanel } from '../../components/chat/QuickActions';
 import { ThinkingIndicator } from '../../components/chat/ThinkingIndicator';
 import { ToolCallGroup } from '../../components/chat/ToolCallCard';
 import type { ToolCallDisplay } from '../../components/chat/ToolCallCard';
@@ -840,19 +840,22 @@ export function ChatPageClient({ initialChatContext, embedded = false }: ChatPag
             onCancel={handleCancelResponse}
             externalRef={inputRef}
             onSetValueRef={setInputValueRef}
-            beforeArea={
-              <QuickActions
-                onAction={(template) => {
-                  setInputValueRef.current?.(template);
-                }}
-              />
-            }
-            afterArea={
+            afterArea={(attachments) => (
               <ChatSettings
                 current={chatSettings}
                 onChange={(s) => setChatSettings(s)}
+                placement="top"
+                attachmentCount={attachments.count}
+                attachmentPanel={attachments.panel}
+                quickActionsPanel={
+                  <QuickActionsPanel
+                    onAction={(template) => {
+                      setInputValueRef.current?.(template);
+                    }}
+                  />
+                }
               />
-            }
+            )}
           />
           <p className="mt-2 flex items-center justify-center gap-2 text-center text-[9px] tracking-[0.06em] text-stone-600/70">
             <span>{t.chat.enterToSend}</span>

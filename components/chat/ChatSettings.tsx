@@ -27,6 +27,10 @@ interface ChatSettingsProps {
   /** Project root for reading the AI SDKs candidate models (Tauri); omit in browser dev. */
   projectRoot?: string;
   variant?: 'icon' | 'pill';
+  placement?: 'bottom' | 'top';
+  attachmentCount?: number;
+  attachmentPanel?: React.ReactNode;
+  quickActionsPanel?: React.ReactNode;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -63,7 +67,16 @@ export function saveChatSettings(settings: ChatSettingsData) {
 
 const ALL_PROVIDERS = listLlmProviders();
 
-export function ChatSettings({ current, onChange, projectRoot, variant = 'icon' }: ChatSettingsProps) {
+export function ChatSettings({
+  current,
+  onChange,
+  projectRoot,
+  variant = 'icon',
+  placement = 'bottom',
+  attachmentCount = 0,
+  attachmentPanel,
+  quickActionsPanel,
+}: ChatSettingsProps) {
   const modelListId = useId();
   const [open, setOpen] = useState(false);
   const [provider, setProvider] = useState(current.provider);
@@ -138,6 +151,7 @@ export function ChatSettings({ current, onChange, projectRoot, variant = 'icon' 
     provider === 'auto'
       ? 'Auto route'
       : `${activeProviderLabel}${model ? ` · ${model}` : ''}`;
+  const panelPositionClass = placement === 'top' ? 'bottom-8 right-0' : 'right-0 top-8';
   const modelHelper = currentSpec
     ? currentSpec.modelSource === 'validated'
       ? `${models.length} model suggestions from the curated catalogue and latest model refresh. You can still type another model ID.`
@@ -195,6 +209,11 @@ export function ChatSettings({ current, onChange, projectRoot, variant = 'icon' 
             {activeRouteSummary}
           </span>
         )}
+        {attachmentCount > 0 && (
+          <span className="ml-0.5 rounded-full border border-amber-200/25 bg-amber-500/15 px-1 text-[9px] leading-4 text-amber-100">
+            {attachmentCount}
+          </span>
+        )}
       </button>
 
       {/* Settings panel */}
@@ -202,7 +221,10 @@ export function ChatSettings({ current, onChange, projectRoot, variant = 'icon' 
         <>
           {/* Backdrop to close on click outside */}
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-8 z-40 w-72 rounded-lg border border-stone-200/20 bg-editor-bg p-3 shadow-xl">
+          <div
+            data-testid="chat-settings-panel"
+            className={`absolute ${panelPositionClass} z-40 max-h-[min(640px,calc(100vh-96px))] w-72 overflow-y-auto rounded-lg border border-stone-200/20 bg-editor-bg p-3 shadow-xl`}
+          >
             <div className="mb-2 flex items-center justify-between">
               <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-400">
                 Chat Settings
@@ -211,6 +233,26 @@ export function ChatSettings({ current, onChange, projectRoot, variant = 'icon' 
                 <X size={12} />
               </button>
             </div>
+
+            {attachmentPanel && (
+              <div className="mb-3 rounded border border-stone-200/10 bg-white/[0.02] p-2">
+                <div className="mb-2 flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-stone-500">
+                  <Settings2 size={11} className="text-amber-200/70" />
+                  File upload
+                </div>
+                {attachmentPanel}
+              </div>
+            )}
+
+            {quickActionsPanel && (
+              <div className="mb-3 rounded border border-stone-200/10 bg-white/[0.02] p-2">
+                <div className="mb-2 flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-stone-500">
+                  <Settings2 size={11} className="text-amber-200/70" />
+                  Quick actions
+                </div>
+                {quickActionsPanel}
+              </div>
+            )}
 
             {/* Candidate models — curated shortlist marked in the AI SDKs view */}
             {candidates.length > 0 && (

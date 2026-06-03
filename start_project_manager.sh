@@ -10,6 +10,7 @@
 #   ./start_project_manager.sh install   force full install check
 #   ./start_project_manager.sh update    update npm deps + rebuild Rust
 #   ./start_project_manager.sh stop      stop all services
+#   ./start_project_manager.sh restart   clean old PM tabs/processes, then start fresh in background
 #   ./start_project_manager.sh hermes    start Hermes Agent dashboard only
 #   ./start_project_manager.sh openclaw  start OpenClaw gateway and open dashboard
 #
@@ -124,8 +125,30 @@ is_next_process() {
   [[ "$cmdline" == *"next-server"* || "$cmdline" == *"next dev"* ]]
 }
 
+process_cwd() {
+  local pid="$1"
+  lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -1
+}
+
+is_project_manager_process() {
+  local pid="$1"
+  local cmdline cwd
+  cmdline="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+  cwd="$(process_cwd "$pid" || true)"
+
+  [[ "$cmdline" == *"$SCRIPT_DIR"* ]] && return 0
+  [[ "$cwd" == "$SCRIPT_DIR" ]] && return 0
+  [[ "$cmdline" == *"target/debug/project-manager"* ]] && return 0
+  [[ "$cmdline" == *"Project Manager.app/Contents/MacOS/Project Manager"* ]] && return 0
+  return 1
+}
+
 kill_pid_if_running() {
   local pid="$1"
+  if [[ "$pid" == "$$" ]]; then
+    warn "Skipping current launcher process (PID $pid)"
+    return 0
+  fi
   kill "$pid" 2>/dev/null || true
   for _ in {1..20}; do
     if ! kill -0 "$pid" 2>/dev/null; then
@@ -251,6 +274,163 @@ stop_listeners_on_port() {
     kill_pid_if_running "$pid"
   done
   success "Port ${port} cleared ($label)"
+}
+
+close_project_manager_browser_tabs() {
+  if [[ "${PROJECT_MANAGER_SKIP_BROWSER_CLEANUP:-0}" == "1" ]]; then
+    success "Browser tab cleanup skipped by PROJECT_MANAGER_SKIP_BROWSER_CLEANUP=1"
+    return 0
+  fi
+
+  if [[ "$PLATFORM" != "macOS" ]] || ! command -v osascript >/dev/null 2>&1; then
+    warn "Browser tab cleanup is only automated on macOS with osascript"
+    return 0
+  fi
+
+  info "Closing old Project Manager browser tabs on port $DEV_PORT..."
+  local output status closed_count timeout_seconds
+  timeout_seconds="${PROJECT_MANAGER_BROWSER_CLEANUP_TIMEOUT_SECONDS:-8}"
+  set +e
+  output="$(perl -e 'my $seconds = shift @ARGV; alarm $seconds; exec @ARGV' \
+    "$timeout_seconds" osascript -l JavaScript - "$DEV_PORT" 2>&1 <<'JXA'
+function run(argv) {
+  const devPort = String(argv[0] || "43187");
+  const browserNames = ["Google Chrome", "Microsoft Edge", "Brave Browser", "Safari"];
+  const escapedPort = devPort.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const projectManagerUrlPattern = new RegExp(
+    "^https?://(localhost|127\\.0\\.0\\.1|\\[::1\\]):" + escapedPort + "([/?#].*)?$",
+    "i",
+  );
+
+  let closedCount = 0;
+  const errors = [];
+
+  for (const browserName of browserNames) {
+    let browser;
+    try {
+      browser = Application(browserName);
+    } catch (error) {
+      continue;
+    }
+    if (!browser.running()) continue;
+
+    try {
+      for (const browserWindow of browser.windows()) {
+        const tabsToClose = [];
+        for (const browserTab of browserWindow.tabs()) {
+          try {
+            const tabUrl = String(browserTab.url() || "");
+            if (projectManagerUrlPattern.test(tabUrl)) {
+              tabsToClose.push(browserTab);
+            }
+          } catch (error) {
+            errors.push(browserName + ": read tab URL failed: " + error);
+          }
+        }
+
+        for (const browserTab of tabsToClose) {
+          try {
+            browserTab.close();
+            closedCount += 1;
+          } catch (error) {
+            errors.push(browserName + ": close tab failed: " + error);
+          }
+        }
+      }
+    } catch (error) {
+      errors.push(browserName + ": browser scan failed: " + error);
+    }
+  }
+
+  if (errors.length > 0) {
+    return String(closedCount) + "\nWARN " + errors.join("\nWARN ");
+  }
+
+  return String(closedCount);
+}
+JXA
+)"
+  status=$?
+  set -e
+
+  if [[ "$status" != "0" ]]; then
+    warn "Browser tab cleanup failed or timed out after ${timeout_seconds}s: $output"
+    return 1
+  fi
+
+  closed_count="$(printf '%s\n' "$output" | sed -n '1p')"
+  if [[ "$closed_count" =~ ^[0-9]+$ ]]; then
+    success "Closed $closed_count old Project Manager browser tab(s)"
+    if [[ "$output" == *$'\nWARN '* ]]; then
+      warn "Browser tab cleanup warnings:"
+      printf '%s\n' "$output" | sed -n '2,$p' >&2
+    fi
+  else
+    warn "Browser tab cleanup ran, but did not return a count: $output"
+    return 1
+  fi
+}
+
+terminate_project_manager_app_processes() {
+  info "Stopping old Project Manager desktop app processes..."
+
+  if [[ "$PLATFORM" == "macOS" ]] && command -v osascript >/dev/null 2>&1; then
+    osascript -e 'tell application "Project Manager" to quit' >/dev/null 2>&1 || true
+  fi
+
+  local pid_file="$SCRIPT_DIR/.project-manager/dev-logs/project-manager-desktop.log.pid"
+  local pid
+  if [[ -f "$pid_file" ]]; then
+    pid="$(tr -dc '0-9' < "$pid_file" 2>/dev/null || true)"
+    if [[ -n "$pid" ]]; then
+      warn "Stopping tracked Project Manager desktop process (PID $pid)"
+      kill_pid_if_running "$pid"
+    fi
+    rm -f "$pid_file"
+  fi
+
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] || continue
+    [[ "$pid" == "$$" ]] && continue
+    if ! is_project_manager_process "$pid"; then
+      continue
+    fi
+    local cmdline
+    cmdline="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+    warn "Stopping old Project Manager process (PID $pid): ${cmdline:-unknown}"
+    kill_pid_if_running "$pid"
+  done < <(pgrep -f "(run-tauri-dev\.mjs|tauri dev|target/debug/project-manager|Project Manager\.app/Contents/MacOS/Project Manager)" 2>/dev/null || true)
+
+  sleep 0.5
+
+  local remaining
+  remaining=""
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] || continue
+    if is_project_manager_process "$pid"; then
+      remaining+="$pid "
+    fi
+  done < <(pgrep -f "(run-tauri-dev\.mjs|tauri dev|target/debug/project-manager|Project Manager\.app/Contents/MacOS/Project Manager)" 2>/dev/null || true)
+  if [[ -n "${remaining// }" ]]; then
+    error "Some Project Manager app processes are still running: $remaining"
+    return 1
+  fi
+
+  success "Old Project Manager desktop app processes stopped"
+}
+
+clean_project_manager_test_environment() {
+  header "Project Manager — Cleaning Old Test Environment"
+  close_project_manager_browser_tabs
+  terminate_project_manager_app_processes
+  stop_listeners_on_port "$DEV_PORT" "Project Manager web app"
+
+  if is_port_listening "$DEV_PORT"; then
+    error "Port $DEV_PORT is still occupied after cleanup"
+    return 1
+  fi
+
+  success "Project Manager test environment is clean"
 }
 
 safe_url_for_display() {
@@ -444,7 +624,7 @@ start_background_service() {
   mkdir -p "$(dirname "$log_file")"
   cd "$SCRIPT_DIR"
   info "Starting $name in background. Log: $log_file"
-  nohup "$@" >> "$log_file" 2>&1 &
+  nohup "$@" </dev/null >> "$log_file" 2>&1 &
   local pid="$!"
   echo "$pid" > "${log_file}.pid"
   success "$name started (PID $pid)"
@@ -461,6 +641,33 @@ running_pid_from_file() {
     return 0
   fi
   return 1
+}
+
+confirm_pm_background_ready() {
+  local log_file="$1"
+  local pid_file="${log_file}.pid"
+  local stable_seconds="${PROJECT_MANAGER_START_STABILITY_SECONDS:-5}"
+
+  if ! wait_for_pm_ready "Project Manager web app"; then
+    print_app_failure "Project Manager desktop app" "dashboard route did not become healthy" "$log_file"
+    return 1
+  fi
+
+  sleep "$stable_seconds"
+
+  local pid
+  pid="$(running_pid_from_file "$pid_file" || true)"
+  if [[ -z "$pid" ]]; then
+    print_app_failure "Project Manager desktop app" "background launcher process exited during startup" "$log_file"
+    return 1
+  fi
+
+  if ! is_dev_server_healthy; then
+    print_app_failure "Project Manager web app" "dashboard route became unhealthy after startup" "$log_file"
+    return 1
+  fi
+
+  success "Project Manager background process is stable (PID $pid)"
 }
 
 print_app_success() {
@@ -932,6 +1139,13 @@ start_project_manager() {
 
   cd "$SCRIPT_DIR"
   configure_tauri_dev_secret_backend
+
+  if [[ "${PROJECT_MANAGER_REUSE_EXISTING:-0}" != "1" && "${PROJECT_MANAGER_START_CLEANED:-0}" != "1" ]]; then
+    clean_project_manager_test_environment
+    export PROJECT_MANAGER_START_CLEANED=1
+    dev_server_running=0
+  fi
+
   ensure_dev_port_available
 
   if [[ "$mode" == "background" ]]; then
@@ -939,7 +1153,7 @@ start_project_manager() {
     existing_desktop_pid="$(running_pid_from_file "${log_file}.pid" || true)"
     if [[ -n "$existing_desktop_pid" ]]; then
       success "Project Manager desktop app already running (PID $existing_desktop_pid)"
-      wait_for_pm_ready "Project Manager web app" || true
+      confirm_pm_background_ready "$log_file"
       maybe_open_local_url "$pm_url" "$dev_server_running"
       print_app_success "Project Manager desktop app" "$DEV_PORT" "$pm_url" "$log_file"
       return 0
@@ -952,7 +1166,7 @@ start_project_manager() {
       "Project Manager desktop app" \
       "$log_file" \
       npm run tauri:dev
-    wait_for_pm_ready "Project Manager web app" || true
+    confirm_pm_background_ready "$log_file"
     maybe_open_local_url "$pm_url" "$dev_server_running"
     print_app_success "Project Manager desktop app" "$DEV_PORT" "$pm_url" "$log_file"
     return 0
@@ -1163,7 +1377,9 @@ cmd_core() {
 
 cmd_stop() {
   header "Project Manager — Stopping Services"
-  
+
+  terminate_project_manager_app_processes || true
+
   local ports=("$DEV_PORT" "$HERMES_PORT" "$OPENCLAW_PORT")
   for port in "${ports[@]}"; do
     local pids
@@ -1177,6 +1393,14 @@ cmd_stop() {
     fi
   done
   success "All services stopped."
+}
+
+cmd_restart() {
+  clean_project_manager_test_environment
+  FORCE_RESTART=1
+  FORCE_OPEN=1
+  export PROJECT_MANAGER_START_CLEANED=1
+  cmd_start_background
 }
 
 # ── Interactive Menu ──────────────────────────────────────────────────────────
@@ -1200,6 +1424,7 @@ show_menu() {
   echo -e " 8) 📥 執行完整安裝 (Full Install)"
   echo -e " 9) 🔄 更新相依性與 Rust 編譯 (Update)"
   echo -e "10) 🛑 停止所有相關服務"
+  echo -e "11) ♻️  清理舊測試環境並重啟 PM"
   echo -e " 0) 🚪 離開 (Exit)"
   echo ""
   read -p "請輸入選項 (Enter choice): " choice
@@ -1215,6 +1440,7 @@ show_menu() {
     8) cmd_install ;;
     9) cmd_update ;;
     10) cmd_stop ;;
+    11) cmd_restart ;;
     0) exit 0 ;;
     *) warn "無效選項 (Invalid choice)"; sleep 1; show_menu ;;
   esac
@@ -1290,13 +1516,14 @@ case "$COMMAND" in
   core)     cmd_core    ;;
   aux)      cmd_aux     ;;
   stop)     cmd_stop    ;;
+  restart)  cmd_restart ;;
   hermes)   cmd_hermes  ;;
   openclaw) cmd_openclaw ;;
   menu)     show_menu   ;;
   auto)     cmd_auto    ;;
   *)
     error "Unknown command: $COMMAND"
-    echo "Usage: $0 [--force-open|--open] [--restart] [install|update|start|web|all|core|aux|stop|hermes|openclaw|menu]"
+    echo "Usage: $0 [--force-open|--open] [--restart] [install|update|start|web|all|core|aux|stop|restart|hermes|openclaw|menu]"
     exit 1
     ;;
 esac

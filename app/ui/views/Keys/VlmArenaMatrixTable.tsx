@@ -789,15 +789,15 @@ export function VlmArenaMatrixTable({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto">
-        <table className="border-collapse text-left" style={{ width: table.getTotalSize() }}>
-          <thead className="sticky top-0 z-10 border-b border-stone-200/12 bg-stone-900">
+      <div className="pm-scroll min-h-0 flex-1 overflow-auto">
+        <table className="table-fixed border-collapse text-left" style={{ width: table.getTotalSize() }}>
+          <thead className="sticky top-0 z-40 border-b border-stone-200/12 bg-stone-900">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
                   <th
                     key={header.id}
-                    className={`relative select-none border-r border-stone-200/10 px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400 ${frozenClass(header.column.id, true)}`}
+                    className={`relative overflow-hidden select-none border-r border-stone-200/10 px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400 ${frozenClass(header.column.id, true)}`}
                     style={cellStyle(header.column.id)}
                   >
                     <button
@@ -829,7 +829,7 @@ export function VlmArenaMatrixTable({
                 {row.getVisibleCells().map((cell) => (
                   <td
                     key={cell.id}
-                    className={`relative isolate border-r border-stone-200/10 px-3 py-2 text-sm text-stone-300 ${frozenClass(cell.column.id)}`}
+                    className={`relative isolate overflow-hidden border-r border-stone-200/10 px-3 py-2 text-sm text-stone-300 ${frozenClass(cell.column.id)}`}
                     style={cellStyle(cell.column.id)}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}

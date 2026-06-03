@@ -126,6 +126,77 @@ describe('ChatPanel', () => {
     }));
   });
 
+  it('opens docked chat settings upward from the bottom input toolbar', async () => {
+    const user = userEvent.setup();
+    renderPanel(true, true);
+
+    expect(screen.queryByTitle(/quick actions/i)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /chat settings/i }));
+
+    const panel = screen.getByTestId('chat-settings-panel');
+    expect(panel).toHaveClass('bottom-8', 'right-0');
+    expect(panel).not.toHaveClass('top-8');
+    expect(screen.getByText(/quick actions/i)).toBeInTheDocument();
+  });
+
+  it('runs quick actions from Chat Settings instead of the left plus menu', async () => {
+    const user = userEvent.setup();
+    renderPanel(true, true);
+
+    expect(screen.queryByTitle(/quick actions/i)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /chat settings/i }));
+    await user.click(screen.getByRole('button', { name: /^plan$/i }));
+
+    expect(screen.getByPlaceholderText(/ask me anything/i)).toHaveValue('Create a plan for: ');
+  });
+
+  it('uploads files from Chat Settings and sends them with the message', async () => {
+    const user = userEvent.setup();
+    sendChatMessageMock.mockResolvedValueOnce({ content: 'Read the attachment.' });
+    const { container } = renderPanel(true, true);
+
+    expect(screen.queryByRole('button', { name: /attach file/i })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /chat settings/i }));
+    expect(screen.getByText(/file upload/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /attach files/i })).toBeInTheDocument();
+
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['hello from settings'], 'notes.md', { type: 'text/markdown' });
+    await user.upload(fileInput, file);
+
+    expect(await screen.findByText('notes.md')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /chat settings/i })).toHaveTextContent('1');
+
+    const input = screen.getByPlaceholderText(/ask me anything/i);
+    await user.type(input, 'summarize attachment');
+    await user.keyboard('{Enter}');
+
+    expect(sendChatMessageMock).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('hello from settings'),
+      attachments: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'notes.md',
+          type: 'text/markdown',
+          content: 'hello from settings',
+        }),
+      ]),
+    }));
+  });
+
+  it('keeps the attachment size limit error inside Chat Settings', async () => {
+    const user = userEvent.setup();
+    const { container } = renderPanel(true, true);
+
+    await user.click(screen.getByRole('button', { name: /chat settings/i }));
+
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+    const tooLargeFile = new File(['x'.repeat(1024 * 1024 + 1)], 'large.log', { type: 'text/plain' });
+    await user.upload(fileInput, tooLargeFile);
+
+    expect(await screen.findByText(/file too large \(max 1mb\): large\.log/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /send message/i })).toBeDisabled();
+  });
+
   it('empty input does not send', async () => {
     renderPanel(true);
     const input = screen.getByPlaceholderText(/ask me anything/i);

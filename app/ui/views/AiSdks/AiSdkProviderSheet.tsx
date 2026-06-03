@@ -397,7 +397,7 @@ export function AiSdkProviderSheet({
   };
   const frozenClass = (columnId: string, header = false) =>
     frozenVisibleIds.includes(columnId)
-      ? `${header ? 'z-30' : 'z-20'} bg-[rgb(var(--pm-rail))]/95 ${lastFrozenId === columnId ? 'shadow-[8px_0_14px_-12px_rgba(255,255,255,0.5)]' : ''}`
+      ? `${header ? 'z-50' : 'z-20'} bg-[rgb(var(--pm-rail))]/95 ${lastFrozenId === columnId ? 'shadow-[8px_0_14px_-12px_rgba(255,255,255,0.5)]' : ''}`
       : '';
 
   // ── View-control handlers ─────────────────────────────────────────────────
@@ -697,8 +697,8 @@ export function AiSdkProviderSheet({
 
         {/* Table */}
         <div className="pm-scroll min-h-0 flex-1 overflow-auto">
-          <table className="border-collapse text-left" style={{ width: table.getTotalSize() }}>
-            <thead className="sticky top-0 z-10 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
+          <table className="table-fixed border-collapse text-left" style={{ width: table.getTotalSize() }}>
+            <thead className="sticky top-0 z-40 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header) => {
@@ -708,7 +708,7 @@ export function AiSdkProviderSheet({
                       <th
                         key={header.id}
                         aria-sort={header.column.getCanSort() ? ariaSort : undefined}
-                        className={`relative select-none border-r border-stone-200/10 px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-400 ${frozenClass(header.column.id, true)}`}
+                        className={`relative overflow-hidden select-none border-r border-stone-200/10 px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-400 ${frozenClass(header.column.id, true)}`}
                         style={cellStyle(header.column.id)}
                       >
                         <div className="flex items-center justify-between gap-1">

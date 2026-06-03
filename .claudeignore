@@ -1,0 +1,25 @@
+# Keep Claude Code's file tooling out of giant non-source trees.
+# Without this, Claude walks ~337k files / 5GB+ and inflates its single Node heap → OOM crashes.
+# (System has plenty of RAM; the limit is V8's per-process heap.) Diagnosis: 2026-06-02.
+
+# Vendored runtimes, agent state, caches — 5GB / ~182k files, never source-of-truth
+.project-manager/hermes/
+.project-manager/openclaw/
+.project-manager/vendor/
+vendor/
+
+# Python virtualenvs (large discovery-cache JSON blobs live here)
+**/venv/
+**/.venv/
+**/site-packages/
+
+# Build / dependency output
+node_modules/
+out/
+src-tauri/target/
+target/
+.next/
+
+# Generated config backups
+.project-manager/config.before-*.json
+.project-manager/config.generated-*.backup.json

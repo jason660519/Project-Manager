@@ -88,7 +88,7 @@ export function LlmArenaDetailSheet({
             </div>
             <div className="max-h-72 overflow-auto border border-stone-200/12">
               <table className="w-full border-collapse text-left">
-                <thead className="sticky top-0 z-10 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
+                <thead className="sticky top-0 z-40 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
                   <tr>
                     <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">{copy.columns.time}</th>
                     <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">{copy.columns.summary}</th>

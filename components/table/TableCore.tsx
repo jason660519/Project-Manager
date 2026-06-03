@@ -19,6 +19,7 @@ import { Bot } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Feature, FeatureStatus } from '../../lib/types';
+import { COL_ID_COLUMN_HEADER } from './colId';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -82,7 +83,7 @@ export function TableCore({ data, onDispatch, onRowClick, selectedIds, onToggleS
         ),
       }),
       columnHelper.accessor('id', {
-        header: 'ID',
+        header: COL_ID_COLUMN_HEADER,
         cell: (info) => <span className="font-mono text-xs">{info.getValue()}</span>,
         size: 60,
       }),
@@ -186,9 +187,9 @@ export function TableCore({ data, onDispatch, onRowClick, selectedIds, onToggleS
   });
 
   return (
-    <div className="overflow-x-auto bg-transparent">
+    <div className="pm-scroll overflow-x-auto bg-transparent">
       <table className="w-full border-collapse text-left">
-        <thead className="sticky top-0 z-10 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
+        <thead className="sticky top-0 z-40 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
               {headerGroup.headers.map((header) => (

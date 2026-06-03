@@ -116,7 +116,35 @@ After green `verify:baseline`:
 
 **Do not** use Cursor embedded browser as the only smoke test — it may inject `data-cursor-ref` and produce false hydration warnings.
 
-### 6.4 dev-log honesty
+### 6.4 Fresh post-test QA environment
+
+Use this when automated checks have finished and the next step is human testing in a clean desktop/browser environment:
+
+```bash
+npm run test:restart-pm
+npm run verify:restart-pm
+```
+
+These commands run the selected test gate first. Only after a zero exit code do they call `/Users/Project-Manager/start_project_manager.sh restart`, which:
+
+- closes old Project Manager browser tabs on port `43187` in Chrome, Edge, Brave, and Safari on macOS
+- stops stale Project Manager Tauri, launcher, and Next.js dev-server processes
+- confirms port `43187` is free before startup
+- starts the Tauri desktop app in the background
+- waits for `/project-progress-dashboard` to return healthy before reporting success
+- performs a final delayed health check before returning success
+- opens a fresh browser tab for manual QA
+
+Operational controls:
+
+- `npm run pm:restart` skips tests and performs the same cleanup/startup sequence.
+- `./start_project_manager.sh start`, `all`, `core`, and `auto` perform the same clean-start preflight by default.
+- `PROJECT_MANAGER_SKIP_BROWSER_CLEANUP=1` preserves existing browser tabs.
+- `PROJECT_MANAGER_REUSE_EXISTING=1` intentionally reuses an already running local app instead of cleaning first.
+- `PROJECT_MANAGER_AFTER_TEST_FINAL_CHECK_SECONDS=30` lengthens the wrapper's final stability window.
+- Logs are written to `.project-manager/dev-logs/restart-after-tests.log` and `.project-manager/dev-logs/project-manager-desktop.log`.
+
+### 6.5 dev-log honesty
 
 `dev-log.md` must list commands **actually run** in the session, not a generic checklist copied from this doc.
 
@@ -252,7 +280,35 @@ Skill：`.claude/skills/verify-before-complete/SKILL.md`。Cursor rule：`.curso
 
 **勿**僅以 Cursor embedded browser 當唯一 smoke test — 可能注入 `data-cursor-ref` 造成假 hydration 警告。
 
-### 6.4 dev-log 誠實紀錄
+### 6.4 測試後全新 QA 環境
+
+當自動化檢查完成、下一步要進入人工測試時，使用：
+
+```bash
+npm run test:restart-pm
+npm run verify:restart-pm
+```
+
+這兩個命令會先執行指定測試關卡。只有 exit code 為 0 時，才會呼叫 `/Users/Project-Manager/start_project_manager.sh restart`，其流程會：
+
+- 關閉 macOS Chrome、Edge、Brave、Safari 中 port `43187` 的舊 Project Manager browser tabs
+- 停止殘留的 Project Manager Tauri、launcher、Next.js dev-server processes
+- 啟動前確認 port `43187` 已釋放
+- 在背景啟動 Tauri desktop app
+- 等待 `/project-progress-dashboard` healthy 後才回報成功
+- 回傳成功前再執行一次延遲 health check
+- 開啟新的 browser tab 供人工 QA
+
+操作控制：
+
+- `npm run pm:restart` 會略過測試，只執行相同 cleanup/startup sequence。
+- `./start_project_manager.sh start`、`all`、`core`、`auto` 預設也會執行相同 clean-start preflight。
+- `PROJECT_MANAGER_SKIP_BROWSER_CLEANUP=1` 可保留既有 browser tabs。
+- `PROJECT_MANAGER_REUSE_EXISTING=1` 可刻意沿用已執行中的 local app，不先清理。
+- `PROJECT_MANAGER_AFTER_TEST_FINAL_CHECK_SECONDS=30` 可拉長 wrapper final stability window。
+- Logs 寫入 `.project-manager/dev-logs/restart-after-tests.log` 與 `.project-manager/dev-logs/project-manager-desktop.log`。
+
+### 6.5 dev-log 誠實紀錄
 
 `dev-log.md` 必須列出本 session **實際執行**的指令，不可只複製本文件 checklist。
 

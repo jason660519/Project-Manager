@@ -159,7 +159,7 @@ export function AbilityToolsTable({
   return (
     <div className="h-full overflow-auto">
       <table className="w-full border-collapse text-left">
-        <thead className="sticky top-0 z-10 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
+        <thead className="sticky top-0 z-40 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
               {headerGroup.headers.map((header) => (

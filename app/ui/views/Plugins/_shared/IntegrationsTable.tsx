@@ -515,16 +515,16 @@ export function IntegrationsTable({
   }
 
   return (
-    <div className="h-full overflow-auto border border-stone-200/12 bg-[rgb(var(--pm-panel))]/72">
-      <table className="w-full min-w-[960px] border-collapse text-left text-sm">
-        <thead className="sticky top-0 z-30 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
+    <div className="pm-scroll h-full overflow-auto border border-stone-200/12 bg-[rgb(var(--pm-panel))]/72">
+      <table className="w-full table-fixed min-w-[960px] border-collapse text-left text-sm">
+        <thead className="sticky top-0 z-40 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
           {table.getHeaderGroups().map((hg) => (
             <tr key={hg.id}>
               {hg.headers.map((h) => (
                 <th
                   key={h.id}
                   onClick={h.column.getCanSort() ? h.column.getToggleSortingHandler() : undefined}
-                  className={`relative select-none px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400 ${
+                  className={`relative overflow-hidden select-none px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400 ${
                     h.column.getCanSort() ? 'cursor-pointer' : ''
                   }`}
                   style={{
@@ -532,7 +532,7 @@ export function IntegrationsTable({
                     minWidth: h.column.getSize(),
                     left: h.column.getIndex() < clampedFrozenCols ? frozenLeftOffsets[h.column.getIndex()] : undefined,
                     position: h.column.getIndex() < clampedFrozenCols ? 'sticky' : undefined,
-                    zIndex: h.column.getIndex() < clampedFrozenCols ? 40 : undefined,
+                    zIndex: h.column.getIndex() < clampedFrozenCols ? 50 : undefined,
                     background:
                       h.column.getIndex() < clampedFrozenCols
                         ? 'rgb(var(--pm-panel))'
@@ -574,7 +574,7 @@ export function IntegrationsTable({
                 {row.getVisibleCells().map((cell) => (
                   <td
                     key={cell.id}
-                    className={`px-3 ${rowPaddingClass} align-middle text-sm text-stone-300`}
+                    className={`overflow-hidden px-3 ${rowPaddingClass} align-middle text-sm text-stone-300`}
                     style={{
                       width: cell.column.getSize(),
                       minWidth: cell.column.getSize(),

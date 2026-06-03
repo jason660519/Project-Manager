@@ -393,7 +393,7 @@ export function ConnectSheet() {
       {/* Table */}
       <div className="min-h-0 flex-1 overflow-auto">
         <table className="w-full border-collapse text-left">
-          <thead className="sticky top-0 z-10 bg-[rgb(var(--pm-panel))]">
+          <thead className="sticky top-0 z-40 bg-[rgb(var(--pm-panel))]">
             <tr className="border-b border-stone-200/15">
               <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-500 whitespace-nowrap">
                 Category

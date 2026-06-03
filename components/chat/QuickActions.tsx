@@ -1,6 +1,6 @@
 'use client';
 
-import { Beaker, Bug, HelpCircle, Image, Puzzle, Plus, Zap } from 'lucide-react';
+import { Bug, HelpCircle, Image, Puzzle, Plus, Zap } from 'lucide-react';
 import { useState } from 'react';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -52,6 +52,24 @@ const ACTIONS: QuickAction[] = [
 
 interface QuickActionsProps {
   onAction: (template: string) => void;
+}
+
+export function QuickActionsPanel({ onAction }: QuickActionsProps) {
+  return (
+    <div className="grid grid-cols-2 gap-1.5">
+      {ACTIONS.map((action) => (
+        <button
+          key={action.id}
+          type="button"
+          onClick={() => onAction(action.promptTemplate)}
+          className="flex h-8 min-w-0 items-center gap-1.5 rounded border border-stone-200/10 bg-white/[0.03] px-2 text-left text-[10px] text-stone-300 transition-colors hover:border-amber-200/25 hover:bg-amber-500/10 hover:text-stone-100"
+        >
+          <span className="shrink-0 text-stone-500">{action.icon}</span>
+          <span className="min-w-0 truncate">{action.label}</span>
+        </button>
+      ))}
+    </div>
+  );
 }
 
 export function QuickActions({ onAction }: QuickActionsProps) {

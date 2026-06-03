@@ -1,11 +1,12 @@
 'use client';
 
-import { FileText, Send, Square, X } from 'lucide-react';
+import { FileText, Send, Square, Upload, X } from 'lucide-react';
 import { KeyboardEvent, useEffect, useRef, useState } from 'react';
 import {
   appendXmuxSnippetToInput,
   getXmuxDraggedSnippet,
 } from '../../lib/xmux/selectedElementSnippet';
+import { useImeSafeSubmit } from '../../lib/hooks/useImeSafeSubmit';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -28,6 +29,11 @@ export interface ChatInputApi {
   getValue: () => string;
 }
 
+export interface ChatInputAttachmentSlot {
+  count: number;
+  panel: React.ReactNode;
+}
+
 interface ChatInputProps {
   placeholder: string;
   sendLabel: string;
@@ -40,7 +46,7 @@ interface ChatInputProps {
   /** Children rendered to the left of the textarea (e.g. quick actions) */
   beforeArea?: React.ReactNode;
   /** Children rendered between textarea and send button (e.g. settings) */
-  afterArea?: React.ReactNode;
+  afterArea?: React.ReactNode | ((attachments: ChatInputAttachmentSlot) => React.ReactNode);
   /** Expose a setValue callback so parent components can set input content */
   onSetValueRef?: React.MutableRefObject<((value: string) => void) | undefined>;
   /** Read/write helpers for parents that append content (e.g. xmux Select Element). */
@@ -107,8 +113,8 @@ export function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sentRef = useRef(false);
-  const composingRef = useRef(false);
   const valueRef = useRef(value);
+  const imeSubmit = useImeSafeSubmit();
   const canSend = (value.trim().length > 0 || files.length > 0) && !loading;
 
   valueRef.current = value;
@@ -199,8 +205,7 @@ export function ChatInput({
       onCancel();
       return;
     }
-    if (event.key !== 'Enter' || event.shiftKey) return;
-    if (event.nativeEvent.isComposing || composingRef.current) return;
+    if (!imeSubmit.shouldSubmitOnEnter(event)) return;
     event.preventDefault();
     submit();
   };
@@ -267,11 +272,28 @@ export function ChatInput({
     appendSnippetAtEnd(snippet);
   };
 
-  return (
-    <div>
-      {/* File chips */}
+  const attachmentPanel = (
+    <div className="space-y-2">
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept={[...SUPPORTED_EXTENSIONS, ...IMAGE_EXTENSIONS].join(',')}
+        className="hidden"
+        onChange={handleFilesSelected}
+      />
+
+      <button
+        type="button"
+        onClick={handleAttach}
+        className="flex h-8 w-full items-center justify-center gap-2 rounded border border-stone-200/15 bg-white/[0.03] px-2 text-[10px] font-medium text-stone-300 transition-colors hover:border-amber-200/30 hover:bg-amber-500/10 hover:text-amber-100"
+      >
+        <Upload size={12} />
+        Attach files
+      </button>
+
       {files.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {files.map((file) => (
             <div
               key={file.id}
@@ -286,6 +308,7 @@ export function ChatInput({
               <button
                 type="button"
                 onClick={() => removeFile(file.id)}
+                aria-label={`Remove ${file.name}`}
                 className="ml-0.5 text-stone-500 hover:text-red-400"
               >
                 <X size={10} />
@@ -295,16 +318,19 @@ export function ChatInput({
         </div>
       )}
 
-      {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        accept={[...SUPPORTED_EXTENSIONS, ...IMAGE_EXTENSIONS].join(',')}
-        className="hidden"
-        onChange={handleFilesSelected}
-      />
+      {fileError && (
+        <p className="text-[9px] text-red-400">{fileError}</p>
+      )}
+    </div>
+  );
 
+  const resolvedAfterArea =
+    typeof afterArea === 'function'
+      ? afterArea({ count: files.length, panel: attachmentPanel })
+      : afterArea;
+
+  return (
+    <div>
       {/* Input row */}
       <div className="flex items-end gap-1.5">
         {/* Left toolbar (before area) */}
@@ -321,12 +347,9 @@ export function ChatInput({
             setValue(event.target.value);
           }}
           onKeyDown={handleKeyDown}
-          onCompositionStart={() => {
-            composingRef.current = true;
-          }}
-          onCompositionEnd={() => {
-            composingRef.current = false;
-          }}
+          onCompositionStart={imeSubmit.onCompositionStart}
+          onCompositionUpdate={imeSubmit.onCompositionUpdate}
+          onCompositionEnd={imeSubmit.onCompositionEnd}
           onDragOver={handleDragOver}
           onDrop={handleDrop}
           placeholder={placeholder}
@@ -335,19 +358,9 @@ export function ChatInput({
         />
 
         {/* Right toolbar (after area) */}
-        {afterArea && (
-          <div className="flex items-center gap-0.5 pb-1">{afterArea}</div>
+        {resolvedAfterArea && (
+          <div className="flex items-center gap-0.5 pb-1">{resolvedAfterArea}</div>
         )}
-
-        {/* Attach file */}
-        <button
-          type="button"
-          onClick={handleAttach}
-          className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded text-stone-500 transition-colors hover:bg-white/[0.06] hover:text-stone-200"
-          title="Attach file"
-        >
-          <FileText size={13} />
-        </button>
 
         {/* Send / stop */}
         <button
@@ -372,11 +385,6 @@ export function ChatInput({
           )}
         </button>
       </div>
-
-      {/* File error */}
-      {fileError && (
-        <p className="mt-1 text-[9px] text-red-400">{fileError}</p>
-      )}
     </div>
   );
 }

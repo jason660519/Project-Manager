@@ -100,7 +100,7 @@ Do not copy every Project Progress Dashboard control into every screen. The clas
 For Project Manager, every Basic Table Sheet and Large Data Sheet must implement or explicitly document a phased exception for the following company-standard controls:
 
 - Table-scoped search in the table toolbar, before filters and view controls.
-- First data column with stable unique row IDs and column definition id `col-id`.
+- First data column with column id `col-id`, RFC 4122 UUID cell values, visible header **`UUID`** (`COL_ID_COLUMN_HEADER` in `components/table/colId.ts`).
 - Default filters for columns whose header, key, or field name contains `Provider`, `Category`, `Status`, or `Company`.
 - `Freeze cols` numeric control for horizontally scrolling tables, with sticky frozen columns and persisted canonical `col-*` IDs.
 - User-resizable column widths with min/max bounds, persisted by canonical column ID.
