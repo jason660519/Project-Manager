@@ -2,10 +2,9 @@
 
 // @table-classification: basic
 // @table-reason: Operational integrations table (toggle/test/method/type columns), sortable,
-//   resizable, hidden-cols, with method/type filters.
-// @table-waivers: search, freeze, shared-primitive — table-scoped search and numeric Freeze cols
-//   not yet implemented; uses bespoke columnSizing state rather than components/table/datasheet.
-//   Declared debt, tracked as follow-up.
+//   resizable, hidden-cols, table-scoped search, numeric Freeze cols, and method/type filters.
+// @table-waivers: shared-primitive — uses bespoke columnSizing state rather than
+//   components/table/datasheet. Declared debt, tracked as follow-up.
 
 import { useMemo, useState } from 'react';
 import {
@@ -20,6 +19,8 @@ import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import type { IntegrationRow } from '../../../../../lib/integrations/types';
 import { connectedInstanceSearchText } from '../../../../../lib/integrations/mappers/connected-instances';
 import { useI18n } from '../../../../../lib/i18n';
+import { uuidv5 } from '../../../../../lib/aiSdks/uuid';
+import { COL_ID_COLUMN_HEADER } from '../../../../../components/table/colId';
 import { StatusBadge } from './status-badge';
 
 export interface IntegrationRowTestResult {
@@ -47,6 +48,11 @@ const DEFAULT_VISIBILITY: ColumnVisibility = {
 };
 
 const columnHelper = createColumnHelper<IntegrationRow>();
+const INTEGRATION_ROW_ID_NAMESPACE = '2f9c5a7e-2b3f-4a76-9302-26a479e3b6a9';
+
+function integrationRowUuid(rowKey: string): string {
+  return uuidv5(rowKey, INTEGRATION_ROW_ID_NAMESPACE);
+}
 
 function emptyCell() {
   return <span className="text-xs text-stone-500">—</span>;
@@ -238,6 +244,22 @@ export function IntegrationsTable({
             }),
           ]
         : []),
+      columnHelper.accessor((row) => integrationRowUuid(row.rowKey), {
+        id: 'col-id',
+        header: COL_ID_COLUMN_HEADER,
+        cell: (info) => {
+          const uuid = info.getValue();
+          return (
+            <span
+              className="block max-w-[160px] truncate font-mono text-[11px] text-stone-300"
+              title={`${uuid} · ${info.row.original.rowKey}`}
+            >
+              {uuid}
+            </span>
+          );
+        },
+        size: 144,
+      }),
       columnHelper.accessor('category1', {
         id: 'col-cat1',
         header: 'Cat.1',
@@ -466,9 +488,11 @@ export function IntegrationsTable({
       if (!q) return true;
       const r = row.original;
       if (r.sourceKind === 'connected-instance') {
-        return connectedInstanceSearchText(r).includes(q);
+        return `${integrationRowUuid(r.rowKey)} ${connectedInstanceSearchText(r)}`.includes(q);
       }
       return (
+        integrationRowUuid(r.rowKey).includes(q) ||
+        r.rowKey.toLowerCase().includes(q) ||
         r.name.toLowerCase().includes(q) ||
         r.company.toLowerCase().includes(q) ||
         r.category1.toLowerCase().includes(q) ||

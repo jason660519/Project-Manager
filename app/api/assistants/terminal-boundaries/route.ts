@@ -6,6 +6,16 @@ import { terminalBoundariesSidecarPath } from '../../../../lib/ai-assistants/ter
 
 export const dynamic = 'force-static';
 
+function isSafeAssistantId(value: string): boolean {
+  return /^[A-Za-z0-9_-]+$/.test(value);
+}
+
+// Absolute on POSIX (`/repo`) or Windows (`C:\repo` / `C:/repo`). The dev flow
+// runs on the host OS, so a POSIX-only check 400s legitimate Windows roots.
+function isAbsoluteProjectRoot(value: string): boolean {
+  return value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value);
+}
+
 function isValidBoundaries(value: unknown): value is TerminalOperationalBoundaries {
   if (!value || typeof value !== 'object') return false;
   const b = value as TerminalOperationalBoundaries;
@@ -17,18 +27,62 @@ function isValidBoundaries(value: unknown): value is TerminalOperationalBoundari
 }
 
 export async function GET(request: NextRequest) {
-  const projectRoot = request.nextUrl.searchParams.get('projectRoot')?.trim() ?? '';
-  const assistantId = request.nextUrl.searchParams.get('assistantId')?.trim() ?? '';
+  const searchParams = new URL(request.url).searchParams;
+  const projectRoot =
+    searchParams.get('projectRoot')?.trim() ??
+    request.headers.get('x-project-root')?.trim() ??
+    '';
+  const assistantId =
+    searchParams.get('assistantId')?.trim() ??
+    request.headers.get('x-assistant-id')?.trim() ??
+    '';
   if (!projectRoot || !assistantId) {
     return NextResponse.json({ error: 'projectRoot and assistantId are required' }, { status: 400 });
   }
-  if (!projectRoot.startsWith('/')) {
+  if (!isAbsoluteProjectRoot(projectRoot)) {
     return NextResponse.json({ error: 'projectRoot must be an absolute path' }, { status: 400 });
+  }
+  if (!isSafeAssistantId(assistantId)) {
+    return NextResponse.json({ error: 'assistantId contains invalid characters' }, { status: 400 });
   }
 
   const path = terminalBoundariesSidecarPath(projectRoot, assistantId);
   if (!existsSync(path)) {
-    return NextResponse.json({ error: 'not_found' }, { status: 404 });
+    return NextResponse.json({ boundaries: null });
+  }
+
+  try {
+    const raw = readFileSync(path, 'utf-8');
+    const boundaries = JSON.parse(raw) as TerminalOperationalBoundaries;
+    if (!isValidBoundaries(boundaries)) {
+      return NextResponse.json({ error: 'Invalid sidecar shape' }, { status: 500 });
+    }
+    return NextResponse.json({ boundaries });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to read sidecar' },
+      { status: 500 },
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const body = await request.json().catch(() => null);
+  const projectRoot = typeof body?.projectRoot === 'string' ? body.projectRoot.trim() : '';
+  const assistantId = typeof body?.assistantId === 'string' ? body.assistantId.trim() : '';
+  if (!projectRoot || !assistantId) {
+    return NextResponse.json({ error: 'projectRoot and assistantId are required' }, { status: 400 });
+  }
+  if (!isAbsoluteProjectRoot(projectRoot)) {
+    return NextResponse.json({ error: 'projectRoot must be an absolute path' }, { status: 400 });
+  }
+  if (!isSafeAssistantId(assistantId)) {
+    return NextResponse.json({ error: 'assistantId contains invalid characters' }, { status: 400 });
+  }
+
+  const path = terminalBoundariesSidecarPath(projectRoot, assistantId);
+  if (!existsSync(path)) {
+    return NextResponse.json({ boundaries: null });
   }
 
   try {
@@ -55,8 +109,11 @@ export async function PUT(request: NextRequest) {
   if (!projectRoot || !assistantId) {
     return NextResponse.json({ error: 'projectRoot and assistantId are required' }, { status: 400 });
   }
-  if (!projectRoot.startsWith('/')) {
+  if (!isAbsoluteProjectRoot(projectRoot)) {
     return NextResponse.json({ error: 'projectRoot must be an absolute path' }, { status: 400 });
+  }
+  if (!isSafeAssistantId(assistantId)) {
+    return NextResponse.json({ error: 'assistantId contains invalid characters' }, { status: 400 });
   }
   if (!isValidBoundaries(boundaries)) {
     return NextResponse.json({ error: 'Invalid boundaries payload' }, { status: 400 });

@@ -69,16 +69,18 @@ Four at-a-glance numbers across the top:
 
 ### Current Project Gates
 
-This section lists the checks Project Manager expects engineers to run before shipping standards-sensitive work. It is intentionally a gate map, not a shell runner.
+This section lists the checks Project Manager expects engineers to run before shipping standards-sensitive work. In the **Tauri desktop app**, each blocking gate card exposes **Run**; the section header exposes **Run blocking gates** (serial: i18n → standards → docs, stop on first failure). Output streams to **Logs** via the existing `spawnAgent` pipeline. **Browser dev mode** (`npm run dev`) shows the same commands but disables Run — copy the command to a terminal instead.
+
+Registry and policy: [`standardsGates.ts`](../../../lib/companyStandards/standardsGates.ts), [`executionPolicy.ts`](../../../lib/companyStandards/executionPolicy.ts), [`spawnStandardsGate.ts`](../../../lib/companyStandards/spawnStandardsGate.ts). Features **F43** (gate UI) and **F44** (execution policy stack — no CLI bypass). See [Execution Policy](./execution-policy.md).
 
 | Gate | Command | Scope | Status |
 |---|---|---|---|
 | UI i18n hardcoded-copy gate | `npm run i18n:check` | Project Manager local | Active blocker |
 | Composite standards gate | `npm run standards:check` | PM plus company baseline | Active blocker |
 | Documentation governance | `npm run docs:check` | Repo documentation | Active blocker |
-| Color-token drift | `company-standards.sh check .` | Company baseline advisory | P2 advisory |
+| Color-token drift | `company-standards.sh check .` | Company baseline advisory | P2 advisory (copy-only in hub v1) |
 
-The current `standards:check` script runs the PM-local `i18n:check` first, then delegates to the company standards checker. The `i18n:check` scope is deliberately narrow today: it scans the Keys Arena UI files for hardcoded CJK copy so strings must move through `lib/i18n`. If this rule proves stable across apps, it should move upstream into `@company-ai/standards-checks` or the company `company-standards.sh` implementation.
+The `i18n:check` npm script runs `scripts/check-ui-i18n.mjs` (Keys Arena UI hardcoded CJK). `standards:check` runs `i18n:check` first, then delegates to the company standards checker when the standards repo path is available on the machine. If this rule proves stable across apps, it should move upstream into `@company-ai/standards-checks` or the company `company-standards.sh` implementation.
 
 ### Recommended Information Architecture (5 layers)
 
@@ -145,7 +147,7 @@ Buttons reveal the file (or folder) in your OS file manager. The hub doesn't ren
 |---|---|
 | Editing standards content | Open the file from the resource grid and edit it directly. |
 | Per-project overrides | `.project-manager/config.json` at the project root. |
-| Running arbitrary shell commands from the hub | Run the listed npm scripts in a terminal until the guarded plugin/bridge contract is implemented. |
+| Running arbitrary shell commands from the hub | Only registry gates via **Run** in Tauri; advisory gates remain copy-only until a npm script exists. |
 | ADR creation | `docs/architecture/ADR-*.md` in this repo; the hub only links to the decision flow, it doesn't write ADRs. |
 | Live plugin status | [Integrations Hub](./integrations-hub.md) — the standards plugin is optional and surfaces there if wired. |
 
@@ -153,7 +155,7 @@ Buttons reveal the file (or folder) in your OS file manager. The hub doesn't ren
 
 | Follow-up | Why it matters |
 |---|---|
-| Live `standards:check` summary | Replace the static gate map with real pass / warn / fail counts once `standards.check.run` is available through a guarded plugin or bridge. |
+| Live `standards:check` summary (structured) | F43 adds pass/fail per gate from exit codes; Phase 2 adds P0/P1/P2 parsed findings via `standards.check.run` plugin. |
 | Per-app profile editor | Inline form to draft / update a profile without leaving the dashboard. |
 | Diff against baseline | Show which baseline rules an app silently overrides — surface ADR-worthy deviations. |
 | Bundled resource viewer | Render the linked docs inside Project Manager (with the Documentation view's classification gate). |

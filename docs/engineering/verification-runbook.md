@@ -1,7 +1,7 @@
 # Verification Runbook
 
 > Status: Active  
-> Last updated: 2026-05-26
+> Last updated: 2026-06-03
 > Primary files: `package.json`, `scripts/docs-governance-check.sh`, `src-tauri/Cargo.toml`, `vitest.config.ts`
 
 ---
@@ -113,8 +113,19 @@ After green `verify:baseline`:
 2. Open changed route(s) in **Chrome, Safari, or Tauri**.
 3. DevTools Console: no React hydration errors on happy path.
 4. Exercise one primary interaction on the changed surface.
+5. **Zero runtime overlay errors:** the Next.js dev **Issues** badge (bottom-left, e.g. “1 Issue”) must be **0** on every changed route after smoke. Uncaught exceptions — including Tauri `unregisterListener` / `listeners[eventId].handlerId` from async event subscribe races — are **ship blockers**. Do not hand off with “fix later”.
+
+Automated route check:
+
+```bash
+npm run verify:dev-issues -- --routes /changed-route[,/another-route]
+```
+
+Run this while `npm run dev` is serving port **43187**. The command reads the Next.js dev overlay and fails on any non-zero **Issues** badge, browser console error, or uncaught page error. Tauri-only shell/bridge behavior still needs manual Tauri smoke because the web route can be clean while the desktop shell raises a runtime overlay.
 
 **Do not** use Cursor embedded browser as the only smoke test — it may inject `data-cursor-ref` and produce false hydration warnings.
+
+Tauri event listeners: follow `docs/engineering/runtime-bridge.md` §4 (`safeUnlisten`, `cancelled` guard, `subscribeAgentProcessEvents`).
 
 ### 6.4 Fresh post-test QA environment
 
@@ -277,8 +288,19 @@ Skill：`.claude/skills/verify-before-complete/SKILL.md`。Cursor rule：`.curso
 2. 在 **Chrome、Safari 或 Tauri** 開啟變更路由。
 3. DevTools Console：happy path 無 React hydration error。
 4. 在變更 surface 執行一個主要互動。
+5. **零 runtime overlay 錯誤：** Next.js 開發模式左下角 **Issues**（例如「1 Issue」）在變更路由上必須為 **0**。未捕獲例外（含 Tauri `unregisterListener` / `listeners[eventId].handlerId` 非同步訂閱競態）屬 **阻擋合併** 問題，不可留給使用者除錯。
+
+自動化路由檢查：
+
+```bash
+npm run verify:dev-issues -- --routes /changed-route[,/another-route]
+```
+
+請在 `npm run dev` 以 **43187** port 服務時執行。此命令會讀取 Next.js dev overlay，遇到非零 **Issues** badge、browser console error、或未捕獲 page error 就失敗。Tauri-only shell/bridge 行為仍需手動 Tauri smoke，因為 web route 乾淨時 desktop shell 仍可能觸發 runtime overlay。
 
 **勿**僅以 Cursor embedded browser 當唯一 smoke test — 可能注入 `data-cursor-ref` 造成假 hydration 警告。
+
+Tauri event：`docs/engineering/runtime-bridge.md` §4（`safeUnlisten`、`cancelled`、`subscribeAgentProcessEvents`）。
 
 ### 6.4 測試後全新 QA 環境
 

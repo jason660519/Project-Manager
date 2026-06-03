@@ -65,11 +65,19 @@ async function flushEffects() {
 
 // Reset module state between tests so the storage singleton is rebuilt and
 // runs its legacy-key migration against the current localStorage snapshot.
+function renderMainClient(
+  ui: React.ReactElement,
+  Provider: React.ComponentType<{ children: React.ReactNode }>,
+) {
+  return render(<Provider>{ui}</Provider>);
+}
+
 async function freshImport() {
   vi.resetModules();
   const { MainClient } = await import('../app/ui/MainClient');
+  const { I18nProvider: Provider } = await import('../lib/i18n');
   const { getProjectsRepository } = await import('../lib/storage');
-  return { MainClient, getProjectsRepository };
+  return { MainClient, I18nProvider: Provider, getProjectsRepository };
 }
 
 beforeEach(() => {
@@ -78,9 +86,9 @@ beforeEach(() => {
 
 describe('real ProjectsView checkbox behavior', () => {
   it('clicking project-manager checkbox shows DASHBOARD badge and bumps scope to 2', async () => {
-    const { MainClient } = await freshImport();
+    const { MainClient, I18nProvider } = await freshImport();
     const user = userEvent.setup();
-    render(<MainClient currentView="dashboard" />);
+    renderMainClient(<MainClient currentView="dashboard" />, I18nProvider);
     await flushEffects();
 
     // Two project rows should be rendered, both with their own checkbox.
@@ -107,9 +115,9 @@ describe('real ProjectsView checkbox behavior', () => {
   });
 
   it('persists selection to namespaced localStorage so fresh dashboard mounts see it', async () => {
-    const { MainClient, getProjectsRepository } = await freshImport();
+    const { MainClient, I18nProvider, getProjectsRepository } = await freshImport();
     const user = userEvent.setup();
-    const { unmount } = render(<MainClient currentView="dashboard" />);
+    const { unmount } = renderMainClient(<MainClient currentView="dashboard" />, I18nProvider);
     await flushEffects();
 
     const checkboxes = screen.getAllByRole('checkbox');
@@ -122,16 +130,16 @@ describe('real ProjectsView checkbox behavior', () => {
     unmount();
 
     // Mount a fresh dashboard instance — it should see both projects.
-    render(<MainClient currentView="dashboard" />);
+    renderMainClient(<MainClient currentView="dashboard" />, I18nProvider);
     await flushEffects();
 
     expect(screen.getByText(/Dashboard scope:\s*2/)).toBeInTheDocument();
   });
 
   it('unchecks project-manager when toggled off (does not stick like the first project)', async () => {
-    const { MainClient } = await freshImport();
+    const { MainClient, I18nProvider } = await freshImport();
     const user = userEvent.setup();
-    render(<MainClient currentView="dashboard" />);
+    renderMainClient(<MainClient currentView="dashboard" />, I18nProvider);
     await flushEffects();
 
     const checkboxes = screen.getAllByRole('checkbox');
@@ -153,8 +161,8 @@ describe('real ProjectsView checkbox behavior', () => {
       JSON.stringify(['owner-property', 'project-manager']),
     );
 
-    const { MainClient } = await freshImport();
-    render(<MainClient currentView="dashboard" />);
+    const { MainClient, I18nProvider } = await freshImport();
+    renderMainClient(<MainClient currentView="dashboard" />, I18nProvider);
     await flushEffects();
 
     const checkboxes = screen.getAllByRole('checkbox');

@@ -51,7 +51,7 @@ export function PhaseTableToolbar({
   };
 
   const hideColumn = (columnId: string) => {
-    if (columnId === 'id') return;
+    if (columnId === 'col-id') return;
     patch({ hiddenColumnIds: Array.from(new Set([...prefs.hiddenColumnIds, columnId])) });
   };
 
@@ -176,7 +176,7 @@ export function PhaseTableToolbar({
             </div>
             {columns.map((col) => {
               const hidden = prefs.hiddenColumnIds.includes(col.id);
-              const protectedColumn = col.id === 'id';
+              const protectedColumn = col.id === 'col-id';
               return (
                 <div key={col.id} className="flex items-center justify-between gap-2 py-1">
                   <span className="truncate text-[11px] text-stone-200">{col.header || col.id}</span>

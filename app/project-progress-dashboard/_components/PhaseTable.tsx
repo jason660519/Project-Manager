@@ -1,5 +1,11 @@
 'use client';
 
+// @table-classification: basic
+// @table-reason: Project Progress Dashboard phase sheets are operational workbook
+//   tables with many columns, horizontal overflow, persistent preferences,
+//   numeric freeze columns, hidden rows/columns, resize controls, sorting,
+//   category filters, and row/document interactions.
+
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { clsx } from 'clsx';
 import type { PhaseTablePrefs } from '../types';
@@ -29,7 +35,7 @@ export function PhaseTable({ rows, columns, prefs, patch, handlers, categoryFilt
   const visibleColumns = useMemo(
     () => columns
       .map((column, originalIndex) => ({ column, originalIndex }))
-      .filter(({ column }) => !hiddenColumnIds.has(column.id) || column.id === 'id'),
+      .filter(({ column }) => !hiddenColumnIds.has(column.id) || column.id === 'col-id'),
     [columns, hiddenColumnIds],
   );
   const visibleWidths = useMemo(
@@ -98,8 +104,8 @@ export function PhaseTable({ rows, columns, prefs, patch, handlers, categoryFilt
   }, [columns, patch, prefs.sorting]);
 
   const hideColumn = useCallback((columnId: string) => {
-    if (columnId === 'id') return;
-    const visibleDataColumns = visibleColumns.filter(({ column }) => column.id !== 'actions' && column.id !== columnId);
+    if (columnId === 'col-id') return;
+    const visibleDataColumns = visibleColumns.filter(({ column }) => column.id !== 'col-actions' && column.id !== columnId);
     if (visibleDataColumns.length === 0) return;
     patch({ hiddenColumnIds: Array.from(new Set([...prefs.hiddenColumnIds, columnId])) });
   }, [patch, prefs.hiddenColumnIds, visibleColumns]);
@@ -182,7 +188,7 @@ export function PhaseTable({ rows, columns, prefs, patch, handlers, categoryFilt
                   aria-sort={isSorted === 'asc' ? 'ascending' : isSorted === 'desc' ? 'descending' : 'none'}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    {col.id === 'category' && categoryFilter ? (
+                    {col.id === 'col-category' && categoryFilter ? (
                       <CategoryColumnFilter header={col.header} {...categoryFilter} />
                     ) : (
                       <button
@@ -285,7 +291,7 @@ export function PhaseTable({ rows, columns, prefs, patch, handlers, categoryFilt
               <button type="button" className="block w-full px-2 py-1.5 text-left hover:bg-white/10" onClick={() => { patch({ frozenDataColCount: contextMenu.visibleIndex + 1 }); setContextMenu(null); }}>
                 Freeze through this column
               </button>
-              <button type="button" disabled={contextMenu.columnId === 'id'} className="block w-full px-2 py-1.5 text-left hover:bg-white/10 disabled:cursor-not-allowed disabled:text-stone-500" onClick={() => { hideColumn(contextMenu.columnId); setContextMenu(null); }}>
+              <button type="button" disabled={contextMenu.columnId === 'col-id'} className="block w-full px-2 py-1.5 text-left hover:bg-white/10 disabled:cursor-not-allowed disabled:text-stone-500" onClick={() => { hideColumn(contextMenu.columnId); setContextMenu(null); }}>
                 Hide column
               </button>
               {prefs.hiddenColumnIds.length > 0 && (

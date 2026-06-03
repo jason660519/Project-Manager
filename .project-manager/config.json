@@ -1333,6 +1333,70 @@
         ],
         "kickoffAt": "2026-06-01T01:52:37.435Z"
       }
+    },
+    {
+      "id": "F43",
+      "name": "Company Standards Gates One-Click Execution",
+      "category": "Frontend/UI",
+      "status": "in_progress",
+      "progress": 85,
+      "phase": "development",
+      "points": 5,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F43/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F43/",
+        "spec": ".project-manager/features/F43/feature-spec.md",
+        "tdd": ".project-manager/features/F43/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F43/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F43/",
+        "implementation": "lib/companyStandards/standardsGates.ts",
+        "test": "__tests__/companyStandardsGates.test.ts"
+      },
+      "notes": "Per-gate Run and Run blocking gates wired in Tauri via standardsGates registry and spawnAgent; browser dev disables Run. Manual Tauri smoke pending.",
+      "createdAt": "2026-06-03T03:21:01.896Z",
+      "updatedAt": "2026-06-03T03:24:00.000Z",
+      "updatedBy": "Cursor",
+      "metadata": {
+        "evidencePaths": [
+          "lib/companyStandards/standardsGates.ts",
+          "__tests__/companyStandardsGates.test.ts",
+          ".project-manager/features/F43/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-03T03:21:01.896Z"
+      }
+    },
+    {
+      "id": "F44",
+      "name": "Execution Policy Integration",
+      "category": "Security/Platform",
+      "status": "in_progress",
+      "progress": 90,
+      "phase": "development",
+      "points": 8,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F44/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F44/",
+        "spec": ".project-manager/features/F44/feature-spec.md",
+        "tdd": ".project-manager/features/F44/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F44/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F44/",
+        "implementation": "lib/companyStandards/executionPolicy.ts",
+        "test": "__tests__/executionPolicy.test.ts"
+      },
+      "notes": "Standards gates use full policy stack; F43 bypass removed. Manual Tauri smoke pending.",
+      "createdAt": "2026-06-03T03:36:12.534Z",
+      "updatedAt": "2026-06-03T05:40:00.000Z",
+      "updatedBy": "Cursor",
+      "metadata": {
+        "evidencePaths": [
+          "lib/companyStandards/executionPolicy.ts",
+          "__tests__/executionPolicy.test.ts",
+          ".project-manager/features/F44/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-03T03:36:12.534Z"
+      }
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",
@@ -1343,6 +1407,6 @@
     "root": "/Volumes/KLEVV-4T-1/Project-Manager"
   },
   "schemaVersion": 8,
-  "updatedAt": "2026-06-01T01:52:37.435Z",
-  "updatedBy": "Codex"
+  "updatedAt": "2026-06-03T03:36:12.534Z",
+  "updatedBy": "Cursor"
 }

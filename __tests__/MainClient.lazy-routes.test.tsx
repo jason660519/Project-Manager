@@ -1,6 +1,7 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, type RenderResult } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { I18nProvider } from '../lib/i18n';
 
 vi.mock('next/dynamic', async () => {
   const ReactActual = await vi.importActual<typeof import('react')>('react');
@@ -109,13 +110,20 @@ vi.mock('../lib/adapters/registry', () => ({
 
 const { MainClient } = await import('../app/ui/MainClient');
 
+function renderMainClient(
+  ui: React.ReactElement,
+  options?: Parameters<typeof render>[1],
+): RenderResult {
+  return render(<I18nProvider>{ui}</I18nProvider>, options);
+}
+
 async function flushRouteView() {
   await act(async () => {});
 }
 
 describe('MainClient lazy route views', () => {
   it('shows a compact loading state before the xmux route chunk resolves', async () => {
-    render(<MainClient currentView="xmux" />);
+    renderMainClient(<MainClient currentView="xmux" />);
 
     expect(screen.getByText('Loading view...')).toBeInTheDocument();
 
@@ -124,7 +132,7 @@ describe('MainClient lazy route views', () => {
   });
 
   it('passes keys deep-link sheet props through the lazy boundary', async () => {
-    render(<MainClient currentView="keys" keysSheet="llm-arena" />);
+    renderMainClient(<MainClient currentView="keys" keysSheet="llm-arena" />);
     await flushRouteView();
 
     expect(await screen.findByTestId('keys-view')).toHaveAttribute(
@@ -134,7 +142,7 @@ describe('MainClient lazy route views', () => {
   });
 
   it('passes documentation manifest and slug through the lazy boundary', async () => {
-    render(
+    renderMainClient(
       <MainClient
         currentView="documentation"
         documentationSlug={['guides', 'features', 'xmux']}
@@ -148,7 +156,7 @@ describe('MainClient lazy route views', () => {
   });
 
   it('preserves AI Assistants sheet selection through the lazy boundary', async () => {
-    render(<MainClient currentView="chat" assistantSheet="engineers" />);
+    renderMainClient(<MainClient currentView="chat" assistantSheet="engineers" />);
     await flushRouteView();
 
     expect(await screen.findByTestId('ai-assistants-view')).toHaveAttribute(

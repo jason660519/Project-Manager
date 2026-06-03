@@ -53,6 +53,8 @@ import {
   type VlmImageToImageRow,
   type VlmImageToImageStyle,
 } from './VlmImageToImageEvaluation';
+import { COL_ID_COLUMN_HEADER } from '../../../../components/table/colId';
+import { uuidv5 } from '../../../../lib/aiSdks/uuid';
 
 interface VlmArenaTableRow {
   index: number;
@@ -86,8 +88,10 @@ interface VlmArenaMatrixTableProps {
 }
 
 const col = createColumnHelper<VlmArenaTableRow>();
-const VLM_STORAGE_KEY = 'projectManager.keys.vlmArena.tablePrefs.v1';
+const VLM_STORAGE_KEY = 'projectManager.keys.vlmArena.tablePrefs.v2';
+const VLM_ARENA_ROW_ID_NAMESPACE = '7e9ac88c-f8bb-4e8c-bb4d-d582a8a31e1b';
 const VLM_COLUMN_IDS = [
+  'col-id',
   'col-no',
   'col-test',
   'col-provider',
@@ -110,6 +114,7 @@ const VLM_COLUMN_IDS = [
 ];
 
 const VLM_DEFAULT_SIZING: Record<string, number> = {
+  'col-id': 156,
   'col-no': 72,
   'col-test': 72,
   'col-provider': 160,
@@ -135,18 +140,18 @@ const VLM_PRESETS: ArenaTablePreset[] = [
   {
     id: 'full',
     label: 'Full',
-    frozenColumnIds: ['col-no', 'col-test', 'col-provider', 'col-model'],
+    frozenColumnIds: ['col-id', 'col-no', 'col-test', 'col-provider', 'col-model'],
   },
   {
     id: 'render-review',
     label: 'Render review',
-    frozenColumnIds: ['col-no', 'col-provider', 'col-model'],
+    frozenColumnIds: ['col-id', 'col-no', 'col-provider', 'col-model'],
     columnVisibility: Object.fromEntries(VLM_COLUMN_IDS.map((id) => [id, !['col-ttft', 'col-tps'].includes(id)])),
   },
   {
     id: 'compact',
     label: 'Compact',
-    frozenColumnIds: ['col-no', 'col-provider'],
+    frozenColumnIds: ['col-id', 'col-no', 'col-provider'],
     columnVisibility: Object.fromEntries(
       VLM_COLUMN_IDS.map((id) => [
         id,
@@ -161,6 +166,13 @@ function statusLabel(row: VlmImageToImageRow, copy: VlmArenaCopy): string {
   if (row.runStatus === 'failed') return copy.statuses.failed;
   if (row.runStatus === 'running') return '模型測試中';
   return copy.statuses.queued;
+}
+
+function vlmArenaRowUuid(item: VlmArenaTableRow): string {
+  return uuidv5(
+    `${item.row.id}:${item.row.provider}:${item.row.model}:${item.row.outputMode}`,
+    VLM_ARENA_ROW_ID_NAMESPACE,
+  );
 }
 
 function statusClassName(row: VlmImageToImageRow): string {
@@ -233,6 +245,7 @@ export function VlmArenaMatrixTable({
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const columnOptions = useMemo(
     () => [
+      { id: 'col-id', label: COL_ID_COLUMN_HEADER, freezable: true },
       { id: 'col-no', label: 'No', freezable: true },
       { id: 'col-test', label: copy.columns.test, freezable: true },
       { id: 'col-provider', label: copy.columns.provider, freezable: true },
@@ -268,7 +281,7 @@ export function VlmArenaMatrixTable({
     storageKey: VLM_STORAGE_KEY,
     columnIds: VLM_COLUMN_IDS,
     defaultSizing: VLM_DEFAULT_SIZING,
-    defaultFrozenColumnIds: ['col-no', 'col-test', 'col-provider', 'col-model'],
+    defaultFrozenColumnIds: ['col-id', 'col-no', 'col-test', 'col-provider', 'col-model'],
   });
 
   const tableRows = useMemo<VlmArenaTableRow[]>(
@@ -292,6 +305,7 @@ export function VlmArenaMatrixTable({
       if (providerFilter !== 'all' && item.row.provider !== providerFilter) return false;
       if (!keyword) return true;
       return [
+        vlmArenaRowUuid(item),
         item.row.provider,
         item.row.model,
         imageToImageModelDisplayName(item.row.provider, item.row.model),
@@ -322,6 +336,19 @@ export function VlmArenaMatrixTable({
 
   const columns = useMemo(
     () => [
+      col.accessor((item) => vlmArenaRowUuid(item), {
+        id: 'col-id',
+        header: COL_ID_COLUMN_HEADER,
+        size: VLM_DEFAULT_SIZING['col-id'],
+        cell: ({ row, getValue }) => (
+          <span
+            className="block truncate font-mono text-[11px] text-stone-300"
+            title={`${getValue()} (${row.original.row.id})`}
+          >
+            {getValue()}
+          </span>
+        ),
+      }),
       col.accessor((item) => item.row.no, {
         id: 'col-no',
         header: '#',

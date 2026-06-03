@@ -9,6 +9,7 @@ import type {
 } from '../../../lib/types';
 import type { CustomProjectProgressRow } from '../types';
 import type { PhaseRow } from './phaseRows';
+import { COL_ID_COLUMN_HEADER } from '../../../components/table/colId';
 import { PathLink, resolveProjectPath } from './pathLinks';
 import { E2E_CATEGORY_PALETTE, e2eCategorySelectOptions } from './e2eCategories';
 
@@ -276,7 +277,7 @@ function EditableProgressBar({
 function categoryColumn(phase: FeaturePhase): ColumnDef {
   if (phase === 'e2e_testing') {
     return {
-      id: 'category',
+      id: 'col-category',
       header: 'E2E Category',
       accessor: (r) => r.category,
       cell: (r, h) => (
@@ -290,7 +291,7 @@ function categoryColumn(phase: FeaturePhase): ColumnDef {
     };
   }
   return {
-    id: 'category',
+    id: 'col-category',
     header: 'Category',
     accessor: (r) => r.category,
     cell: (r) => (
@@ -303,7 +304,7 @@ function categoryColumn(phase: FeaturePhase): ColumnDef {
 
 function pointsColumn(): ColumnDef {
   return {
-    id: 'points',
+    id: 'col-points',
     header: 'SP',
     accessor: (r) => r.points,
     cell: (r, h) => (
@@ -319,7 +320,20 @@ function pointsColumn(): ColumnDef {
 function commonIdNameCols(phase: FeaturePhase, projectNameLabel = 'Project Name'): ColumnDef[] {
   const cols: ColumnDef[] = [
     {
-      id: 'project',
+      id: 'col-id',
+      header: COL_ID_COLUMN_HEADER,
+      accessor: (r) => r.uuid,
+      cell: (r) => (
+        <span
+          className="block max-w-[160px] truncate font-mono text-[11px] text-stone-300"
+          title={`${r.uuid} · ${r.rowKey}`}
+        >
+          {r.uuid}
+        </span>
+      ),
+    },
+    {
+      id: 'col-project',
       header: projectNameLabel,
       accessor: (r) => r.projectName ?? '',
       cell: (r) => (
@@ -328,14 +342,14 @@ function commonIdNameCols(phase: FeaturePhase, projectNameLabel = 'Project Name'
         </span>
       ),
     },
-    { id: 'id', header: 'ID', accessor: (r) => r.id, cell: (r) => (
+    { id: 'col-feature-id', header: 'Feature ID', accessor: (r) => r.id, cell: (r) => (
       <span className="font-mono text-[11px] text-stone-300">{r.id}</span>
     )},
   ];
   if (phase === 'development') cols.push(pointsColumn());
   cols.push(
     categoryColumn(phase),
-    { id: 'name', header: 'Function / Feature', accessor: (r) => r.name, cell: (r) => (
+    { id: 'col-name', header: 'Function / Feature', accessor: (r) => r.name, cell: (r) => (
       <span className="text-sm font-medium text-stone-100">{r.name}</span>
     )},
   );
@@ -422,7 +436,7 @@ function PWEChip({
 
 function actionsCol(): ColumnDef {
   return {
-    id: 'actions',
+    id: 'col-actions',
     header: 'Dispatch',
     cell: (row, h) => {
       const hidden = h.hiddenRowKeysSet.has(row.rowKey);
@@ -673,13 +687,13 @@ function AcceptanceChecklistCell({ row, handlers }: { row: PhaseRow; handlers: C
 export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[] {
   return [
     ...commonIdNameCols('development', projectNameLabel),
-    { id: 'progress', header: 'Progress', accessor: (r) => r.progress, cell: (r, h) => (
+    { id: 'col-progress', header: 'Progress', accessor: (r) => r.progress, cell: (r, h) => (
       <EditableProgressBar
         percent={r.progress}
         onCommit={(n) => patchRow(r, { progress: n ?? 0, percentage: n ?? 0 }, h)}
       />
     )},
-    { id: 'status', header: 'Status', accessor: (r) => r.status, cell: (r, h) => (
+    { id: 'col-status', header: 'Status', accessor: (r) => r.status, cell: (r, h) => (
       <div className="flex flex-col gap-0.5">
         <EditableSelect
           value={r.status as FeatureStatus}
@@ -707,17 +721,17 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
         )}
       </div>
     )},
-    { id: 'checklist', header: 'Checklist', accessor: (r) => (
+    { id: 'col-checklist', header: 'Checklist', accessor: (r) => (
       r.feature?.acceptanceChecklist?.filter((i) => i.passes).length ?? 0
     ), cell: (r, h) => (r.source === 'feature' ? <AcceptanceChecklistCell row={r} handlers={h} /> : <span className="text-xs text-stone-500">—</span>) },
-    { id: 'section', header: 'Located Section', accessor: (r) => r.locatedSection ?? '', cell: (r, h) => (
+    { id: 'col-section', header: 'Located Section', accessor: (r) => r.locatedSection ?? '', cell: (r, h) => (
       <EditableText
         value={r.locatedSection}
         onCommit={(v) => patchRow(r, { locatedSection: v || undefined }, h)}
       />
     )},
     {
-      id: 'spec',
+      id: 'col-spec',
       header: 'Feature Spec',
       accessor: (r) => r.specPath ?? '',
       cell: (r, h) => (
@@ -730,7 +744,7 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
       ),
     },
     {
-      id: 'tdd',
+      id: 'col-tdd',
       header: 'TDD Spec',
       accessor: (r) => r.tddPath ?? '',
       cell: (r, h) => (
@@ -743,7 +757,7 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
       ),
     },
     {
-      id: 'unitIntegrationTest',
+      id: 'col-unit-integ',
       header: 'Unit/Integ Test',
       accessor: (r) => r.unitIntegrationTestPath ?? '',
       cell: (r, h) => (
@@ -756,7 +770,7 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
       ),
     },
     {
-      id: 'e2eFolder',
+      id: 'col-e2e-folder',
       header: 'E2E Folder',
       accessor: (r) => r.e2eAcceptanceTestScriptFolder ?? '',
       cell: (r, h) => (
@@ -768,7 +782,7 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
         />
       ),
     },
-    { id: 'tddProgress', header: 'TDD Progress', accessor: (r) => r.tddProgress ?? -1, cell: (r, h) => (
+    { id: 'col-tdd-progress', header: 'TDD Progress', accessor: (r) => r.tddProgress ?? -1, cell: (r, h) => (
       <EditableProgressBar
         percent={r.tddProgress}
         allowEmpty
@@ -776,7 +790,7 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
       />
     )},
     {
-      id: 'tddReport',
+      id: 'col-tdd-report',
       header: 'TDD Report',
       accessor: (r) => r.tddReportPath ?? '',
       cell: (r, h) => (
@@ -789,7 +803,7 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
       ),
     },
     {
-      id: 'debugRetro',
+      id: 'col-debug-retro',
       header: 'Debug Retro',
       accessor: (r) => r.debugRetroPath ?? '',
       cell: (r, h) => (
@@ -802,7 +816,7 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
       ),
     },
     {
-      id: 'testScenarios',
+      id: 'col-test-scenarios',
       header: 'Test Scenarios',
       accessor: (r) => r.testScenariosPath ?? '',
       cell: (r, h) => (
@@ -815,7 +829,7 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
       ),
     },
     {
-      id: 'devLog',
+      id: 'col-dev-log',
       header: 'Dev Logs',
       accessor: (r) => r.devLogFolder ?? '',
       cell: (r, h) => (
@@ -827,7 +841,7 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
         />
       ),
     },
-    { id: 'notes', header: 'README', accessor: (r) => r.notes ?? '', cell: (r, h) => (
+    { id: 'col-notes', header: 'README', accessor: (r) => r.notes ?? '', cell: (r, h) => (
       <NotesCell
         projectRoot={r.sourceProjectRoot ?? h.projectRoot}
         readmePath={r.readmePath}
@@ -841,14 +855,14 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
 export function createTestingColumns(projectNameLabel?: string): ColumnDef[] {
   return [
     ...commonIdNameCols('e2e_testing', projectNameLabel),
-    { id: 'coverage', header: 'Coverage', accessor: (r) => r.testCoverage ?? -1, cell: (r, h) => (
+    { id: 'col-coverage', header: 'Coverage', accessor: (r) => r.testCoverage ?? -1, cell: (r, h) => (
       <EditableProgressBar
         percent={r.testCoverage}
         allowEmpty
         onCommit={(n) => patchRow(r, { testCoverage: n }, h)}
       />
     )},
-    { id: 'testStatus', header: 'Test Status', accessor: (r) => r.testStatus ?? '', cell: (r, h) => (
+    { id: 'col-test-status', header: 'Test Status', accessor: (r) => r.testStatus ?? '', cell: (r, h) => (
       <EditableSelect
         value={r.testStatus}
         options={TEST_STATUS_OPTIONS as unknown as Array<{ value: TestStatus; label: string }>}
@@ -856,8 +870,8 @@ export function createTestingColumns(projectNameLabel?: string): ColumnDef[] {
         onCommit={(v) => patchRow(r, { testStatus: v as TestStatus }, h)}
       />
     )},
-    { id: 'progress', header: 'Progress', accessor: (r) => r.progress, cell: (r) => progressBar(r.progress) },
-    { id: 'section', header: 'Located Section', accessor: (r) => r.locatedSection ?? '', cell: (r, h) => (
+    { id: 'col-progress', header: 'Progress', accessor: (r) => r.progress, cell: (r) => progressBar(r.progress) },
+    { id: 'col-section', header: 'Located Section', accessor: (r) => r.locatedSection ?? '', cell: (r, h) => (
       <EditableText
         value={r.locatedSection}
         onCommit={(v) => patchRow(r, { locatedSection: v || undefined }, h)}
@@ -870,7 +884,7 @@ export function createTestingColumns(projectNameLabel?: string): ColumnDef[] {
 export function createDeploymentColumns(projectNameLabel?: string): ColumnDef[] {
   return [
     ...commonIdNameCols('deployment', projectNameLabel),
-    { id: 'deployStatus', header: 'Status', accessor: (r) => r.deployStatus ?? '', cell: (r, h) => (
+    { id: 'col-deploy-status', header: 'Status', accessor: (r) => r.deployStatus ?? '', cell: (r, h) => (
       <EditableSelect
         value={r.deployStatus}
         options={DEPLOY_STATUS_OPTIONS as unknown as Array<{ value: DeployStatus; label: string }>}
@@ -878,20 +892,20 @@ export function createDeploymentColumns(projectNameLabel?: string): ColumnDef[] 
         onCommit={(v) => patchRow(r, { deployStatus: v as DeployStatus }, h)}
       />
     )},
-    { id: 'deployEnv', header: 'Environment', accessor: (r) => r.deployEnv ?? '', cell: (r, h) => (
+    { id: 'col-env', header: 'Environment', accessor: (r) => r.deployEnv ?? '', cell: (r, h) => (
       <EditableText
         value={r.deployEnv}
         onCommit={(v) => patchRow(r, { deployEnv: v || undefined }, h)}
       />
     )},
-    { id: 'deployDate', header: 'Deploy Date', accessor: (r) => r.deployDate ?? '', cell: (r, h) => (
+    { id: 'col-date', header: 'Deploy Date', accessor: (r) => r.deployDate ?? '', cell: (r, h) => (
       <EditableText
         value={r.deployDate}
         kind="date"
         onCommit={(v) => patchRow(r, { deployDate: v || undefined }, h)}
       />
     )},
-    { id: 'progress', header: 'Progress', accessor: (r) => r.progress, cell: (r) => progressBar(r.progress) },
+    { id: 'col-progress', header: 'Progress', accessor: (r) => r.progress, cell: (r) => progressBar(r.progress) },
     actionsCol(),
   ];
 }
@@ -918,10 +932,10 @@ function opsNumericCell(
 export function createOperationsColumns(projectNameLabel?: string): ColumnDef[] {
   return [
     ...commonIdNameCols('operations', projectNameLabel),
-    { id: 'uptime',          header: 'Uptime %',      accessor: (r) => r.uptimePercent   ?? -1, cell: opsNumericCell('uptimePercent') },
-    { id: 'errorRate',       header: 'Error %',       accessor: (r) => r.errorRate       ?? -1, cell: opsNumericCell('errorRate') },
-    { id: 'avgResponseTime', header: 'Response (ms)', accessor: (r) => r.avgResponseTime ?? -1, cell: opsNumericCell('avgResponseTime') },
-    { id: 'lastIncident',    header: 'Last Incident', accessor: (r) => r.lastIncident    ?? '', cell: (r, h) => (
+    { id: 'col-uptime',   header: 'Uptime %',      accessor: (r) => r.uptimePercent   ?? -1, cell: opsNumericCell('uptimePercent') },
+    { id: 'col-error',    header: 'Error %',       accessor: (r) => r.errorRate       ?? -1, cell: opsNumericCell('errorRate') },
+    { id: 'col-rt',       header: 'Response (ms)', accessor: (r) => r.avgResponseTime ?? -1, cell: opsNumericCell('avgResponseTime') },
+    { id: 'col-incident', header: 'Last Incident', accessor: (r) => r.lastIncident    ?? '', cell: (r, h) => (
       <EditableText
         value={r.lastIncident}
         onCommit={(v) => patchRow(r, { lastIncident: v || undefined }, h)}

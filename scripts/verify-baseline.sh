@@ -36,6 +36,7 @@ maybe_standards_check() {
 run npm run typecheck
 maybe_standards_check
 run npm run docs:check
+run node scripts/audit-table-sheets.mjs --check
 run node scripts/check-static-export-hygiene.mjs
 run node scripts/check-native-dialogs.mjs
 run node scripts/check-ui-i18n.mjs
@@ -55,4 +56,5 @@ echo "Manual smoke (required for UI changes, not automated here):"
 echo "  1. npm run dev  OR  npm run tauri:dev"
 echo "  2. Open the changed route in Chrome/Safari/Tauri — NOT Cursor embedded browser alone"
 echo "  3. Confirm browser console has no hydration/React errors"
+echo "  4. Run: npm run verify:dev-issues -- --routes /changed-route"
 echo "See docs/engineering/verification-runbook.md §6"

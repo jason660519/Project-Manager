@@ -9,11 +9,12 @@
  *   4. New instance reads localStorage → shows the updated selection
  */
 
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, type RenderResult } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DASHBOARD_SELECTED_PROJECTS_STORAGE_KEY } from '../lib/dashboardStorage';
+import { I18nProvider } from '../lib/i18n';
 import {
   KEY_PERSONAL_DASHBOARD_PROJECT_IDS,
   KEY_PERSONAL_SEEDED,
@@ -108,6 +109,13 @@ vi.mock('../lib/adapters/registry', () => ({
 // ── Import the component under test AFTER mocks are declared ──────────────────
 const { MainClient } = await import('../app/ui/MainClient');
 
+function renderMainClient(
+  ui: React.ReactElement,
+  options?: Parameters<typeof render>[1],
+): RenderResult {
+  return render(<I18nProvider>{ui}</I18nProvider>, options);
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function flushEffects() {
@@ -132,7 +140,7 @@ afterEach(() => {
 describe('checkbox toggle → localStorage sync', () => {
   it('adds project-manager to localStorage immediately when checkbox is checked', async () => {
     const user = userEvent.setup();
-    const { unmount } = render(<MainClient currentView="dashboard" />);
+    const { unmount } = renderMainClient(<MainClient currentView="dashboard" />);
     await flushEffects();
 
     await user.click(screen.getByTestId('toggle-project-manager-on'));
@@ -151,7 +159,7 @@ describe('checkbox toggle → localStorage sync', () => {
     );
 
     const user = userEvent.setup();
-    const { unmount } = render(<MainClient currentView="dashboard" />);
+    const { unmount } = renderMainClient(<MainClient currentView="dashboard" />);
     await flushEffects();
 
     await user.click(screen.getByTestId('toggle-project-manager-off'));
@@ -169,7 +177,7 @@ describe('checkbox toggle → localStorage sync', () => {
     );
 
     const user = userEvent.setup();
-    const { unmount } = render(<MainClient currentView="dashboard" />);
+    const { unmount } = renderMainClient(<MainClient currentView="dashboard" />);
     await flushEffects();
 
     // Remove project-manager — selection should drop to just owner-property
@@ -189,12 +197,12 @@ describe('cross-route persistence: dashboard Projects sheet → /project-progres
   it('dashboard receives updated feature list after project-manager is added', async () => {
     const user = userEvent.setup();
 
-    const { unmount: unmount1 } = render(<MainClient currentView="dashboard" />);
+    const { unmount: unmount1 } = renderMainClient(<MainClient currentView="dashboard" />);
     await flushEffects();
     await user.click(screen.getByTestId('toggle-project-manager-on'));
     unmount1();
 
-    render(<MainClient currentView="dashboard" />);
+    renderMainClient(<MainClient currentView="dashboard" />);
     await flushEffects();
 
     const dashboard = screen.getByTestId('dashboard');
@@ -210,7 +218,7 @@ describe('init: localStorage state is restored on fresh mount', () => {
       JSON.stringify(['owner-property', 'project-manager']),
     );
 
-    render(<MainClient currentView="dashboard" />);
+    renderMainClient(<MainClient currentView="dashboard" />);
     await flushEffects();
 
     const selectionEl = screen.getByTestId('current-selection');
@@ -221,7 +229,7 @@ describe('init: localStorage state is restored on fresh mount', () => {
   });
 
   it('defaults to first project when localStorage is empty', async () => {
-    render(<MainClient currentView="dashboard" />);
+    renderMainClient(<MainClient currentView="dashboard" />);
     await flushEffects();
 
     const selectionEl = screen.getByTestId('current-selection');
@@ -236,7 +244,7 @@ describe('empty project list', () => {
     localStorage.setItem(KEY_SHARED_PROJECTS, JSON.stringify([]));
     localStorage.setItem(KEY_PERSONAL_SEEDED, 'true');
 
-    render(<MainClient currentView="dashboard" />);
+    renderMainClient(<MainClient currentView="dashboard" />);
     await flushEffects();
 
     expect(screen.getByTestId('projects')).toBeInTheDocument();
@@ -302,7 +310,7 @@ describe('web registry sync', () => {
       ],
     } as Response);
 
-    render(<MainClient currentView="dashboard" />);
+    renderMainClient(<MainClient currentView="dashboard" />);
 
     await screen.findByTestId('dashboard');
     await vi.waitFor(() => {

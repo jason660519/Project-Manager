@@ -9,7 +9,7 @@ import {
   readStoredFontZoomScale,
 } from '../fontZoom';
 import type { FontZoomAction } from '../fontZoom';
-import { onFontZoomShortcut } from '../bridge';
+import { onFontZoomShortcut, safeUnlisten } from '../bridge';
 
 function getFontZoomStorage(): Storage | undefined {
   try {
@@ -51,7 +51,7 @@ export function useFontZoomShortcuts() {
     })
       .then((cleanup) => {
         if (cancelled) {
-          cleanup();
+          safeUnlisten(cleanup);
         } else {
           unlisten = cleanup;
         }
@@ -62,7 +62,8 @@ export function useFontZoomShortcuts() {
 
     return () => {
       cancelled = true;
-      unlisten?.();
+      safeUnlisten(unlisten);
+      unlisten = undefined;
     };
   }, []);
 

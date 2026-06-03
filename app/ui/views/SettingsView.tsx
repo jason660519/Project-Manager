@@ -62,7 +62,7 @@ function SettingsStatusBadge({
 
 function SettingsRowsTable({ rows }: { rows: SettingsRow[] }) {
   return (
-    <div className="overflow-x-auto bg-transparent">
+    <div className="pm-scroll overflow-x-auto bg-transparent">
       <table className="w-full min-w-[760px] border-collapse text-left">
         <thead className="sticky top-0 z-40 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
           <tr>

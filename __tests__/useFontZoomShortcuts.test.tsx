@@ -21,6 +21,9 @@ const bridgeMock = vi.hoisted(() => ({
 
 vi.mock('../lib/bridge', () => ({
   onFontZoomShortcut: bridgeMock.onFontZoomShortcut,
+  safeUnlisten: (fn: (() => void) | undefined) => {
+    fn?.();
+  },
 }));
 
 describe('useFontZoomShortcuts', () => {

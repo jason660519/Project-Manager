@@ -953,9 +953,19 @@ export type FontZoomShortcutPayload = {
 };
 export type UnlistenFn = () => void;
 
+export function safeUnlisten(unlisten: UnlistenFn | undefined): void {
+  if (!unlisten) return;
+  try {
+    unlisten();
+  } catch (error) {
+    console.warn('[bridge] event unlisten skipped (already removed or never registered)', error);
+  }
+}
+
 async function listen<T>(event: string, cb: (payload: T) => void): Promise<UnlistenFn> {
   const { listen: tauriListen } = await import('@tauri-apps/api/event');
-  return tauriListen<T>(event, (e) => cb(e.payload));
+  const unlisten = await tauriListen<T>(event, (e) => cb(e.payload));
+  return () => safeUnlisten(unlisten);
 }
 
 export function onAgentStdout(cb: (p: AgentStdioPayload) => void): Promise<UnlistenFn> {
@@ -968,6 +978,21 @@ export function onAgentStderr(cb: (p: AgentStdioPayload) => void): Promise<Unlis
 
 export function onAgentExit(cb: (p: AgentExitPayload) => void): Promise<UnlistenFn> {
   return listen<AgentExitPayload>('agent-exit', cb);
+}
+
+export async function subscribeAgentProcessEvents(handlers: {
+  onStdout: (payload: AgentStdioPayload) => void;
+  onStderr: (payload: AgentStdioPayload) => void;
+  onExit: (payload: AgentExitPayload) => void;
+}): Promise<UnlistenFn> {
+  const unStdout = await onAgentStdout(handlers.onStdout);
+  const unStderr = await onAgentStderr(handlers.onStderr);
+  const unExit = await onAgentExit(handlers.onExit);
+  return () => {
+    safeUnlisten(unStdout);
+    safeUnlisten(unStderr);
+    safeUnlisten(unExit);
+  };
 }
 
 export function onFontZoomShortcut(
@@ -1809,6 +1834,41 @@ export async function saveSession(sessionsDir: string, session: AgentSession): P
 
 // ── Generic file read ─────────────────────────────────────────────────────────
 
+let browserProjectRootPromise: Promise<string> | null = null;
+
+function isAbsoluteFilePath(filePath: string): boolean {
+  return filePath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(filePath);
+}
+
+function normalizePathForBrowserCompare(filePath: string): string {
+  const normalized = filePath.replace(/\\/g, '/').replace(/\/+$/, '');
+  return normalized || '/';
+}
+
+async function getBrowserProjectRoot(): Promise<string> {
+  if (!browserProjectRootPromise) {
+    browserProjectRootPromise = fetch('/api/project-manager-root')
+      .then(async (res) => {
+        const body = (await res.json().catch(() => null)) as { root?: unknown; error?: string } | null;
+        if (!res.ok) {
+          throw new Error(body?.error ?? `Cannot resolve Project Manager root: ${res.status}`);
+        }
+        return typeof body?.root === 'string' ? body.root : '';
+      })
+      .catch(() => '');
+  }
+  return browserProjectRootPromise;
+}
+
+async function assertBrowserReadPathAllowed(filePath: string): Promise<void> {
+  if (!isAbsoluteFilePath(filePath)) return;
+  const root = normalizePathForBrowserCompare(await getBrowserProjectRoot());
+  if (!root) return;
+  const target = normalizePathForBrowserCompare(filePath);
+  if (target === root || target.startsWith(`${root}/`)) return;
+  throw new Error('Access denied: path is outside the project directory');
+}
+
 /**
  * Read a plain-text file from disk and return its content.
  * In Tauri mode uses the Rust bridge; in browser dev mode uses
@@ -1820,6 +1880,7 @@ export async function readFile(path: string): Promise<string> {
   }
   // Browser dev mode: proxy through Next.js API route
   if (typeof window === 'undefined') return '';
+  await assertBrowserReadPathAllowed(path);
   const res = await fetch('/api/editor/read-file', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

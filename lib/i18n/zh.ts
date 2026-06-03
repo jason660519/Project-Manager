@@ -816,6 +816,34 @@ export const zh: Translations = {
       },
     },
   },
+  companyStandards: {
+    gates: {
+      sectionTitle: '执行已登记的项目闸门',
+      sectionDetail:
+        '仅能在桌面版从此页执行目录内的 npm 指令；输出会出现在 Logs。浏览器开发模式仅显示指令、不会执行。',
+      runGate: '执行',
+      runAllBlocking: '执行阻挡性闸门',
+      running: '执行中',
+      pass: '通过',
+      fail: '失败',
+      skipped: '跳过',
+      blocked: '已阻挡',
+      desktopRequired: '需使用 Project Manager 桌面版（Tauri）。请复制指令至终端执行。',
+      copyCommand: '复制指令',
+      copied: '已复制',
+      runAllProgress: '执行闸门 {current}（{index}/{total}）',
+      policyBlocked: '终端机政策已阻挡此指令',
+      spawnFailed: '无法启动闸门',
+      notRunnable: '建议性闸门 — 请在公司标准脚本环境执行',
+      policyPermissionBlocked:
+        'AI Assistant 的 tool:run_command 权限为 blocked。请至 AI Assistants → Permissions 设为 Granted 或 Guarded。',
+      policyCliNotExposed:
+        'npm 尚未对 Project Manager 暴露。请至 Integrations Hub → Commands 启用 npm，或在 Settings 套用 AI CLI Preset。',
+      policyTerminalBlocked:
+        '指令被 Terminal Operational Boundaries（白/黑名单）阻挡。请至 AI Assistants → Overview 检查规则。',
+      policyBridgeBlocked: '桌面版运行阶段的终端政策阻挡此指令。',
+    },
+  },
   codeEditor: {
     title: '代码编辑器',
     save: '保存',

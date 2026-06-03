@@ -132,6 +132,7 @@ The current implementation already has chat, AI Engineers, provider/model select
 
 ## Related guides
 
+- [Execution Policy](./execution-policy.md) — how Permissions, Commands exposure, and Terminal boundaries combine
 - [AI Assistant](chat.md)
 - [AI Engineers](engineers.md)
 - [Agent Workflows](agent-workflows.md)

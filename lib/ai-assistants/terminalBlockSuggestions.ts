@@ -1,8 +1,16 @@
 import type { TerminalBlockSuggestion } from './types';
 
+function isSafeAssistantId(value: string): boolean {
+  return /^[A-Za-z0-9_-]+$/.test(value);
+}
+
 export function terminalBlockSuggestionsSidecarPath(projectRoot: string, assistantId: string): string {
   const root = projectRoot.replace(/\/+$/, '');
-  return `${root}/.project-manager/assistants/${assistantId}/terminal-block-suggestions.json`;
+  const id = assistantId.trim();
+  if (!isSafeAssistantId(id)) {
+    throw new Error('Invalid assistantId');
+  }
+  return `${root}/.project-manager/assistants/${id}/terminal-block-suggestions.json`;
 }
 
 export function createTerminalBlockSuggestion(input: {
@@ -40,10 +48,13 @@ export async function loadTerminalBlockSuggestions(
   projectRoot: string,
   assistantId: string,
 ): Promise<TerminalBlockSuggestion[]> {
+  const trimmedRoot = projectRoot.trim();
+  const trimmedId = assistantId.trim();
+  if (!trimmedRoot || !trimmedId || !isSafeAssistantId(trimmedId)) return [];
   if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
     try {
       const { readFile } = await import('../bridge');
-      const raw = await readFile(terminalBlockSuggestionsSidecarPath(projectRoot, assistantId));
+      const raw = await readFile(terminalBlockSuggestionsSidecarPath(trimmedRoot, trimmedId));
       const parsed = JSON.parse(raw) as TerminalBlockSuggestion[];
       return Array.isArray(parsed) ? parsed : [];
     } catch {
@@ -52,9 +63,11 @@ export async function loadTerminalBlockSuggestions(
   }
 
   const url = new URL('/api/assistants/terminal-block-suggestions', window.location.origin);
-  url.searchParams.set('projectRoot', projectRoot);
-  url.searchParams.set('assistantId', assistantId);
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectRoot: trimmedRoot, assistantId: trimmedId }),
+  });
   if (!res.ok) return [];
   const body = (await res.json()) as { suggestions?: TerminalBlockSuggestion[] };
   return body.suggestions ?? [];
@@ -65,10 +78,18 @@ export async function saveTerminalBlockSuggestions(
   assistantId: string,
   suggestions: TerminalBlockSuggestion[],
 ): Promise<void> {
+  const trimmedRoot = projectRoot.trim();
+  const trimmedId = assistantId.trim();
+  if (!trimmedRoot || !trimmedId) {
+    throw new Error('saveTerminalBlockSuggestions: projectRoot and assistantId are required');
+  }
+  if (!isSafeAssistantId(trimmedId)) {
+    throw new Error('saveTerminalBlockSuggestions: invalid assistantId');
+  }
   if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
     const { writeFile } = await import('../bridge');
     await writeFile(
-      terminalBlockSuggestionsSidecarPath(projectRoot, assistantId),
+      terminalBlockSuggestionsSidecarPath(trimmedRoot, trimmedId),
       JSON.stringify(suggestions, null, 2),
     );
     return;
@@ -77,7 +98,7 @@ export async function saveTerminalBlockSuggestions(
   const res = await fetch('/api/assistants/terminal-block-suggestions', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ projectRoot, assistantId, suggestions }),
+    body: JSON.stringify({ projectRoot: trimmedRoot, assistantId: trimmedId, suggestions }),
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };

@@ -3,6 +3,10 @@ import { join } from 'path';
 import type { TerminalBlockSuggestion } from './types';
 import { terminalBlockSuggestionsSidecarPath } from './terminalBlockSuggestions';
 
+function isSafeAssistantId(value: string): boolean {
+  return /^[A-Za-z0-9_-]+$/.test(value);
+}
+
 export function loadTerminalBlockSuggestionsSync(
   projectRoot: string,
   assistantId: string,
@@ -26,7 +30,7 @@ export function saveTerminalBlockSuggestionsSync(
 ): void {
   const trimmedRoot = projectRoot.trim();
   const trimmedId = assistantId.trim();
-  if (!trimmedRoot || !trimmedId) return;
+  if (!trimmedRoot || !trimmedId || !isSafeAssistantId(trimmedId)) return;
   const dir = join(trimmedRoot, '.project-manager', 'assistants', trimmedId);
   mkdirSync(dir, { recursive: true });
   writeFileSync(

@@ -61,7 +61,7 @@ describe('column cell editing — feature rows route through onPatchFeature', ()
     const user = userEvent.setup();
     const row = featureToPhaseRow(baseFeature({ id: 'F01', points: 1 }));
     const onPatchFeature = vi.fn();
-    renderCell('development', 'points', row, { onPatchFeature });
+    renderCell('development', 'col-points', row, { onPatchFeature });
 
     // The cell starts in display mode showing "1"; click to enter edit mode.
     await user.click(screen.getByRole('button', { name: '1' }));
@@ -78,7 +78,7 @@ describe('column cell editing — feature rows route through onPatchFeature', ()
     const user = userEvent.setup();
     const row = featureToPhaseRow(baseFeature({ id: 'F02', phase: 'e2e_testing' }));
     const onPatchFeature = vi.fn();
-    renderCell('e2e_testing', 'testStatus', row, { onPatchFeature });
+    renderCell('e2e_testing', 'col-test-status', row, { onPatchFeature });
 
     const select = screen.getByRole('combobox') as HTMLSelectElement;
     await user.selectOptions(select, 'passed');
@@ -90,7 +90,7 @@ describe('column cell editing — feature rows route through onPatchFeature', ()
     const user = userEvent.setup();
     const row = featureToPhaseRow(baseFeature({ id: 'F03', phase: 'deployment' }));
     const onPatchFeature = vi.fn();
-    renderCell('deployment', 'deployStatus', row, { onPatchFeature });
+    renderCell('deployment', 'col-deploy-status', row, { onPatchFeature });
     await user.selectOptions(screen.getByRole('combobox'), 'production');
     expect(onPatchFeature).toHaveBeenCalledWith('F03', { deployStatus: 'production' });
   });
@@ -99,7 +99,7 @@ describe('column cell editing — feature rows route through onPatchFeature', ()
     const user = userEvent.setup();
     const row = featureToPhaseRow(baseFeature({ id: 'F04', phase: 'operations' }));
     const onPatchFeature = vi.fn();
-    renderCell('operations', 'uptime', row, { onPatchFeature });
+    renderCell('operations', 'col-uptime', row, { onPatchFeature });
 
     await user.click(screen.getByRole('button')); // enter edit
     const input = screen.getByRole('spinbutton') as HTMLInputElement;
@@ -117,7 +117,7 @@ describe('column cell editing — custom rows route through onPatchCustomRow', (
     const row = customRowToPhaseRow(baseCustom({ rowId: 'C-9', phase: 'development' }));
     const onPatchFeature = vi.fn();
     const onPatchCustomRow = vi.fn();
-    renderCell('development', 'section', row, { onPatchFeature, onPatchCustomRow });
+    renderCell('development', 'col-section', row, { onPatchFeature, onPatchCustomRow });
 
     await user.click(screen.getByRole('button')); // page cell starts with "—" placeholder
     const input = screen.getByRole('textbox') as HTMLInputElement;
@@ -132,13 +132,13 @@ describe('column cell editing — custom rows route through onPatchCustomRow', (
 describe('phase switcher in actions column', () => {
   it('is shown for custom rows only', () => {
     const customRow = customRowToPhaseRow(baseCustom({ rowId: 'C-10', phase: 'development' }));
-    renderCell('development', 'actions', customRow);
+    renderCell('development', 'col-actions', customRow);
     expect(screen.getByTitle('Move feature to another phase')).toBeInTheDocument();
   });
 
   it('is hidden for feature rows (phase moves via Dispatch modal)', () => {
     const row = featureToPhaseRow(baseFeature({ id: 'F10', phase: 'development' }));
-    renderCell('development', 'actions', row);
+    renderCell('development', 'col-actions', row);
     expect(screen.queryByTitle('Move feature to another phase')).toBeNull();
   });
 
@@ -146,7 +146,7 @@ describe('phase switcher in actions column', () => {
     const user = userEvent.setup();
     const row = customRowToPhaseRow(baseCustom({ rowId: 'C-11', phase: 'development' }));
     const onChangePhase = vi.fn();
-    renderCell('development', 'actions', row, { onChangePhase });
+    renderCell('development', 'col-actions', row, { onChangePhase });
 
     const phaseSelect = screen.getByTitle('Move feature to another phase') as HTMLSelectElement;
     await user.selectOptions(phaseSelect, 'e2e_testing');
@@ -160,20 +160,20 @@ describe('feature-only Dispatch button', () => {
   it('renders for feature rows when onDispatch is provided', () => {
     const row = featureToPhaseRow(baseFeature({ id: 'F11' }));
     const onDispatch = vi.fn();
-    renderCell('development', 'actions', row, { onDispatch });
+    renderCell('development', 'col-actions', row, { onDispatch });
     expect(screen.getByTitle(/Dispatch — assign engineer/)).toBeInTheDocument();
   });
 
   it('is hidden for custom rows even when onDispatch is provided', () => {
     const row = customRowToPhaseRow(baseCustom({ rowId: 'C-11' }));
     const onDispatch = vi.fn();
-    renderCell('development', 'actions', row, { onDispatch });
+    renderCell('development', 'col-actions', row, { onDispatch });
     expect(screen.queryByTitle(/Dispatch — assign engineer/)).toBeNull();
   });
 
   it('is hidden for feature rows when onDispatch is undefined', () => {
     const row = featureToPhaseRow(baseFeature({ id: 'F12' }));
-    renderCell('development', 'actions', row);
+    renderCell('development', 'col-actions', row);
     expect(screen.queryByTitle(/Dispatch — assign engineer/)).toBeNull();
   });
 });

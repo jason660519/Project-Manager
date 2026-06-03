@@ -157,6 +157,10 @@ Close by clicking the X, pressing Esc, or selecting another row.
 | Cross-sheet bulk dispatch | Select 3 plugins + 1 channel and run a single configure action across them. |
 | Inline rescan diff in the toolbar | Show a one-line "+2 / -1 / ~3" badge on each tab without opening the report panel. |
 
+## Execution policy
+
+Spawning any inventoried CLI (including **npm** for standards gates) requires the row to be **exposed** on the Commands sheet. That layer works together with AI Assistants **Permissions** and **Terminal Operational Boundaries** — see [Execution Policy](./execution-policy.md).
+
 ## References
 
 - Page entry: [`app/integrations-hub/page.tsx`](https://github.com/jason660519/Project-Manager/tree/main/app/integrations-hub/page.tsx)

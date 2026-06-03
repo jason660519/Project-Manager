@@ -7,6 +7,7 @@ import {
   customRowToPhaseRow,
   featureToPhaseRow,
 } from '../app/project-progress-dashboard/_lib/phaseRows';
+import { isUuid } from '../lib/aiSdks/uuid';
 
 const f = (overrides: Partial<Feature>): Feature => ({
   id: overrides.id ?? 'F',
@@ -33,6 +34,8 @@ describe('featureToPhaseRow', () => {
     expect(row.rowKey).toBe('feature::F01');
     expect(row.source).toBe('feature');
     expect(row.featureId).toBe('F01');
+    expect(isUuid(row.uuid)).toBe(true);
+    expect(row.id).toBe('F01');
   });
 
   it('defaults missing points to 1 so aggregations never divide by zero', () => {
@@ -66,6 +69,8 @@ describe('customRowToPhaseRow', () => {
     expect(row.source).toBe('custom');
     expect(row.customRowId).toBe('X-1');
     expect(row.feature).toBeUndefined();
+    expect(isUuid(row.uuid)).toBe(true);
+    expect(row.id).toBe('X-1');
   });
 });
 

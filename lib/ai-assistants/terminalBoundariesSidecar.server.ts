@@ -1,10 +1,16 @@
 import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { join as joinPath } from 'path';
 import type { TerminalOperationalBoundaries } from './types';
 import { createDefaultTerminalBoundaries } from './terminalBoundaries';
-import { join as joinPath } from 'path';
+
+function isSafeAssistantId(value: string): boolean {
+  return /^[A-Za-z0-9_-]+$/.test(value);
+}
 
 function terminalBoundariesSidecarPath(projectRoot: string, assistantId: string): string {
+  if (!isSafeAssistantId(assistantId)) {
+    throw new Error('Invalid assistantId');
+  }
   return joinPath(projectRoot, '.project-manager', 'assistants', assistantId, 'terminal-boundaries.json');
 }
 
@@ -12,7 +18,7 @@ export function loadTerminalBoundariesSidecarSync(
   projectRoot: string,
   assistantId: string,
 ): TerminalOperationalBoundaries | null {
-  if (!projectRoot?.trim() || !assistantId?.trim()) return null;
+  if (!projectRoot?.trim() || !assistantId?.trim() || !isSafeAssistantId(assistantId.trim())) return null;
   try {
     const path = terminalBoundariesSidecarPath(projectRoot, assistantId);
     if (!existsSync(path)) return null;
