@@ -206,8 +206,16 @@ export function BatchDispatchModal({
       }
       staged.set(token, [event]);
       if (staged.size > stagingCap) {
-        const oldest = staged.keys().next().value;
-        if (oldest !== undefined) staged.delete(oldest);
+        // Never drop a staged exit (it would strand a batch item in "running");
+        // shed only the oldest stdout-only token. Foreign tokens from concurrent
+        // runs that exit are kept until drained — bounded by the spawn window.
+        for (const [tok, q] of staged) {
+          if (tok === token) continue;
+          if (!q.some((e) => e.kind === 'exit')) {
+            staged.delete(tok);
+            break;
+          }
+        }
       }
     };
 

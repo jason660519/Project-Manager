@@ -281,4 +281,46 @@ describe('BatchDispatchModal state handling', () => {
     // All complete — none evicted/stranded.
     expect(await screen.findByText(`${COUNT} 完成`)).toBeInTheDocument();
   });
+
+  // Regression (PR #16 re-review, TaskDispatchModal.tsx:409 thread): a staged
+  // EXIT must never be FIFO-evicted by a flood of unrelated stdout tokens from
+  // concurrent runs (gates / other dispatches). Losing stdout is cosmetic;
+  // losing the exit strands the item in "running".
+  it('keeps a staged exit when foreign stdout tokens overflow the cap', async () => {
+    const user = userEvent.setup();
+    let resolveSpawn: ((v: { pid: number; spawnToken: number }) => void) | null = null;
+    spawnAgentMock.mockImplementationOnce(
+      () =>
+        new Promise<{ pid: number; spawnToken: number }>((resolve) => {
+          resolveSpawn = resolve;
+        }),
+    );
+
+    render(
+      <I18nProvider>
+        <BatchDispatchModal {...baseProps} features={[makeFeature('F1')]} />
+      </I18nProvider>,
+    );
+
+    await user.click(screen.getByText('開始批次派遣'));
+    await waitFor(() => expect(exitHandler).not.toBeNull());
+
+    act(() => {
+      // This item's own exit lands first (token 900), before the spawn resolves.
+      exitHandler?.({ pid: 900, spawnToken: 900, code: 0 });
+      // Then a flood of foreign stdout-only tokens (never mapped) far exceeds the
+      // cap. Old FIFO policy would evict token 900's exit; the fix sheds only
+      // stdout-only tokens, preserving the exit.
+      for (let t = 1000; t < 1100; t += 1) {
+        stdoutHandler?.({ pid: t, spawnToken: t, line: `foreign ${t}` });
+      }
+    });
+
+    await act(async () => {
+      resolveSpawn?.({ pid: 900, spawnToken: 900 });
+    });
+
+    // The item completed → its staged exit survived the foreign-stdout flood.
+    expect(await screen.findByText('1 完成')).toBeInTheDocument();
+  });
 });

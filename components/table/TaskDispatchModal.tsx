@@ -405,8 +405,17 @@ export function TaskDispatchModal({
         }
         staged.set(token, [event]);
         if (staged.size > PENDING_EVENT_CAP) {
-          const oldest = staged.keys().next().value;
-          if (oldest !== undefined) staged.delete(oldest);
+          // Evict the oldest token that carries NO exit — never drop a staged
+          // exit, or the run it belongs to (possibly this role's own, racing the
+          // spawn invoke) would strand in "running". stdout-only floods from
+          // unrelated tokens are cosmetic and safe to shed.
+          for (const [tok, q] of staged) {
+            if (tok === token) continue;
+            if (!q.some((e) => e.kind === 'exit')) {
+              staged.delete(tok);
+              break;
+            }
+          }
         }
       };
 
