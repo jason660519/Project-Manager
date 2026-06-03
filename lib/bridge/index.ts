@@ -323,6 +323,13 @@ export interface SpawnAgentOptions {
   args: string[];
   /** Absolute path to the project root */
   workingDir: string;
+  /**
+   * Fired synchronously after all bridge policy preflight, immediately before
+   * the native spawn invoke that creates the PID. Lets a caller open an
+   * early-exit capture window around ONLY the PID-return race (agent-exit can
+   * arrive before this invoke resolves), not the preceding async policy checks.
+   */
+  onBeforeNativeSpawn?: () => void;
 }
 
 /**
@@ -335,6 +342,7 @@ export interface SpawnAgentOptions {
 export async function spawnAgent(opts: SpawnAgentOptions): Promise<number> {
   if (isTauri()) {
     await assertCommandPolicyAllows(opts.command);
+    opts.onBeforeNativeSpawn?.();
     return invoke<number>('spawn_agent', {
       command: opts.command,
       args: opts.args,

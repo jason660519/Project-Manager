@@ -59,13 +59,16 @@ describe('spawnStandardsGateRun', () => {
     expect(spawnAgent).not.toHaveBeenCalled();
   });
 
-  it('fires onSpawnStart after preflight and immediately before spawnAgent', async () => {
+  it('forwards onSpawnStart to spawnAgent.onBeforeNativeSpawn, after preflight', async () => {
     const order: string[] = [];
     evaluateTerminalCommandBridge.mockImplementationOnce(async () => {
       order.push('preflight');
       return { decision: 'allowed' };
     });
-    spawnAgent.mockImplementationOnce(async () => {
+    // spawnAgent fires onBeforeNativeSpawn after its own bridge policy preflight,
+    // immediately before the native spawn — emulate that ordering here.
+    spawnAgent.mockImplementationOnce(async (opts: { onBeforeNativeSpawn?: () => void }) => {
+      opts.onBeforeNativeSpawn?.();
       order.push('spawn');
       return 4242;
     });
