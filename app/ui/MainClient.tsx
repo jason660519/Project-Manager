@@ -187,6 +187,10 @@ const SEED_PROJECTS: ProjectEntry[] = [
 
 const SEED_PROJECT_IDS = new Set(SEED_PROJECTS.map((p) => p.id));
 
+// Upper bound on staged exit codes (see gateExitCodesRef). Bounds memory when
+// non-gate dispatch PIDs flow through the global listener and are never drained.
+const GATE_EXIT_CACHE_CAP = 64;
+
 interface MainClientProps {
   currentView: ViewId;
   initialProjectId?: string;
@@ -230,7 +234,13 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
   const gateProcessPidsRef = useRef<Set<number>>(new Set());
   // Exit codes that arrived before `waitForGateProcessExit` registered a waiter
   // (fast/instant-failing gates). Cached so the await resolves instead of hanging.
+  // Only ever populated for the gate PID currently being spawned (see
+  // gateSpawnPendingRef) — never for unrelated dispatch PIDs.
   const gateExitCodesRef = useRef<Map<number, number>>(new Map());
+  // True only while a standards-gate spawn is awaiting its PID. The global
+  // listener stages early exits ONLY in this window, so dispatch-modal PIDs are
+  // never cached and a reused OS PID can't replay a stale exit onto a later gate.
+  const gateSpawnPendingRef = useRef(false);
   const [gatePhases, setGatePhases] = useState<Partial<Record<StandardsGateId, GateRunPhase>>>({});
   const [gateRunAllProgress, setGateRunAllProgress] = useState<GateRunAllProgress | null>(null);
   const [gateRunMessage, setGateRunMessage] = useState<string | null>(null);
@@ -799,8 +809,8 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
       const { subscribeAgentProcessEvents, safeUnlisten } = await import('../../lib/bridge');
       // This MainClient-level listener exists to capture standards-gate process
       // events (gates have no mounted modal to forward them). Dispatch modals
-      // already subscribe and forward their own PIDs, so route ONLY gate-owned
-      // PIDs here to avoid double-appending logs / double-handling exits.
+      // already subscribe and forward their own PIDs, so route logs/exits for
+      // gate-owned PIDs only — otherwise dispatch events would be handled twice.
       const unlisten = await subscribeAgentProcessEvents({
         onStdout: ({ pid, line }) => {
           if (gateProcessPidsRef.current.has(pid)) handleRunLogRef.current(pid, line);
@@ -809,7 +819,25 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
           if (gateProcessPidsRef.current.has(pid)) handleRunLogRef.current(pid, line);
         },
         onExit: ({ pid, code }) => {
-          if (gateProcessPidsRef.current.has(pid)) handleRunEndRef.current(pid, code);
+          if (gateProcessPidsRef.current.has(pid)) {
+            handleRunEndRef.current(pid, code);
+            return;
+          }
+          // PID not yet claimed. Rust (src-tauri/src/lib.rs) starts the
+          // exit-emitting task before returning the PID, so a fast gate's
+          // agent-exit can arrive before spawnStandardsGateRun resolves. Stage
+          // it so the gate claim can reconcile instead of hanging forever — but
+          // ONLY while a gate spawn is in flight. Outside that window an unclaimed
+          // PID is a dispatch-modal process the modal handles itself; caching it
+          // would both leak and risk a reused OS PID replaying a stale exit onto
+          // a later gate.
+          if (!gateSpawnPendingRef.current) return;
+          const codes = gateExitCodesRef.current;
+          codes.set(pid, code);
+          if (codes.size > GATE_EXIT_CACHE_CAP) {
+            const oldest = codes.keys().next().value;
+            if (oldest !== undefined) codes.delete(oldest);
+          }
         },
       });
       if (cancelled) {
@@ -850,13 +878,25 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
       setGateRunMessage(null);
       setGatePhases((phases) => ({ ...phases, [gateId]: 'running' }));
       try {
-        const result = await spawnStandardsGateRun(gateId, root, isTauri);
-        // Claim the PID before any further await so the global listener routes
-        // its events and an instant exit is cached, not dropped.
+        // Open the early-exit capture window only around the actual spawn (after
+        // preflight), so dispatch exits during policy/inventory checks are never
+        // staged. onSpawnStart fires synchronously right before the PID is created.
+        const result = await spawnStandardsGateRun(gateId, root, isTauri, () => {
+          gateExitCodesRef.current.clear();
+          gateSpawnPendingRef.current = true;
+        });
+        // Claim the PID so the global listener routes this gate's events.
         gateProcessPidsRef.current.add(result.pid);
         handleRunStart(result.pid, result.featureId, result.featureName, result.command, result.args);
+        // The exit may have already fired before we claimed the PID (Rust emits
+        // agent-exit before returning it). Replay it now that the run exists,
+        // then close the window so no further unclaimed PIDs are staged.
+        const earlyExit = gateExitCodesRef.current.get(result.pid);
+        gateSpawnPendingRef.current = false;
+        if (earlyExit !== undefined) handleRunEnd(result.pid, earlyExit);
         await waitForGateProcessExit(result.pid);
       } catch (e) {
+        gateSpawnPendingRef.current = false;
         setGateRunMessage(formatStandardsGateRunError(e, standardsGateLabels));
         setGatePhases((phases) => ({
           ...phases,
@@ -871,6 +911,7 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
       gateOrchestrationBusy,
       activeRuns,
       handleRunStart,
+      handleRunEnd,
       waitForGateProcessExit,
       standardsGateLabels,
     ],
@@ -902,10 +943,17 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
       setGatePhases((phases) => ({ ...phases, [gate.id]: 'running' }));
 
       try {
-        const result = await spawnStandardsGateRun(gate.id, root, isTauri);
-        // Claim the PID before any further await (see handleRunStandardsGate).
+        // Open the early-exit window only around the actual spawn (see handleRunStandardsGate).
+        const result = await spawnStandardsGateRun(gate.id, root, isTauri, () => {
+          gateExitCodesRef.current.clear();
+          gateSpawnPendingRef.current = true;
+        });
+        // Claim the PID and replay any exit that fired first (see handleRunStandardsGate).
         gateProcessPidsRef.current.add(result.pid);
         handleRunStart(result.pid, result.featureId, result.featureName, result.command, result.args);
+        const earlyExit = gateExitCodesRef.current.get(result.pid);
+        gateSpawnPendingRef.current = false;
+        if (earlyExit !== undefined) handleRunEnd(result.pid, earlyExit);
         const code = await waitForGateProcessExit(result.pid);
         setGatePhases((phases) => ({
           ...phases,
@@ -919,6 +967,7 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
           break;
         }
       } catch (e) {
+        gateSpawnPendingRef.current = false;
         setGateRunMessage(formatStandardsGateRunError(e, standardsGateLabels));
         setGatePhases((phases) => ({
           ...phases,
@@ -941,6 +990,7 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
     gateOrchestrationBusy,
     activeRuns,
     handleRunStart,
+    handleRunEnd,
     waitForGateProcessExit,
     standardsGateLabels,
   ]);

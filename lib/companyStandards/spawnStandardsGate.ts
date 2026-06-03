@@ -90,6 +90,12 @@ export async function spawnStandardsGateRun(
   gateId: StandardsGateId,
   workingDir: string,
   isTauri: boolean,
+  // Forwarded to spawnAgent's onBeforeNativeSpawn: fired synchronously after ALL
+  // preflight (both this helper's policy/inventory checks and the bridge's own
+  // assertCommandPolicyAllows), immediately before the native spawn creates the
+  // PID. Lets the caller open its early-exit capture window around ONLY the
+  // PID-return race (see MainClient gateSpawnPendingRef).
+  onSpawnStart?: () => void,
 ): Promise<{
   pid: number;
   featureId: string;
@@ -127,6 +133,9 @@ export async function spawnStandardsGateRun(
     command: inv.command,
     args: inv.args,
     workingDir,
+    // Open the early-exit window below the bridge's own policy preflight, right
+    // before the native spawn creates the PID.
+    onBeforeNativeSpawn: onSpawnStart,
   });
 
   return {
