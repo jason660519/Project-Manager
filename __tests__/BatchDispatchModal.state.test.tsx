@@ -7,6 +7,7 @@ import { I18nProvider } from '../lib/i18n';
 const spawnAgentMock = vi.fn();
 const augmentArgsWithMcpMock = vi.fn().mockImplementation((_command, args) => Promise.resolve(args));
 let exitHandler: ((event: { pid: number; spawnToken: number; code: number }) => void) | null = null;
+let stdoutHandler: ((event: { pid: number; spawnToken: number; line: string }) => void) | null = null;
 
 vi.mock('../lib/bridge', () => ({
   augmentArgsWithMcp: augmentArgsWithMcpMock,
@@ -16,7 +17,10 @@ vi.mock('../lib/bridge', () => ({
     exitHandler = handler;
     return vi.fn();
   }),
-  onAgentStdout: vi.fn().mockResolvedValue(vi.fn()),
+  onAgentStdout: vi.fn().mockImplementation(async (handler) => {
+    stdoutHandler = handler;
+    return vi.fn();
+  }),
   spawnAgent: spawnAgentMock,
 }));
 
@@ -74,6 +78,7 @@ describe('BatchDispatchModal state handling', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     exitHandler = null;
+    stdoutHandler = null;
     spawnAgentMock.mockResolvedValue({ pid: 101, spawnToken: 101 });
   });
 
@@ -188,6 +193,47 @@ describe('BatchDispatchModal state handling', () => {
     act(() => {
       exitHandler?.({ pid: 500, spawnToken: 42, code: 0 });
     });
+    expect(await screen.findByText('1 完成')).toBeInTheDocument();
+  });
+
+  // Regression (PR #16): Rust starts the emit tasks before returning the spawn
+  // token (ADR-014), so a fast feature's events can arrive BEFORE spawnAgent
+  // resolves — while tokenToFeatureId has no mapping. They must be staged and
+  // replayed on claim, or the item is stranded in "running" forever.
+  it('replays events that arrive before the spawn token is mapped', async () => {
+    const user = userEvent.setup();
+    let resolveSpawn: ((v: { pid: number; spawnToken: number }) => void) | null = null;
+    spawnAgentMock.mockImplementationOnce(
+      () =>
+        new Promise<{ pid: number; spawnToken: number }>((resolve) => {
+          resolveSpawn = resolve;
+        }),
+    );
+
+    render(
+      <I18nProvider>
+        <BatchDispatchModal {...baseProps} features={[makeFeature('F1')]} />
+      </I18nProvider>,
+    );
+
+    await user.click(screen.getByText('開始批次派遣'));
+    // Listeners are registered before the spawn is awaited.
+    await waitFor(() => expect(exitHandler).not.toBeNull());
+
+    // Stdout + exit land BEFORE the spawn resolves (token not yet mapped). The
+    // stdout exercises the staging path; the exit is the correctness case —
+    // without staging it is dropped and the item is stuck "running" forever.
+    act(() => {
+      stdoutHandler?.({ pid: 700, spawnToken: 700, line: 'early output' });
+      exitHandler?.({ pid: 700, spawnToken: 700, code: 0 });
+    });
+
+    // The spawn resolves and claims the token → staged events replay.
+    await act(async () => {
+      resolveSpawn?.({ pid: 700, spawnToken: 700 });
+    });
+
+    // Completed (not stranded in "running") — proves the early exit was replayed.
     expect(await screen.findByText('1 完成')).toBeInTheDocument();
   });
 });

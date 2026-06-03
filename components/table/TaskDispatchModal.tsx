@@ -76,6 +76,16 @@ interface TaskDispatchModalProps {
 
 type RolePhase = 'idle' | 'pending' | 'running' | 'done' | 'error';
 
+// An agent event that arrived before its spawn token was claimed (Rust emits
+// stdout/exit before returning the token — ADR-014). Staged, then replayed.
+type PendingAgentEvent =
+  | { kind: 'stdout'; pid: number; line: string }
+  | { kind: 'exit'; pid: number; code: number };
+
+// Bounds the pre-claim staging map so events for unrelated tokens (other
+// concurrent dispatches) can't accumulate before our token is claimed.
+const PENDING_EVENT_CAP = 64;
+
 interface RoleRunState {
   phase: RolePhase;
   /** OS PID — retained for kill_process and PID display only. */
@@ -380,20 +390,32 @@ export function TaskDispatchModal({
       const args = await augmentArgsWithMcp(command, baseArgs, collectEnabledMcpServers(projectRoot));
 
       // Listeners are registered before the spawn resolves, so the token isn't
-      // known yet. Hold it in a closure-local that both handlers read live —
-      // correlate by token, never the reusable PID (ADR-014). Until the token is
-      // set, no event can match (events for this run can't precede the spawn
-      // that creates it).
+      // known yet. Rust starts the stdout/exit emit tasks BEFORE returning the
+      // token (ADR-014), so this run's events can arrive first. Stage anything
+      // that lands before the token is claimed and replay it afterwards — a fast
+      // process must not lose its early output or, worse, its exit (which would
+      // strand the role in "running"). Correlate by token, never the reusable PID.
       let activeSpawnToken: number | null = null;
+      const staged = new Map<number, PendingAgentEvent[]>();
+      const stage = (token: number, event: PendingAgentEvent) => {
+        const queue = staged.get(token);
+        if (queue) {
+          queue.push(event);
+          return;
+        }
+        staged.set(token, [event]);
+        if (staged.size > PENDING_EVENT_CAP) {
+          const oldest = staged.keys().next().value;
+          if (oldest !== undefined) staged.delete(oldest);
+        }
+      };
 
-      const unStdout = await onAgentStdout(({ pid: eventPid, spawnToken: eventToken, line }) => {
-        if (activeSpawnToken === null || eventToken !== activeSpawnToken) return;
+      const applyStdout = (eventPid: number, line: string) => {
         setLogs((prev) => [...prev, { role, line }]);
         onRunLog?.(eventPid, line);
-      });
+      };
 
-      const unExit = await onAgentExit(({ pid: exitPid, spawnToken: exitToken, code }) => {
-        if (activeSpawnToken === null || exitToken !== activeSpawnToken) return;
+      const applyExit = (exitPid: number, code: number) => {
         const succeeded = code === 0;
         const nextAssignments = { ...(feature.harnessAssignments ?? {}) };
         nextAssignments[role] = {
@@ -411,6 +433,18 @@ export function TaskDispatchModal({
         if (role === 'worker') {
           onFeatureUpdate?.(feature.id, { assignedTo: undefined, assignedAt: undefined });
         }
+      };
+
+      const unStdout = await onAgentStdout(({ pid: eventPid, spawnToken: eventToken, line }) => {
+        if (activeSpawnToken === null) { stage(eventToken, { kind: 'stdout', pid: eventPid, line }); return; }
+        if (eventToken !== activeSpawnToken) return;
+        applyStdout(eventPid, line);
+      });
+
+      const unExit = await onAgentExit(({ pid: exitPid, spawnToken: exitToken, code }) => {
+        if (activeSpawnToken === null) { stage(exitToken, { kind: 'exit', pid: exitPid, code }); return; }
+        if (exitToken !== activeSpawnToken) return;
+        applyExit(exitPid, code);
       });
 
       unlistenRefs.current.push(unStdout, unExit);
@@ -429,6 +463,17 @@ export function TaskDispatchModal({
       onFeatureUpdate?.(feature.id, { harnessAssignments: nextAssignments });
 
       onExecuted({ success: true, message: `${adapter.name} started (PID: ${pid})`, command, args, dryRun: false, pid });
+
+      // Replay events that beat the token claim. Running state + onRunStart are
+      // set above first, so a staged exit lands as done/error, not overwritten.
+      const pending = staged.get(spawnToken);
+      staged.clear();
+      if (pending) {
+        for (const event of pending) {
+          if (event.kind === 'stdout') applyStdout(event.pid, event.line);
+          else applyExit(event.pid, event.code);
+        }
+      }
     } catch (err) {
       setLogs((prev) => [...prev, { role, line: `Error: ${err}` }]);
       setRunStates((prev) => ({ ...prev, [role]: { phase: 'error' as const, activePid: null, activeToken: null } }));

@@ -73,6 +73,17 @@ interface BatchItem {
 
 type BatchPhase = 'idle' | 'running' | 'done';
 
+// An agent event that arrived before its spawn token was mapped to a feature
+// (Rust emits stdout/exit before returning the token — ADR-014). Staged, then
+// replayed once the mapping exists.
+type PendingAgentEvent =
+  | { kind: 'stdout'; pid: number; line: string }
+  | { kind: 'exit'; pid: number; code: number };
+
+// Bounds the pre-claim staging map so events for tokens this batch never maps
+// (other dispatches) can't accumulate.
+const PENDING_EVENT_CAP = 64;
+
 interface BatchDispatchModalProps {
   features: Feature[];
   adapters: AnyAdapterConfig[];
@@ -177,21 +188,33 @@ export function BatchDispatchModal({
     // Map spawnToken → featureId for event routing. Tokens are unique &
     // monotonic, so a reused OS PID can't cross-correlate (ADR-014).
     const tokenToFeatureId = new Map<number, string>();
+    // Rust starts the emit tasks before returning the token, so a fast feature's
+    // events can arrive before its mapping is set. Stage them, then replay once
+    // the token is mapped — otherwise the item is stranded in "running".
+    const staged = new Map<number, PendingAgentEvent[]>();
+    const stage = (token: number, event: PendingAgentEvent) => {
+      const queue = staged.get(token);
+      if (queue) {
+        queue.push(event);
+        return;
+      }
+      staged.set(token, [event]);
+      if (staged.size > PENDING_EVENT_CAP) {
+        const oldest = staged.keys().next().value;
+        if (oldest !== undefined) staged.delete(oldest);
+      }
+    };
 
-    const unStdout = await onAgentStdout(({ pid: eventPid, spawnToken, line }) => {
-      const featureId = tokenToFeatureId.get(spawnToken);
-      if (!featureId) return;
+    const applyStdout = (featureId: string, eventPid: number, line: string) => {
       setItems((prev) =>
         prev.map((item) =>
           item.feature.id === featureId ? { ...item, logs: [...item.logs, line] } : item,
         ),
       );
       onRunLog?.(eventPid, line);
-    });
+    };
 
-    const unExit = await onAgentExit(({ pid: exitPid, spawnToken, code }) => {
-      const featureId = tokenToFeatureId.get(spawnToken);
-      if (!featureId) return;
+    const applyExit = (featureId: string, exitPid: number, code: number) => {
       const succeeded = code === 0;
       setItems((prev) =>
         prev.map((item) =>
@@ -212,6 +235,18 @@ export function BatchDispatchModal({
           onFeatureUpdate?.(featureId, { progress: Math.min(feature.progress + 20, 100) });
         }
       }
+    };
+
+    const unStdout = await onAgentStdout(({ pid: eventPid, spawnToken, line }) => {
+      const featureId = tokenToFeatureId.get(spawnToken);
+      if (!featureId) { stage(spawnToken, { kind: 'stdout', pid: eventPid, line }); return; }
+      applyStdout(featureId, eventPid, line);
+    });
+
+    const unExit = await onAgentExit(({ pid: exitPid, spawnToken, code }) => {
+      const featureId = tokenToFeatureId.get(spawnToken);
+      if (!featureId) { stage(spawnToken, { kind: 'exit', pid: exitPid, code }); return; }
+      applyExit(featureId, exitPid, code);
     });
 
     unlistenRefs.current.push(unStdout, unExit);
@@ -232,6 +267,17 @@ export function BatchDispatchModal({
             ),
           );
           onRunStart?.(pid, feature.id, feature.name, adapter.command, args);
+          // Replay events that beat the mapping (running state set above first).
+          // Drain only this token — sibling features in this batch may still be
+          // staging their own concurrently.
+          const pending = staged.get(spawnToken);
+          if (pending) {
+            staged.delete(spawnToken);
+            for (const event of pending) {
+              if (event.kind === 'stdout') applyStdout(feature.id, event.pid, event.line);
+              else applyExit(feature.id, event.pid, event.code);
+            }
+          }
         } catch (err) {
           setItems((prev) =>
             prev.map((i) =>
