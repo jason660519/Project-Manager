@@ -10,6 +10,12 @@ function isSafeAssistantId(value: string): boolean {
   return /^[A-Za-z0-9_-]+$/.test(value);
 }
 
+// Absolute on POSIX (`/repo`) or Windows (`C:\repo` / `C:/repo`). The dev flow
+// runs on the host OS, so a POSIX-only check 400s legitimate Windows roots.
+function isAbsoluteProjectRoot(value: string): boolean {
+  return value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value);
+}
+
 function isValidBoundaries(value: unknown): value is TerminalOperationalBoundaries {
   if (!value || typeof value !== 'object') return false;
   const b = value as TerminalOperationalBoundaries;
@@ -33,7 +39,7 @@ export async function GET(request: NextRequest) {
   if (!projectRoot || !assistantId) {
     return NextResponse.json({ error: 'projectRoot and assistantId are required' }, { status: 400 });
   }
-  if (!projectRoot.startsWith('/')) {
+  if (!isAbsoluteProjectRoot(projectRoot)) {
     return NextResponse.json({ error: 'projectRoot must be an absolute path' }, { status: 400 });
   }
   if (!isSafeAssistantId(assistantId)) {
@@ -67,7 +73,7 @@ export async function POST(request: NextRequest) {
   if (!projectRoot || !assistantId) {
     return NextResponse.json({ error: 'projectRoot and assistantId are required' }, { status: 400 });
   }
-  if (!projectRoot.startsWith('/')) {
+  if (!isAbsoluteProjectRoot(projectRoot)) {
     return NextResponse.json({ error: 'projectRoot must be an absolute path' }, { status: 400 });
   }
   if (!isSafeAssistantId(assistantId)) {
@@ -103,7 +109,7 @@ export async function PUT(request: NextRequest) {
   if (!projectRoot || !assistantId) {
     return NextResponse.json({ error: 'projectRoot and assistantId are required' }, { status: 400 });
   }
-  if (!projectRoot.startsWith('/')) {
+  if (!isAbsoluteProjectRoot(projectRoot)) {
     return NextResponse.json({ error: 'projectRoot must be an absolute path' }, { status: 400 });
   }
   if (!isSafeAssistantId(assistantId)) {

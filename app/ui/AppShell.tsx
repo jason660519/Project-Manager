@@ -2,7 +2,6 @@
 
 import type { ReactNode } from 'react';
 import { ViewId } from '../../lib/types';
-import { I18nProvider } from '../../lib/i18n';
 import type { ChatContext } from '../../lib/chat/types';
 import { useFontZoomShortcuts } from '../../lib/hooks/useFontZoomShortcuts';
 import { Sidebar } from './Sidebar';
@@ -27,7 +26,6 @@ export function AppShell({
   useFontZoomShortcuts();
 
   return (
-    <I18nProvider>
     <main
       className={`${isXmux ? 'h-screen overflow-hidden' : 'min-h-screen'} text-stone-100`}
       style={{ background: 'var(--pm-bg)' }}
@@ -65,6 +63,5 @@ export function AppShell({
         </div>
       </div>
     </main>
-    </I18nProvider>
   );
 }

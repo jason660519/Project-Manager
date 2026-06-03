@@ -224,6 +224,13 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
   const cronJobsRef = useRef<CronJob[]>([]);
   const cronNextRunRef = useRef<Record<string, number>>({});
   const gateExitWaitersRef = useRef<Map<number, (code: number) => void>>(new Map());
+  // PIDs spawned by the standards-gate runner. The global agent-event listener
+  // only routes these; dispatch modals own their own PIDs and forward separately
+  // (otherwise each gate-vs-dispatch event would be handled twice).
+  const gateProcessPidsRef = useRef<Set<number>>(new Set());
+  // Exit codes that arrived before `waitForGateProcessExit` registered a waiter
+  // (fast/instant-failing gates). Cached so the await resolves instead of hanging.
+  const gateExitCodesRef = useRef<Map<number, number>>(new Map());
   const [gatePhases, setGatePhases] = useState<Partial<Record<StandardsGateId, GateRunPhase>>>({});
   const [gateRunAllProgress, setGateRunAllProgress] = useState<GateRunAllProgress | null>(null);
   const [gateRunMessage, setGateRunMessage] = useState<string | null>(null);
@@ -741,7 +748,12 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
     if (waiter) {
       gateExitWaitersRef.current.delete(pid);
       waiter(exitCode);
+    } else if (gateProcessPidsRef.current.has(pid)) {
+      // Exit raced ahead of waitForGateProcessExit — stash the code so the
+      // pending await resolves immediately instead of blocking forever.
+      gateExitCodesRef.current.set(pid, exitCode);
     }
+    gateProcessPidsRef.current.delete(pid);
 
     setActiveRuns((prev) => {
       const run = prev.find((r) => r.pid === pid);
@@ -785,10 +797,20 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
     let unlistenAll: (() => void) | undefined;
     void (async () => {
       const { subscribeAgentProcessEvents, safeUnlisten } = await import('../../lib/bridge');
+      // This MainClient-level listener exists to capture standards-gate process
+      // events (gates have no mounted modal to forward them). Dispatch modals
+      // already subscribe and forward their own PIDs, so route ONLY gate-owned
+      // PIDs here to avoid double-appending logs / double-handling exits.
       const unlisten = await subscribeAgentProcessEvents({
-        onStdout: ({ pid, line }) => handleRunLogRef.current(pid, line),
-        onStderr: ({ pid, line }) => handleRunLogRef.current(pid, line),
-        onExit: ({ pid, code }) => handleRunEndRef.current(pid, code),
+        onStdout: ({ pid, line }) => {
+          if (gateProcessPidsRef.current.has(pid)) handleRunLogRef.current(pid, line);
+        },
+        onStderr: ({ pid, line }) => {
+          if (gateProcessPidsRef.current.has(pid)) handleRunLogRef.current(pid, line);
+        },
+        onExit: ({ pid, code }) => {
+          if (gateProcessPidsRef.current.has(pid)) handleRunEndRef.current(pid, code);
+        },
       });
       if (cancelled) {
         safeUnlisten(unlisten);
@@ -804,6 +826,12 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
   }, [isTauri]);
 
   const waitForGateProcessExit = useCallback((pid: number) => {
+    // The exit event may have already fired before we got here — drain the cache.
+    const cached = gateExitCodesRef.current.get(pid);
+    if (cached !== undefined) {
+      gateExitCodesRef.current.delete(pid);
+      return Promise.resolve(cached);
+    }
     return new Promise<number>((resolve) => {
       gateExitWaitersRef.current.set(pid, resolve);
     });
@@ -813,7 +841,7 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
     async (gateId: StandardsGateId) => {
       const root = projectManagerRoot?.trim();
       if (!isTauri || !root) {
-        setGateRunMessage('Run requires the Project Manager desktop app.');
+        setGateRunMessage(standardsGateLabels.desktopRequired);
         return;
       }
       if (gateOrchestrationBusy || activeRuns.some((r) => r.featureId.startsWith('gate:'))) {
@@ -823,6 +851,9 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
       setGatePhases((phases) => ({ ...phases, [gateId]: 'running' }));
       try {
         const result = await spawnStandardsGateRun(gateId, root, isTauri);
+        // Claim the PID before any further await so the global listener routes
+        // its events and an instant exit is cached, not dropped.
+        gateProcessPidsRef.current.add(result.pid);
         handleRunStart(result.pid, result.featureId, result.featureName, result.command, result.args);
         await waitForGateProcessExit(result.pid);
       } catch (e) {
@@ -848,7 +879,7 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
   const handleRunAllBlockingGates = useCallback(async () => {
     const root = projectManagerRoot?.trim();
     if (!isTauri || !root) {
-      setGateRunMessage('Run requires the Project Manager desktop app.');
+      setGateRunMessage(standardsGateLabels.desktopRequired);
       return;
     }
     if (gateOrchestrationBusy || activeRuns.some((r) => r.featureId.startsWith('gate:'))) {
@@ -872,6 +903,8 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
 
       try {
         const result = await spawnStandardsGateRun(gate.id, root, isTauri);
+        // Claim the PID before any further await (see handleRunStandardsGate).
+        gateProcessPidsRef.current.add(result.pid);
         handleRunStart(result.pid, result.featureId, result.featureName, result.command, result.args);
         const code = await waitForGateProcessExit(result.pid);
         setGatePhases((phases) => ({

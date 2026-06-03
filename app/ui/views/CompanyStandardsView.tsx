@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   BadgeCheck,
   Boxes,
@@ -350,6 +350,14 @@ export function CompanyStandardsView({
   const { t } = useI18n();
   const g = t.companyStandards.gates;
   const [copyHint, setCopyHint] = useState<string | null>(null);
+  const copyHintTimerRef = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (copyHintTimerRef.current !== null) window.clearTimeout(copyHintTimerRef.current);
+    },
+    [],
+  );
 
   const handleOpen = (path: string) => {
     void openPath(path).catch(() => {});
@@ -360,7 +368,11 @@ export function CompanyStandardsView({
       void navigator.clipboard?.writeText(command).then(
         () => {
           setCopyHint(g.copied);
-          window.setTimeout(() => setCopyHint(null), 2000);
+          if (copyHintTimerRef.current !== null) window.clearTimeout(copyHintTimerRef.current);
+          copyHintTimerRef.current = window.setTimeout(() => {
+            setCopyHint(null);
+            copyHintTimerRef.current = null;
+          }, 2000);
         },
         () => {
           setCopyHint(null);
