@@ -1812,16 +1812,35 @@ export function ProjectsView({
                 </Fragment>
               );
             })}
-            {projects.length === 0 && (
+            {table.getRowModel().rows.length === 0 && (
               <tr>
                 <td
                   colSpan={table.getVisibleLeafColumns().length}
                   className="px-6 py-10 text-center"
                 >
-                  <p className="text-sm text-stone-300">No projects yet</p>
-                  <p className="mt-1 text-xs text-stone-500">
-                    Add a local folder or GitHub repo to start tracking progress.
-                  </p>
+                  {projects.length === 0 ? (
+                    <>
+                      <p className="text-sm text-stone-300">No projects yet</p>
+                      <p className="mt-1 text-xs text-stone-500">
+                        Add a local folder or GitHub repo to start tracking progress.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-stone-300">No rows match the current search or filters.</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProjectSearch('');
+                          setProjectStatusFilter('all');
+                          setShowProjectHiddenRows(false);
+                        }}
+                        className="mt-3 border border-stone-200/20 px-3 py-1.5 text-xs text-stone-200 hover:bg-white/5"
+                      >
+                        Clear search and filters
+                      </button>
+                    </>
+                  )}
                 </td>
               </tr>
             )}

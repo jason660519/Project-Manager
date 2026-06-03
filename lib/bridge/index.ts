@@ -953,9 +953,20 @@ export type FontZoomShortcutPayload = {
 };
 export type UnlistenFn = () => void;
 
+/** Idempotent Tauri event teardown — avoids Runtime TypeError when unlisten races Strict Mode or async subscribe. */
+export function safeUnlisten(unlisten: UnlistenFn | undefined): void {
+  if (!unlisten) return;
+  try {
+    unlisten();
+  } catch (error) {
+    console.warn('[bridge] event unlisten skipped (already removed or never registered)', error);
+  }
+}
+
 async function listen<T>(event: string, cb: (payload: T) => void): Promise<UnlistenFn> {
   const { listen: tauriListen } = await import('@tauri-apps/api/event');
-  return tauriListen<T>(event, (e) => cb(e.payload));
+  const unlisten = await tauriListen<T>(event, (e) => cb(e.payload));
+  return () => safeUnlisten(unlisten);
 }
 
 export function onAgentStdout(cb: (p: AgentStdioPayload) => void): Promise<UnlistenFn> {
@@ -968,6 +979,24 @@ export function onAgentStderr(cb: (p: AgentStdioPayload) => void): Promise<Unlis
 
 export function onAgentExit(cb: (p: AgentExitPayload) => void): Promise<UnlistenFn> {
   return listen<AgentExitPayload>('agent-exit', cb);
+}
+
+/**
+ * Subscribe to agent stdout/stderr/exit once. Use in React effects with `cancelled` guard + cleanup.
+ */
+export async function subscribeAgentProcessEvents(handlers: {
+  onStdout: (payload: AgentStdioPayload) => void;
+  onStderr: (payload: AgentStdioPayload) => void;
+  onExit: (payload: AgentExitPayload) => void;
+}): Promise<UnlistenFn> {
+  const unStdout = await onAgentStdout(handlers.onStdout);
+  const unStderr = await onAgentStderr(handlers.onStderr);
+  const unExit = await onAgentExit(handlers.onExit);
+  return () => {
+    safeUnlisten(unStdout);
+    safeUnlisten(unStderr);
+    safeUnlisten(unExit);
+  };
 }
 
 export function onFontZoomShortcut(

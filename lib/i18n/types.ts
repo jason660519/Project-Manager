@@ -821,6 +821,30 @@ export interface Translations {
       };
     };
   };
+  companyStandards: {
+    gates: {
+      sectionTitle: string;
+      sectionDetail: string;
+      runGate: string;
+      runAllBlocking: string;
+      running: string;
+      pass: string;
+      fail: string;
+      skipped: string;
+      blocked: string;
+      desktopRequired: string;
+      copyCommand: string;
+      copied: string;
+      runAllProgress: string;
+      policyBlocked: string;
+      spawnFailed: string;
+      notRunnable: string;
+      policyPermissionBlocked: string;
+      policyCliNotExposed: string;
+      policyTerminalBlocked: string;
+      policyBridgeBlocked: string;
+    };
+  };
   codeEditor: {
     title: string;
     save: string;

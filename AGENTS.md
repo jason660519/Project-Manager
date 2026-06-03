@@ -41,7 +41,7 @@ Before claiming **done**, marking a feature **100%**, or offering **commit/PR**:
 npm run verify:baseline
 ```
 
-Follow `./.claude/skills/verify-before-complete/SKILL.md`. UI changes also require manual browser smoke in Chrome/Safari/Tauri (not Cursor embedded browser alone). See `./docs/engineering/verification-runbook.md` §6.
+Follow `./.claude/skills/verify-before-complete/SKILL.md`. UI changes also require manual browser smoke in Chrome/Safari/Tauri (not Cursor embedded browser alone). See `./docs/engineering/verification-runbook.md` §6. **Ship blocker:** Next.js dev **Issues** count must be **0** on changed routes (no runtime errors left for the user). Tauri events: `safeUnlisten` / `subscribeAgentProcessEvents` — `docs/engineering/runtime-bridge.md` §4.
 
 If Project Manager must deviate from company standards, create an ADR under `docs/architecture/`.
 

@@ -36,6 +36,15 @@ import { ProjectProgressClient } from '../project-progress-dashboard/ProjectProg
 import { ProjectsView } from './views/ProjectsView';
 import { DOCUMENTATION_SITE_PUBLIC_MANIFEST } from '../../lib/generated/documentation-site-public';
 import type { AIAssistantSheetId } from '../../lib/ai-assistants/types';
+import {
+  getBlockingGatesInOrder,
+  type GateRunAllProgress,
+  type GateRunPhase,
+  type StandardsGateId,
+} from '../../lib/companyStandards/standardsGates';
+import { formatStandardsGateRunError } from '../../lib/companyStandards/formatGatePolicyMessage';
+import { spawnStandardsGateRun, StandardsGateRunError } from '../../lib/companyStandards/spawnStandardsGate';
+import { I18nProvider, useI18n } from '../../lib/i18n';
 
 function RouteViewLoading() {
   return (
@@ -188,7 +197,17 @@ interface MainClientProps {
   assistantSheet?: AIAssistantSheetId;
 }
 
-export function MainClient({ currentView, initialProjectId, integrationsSheet, keysSheet, aiSdksSheet, documentationSlug, assistantSheet }: MainClientProps) {
+export function MainClient(props: MainClientProps) {
+  return (
+    <I18nProvider>
+      <MainClientInner {...props} />
+    </I18nProvider>
+  );
+}
+
+function MainClientInner({ currentView, initialProjectId, integrationsSheet, keysSheet, aiSdksSheet, documentationSlug, assistantSheet }: MainClientProps) {
+  const { t } = useI18n();
+  const standardsGateLabels = t.companyStandards.gates;
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectEntry[]>(SEED_PROJECTS);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
@@ -204,6 +223,11 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
   const [detectedProjectManagerRoot, setDetectedProjectManagerRoot] = useState<string>('');
   const cronJobsRef = useRef<CronJob[]>([]);
   const cronNextRunRef = useRef<Record<string, number>>({});
+  const gateExitWaitersRef = useRef<Map<number, (code: number) => void>>(new Map());
+  const [gatePhases, setGatePhases] = useState<Partial<Record<StandardsGateId, GateRunPhase>>>({});
+  const [gateRunAllProgress, setGateRunAllProgress] = useState<GateRunAllProgress | null>(null);
+  const [gateRunMessage, setGateRunMessage] = useState<string | null>(null);
+  const [gateOrchestrationBusy, setGateOrchestrationBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -713,9 +737,22 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
   }, []);
 
   const handleRunEnd = useCallback((pid: number, exitCode: number) => {
+    const waiter = gateExitWaitersRef.current.get(pid);
+    if (waiter) {
+      gateExitWaitersRef.current.delete(pid);
+      waiter(exitCode);
+    }
+
     setActiveRuns((prev) => {
       const run = prev.find((r) => r.pid === pid);
       if (run) {
+        if (run.featureId.startsWith('gate:')) {
+          const gateId = run.featureId.slice(5) as StandardsGateId;
+          setGatePhases((phases) => ({
+            ...phases,
+            [gateId]: exitCode === 0 ? 'pass' : 'fail',
+          }));
+        }
         const completed: CompletedRun = {
           ...run,
           completedAt: Date.now(),
@@ -728,6 +765,11 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
     });
   }, []);
 
+  const handleRunLogRef = useRef(handleRunLog);
+  const handleRunEndRef = useRef(handleRunEnd);
+  handleRunLogRef.current = handleRunLog;
+  handleRunEndRef.current = handleRunEnd;
+
   const handleKillRun = useCallback(
     async (pid: number) => {
       const { killProcess } = await import('../../lib/bridge');
@@ -736,6 +778,142 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
     },
     [handleRunEnd],
   );
+
+  useEffect(() => {
+    if (!isTauri) return;
+    let cancelled = false;
+    let unlistenAll: (() => void) | undefined;
+    void (async () => {
+      const { subscribeAgentProcessEvents, safeUnlisten } = await import('../../lib/bridge');
+      const unlisten = await subscribeAgentProcessEvents({
+        onStdout: ({ pid, line }) => handleRunLogRef.current(pid, line),
+        onStderr: ({ pid, line }) => handleRunLogRef.current(pid, line),
+        onExit: ({ pid, code }) => handleRunEndRef.current(pid, code),
+      });
+      if (cancelled) {
+        safeUnlisten(unlisten);
+        return;
+      }
+      unlistenAll = unlisten;
+    })();
+    return () => {
+      cancelled = true;
+      unlistenAll?.();
+      unlistenAll = undefined;
+    };
+  }, [isTauri]);
+
+  const waitForGateProcessExit = useCallback((pid: number) => {
+    return new Promise<number>((resolve) => {
+      gateExitWaitersRef.current.set(pid, resolve);
+    });
+  }, []);
+
+  const handleRunStandardsGate = useCallback(
+    async (gateId: StandardsGateId) => {
+      const root = projectManagerRoot?.trim();
+      if (!isTauri || !root) {
+        setGateRunMessage('Run requires the Project Manager desktop app.');
+        return;
+      }
+      if (gateOrchestrationBusy || activeRuns.some((r) => r.featureId.startsWith('gate:'))) {
+        return;
+      }
+      setGateRunMessage(null);
+      setGatePhases((phases) => ({ ...phases, [gateId]: 'running' }));
+      try {
+        const result = await spawnStandardsGateRun(gateId, root, isTauri);
+        handleRunStart(result.pid, result.featureId, result.featureName, result.command, result.args);
+        await waitForGateProcessExit(result.pid);
+      } catch (e) {
+        setGateRunMessage(formatStandardsGateRunError(e, standardsGateLabels));
+        setGatePhases((phases) => ({
+          ...phases,
+          [gateId]:
+            e instanceof StandardsGateRunError && e.policyFailure ? 'blocked' : 'fail',
+        }));
+      }
+    },
+    [
+      isTauri,
+      projectManagerRoot,
+      gateOrchestrationBusy,
+      activeRuns,
+      handleRunStart,
+      waitForGateProcessExit,
+      standardsGateLabels,
+    ],
+  );
+
+  const handleRunAllBlockingGates = useCallback(async () => {
+    const root = projectManagerRoot?.trim();
+    if (!isTauri || !root) {
+      setGateRunMessage('Run requires the Project Manager desktop app.');
+      return;
+    }
+    if (gateOrchestrationBusy || activeRuns.some((r) => r.featureId.startsWith('gate:'))) {
+      return;
+    }
+
+    const blocking = getBlockingGatesInOrder();
+    setGateRunMessage(null);
+    setGateOrchestrationBusy(true);
+    setGateRunAllProgress({ active: true, index: 0, total: blocking.length });
+
+    for (let i = 0; i < blocking.length; i += 1) {
+      const gate = blocking[i];
+      setGateRunAllProgress({
+        active: true,
+        currentLabel: gate.label,
+        index: i + 1,
+        total: blocking.length,
+      });
+      setGatePhases((phases) => ({ ...phases, [gate.id]: 'running' }));
+
+      try {
+        const result = await spawnStandardsGateRun(gate.id, root, isTauri);
+        handleRunStart(result.pid, result.featureId, result.featureName, result.command, result.args);
+        const code = await waitForGateProcessExit(result.pid);
+        setGatePhases((phases) => ({
+          ...phases,
+          [gate.id]: code === 0 ? 'pass' : 'fail',
+        }));
+        if (code !== 0) {
+          for (let j = i + 1; j < blocking.length; j += 1) {
+            const skipped = blocking[j];
+            setGatePhases((phases) => ({ ...phases, [skipped.id]: 'skipped' }));
+          }
+          break;
+        }
+      } catch (e) {
+        setGateRunMessage(formatStandardsGateRunError(e, standardsGateLabels));
+        setGatePhases((phases) => ({
+          ...phases,
+          [gate.id]:
+            e instanceof StandardsGateRunError && e.policyFailure ? 'blocked' : 'fail',
+        }));
+        for (let j = i + 1; j < blocking.length; j += 1) {
+          const skipped = blocking[j];
+          setGatePhases((phases) => ({ ...phases, [skipped.id]: 'skipped' }));
+        }
+        break;
+      }
+    }
+
+    setGateRunAllProgress(null);
+    setGateOrchestrationBusy(false);
+  }, [
+    isTauri,
+    projectManagerRoot,
+    gateOrchestrationBusy,
+    activeRuns,
+    handleRunStart,
+    waitForGateProcessExit,
+    standardsGateLabels,
+  ]);
+
+  const standardsGateRunBusy =
+    gateOrchestrationBusy || activeRuns.some((r) => r.featureId.startsWith('gate:'));
 
   const handleFeatureUpdate = useCallback(
     (featureId: string, update: Partial<Feature>) => {
@@ -1400,7 +1578,18 @@ export function MainClient({ currentView, initialProjectId, integrationsSheet, k
           initialSlug={documentationSlug ?? []}
         />
       )}
-      {currentView === 'company-standards' && <CompanyStandardsView />}
+      {currentView === 'company-standards' && (
+        <CompanyStandardsView
+          dashboardScopeProjects={effectiveDashboardProjects}
+          canRunGates={isTauri && Boolean(projectManagerRoot?.trim())}
+          gatePhases={gatePhases}
+          runAllProgress={gateRunAllProgress}
+          gateRunMessage={gateRunMessage}
+          anyGateRunning={standardsGateRunBusy}
+          onRunGate={handleRunStandardsGate}
+          onRunAllBlocking={handleRunAllBlockingGates}
+        />
+      )}
     </AppShell>
   );
 }

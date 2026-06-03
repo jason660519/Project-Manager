@@ -83,3 +83,4 @@ cargo check  --manifest-path src-tauri/Cargo.toml
 - **ADR adherence.** Surface contradictions with closed ADRs loudly (002 = schemaVersion, 003 = prompt in TS, 004 = key in Rust).
 - **Verification baseline.** Run **`npm run verify:baseline`** (single gate) before claiming done or shipping. Partial runs do not count — see `verify-before-complete` skill.
 - **No false completion.** Never mark a feature 100%, say "verification passed", or offer commit/PR without green `verify:baseline` and (for UI) manual browser smoke in Chrome/Safari/Tauri.
+- **Zero dev overlay errors.** After UI work, the Next.js **Issues** badge (bottom-left) must be **0** on changed routes — no uncaught runtime errors (including Tauri `listen` / `unregisterListener` races). Use `safeUnlisten` + async `cancelled` guards per `docs/engineering/runtime-bridge.md` §4.

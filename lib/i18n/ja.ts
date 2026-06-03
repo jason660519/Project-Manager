@@ -817,6 +817,35 @@ export const ja: Translations = {
       },
     },
   },
+  companyStandards: {
+    gates: {
+      sectionTitle: '登録済みプロジェクトゲートを実行',
+      sectionDetail:
+        'デスクトップアプリからこのハブでカタログ登録された npm スクリプトのみ実行できます。出力は Logs に表示されます。ブラウザ開発モードではコマンド表示のみです。',
+      runGate: '実行',
+      runAllBlocking: 'ブロッキングゲートを実行',
+      running: '実行中',
+      pass: '合格',
+      fail: '失敗',
+      skipped: 'スキップ',
+      blocked: 'ブロック',
+      desktopRequired:
+        'Project Manager デスクトップアプリ（Tauri）が必要です。コマンドをコピーしてターミナルで実行してください。',
+      copyCommand: 'コマンドをコピー',
+      copied: 'コピーしました',
+      runAllProgress: 'ゲート {current} を実行中（{index}/{total}）',
+      policyBlocked: 'ターミナルポリシーによりブロックされました',
+      spawnFailed: 'ゲートの起動に失敗しました',
+      notRunnable: 'アドバイザリゲート — ハブ外の company standards スクリプトで実行',
+      policyPermissionBlocked:
+        'Assistant の tool:run_command が blocked です。AI Assistants → Permissions で Granted または Guarded に設定してください。',
+      policyCliNotExposed:
+        'npm が Project Manager に公開されていません。Integrations Hub → Commands で npm を有効化するか、Settings の AI CLI Preset を適用してください。',
+      policyTerminalBlocked:
+        'コマンドが Terminal Operational Boundaries（ホワイト／ブラックリスト）によりブロックされました。AI Assistants → Overview でルールを確認してください。',
+      policyBridgeBlocked: 'デスクトップランタイムのターミナルポリシーによりブロックされました。',
+    },
+  },
   codeEditor: {
     title: 'コードエディタ',
     save: '保存',

@@ -32,6 +32,9 @@ vi.mock('../lib/bridge', () => ({
   killProcess: vi.fn().mockResolvedValue(undefined),
   onAgentExit: vi.fn().mockResolvedValue(vi.fn()),
   onAgentStdout: vi.fn().mockResolvedValue(vi.fn()),
+  safeUnlisten: vi.fn((fn: (() => void) | undefined) => {
+    fn?.();
+  }),
   spawnAgent: vi.fn().mockResolvedValue(0),
 }));
 

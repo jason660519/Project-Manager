@@ -1,28 +1,41 @@
 'use client';
 
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import {
   BadgeCheck,
   Boxes,
   CheckCircle2,
-  ClipboardCheck,
+  Copy,
   ExternalLink,
-  FileCheck2,
   FileText,
   FolderOpen,
   GitBranch,
   Layers3,
-  Languages,
+  Loader2,
   Package,
   PanelsTopLeft,
+  Play,
   Route,
   ScanSearch,
   ShieldCheck,
   Sparkles,
   Terminal,
-  TriangleAlert,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { openPath } from '../../../lib/bridge';
+import { buildGovernedAppsMetric } from '../../../lib/companyStandards/governedProjectsMetric';
+import {
+  STANDARDS_GATES_REGISTRY,
+  resolveGateIcon,
+  type GateRunAllProgress,
+  type GateRunPhase,
+  type StandardsGateDefinition,
+  type StandardsGateId,
+} from '../../../lib/companyStandards/standardsGates';
+
+export type { GateRunAllProgress, GateRunPhase };
+import { useI18n } from '../../../lib/i18n';
+import type { ProjectEntry } from '../../../lib/types';
 
 const PROJECT_ROOT = '/Users/Project-Manager';
 const STANDARDS_ROOT = '/Users/Company-AI-App-Standards';
@@ -52,17 +65,6 @@ interface StandardLayer {
   examples: string[];
   icon: LucideIcon;
   tone: Tone;
-}
-
-interface StandardsGate {
-  label: string;
-  status: string;
-  statusTone: Tone;
-  command: string;
-  scope: string;
-  detail: string;
-  tags: string[];
-  icon: LucideIcon;
 }
 
 interface AppProfile {
@@ -121,18 +123,12 @@ const TONE_STYLES: Record<Tone, { border: string; bg: string; text: string; icon
   },
 };
 
-const METRICS: Metric[] = [
+const STATIC_METRICS: Metric[] = [
   {
     label: 'Baseline',
     value: 'v0.2',
     detail: 'Company AI app rules',
     tone: 'emerald',
-  },
-  {
-    label: 'Governed Apps',
-    value: '4',
-    detail: 'PM, SayDo, Realestate, Standards',
-    tone: 'cyan',
   },
   {
     label: 'PM Profile',
@@ -188,53 +184,6 @@ const STANDARD_LAYERS: StandardLayer[] = [
     examples: ['i18n:check', 'standards:check', 'docs:check', 'P0/P1/P2'],
     icon: ShieldCheck,
     tone: 'stone',
-  },
-];
-
-const STANDARDS_GATES: StandardsGate[] = [
-  {
-    label: 'UI i18n hardcoded-copy gate',
-    status: 'Active',
-    statusTone: 'emerald',
-    command: 'npm run i18n:check',
-    scope: 'Project Manager local',
-    detail:
-      'Scans Keys Arena UI files for hardcoded CJK copy so visible strings stay in lib/i18n translations.',
-    tags: ['Arena scope', 'visible copy', 'blocking'],
-    icon: Languages,
-  },
-  {
-    label: 'Composite standards gate',
-    status: 'Active',
-    statusTone: 'emerald',
-    command: 'npm run standards:check',
-    scope: 'PM plus company baseline',
-    detail:
-      'Runs the PM-local i18n gate first, then delegates to the company standards checker for the shared baseline.',
-    tags: ['preflight', 'company script', 'blocking'],
-    icon: ClipboardCheck,
-  },
-  {
-    label: 'Documentation governance',
-    status: 'Active',
-    statusTone: 'cyan',
-    command: 'npm run docs:check',
-    scope: 'Repo documentation',
-    detail:
-      'Keeps public/internal docs, naming, bilingual layout, and source-of-truth placement aligned with PM rules.',
-    tags: ['docs layout', 'naming', 'public guide'],
-    icon: FileCheck2,
-  },
-  {
-    label: 'Color-token drift',
-    status: 'P2 advisory',
-    statusTone: 'amber',
-    command: 'company-standards.sh check .',
-    scope: 'Company baseline advisory',
-    detail:
-      'Flags hardcoded color drift as a follow-up until the shared token package and migration plan are ready.',
-    tags: ['design tokens', 'non-blocking', 'follow-up'],
-    icon: TriangleAlert,
   },
 ];
 
@@ -299,14 +248,6 @@ const PACKAGE_LANES: PackageLane[] = [
     detail: 'Extract only after two or more apps converge on the same framework-level component contracts.',
     icon: Package,
   },
-];
-
-const GOVERNANCE_FLOW = [
-  'Company baseline',
-  'App profile',
-  'Repo-local override',
-  'ADR for deviations',
-  'Executable checks',
 ];
 
 const RESOURCES: ResourceLink[] = [
@@ -384,55 +325,92 @@ function profileStatusClass(status: AppProfile['status']) {
   return 'border-amber-200/25 bg-amber-950/25 text-amber-100';
 }
 
-export function CompanyStandardsView() {
+export interface CompanyStandardsViewProps {
+  /** Same scope as Project Progress Dashboard (`effectiveDashboardProjects` in MainClient). */
+  dashboardScopeProjects: ProjectEntry[];
+  canRunGates: boolean;
+  gatePhases: Partial<Record<StandardsGateId, GateRunPhase>>;
+  runAllProgress: GateRunAllProgress | null;
+  gateRunMessage: string | null;
+  anyGateRunning: boolean;
+  onRunGate: (gateId: StandardsGateId) => void;
+  onRunAllBlocking: () => void;
+}
+
+export function CompanyStandardsView({
+  dashboardScopeProjects,
+  canRunGates,
+  gatePhases,
+  runAllProgress,
+  gateRunMessage,
+  anyGateRunning,
+  onRunGate,
+  onRunAllBlocking,
+}: CompanyStandardsViewProps) {
+  const { t } = useI18n();
+  const g = t.companyStandards.gates;
+  const [copyHint, setCopyHint] = useState<string | null>(null);
+
   const handleOpen = (path: string) => {
     void openPath(path).catch(() => {});
   };
 
+  const handleCopyCommand = useCallback(
+    (command: string) => {
+      void navigator.clipboard?.writeText(command).then(
+        () => {
+          setCopyHint(g.copied);
+          window.setTimeout(() => setCopyHint(null), 2000);
+        },
+        () => {
+          setCopyHint(null);
+        },
+      );
+    },
+    [g.copied],
+  );
+
+  const blockingCount = useMemo(
+    () => STANDARDS_GATES_REGISTRY.filter((gate) => gate.blocking).length,
+    [],
+  );
+
+  const metrics = useMemo<Metric[]>(() => {
+    const governed = buildGovernedAppsMetric(dashboardScopeProjects);
+    return [
+      STATIC_METRICS[0],
+      {
+        label: 'Governed Apps',
+        value: governed.value,
+        detail: governed.detail,
+        tone: 'cyan',
+      },
+      ...STATIC_METRICS.slice(1),
+    ];
+  }, [dashboardScopeProjects]);
+
   return (
     <div className="mx-auto flex h-full min-h-0 max-w-[1180px] flex-col gap-5 overflow-y-auto px-4 py-5 text-stone-100 sm:px-5 lg:px-6">
-      <header className="border border-stone-200/12 bg-[rgb(var(--pm-panel))]/72">
-        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_340px]">
-          <div className="min-w-0 p-4 sm:p-5">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-2 border border-emerald-300/25 bg-emerald-950/30 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-200">
-                <ShieldCheck size={13} />
-                Governance Hub
-              </span>
-              <span className="inline-flex items-center gap-2 border border-cyan-300/20 bg-cyan-950/20 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200">
-                Plugin optional
-              </span>
-            </div>
-            <h1 className="mt-4 text-2xl font-semibold tracking-normal text-stone-50 sm:text-[28px]">
-              Company Standards Hub
-            </h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-300">
-              Shared company standards should live above app-specific design guides: common
-              foundations, component contracts, patterns, governance, and executable checks belong in
-              the standards repo; each app keeps only its profile, overrides, and ADR-backed
-              deviations.
-            </p>
-          </div>
-          <div className="border-t border-stone-200/10 p-4 sm:p-5 lg:border-l lg:border-t-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-400">
-              Adoption Model
-            </p>
-            <div className="mt-3 flex flex-col gap-2">
-              {GOVERNANCE_FLOW.map((step, index) => (
-                <div key={step} className="flex items-center gap-2 text-xs text-stone-300">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center border border-stone-200/15 bg-white/[0.045] font-mono text-[10px] text-stone-400">
-                    {index + 1}
-                  </span>
-                  <span>{step}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+      <header className="border border-stone-200/12 bg-[rgb(var(--pm-panel))]/72 p-4 sm:p-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-2 border border-emerald-300/25 bg-emerald-950/30 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-200">
+            <ShieldCheck size={13} />
+            Governance Hub
+          </span>
         </div>
+        <h1 className="mt-4 text-2xl font-semibold tracking-normal text-stone-50 sm:text-[28px]">
+          Company Standards Hub
+        </h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-300">
+          Shared company standards should live above app-specific design guides: common
+          foundations, component contracts, patterns, governance, and executable checks belong in
+          the standards repo; each app keeps only its profile, overrides, and ADR-backed
+          deviations.
+        </p>
       </header>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {METRICS.map((metric) => (
+        {metrics.map((metric) => (
           <MetricCard key={metric.label} metric={metric} />
         ))}
       </section>
@@ -441,14 +419,58 @@ export function CompanyStandardsView() {
         <SectionHeader
           icon={Terminal}
           eyebrow="Current project gates"
-          title="Show Executable Checks Without Running Shell Commands Here"
-          detail="The hub exposes the active PM standards gates and the upstream extraction target. Live execution should stay behind the optional standards plugin or a guarded local bridge."
+          title={g.sectionTitle}
+          detail={g.sectionDetail}
+          actions={
+            <button
+              type="button"
+              disabled={!canRunGates || anyGateRunning}
+              onClick={onRunAllBlocking}
+              className="inline-flex items-center gap-1.5 border border-emerald-200/25 bg-emerald-100/10 px-2.5 py-1.5 text-[11px] font-medium text-emerald-100 hover:bg-emerald-100/18 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {anyGateRunning ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+              {g.runAllBlocking}
+            </button>
+          }
         />
+        {!canRunGates ? (
+          <p className="border-b border-stone-200/10 px-4 pb-3 text-xs leading-5 text-amber-100/90">
+            {g.desktopRequired}
+          </p>
+        ) : null}
+        {gateRunMessage ? (
+          <p className="border-b border-stone-200/10 px-4 pb-3 text-xs leading-5 text-red-200/90">
+            {gateRunMessage}
+          </p>
+        ) : null}
+        {runAllProgress?.active && runAllProgress.currentLabel ? (
+          <p className="border-b border-stone-200/10 px-4 pb-3 text-xs text-stone-400">
+            {g.runAllProgress
+              .replace('{current}', runAllProgress.currentLabel)
+              .replace('{index}', String(runAllProgress.index))
+              .replace('{total}', String(runAllProgress.total))}
+          </p>
+        ) : null}
+        {copyHint ? (
+          <p className="border-b border-stone-200/10 px-4 pb-3 text-xs text-emerald-200/90">{copyHint}</p>
+        ) : null}
         <div className="grid gap-3 p-4 lg:grid-cols-2">
-          {STANDARDS_GATES.map((gate) => (
-            <StandardsGateCard key={gate.command} gate={gate} />
+          {STANDARDS_GATES_REGISTRY.map((gate) => (
+            <StandardsGateCard
+              key={gate.id}
+              gate={gate}
+              phase={gatePhases[gate.id] ?? 'idle'}
+              canRun={canRunGates && gate.npmScript !== null}
+              anyGateRunning={anyGateRunning}
+              labels={g}
+              onRun={() => onRunGate(gate.id)}
+              onCopy={() => handleCopyCommand(gate.displayCommand)}
+            />
           ))}
         </div>
+        <p className="border-t border-stone-200/10 px-4 py-2 text-[10px] text-stone-500">
+          {blockingCount} blocking gates · advisory gates are copy-only in v1
+        </p>
       </section>
 
       <section className="border border-stone-200/12 bg-[rgb(var(--pm-panel))]/62">
@@ -544,22 +566,29 @@ function SectionHeader({
   eyebrow,
   title,
   detail,
+  actions,
 }: {
   icon: LucideIcon;
   eyebrow: string;
   title: string;
   detail: string;
+  actions?: ReactNode;
 }) {
   return (
     <div className="border-b border-stone-200/10 px-4 py-3">
-      <div className="flex items-center gap-2">
-        <Icon size={14} className="text-stone-400" />
-        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-500">
-          {eyebrow}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <Icon size={14} className="text-stone-400" />
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-500">
+              {eyebrow}
+            </p>
+          </div>
+          <h2 className="mt-1 text-sm font-semibold text-stone-50">{title}</h2>
+          <p className="mt-1 max-w-4xl text-xs leading-5 text-stone-400">{detail}</p>
+        </div>
+        {actions ? <div className="shrink-0">{actions}</div> : null}
       </div>
-      <h2 className="mt-1 text-sm font-semibold text-stone-50">{title}</h2>
-      <p className="mt-1 max-w-4xl text-xs leading-5 text-stone-400">{detail}</p>
     </div>
   );
 }
@@ -577,13 +606,56 @@ function MetricCard({ metric }: { metric: Metric }) {
   );
 }
 
-function StandardsGateCard({ gate }: { gate: StandardsGate }) {
+import type { Translations } from '../../../lib/i18n/types';
+
+type GateCardLabels = Translations['companyStandards']['gates'];
+
+function runPhaseLabel(phase: GateRunPhase, labels: GateCardLabels): string | null {
+  if (phase === 'running') return labels.running;
+  if (phase === 'pass') return labels.pass;
+  if (phase === 'fail') return labels.fail;
+  if (phase === 'skipped') return labels.skipped;
+  if (phase === 'blocked') return labels.blocked;
+  return null;
+}
+
+function runPhaseClass(phase: GateRunPhase): string {
+  if (phase === 'pass') return 'border-emerald-300/35 text-emerald-200';
+  if (phase === 'fail' || phase === 'blocked') return 'border-red-300/35 text-red-200';
+  if (phase === 'running') return 'border-cyan-300/35 text-cyan-200';
+  if (phase === 'skipped') return 'border-stone-200/20 text-stone-400';
+  return '';
+}
+
+function StandardsGateCard({
+  gate,
+  phase,
+  canRun,
+  anyGateRunning,
+  labels,
+  onRun,
+  onCopy,
+}: {
+  gate: StandardsGateDefinition;
+  phase: GateRunPhase;
+  canRun: boolean;
+  anyGateRunning: boolean;
+  labels: GateCardLabels;
+  onRun: () => void;
+  onCopy: () => void;
+}) {
   const tone = TONE_STYLES[gate.statusTone];
+  const Icon = resolveGateIcon(gate.iconKey);
+  const resultLabel = runPhaseLabel(phase, labels);
+  const runnable = gate.npmScript !== null;
+
   return (
     <article className={`min-w-0 border ${tone.border} ${tone.bg} p-3`}>
       <div className="flex items-start gap-3">
-        <div className={`flex h-9 w-9 shrink-0 items-center justify-center border ${tone.border} bg-[rgb(var(--pm-input))] ${tone.icon}`}>
-          <gate.icon size={16} />
+        <div
+          className={`flex h-9 w-9 shrink-0 items-center justify-center border ${tone.border} bg-[rgb(var(--pm-input))] ${tone.icon}`}
+        >
+          <Icon size={16} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -591,17 +663,24 @@ function StandardsGateCard({ gate }: { gate: StandardsGate }) {
             <span
               className={`border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${tone.border} ${tone.text}`}
             >
-              {gate.status}
+              {gate.catalogStatus}
             </span>
+            {resultLabel ? (
+              <span
+                className={`border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${runPhaseClass(phase)}`}
+              >
+                {resultLabel}
+              </span>
+            ) : null}
           </div>
           <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-500">
             {gate.scope}
           </p>
           <code className="mt-2 block truncate border border-stone-200/12 bg-black/20 px-2 py-1 font-mono text-[11px] text-stone-200">
-            {gate.command}
+            {gate.displayCommand}
           </code>
           <p className="mt-2 text-xs leading-5 text-stone-400">{gate.detail}</p>
-          <div className="mt-3 flex flex-wrap gap-1.5">
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
             {gate.tags.map((tag) => (
               <span
                 key={tag}
@@ -610,6 +689,30 @@ function StandardsGateCard({ gate }: { gate: StandardsGate }) {
                 {tag}
               </span>
             ))}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={!canRun || !runnable || anyGateRunning || phase === 'running'}
+              title={!runnable ? labels.notRunnable : undefined}
+              onClick={onRun}
+              className="inline-flex items-center gap-1 border border-emerald-200/25 bg-emerald-100/10 px-2 py-1 text-[11px] font-medium text-emerald-100 hover:bg-emerald-100/18 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {phase === 'running' ? (
+                <Loader2 size={11} className="animate-spin" />
+              ) : (
+                <Play size={11} />
+              )}
+              {labels.runGate}
+            </button>
+            <button
+              type="button"
+              onClick={onCopy}
+              className="inline-flex items-center gap-1 border border-stone-200/15 bg-white/[0.04] px-2 py-1 text-[11px] text-stone-300 hover:border-stone-200/25 hover:text-stone-100"
+            >
+              <Copy size={11} />
+              {labels.copyCommand}
+            </button>
           </div>
         </div>
       </div>

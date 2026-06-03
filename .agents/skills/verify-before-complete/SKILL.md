@@ -50,7 +50,10 @@ Automated checks **do not** replace opening the app.
 1. Start `npm run dev` (port **43187**) or `npm run tauri:dev` for shell changes.
 2. Open the **changed route(s)** in **Chrome, Safari, or Tauri** — not Cursor embedded browser alone (it injects `data-cursor-ref` and can cause false hydration errors).
 3. Open DevTools → Console. **Zero** React hydration errors and zero uncaught exceptions on the happy path.
-4. Click one primary action on the changed surface (save, tab switch, guarded approve, etc.).
+4. Confirm the Next.js dev **Issues** overlay (bottom-left “N Issues”) is **0** on each changed route — any count is a ship blocker; never hand off runtime errors for the user to debug.
+5. Click one primary action on the changed surface (save, tab switch, guarded approve, etc.).
+
+Tauri event listeners: `safeUnlisten` + async `cancelled` guard — see `docs/engineering/runtime-bridge.md` §4.
 
 If you cannot run the browser, say so explicitly and list what the user must verify — **do not** claim completion.
 

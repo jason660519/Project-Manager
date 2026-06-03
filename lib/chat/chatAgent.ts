@@ -5,6 +5,7 @@ import {
 import {
   onAgentExit,
   onAgentStdout,
+  safeUnlisten,
   callLlmRouted,
   isTauriRuntime,
   killProcess,
@@ -822,8 +823,12 @@ function waitForAgentOutput(pid: number, abortSignal?: AbortSignal): Promise<str
     let timeoutId: number | undefined;
 
     const cleanup = () => {
-      unStdout?.();
-      unExit?.();
+      const stdoutCleanup = unStdout;
+      const exitCleanup = unExit;
+      unStdout = undefined;
+      unExit = undefined;
+      safeUnlisten(stdoutCleanup);
+      safeUnlisten(exitCleanup);
       if (timeoutId !== undefined) window.clearTimeout(timeoutId);
       abortSignal?.removeEventListener('abort', abort);
     };

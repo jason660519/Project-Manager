@@ -816,6 +816,34 @@ export const zhHant: Translations = {
       },
     },
   },
+  companyStandards: {
+    gates: {
+      sectionTitle: '執行已登記的專案閘道',
+      sectionDetail:
+        '僅能在桌面版從此頁執行目錄內的 npm 指令；輸出會出現在 Logs。瀏覽器開發模式僅顯示指令、不會執行。',
+      runGate: '執行',
+      runAllBlocking: '執行阻擋性閘道',
+      running: '執行中',
+      pass: '通過',
+      fail: '失敗',
+      skipped: '略過',
+      blocked: '已阻擋',
+      desktopRequired: '需使用 Project Manager 桌面版（Tauri）。請複製指令至終端機執行。',
+      copyCommand: '複製指令',
+      copied: '已複製',
+      runAllProgress: '執行閘道 {current}（{index}/{total}）',
+      policyBlocked: '終端機政策已阻擋此指令',
+      spawnFailed: '無法啟動閘道',
+      notRunnable: '建議性閘道 — 請在公司標準腳本環境執行',
+      policyPermissionBlocked:
+        'AI Assistant 的 tool:run_command 權限為 blocked。請至 AI Assistants → Permissions 設為 Granted 或 Guarded。',
+      policyCliNotExposed:
+        'npm 尚未對 Project Manager 暴露。請至 Integrations Hub → Commands 啟用 npm，或在 Settings 套用 AI CLI Preset。',
+      policyTerminalBlocked:
+        '指令被 Terminal Operational Boundaries（白／黑名單）阻擋。請至 AI Assistants → Overview 檢查規則。',
+      policyBridgeBlocked: '桌面版執行階段的終端機政策阻擋此指令。',
+    },
+  },
   codeEditor: {
     title: '程式碼編輯器',
     save: '儲存',

@@ -815,6 +815,35 @@ export const en: Translations = {
       },
     },
   },
+  companyStandards: {
+    gates: {
+      sectionTitle: 'Run registered project gates',
+      sectionDetail:
+        'Execute only catalogued npm scripts from this hub in the desktop app. Output streams to Logs; browser dev mode shows commands without running them.',
+      runGate: 'Run',
+      runAllBlocking: 'Run blocking gates',
+      running: 'Running',
+      pass: 'Pass',
+      fail: 'Fail',
+      skipped: 'Skipped',
+      blocked: 'Blocked',
+      desktopRequired: 'Run requires the Project Manager desktop app (Tauri). Copy the command to run in a terminal.',
+      copyCommand: 'Copy command',
+      copied: 'Copied',
+      runAllProgress: 'Running gate {current} ({index}/{total})',
+      policyBlocked: 'Command blocked by terminal policy',
+      spawnFailed: 'Failed to start gate',
+      notRunnable: 'Advisory gate — run via company standards script outside this hub',
+      policyPermissionBlocked:
+        'Assistant permission tool:run_command is blocked. Open AI Assistants → Permissions and set it to Granted or Guarded.',
+      policyCliNotExposed:
+        'npm is not exposed for Project Manager. Open Integrations Hub → Commands and enable npm, or apply the AI CLI Preset in Settings.',
+      policyTerminalBlocked:
+        'Command blocked by Terminal Operational Boundaries (whitelist/blacklist). Open AI Assistants → Overview to review rules.',
+      policyBridgeBlocked:
+        'Command blocked by the desktop runtime terminal policy.',
+    },
+  },
   codeEditor: {
     title: 'Code Editor',
     save: 'Save',

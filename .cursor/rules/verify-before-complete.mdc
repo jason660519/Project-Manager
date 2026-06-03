@@ -10,7 +10,7 @@ alwaysApply: true
 Before saying **done**, **100%**, **ready to commit/PR**, or **verification passed**:
 
 1. Run `npm run verify:baseline` from repo root — all steps must exit 0.
-2. For any UI / routing / `'use client'` / i18n / localStorage change: manual smoke in **Chrome/Safari/Tauri** on port 43187. Cursor embedded browser alone is not sufficient (injects `data-cursor-ref`).
+2. For any UI / routing / `'use client'` / i18n / localStorage change: manual smoke in **Chrome/Safari/Tauri** on port 43187. Cursor embedded browser alone is not sufficient (injects `data-cursor-ref`). **Issues overlay must be 0** on changed routes (no Next runtime errors / no Tauri `unregisterListener` leaks).
 3. Do **not** commit or open a PR unless the user explicitly asks.
 
 Read and follow `.claude/skills/verify-before-complete/SKILL.md` when wrapping up work.

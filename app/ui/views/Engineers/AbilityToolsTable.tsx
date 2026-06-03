@@ -1,10 +1,10 @@
 'use client';
 
-// @table-classification: basic
+// @table-classification: simple
 // @table-reason: Tools × capabilities matrix with dynamic capability columns that can overflow
 //   horizontally; a selection/navigation surface embedded under a parent WorkstationFrame.
-// @table-waivers: search, freeze, resize, sort, hidden, shared-primitive — currently a bare
-//   getCoreRowModel table; mandatory controls not yet implemented. Declared debt, follow-up.
+//   Per table-governance §1, Simple Tables need stable ids + row actions, not the full
+//   Basic Table Sheet control set.
 
 /**
  * Ability / Tools sheet — one row per engineer, capability assignment focus.
@@ -157,7 +157,7 @@ export function AbilityToolsTable({
   });
 
   return (
-    <div className="h-full overflow-auto">
+    <div className="pm-scroll h-full overflow-auto">
       <table className="w-full border-collapse text-left">
         <thead className="sticky top-0 z-40 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
           {table.getHeaderGroups().map((headerGroup) => (

@@ -10,6 +10,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "next typegen && tsc --noEmit",
+    "i18n:check": "node scripts/check-ui-i18n.mjs",
     "guard:legacy-surfaces": "node scripts/check-legacy-surfaces.mjs",
     "branch:check": "node scripts/check-branch-hygiene.mjs",
     "feature:kickoff": "node scripts/create-feature-checkpoint.mjs",
