@@ -236,4 +236,49 @@ describe('BatchDispatchModal state handling', () => {
     // Completed (not stranded in "running") — proves the early exit was replayed.
     expect(await screen.findByText('1 完成')).toBeInTheDocument();
   });
+
+  // Regression (PR #16 re-review): a batch larger than the foreign-token cap
+  // whose processes all exit before any spawn resolves must NOT evict its own
+  // staged exits. The cap scales with batch size, so every item still completes.
+  it('does not evict staged exits for a batch larger than the cap', async () => {
+    const user = userEvent.setup();
+    const COUNT = 70; // > the 64 foreign-token headroom
+    const features = Array.from({ length: COUNT }, (_, i) => makeFeature(`F${i + 1}`));
+
+    // Defer every spawn; assign a unique token per call so exits can arrive first.
+    const resolvers: Array<(v: { pid: number; spawnToken: number }) => void> = [];
+    let nextToken = 0;
+    spawnAgentMock.mockImplementation(() => {
+      nextToken += 1;
+      const token = nextToken;
+      return new Promise<{ pid: number; spawnToken: number }>((resolve) => {
+        resolvers.push((v) => resolve(v ?? { pid: token, spawnToken: token }));
+      });
+    });
+
+    render(
+      <I18nProvider>
+        <BatchDispatchModal {...baseProps} features={features} />
+      </I18nProvider>,
+    );
+
+    await user.click(screen.getByText('開始批次派遣'));
+    // Wait until all spawns are in flight (tokens 1..COUNT assigned).
+    await waitFor(() => expect(resolvers.length).toBe(COUNT));
+
+    // Every exit lands before any spawn resolves — all staged at once.
+    act(() => {
+      for (let token = 1; token <= COUNT; token += 1) {
+        exitHandler?.({ pid: token, spawnToken: token, code: 0 });
+      }
+    });
+
+    // Now resolve every spawn → each token maps and drains its staged exit.
+    await act(async () => {
+      resolvers.forEach((resolve, i) => resolve({ pid: i + 1, spawnToken: i + 1 }));
+    });
+
+    // All complete — none evicted/stranded.
+    expect(await screen.findByText(`${COUNT} 完成`)).toBeInTheDocument();
+  });
 });

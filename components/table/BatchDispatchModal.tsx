@@ -192,6 +192,12 @@ export function BatchDispatchModal({
     // events can arrive before its mapping is set. Stage them, then replay once
     // the token is mapped — otherwise the item is stranded in "running".
     const staged = new Map<number, PendingAgentEvent[]>();
+    // Every token this batch spawns will eventually be mapped, so the cap must
+    // exceed the batch size — otherwise a batch of >cap fast-exiting processes
+    // (all staged before any spawn resolves) would FIFO-evict a legitimate
+    // exit and strand that item in "running". Headroom above the batch size
+    // still bounds foreign tokens (events from other concurrent dispatches).
+    const stagingCap = items.length + PENDING_EVENT_CAP;
     const stage = (token: number, event: PendingAgentEvent) => {
       const queue = staged.get(token);
       if (queue) {
@@ -199,7 +205,7 @@ export function BatchDispatchModal({
         return;
       }
       staged.set(token, [event]);
-      if (staged.size > PENDING_EVENT_CAP) {
+      if (staged.size > stagingCap) {
         const oldest = staged.keys().next().value;
         if (oldest !== undefined) staged.delete(oldest);
       }
@@ -289,6 +295,11 @@ export function BatchDispatchModal({
         }
       }),
     );
+
+    // Every batch token is now mapped (and its staged events drained), so
+    // anything still staged is foreign — release it. Live events for mapped
+    // tokens continue to route directly through the handlers above.
+    staged.clear();
 
     setBatchPhase('done');
   };
