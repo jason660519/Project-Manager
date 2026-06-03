@@ -1,9 +1,13 @@
 import type { Feature, FeaturePhase, FeatureStatus, IDEId } from '../../../lib/types';
+import { uuidv5 } from '../../../lib/aiSdks/uuid';
 import type { CustomProjectProgressRow, PhaseRowMeta } from '../types';
+
+const PHASE_ROW_ID_NAMESPACE = '1f7c9d85-e5e1-4da7-a43a-bafeb75380d7';
 
 /** Display-side row used by every phase tab. Wraps a project Feature or a custom row. */
 export interface PhaseRow extends PhaseRowMeta {
   projectName?: string;
+  uuid: string;          // RFC 4122 UUID for col-id / future database identity
   id: string;            // human-readable feature id ("F01" / row id)
   name: string;
   category: string;
@@ -46,14 +50,24 @@ export interface PhaseRow extends PhaseRowMeta {
 
 const safePoints = (f: Feature) => (typeof f.points === 'number' && f.points > 0 ? f.points : 1);
 
+function phaseRowUuid(naturalKey: string): string {
+  return uuidv5(naturalKey, PHASE_ROW_ID_NAMESPACE);
+}
+
 /** Map a Feature → display row for a given phase view. */
 export function featureToPhaseRow(feature: Feature, defaultProjectName?: string): PhaseRow {
+  const projectIdentity =
+    (feature.metadata?.sourceProjectRoot as string | undefined)
+    ?? (feature.metadata?.sourceProjectName as string | undefined)
+    ?? defaultProjectName
+    ?? 'default-project';
   return {
     rowKey: `feature::${feature.id}`,
     source: 'feature',
     featureId: feature.id,
     projectName: (feature.metadata?.sourceProjectName as string | undefined) ?? defaultProjectName,
     sourceProjectRoot: feature.metadata?.sourceProjectRoot as string | undefined,
+    uuid: phaseRowUuid(`feature:${projectIdentity}:${feature.id}`),
     id: feature.id,
     name: feature.name,
     category: feature.category,
@@ -96,11 +110,13 @@ export function featureToPhaseRow(feature: Feature, defaultProjectName?: string)
 /** Map a custom row payload → display row for a phase view. */
 export function customRowToPhaseRow(row: CustomProjectProgressRow, defaultProjectName?: string): PhaseRow {
   const points = typeof row.points === 'number' && row.points > 0 ? row.points : 1;
+  const projectIdentity = row.projectName ?? defaultProjectName ?? 'default-project';
   return {
     rowKey: `custom::${row.rowId}`,
     source: 'custom',
     customRowId: row.rowId,
     projectName: row.projectName ?? defaultProjectName,
+    uuid: phaseRowUuid(`custom:${projectIdentity}:${row.phase}:${row.rowId}`),
     id: row.rowId,
     name: row.name,
     category: row.category,

@@ -5,7 +5,7 @@ description: Mandatory completion gate for Project Manager. Run npm run verify:b
 
 # Verify Before Complete — mandatory AI engineer gate
 
-> **Hard rule:** If you have not run `npm run verify:baseline` and (for UI) manual browser smoke, you **must not** say the task is done, mark progress 100%, offer commit/PR, or claim verification passed.
+> **Hard rule:** If you have not run `npm run verify:baseline` and (for UI) `npm run verify:dev-issues` plus manual browser smoke, you **must not** say the task is done, mark progress 100%, offer commit/PR, or claim verification passed.
 
 This skill closes the gap between "tests passed" and "app actually opens".
 
@@ -51,7 +51,8 @@ Automated checks **do not** replace opening the app.
 2. Open the **changed route(s)** in **Chrome, Safari, or Tauri** — not Cursor embedded browser alone (it injects `data-cursor-ref` and can cause false hydration errors).
 3. Open DevTools → Console. **Zero** React hydration errors and zero uncaught exceptions on the happy path.
 4. Confirm the Next.js dev **Issues** overlay (bottom-left “N Issues”) is **0** on each changed route — any count is a ship blocker; never hand off runtime errors for the user to debug.
-5. Click one primary action on the changed surface (save, tab switch, guarded approve, etc.).
+5. For browser-rendered routes, run `npm run verify:dev-issues -- --routes /changed-route[,/another-route]` while `npm run dev` is serving port 43187; paste its PASS/FAIL summary into the final verification note.
+6. Click one primary action on the changed surface (save, tab switch, guarded approve, etc.). Tauri-specific shell/bridge behavior still requires manual Tauri smoke.
 
 Tauri event listeners: `safeUnlisten` + async `cancelled` guard — see `docs/engineering/runtime-bridge.md` §4.
 
@@ -64,6 +65,7 @@ If you cannot run the browser, say so explicitly and list what the user must ver
 Before setting `.project-manager/config.json` progress to **100%** or phase `done`:
 
 - [ ] `npm run verify:baseline` green in this session (paste summary or exit code)
+- [ ] UI routes only: `npm run verify:dev-issues -- --routes ...` green in this session
 - [ ] UI smoke done or delegated with explicit user checklist
 - [ ] `dev-log.md` lists verification commands actually run (not aspirational)
 - [ ] No `"completed"` without the above

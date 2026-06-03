@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { fireEvent, render } from '@testing-library/react';
 import { VlmArenaMatrixTable } from '../app/ui/views/Keys/VlmArenaMatrixTable';
 import { en } from '../lib/i18n/en';
+import { isUuid } from '../lib/aiSdks/uuid';
 import type { VlmImageToImageRow } from '../app/ui/views/Keys/VlmImageToImageEvaluation';
 
 /** Regression: the VLM Arena prompt <textarea> must keep focus across keystrokes. */
@@ -66,6 +67,19 @@ function Harness() {
 }
 
 describe('VlmArenaMatrixTable prompt focus', () => {
+  it('renders a UUID col-id identity column before the human sequence column', () => {
+    const { container, getByText } = render(<Harness />);
+
+    const headers = Array.from(container.querySelectorAll('thead th')).map((th) => th.textContent ?? '');
+    expect(headers[0]).toContain('UUID');
+    expect(headers[1]).toContain('#');
+    expect(getByText('UUID')).toBeInTheDocument();
+
+    const firstCell = container.querySelector('tbody td');
+    expect(firstCell).not.toBeNull();
+    expect(isUuid((firstCell?.textContent ?? '').trim())).toBe(true);
+  });
+
   it('keeps the prompt textarea mounted and focused across keystrokes', () => {
     const { container } = render(<Harness />);
     const ta = container.querySelector('textarea') as HTMLTextAreaElement;

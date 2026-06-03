@@ -1,5 +1,11 @@
 'use client';
 
+// @table-classification: basic
+// @table-reason: GitHub Issues dashboard sheet is an operational table with
+//   UUID row identity, issue-number human key, table-scoped search, status/type
+//   filters, numeric freeze columns, hidden columns, resize controls, sorting,
+//   empty states, and issue actions.
+
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type Dispatch, type MouseEvent, type ReactNode, type SetStateAction } from 'react';
 import {
   AlertCircle,
@@ -19,6 +25,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { COL_ID_COLUMN_HEADER } from '../../../components/table/colId';
+import { uuidv5 } from '../../../lib/aiSdks/uuid';
 import type { AnyAdapterConfig, EngineerRole, GithubIssue, IDEId } from '../../../lib/types';
 import {
   fetchGithubIssueComments,
@@ -90,9 +97,11 @@ interface RepoSyncState {
 const CACHE_PREFIX = 'pm-issues-';
 const ISSUES_TABLE_PREFS_KEY = 'projectManager.progressDashboard.issuesTable.v2';
 const GITHUB_PROVIDER = PROVIDERS.find((provider) => provider.id === 'github') ?? null;
+const ISSUE_ROW_ID_NAMESPACE = 'f2cbb027-6f2b-46f0-9d7a-9f20a76dd0c4';
 const ISSUE_COLUMN_DEFS = [
   { id: 'col-select', label: 'Sel', width: 44, sortable: false },
-  { id: 'col-id', label: COL_ID_COLUMN_HEADER, width: 88, sortable: true },
+  { id: 'col-id', label: COL_ID_COLUMN_HEADER, width: 144, sortable: true },
+  { id: 'col-issue-number', label: 'Issue #', width: 88, sortable: true },
   { id: 'col-project', label: 'Project', width: 132, sortable: true },
   { id: 'col-title', label: 'Title', width: 320, sortable: true },
   { id: 'col-status', label: 'Status', width: 88, sortable: true },
@@ -103,6 +112,10 @@ const ISSUE_COLUMN_DEFS = [
 
 type IssueColumnId = (typeof ISSUE_COLUMN_DEFS)[number]['id'];
 type IssueSort = { columnId: IssueColumnId; direction: 'asc' | 'desc' } | null;
+
+function issueRowUuid(issue: Pick<DetailIssue, 'repoUrl' | 'number'>): string {
+  return uuidv5(`${issue.repoUrl}#${issue.number}`, ISSUE_ROW_ID_NAMESPACE);
+}
 
 function isTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -501,6 +514,7 @@ export function IssuesTab({
       result = result.filter((i) =>
         i.title.toLowerCase().includes(q) ||
         `#${i.number}`.includes(q) ||
+        issueRowUuid(i).includes(q) ||
         i.projectName.toLowerCase().includes(q) ||
         i.repoName.toLowerCase().includes(q),
       );
@@ -510,7 +524,8 @@ export function IssuesTab({
     return [...result].sort((a, b) => {
       const read = (issue: DetailIssue): string | number => {
         switch (issueSort.columnId) {
-          case 'col-id': return issue.number;
+          case 'col-id': return issueRowUuid(issue);
+          case 'col-issue-number': return issue.number;
           case 'col-project': return issue.projectName;
           case 'col-title': return issue.title;
           case 'col-status': return issue.state;
@@ -1661,6 +1676,15 @@ function IssuesTable({
           />
         );
       case 'col-id':
+        return (
+          <span
+            className="block max-w-[160px] truncate font-mono text-[11px] text-stone-300"
+            title={`${issueRowUuid(issue)} · ${issue.repoUrl}#${issue.number}`}
+          >
+            {issueRowUuid(issue)}
+          </span>
+        );
+      case 'col-issue-number':
         return <span className="font-mono text-stone-300">#{issue.number}</span>;
       case 'col-project':
         return <span className="text-[11px] text-stone-400">{issue.projectName}</span>;

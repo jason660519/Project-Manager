@@ -1838,6 +1838,41 @@ export async function saveSession(sessionsDir: string, session: AgentSession): P
 
 // ── Generic file read ─────────────────────────────────────────────────────────
 
+let browserProjectRootPromise: Promise<string> | null = null;
+
+function isAbsoluteFilePath(filePath: string): boolean {
+  return filePath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(filePath);
+}
+
+function normalizePathForBrowserCompare(filePath: string): string {
+  const normalized = filePath.replace(/\\/g, '/').replace(/\/+$/, '');
+  return normalized || '/';
+}
+
+async function getBrowserProjectRoot(): Promise<string> {
+  if (!browserProjectRootPromise) {
+    browserProjectRootPromise = fetch('/api/project-manager-root')
+      .then(async (res) => {
+        const body = (await res.json().catch(() => null)) as { root?: unknown; error?: string } | null;
+        if (!res.ok) {
+          throw new Error(body?.error ?? `Cannot resolve Project Manager root: ${res.status}`);
+        }
+        return typeof body?.root === 'string' ? body.root : '';
+      })
+      .catch(() => '');
+  }
+  return browserProjectRootPromise;
+}
+
+async function assertBrowserReadPathAllowed(filePath: string): Promise<void> {
+  if (!isAbsoluteFilePath(filePath)) return;
+  const root = normalizePathForBrowserCompare(await getBrowserProjectRoot());
+  if (!root) return;
+  const target = normalizePathForBrowserCompare(filePath);
+  if (target === root || target.startsWith(`${root}/`)) return;
+  throw new Error('Access denied: path is outside the project directory');
+}
+
 /**
  * Read a plain-text file from disk and return its content.
  * In Tauri mode uses the Rust bridge; in browser dev mode uses
@@ -1849,6 +1884,7 @@ export async function readFile(path: string): Promise<string> {
   }
   // Browser dev mode: proxy through Next.js API route
   if (typeof window === 'undefined') return '';
+  await assertBrowserReadPathAllowed(path);
   const res = await fetch('/api/editor/read-file', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

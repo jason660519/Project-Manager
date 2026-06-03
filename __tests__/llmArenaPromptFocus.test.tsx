@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { fireEvent, render } from '@testing-library/react';
 import { LlmArenaMatrixTable } from '../app/ui/views/Keys/LlmArenaMatrixTable';
 import { en } from '../lib/i18n/en';
+import { isUuid } from '../lib/aiSdks/uuid';
 import type { ArenaModelSpec, ArenaResult } from '../app/ui/views/Keys/useArenaChat';
 
 /**
@@ -61,6 +62,19 @@ function Harness() {
 }
 
 describe('LlmArenaMatrixTable prompt focus', () => {
+  it('renders a UUID col-id identity column before the human sequence column', () => {
+    const { container, getByText } = render(<Harness />);
+
+    const headers = Array.from(container.querySelectorAll('thead th')).map((th) => th.textContent ?? '');
+    expect(headers[0]).toContain('UUID');
+    expect(headers[1]).toContain('No');
+    expect(getByText('UUID')).toBeInTheDocument();
+
+    const firstCell = container.querySelector('tbody td');
+    expect(firstCell).not.toBeNull();
+    expect(isUuid((firstCell?.textContent ?? '').trim())).toBe(true);
+  });
+
   it('keeps the test-prompt textarea mounted and focused across keystrokes', () => {
     const { container } = render(<Harness />);
 

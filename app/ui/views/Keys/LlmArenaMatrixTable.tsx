@@ -59,6 +59,8 @@ import {
   type LlmArenaCopy,
   type RunHistoryEntry,
 } from './LlmArenaTypes';
+import { COL_ID_COLUMN_HEADER } from '../../../../components/table/colId';
+import { uuidv5 } from '../../../../lib/aiSdks/uuid';
 
 interface ProviderLike {
   id: LlmProviderId;
@@ -104,8 +106,10 @@ interface LlmArenaMatrixTableProps {
 }
 
 const col = createColumnHelper<LlmArenaTableRow>();
-const LLM_STORAGE_KEY = 'projectManager.keys.llmArena.tablePrefs.v2';
+const LLM_STORAGE_KEY = 'projectManager.keys.llmArena.tablePrefs.v3';
+const LLM_ARENA_ROW_ID_NAMESPACE = '87a9c48f-bf9d-4f7a-92f4-97e90f1c3d43';
 const LLM_COLUMN_IDS = [
+  'col-id',
   'col-no',
   'col-activity-filter',
   'col-provider',
@@ -129,6 +133,7 @@ const LLM_COLUMN_IDS = [
 ];
 
 const LLM_DEFAULT_SIZING: Record<string, number> = {
+  'col-id': 156,
   'col-no': 72,
   'col-activity-filter': 124,
   'col-provider': 170,
@@ -155,18 +160,18 @@ const LLM_PRESETS: ArenaTablePreset[] = [
   {
     id: 'full',
     label: 'Full',
-    frozenColumnIds: ['col-no', 'col-activity-filter', 'col-provider', 'col-model'],
+    frozenColumnIds: ['col-id', 'col-no', 'col-activity-filter', 'col-provider', 'col-model'],
   },
   {
     id: 'run-review',
     label: 'Run review',
-    frozenColumnIds: ['col-no', 'col-provider', 'col-model'],
+    frozenColumnIds: ['col-id', 'col-no', 'col-provider', 'col-model'],
     columnVisibility: Object.fromEntries(LLM_COLUMN_IDS.map((id) => [id, !['col-invocation', 'col-ttft'].includes(id)])),
   },
   {
     id: 'compact',
     label: 'Compact',
-    frozenColumnIds: ['col-no', 'col-provider'],
+    frozenColumnIds: ['col-id', 'col-no', 'col-provider'],
     columnVisibility: Object.fromEntries(
       LLM_COLUMN_IDS.map((id) => [
         id,
@@ -180,6 +185,10 @@ function SortMarker({ value }: { value: false | 'asc' | 'desc' }) {
   if (value === 'asc') return <span className="text-emerald-200">↑</span>;
   if (value === 'desc') return <span className="text-emerald-200">↓</span>;
   return null;
+}
+
+function llmArenaRowUuid(row: LlmArenaTableRow): string {
+  return uuidv5(`${row.spec.provider}:${row.spec.model}`, LLM_ARENA_ROW_ID_NAMESPACE);
 }
 
 export function LlmArenaMatrixTable({
@@ -215,6 +224,7 @@ export function LlmArenaMatrixTable({
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const columnOptions = useMemo(
     () => [
+      { id: 'col-id', label: COL_ID_COLUMN_HEADER, freezable: true },
       { id: 'col-no', label: 'No', freezable: true },
       { id: 'col-activity-filter', label: copy.activityFilter.label, freezable: true },
       { id: 'col-provider', label: copy.columns.provider, freezable: true },
@@ -251,7 +261,7 @@ export function LlmArenaMatrixTable({
     storageKey: LLM_STORAGE_KEY,
     columnIds: LLM_COLUMN_IDS,
     defaultSizing: LLM_DEFAULT_SIZING,
-    defaultFrozenColumnIds: ['col-no', 'col-activity-filter', 'col-provider', 'col-model'],
+    defaultFrozenColumnIds: ['col-id', 'col-no', 'col-activity-filter', 'col-provider', 'col-model'],
   });
 
   const rows = useMemo<LlmArenaTableRow[]>(
@@ -280,6 +290,7 @@ export function LlmArenaMatrixTable({
       if (activityFilter === 'inactivity' && isActive) return false;
       if (!keyword) return true;
       const searchBlob = [
+        llmArenaRowUuid(row),
         row.spec.provider,
         row.spec.model,
         row.result?.content ?? '',
@@ -317,6 +328,19 @@ export function LlmArenaMatrixTable({
 
   const columns = useMemo(
     () => [
+      col.accessor((row) => llmArenaRowUuid(row), {
+        id: 'col-id',
+        header: COL_ID_COLUMN_HEADER,
+        size: LLM_DEFAULT_SIZING['col-id'],
+        cell: ({ row, getValue }) => (
+          <span
+            className="block truncate font-mono text-[11px] text-stone-300"
+            title={`${getValue()} (${row.original.spec.provider}:${row.original.spec.model})`}
+          >
+            {getValue()}
+          </span>
+        ),
+      }),
       col.accessor((row) => row.index + 1, {
         id: 'col-no',
         header: 'No',

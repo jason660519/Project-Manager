@@ -10,10 +10,10 @@ const LEGACY_E2E_PHASE_KEY = 'testing';
 
 /** Phase-specific defaults. Column counts must match the column factories. */
 export const DEFAULT_WIDTHS_BY_PHASE: Record<FeaturePhase, number[]> = {
-  development: [120, 60, 50, 110, 220, 140, 110, 110, 110, 150, 150, 150, 150, 130, 150, 150, 150, 130, 180, 200],
-  e2e_testing: [120, 60, 110, 220, 110, 110, 110, 140, 100],
-  deployment:  [120, 60, 110, 220, 110, 120, 120, 140, 140],
-  operations:  [120, 60, 110, 220, 110, 100, 100, 100, 200],
+  development: [144, 120, 88, 50, 110, 220, 140, 110, 110, 110, 150, 150, 150, 150, 130, 150, 150, 150, 130, 180, 200],
+  e2e_testing: [144, 120, 88, 110, 220, 110, 110, 110, 140, 100],
+  deployment:  [144, 120, 88, 110, 220, 110, 120, 120, 140, 140],
+  operations:  [144, 120, 88, 110, 220, 110, 100, 100, 100, 200],
 };
 
 export const DEFAULT_HEADER_HEIGHT = 40;
@@ -49,35 +49,36 @@ function normalizeStringArray(value: unknown): string[] {
 }
 
 const COLUMN_ID_MIGRATION: Record<string, string> = {
-  'col-project': 'project',
-  'col-id': 'id',
-  'col-points': 'points',
-  'col-category': 'category',
-  'col-name': 'name',
-  'col-progress': 'progress',
-  'col-status': 'status',
-  'col-checklist': 'checklist',
-  'col-section': 'section',
-  'col-spec': 'spec',
-  'col-tdd': 'tdd',
-  'col-unit-integ': 'unitIntegrationTest',
-  'col-e2e-folder': 'e2eFolder',
-  'col-tdd-progress': 'tddProgress',
-  'col-tdd-report': 'tddReport',
-  'col-debug-retro': 'debugRetro',
-  'col-test-scenarios': 'testScenarios',
-  'col-dev-log': 'devLog',
-  'col-notes': 'notes',
-  'col-actions': 'actions',
-  'col-coverage': 'coverage',
-  'col-test-status': 'testStatus',
-  'col-deploy-status': 'deployStatus',
-  'col-env': 'deployEnv',
-  'col-date': 'deployDate',
-  'col-uptime': 'uptime',
-  'col-error': 'errorRate',
-  'col-rt': 'avgResponseTime',
-  'col-incident': 'lastIncident',
+  project: 'col-project',
+  id: 'col-feature-id',
+  featureId: 'col-feature-id',
+  points: 'col-points',
+  category: 'col-category',
+  name: 'col-name',
+  progress: 'col-progress',
+  status: 'col-status',
+  checklist: 'col-checklist',
+  section: 'col-section',
+  spec: 'col-spec',
+  tdd: 'col-tdd',
+  unitIntegrationTest: 'col-unit-integ',
+  e2eFolder: 'col-e2e-folder',
+  tddProgress: 'col-tdd-progress',
+  tddReport: 'col-tdd-report',
+  debugRetro: 'col-debug-retro',
+  testScenarios: 'col-test-scenarios',
+  devLog: 'col-dev-log',
+  notes: 'col-notes',
+  actions: 'col-actions',
+  coverage: 'col-coverage',
+  testStatus: 'col-test-status',
+  deployStatus: 'col-deploy-status',
+  deployEnv: 'col-env',
+  deployDate: 'col-date',
+  uptime: 'col-uptime',
+  errorRate: 'col-error',
+  avgResponseTime: 'col-rt',
+  lastIncident: 'col-incident',
 };
 
 function migrateColumnId(columnId: string): string {
@@ -157,7 +158,7 @@ function readPrefs(phase: FeaturePhase): PhaseTablePrefs {
       frozenDataColCount: clampNumber(parsed.frozenDataColCount, 0, 5, 0),
       hiddenColumnIds: normalizeStringArray(parsed.hiddenColumnIds)
         .map(migrateColumnId)
-        .filter((id) => id !== 'id'),
+        .filter((id) => id !== 'col-id'),
       hiddenRowKeys: normalizeStringArray(parsed.hiddenRowKeys),
       sorting: Array.isArray(parsed.sorting)
         ? parsed.sorting.filter((item): item is PhaseTablePrefs['sorting'][number] => (

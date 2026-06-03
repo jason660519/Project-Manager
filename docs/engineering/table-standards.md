@@ -155,8 +155,9 @@ Before shipping table changes:
 
 1. `npm run typecheck`
 2. Relevant tests for table behavior (sorting, labels, row actions, empty states)
-3. Manual scan in dashboard route for hover, sticky behavior, and document-link opening behavior
-4. Manual viewport check for workstation pages: bottom sheets remain visible without page-level vertical scrolling
+3. `npm run table:sheet:audit -- --write`
+4. Manual scan in changed routes for hover, sticky behavior, resize/freeze controls, hidden column/row recovery, and document-link opening behavior
+5. Manual viewport check for workstation pages: bottom sheets remain visible without page-level vertical scrolling
 
 ## Adoption Rule For New Views
 
@@ -165,33 +166,24 @@ Any new data-heavy view in `app/ui/views/` or `app/project-progress-dashboard/` 
 1. Reuse existing table primitives/patterns, or
 2. Document a justified deviation in the feature folder and, if architectural, in an ADR.
 
-## Coverage Snapshot (2026-06-03)
+## Source-Driven Inventory
 
-Current table-sheet inventory and adoption status:
+Do **not** use hand-maintained coverage snapshots as completion proof. They drift.
 
-| Surface | Classification | Status |
-| --- | --- | --- |
-| `app/ui/views/Keys/KeysProviderTable.tsx` | Basic Table Sheet | Reference implementation for right-click resize, row height, hidden rows/cols, delete-row context action, fixed layout clipping, and sticky z-index ladder. |
-| `components/table/datasheet/DataTableShell.tsx` | Shared Basic/Large primitive | Must be reused for new TanStack sheet chrome when possible; owns fixed layout, persistent table scroll, clipping, sort arrows, resize handles, empty rows, and sticky layering. |
-| `components/table/datasheet/frozenColumns.ts` | Shared primitive | Numeric leftmost-N freeze model; frozen headers layer above regular headers and frozen body cells. |
-| `app/ui/views/Keys/CodingAgentCandidateTable.tsx` | Basic Table Sheet | Uses `DataTableShell`; inherits shared layout/clipping/z-index behavior. |
-| `app/ui/views/AiSdks/AiSdkProviderSheet.tsx` | Basic Table Sheet | Bespoke sheet with table prefs; must keep clipping/z-index behavior aligned with the shared primitive until migrated. |
-| `app/ui/views/Keys/LlmArenaMatrixTable.tsx` | Basic Table Sheet | Bespoke arena sheet; inline shell remains allowed only while it mirrors shared clipping/z-index behavior. |
-| `app/ui/views/Keys/VlmArenaMatrixTable.tsx` | Basic Table Sheet | Bespoke arena sheet; inline shell remains allowed only while it mirrors shared clipping/z-index behavior. |
-| `app/ui/views/Plugins/_shared/IntegrationsTable.tsx` | Basic Table Sheet | Uses TanStack with persistent layout patterns; verify against shared primitive before adding new sheet behaviors. |
-| `app/ui/views/ProjectsView.tsx` | Basic Table Sheet | Project selection sheet with resize/freeze/hide controls; must follow the same fixed layout, clipping, persistent scroll, and z-index ladder. |
-| `app/project-progress-dashboard/_components/PhaseTable.tsx` | Basic Table Sheet | Dashboard-specific table; keep freeze/layout behavior aligned with the z-index ladder and persistent scroll rule. |
-| `app/project-progress-dashboard/_components/IssuesTab.tsx` | Basic/Table-like dashboard surface | Uses bespoke sticky table; must follow the z-index/clipping rules when resize/freeze is introduced. |
-| `components/table/TableCore.tsx` | Shared/simple primitive | Suitable for simple tables; do not promote to Basic Table Sheet without adding missing preference/context-menu controls. |
-| `app/ui/views/Engineers/AbilityToolsTable.tsx` | Simple Table | Read/scan table; keep sticky header and empty state, but do not overbuild Basic controls unless usage changes. |
-| `app/ui/views/Engineers/AiEngineersTable.tsx` | Simple Table | Read/scan table; not a Basic Table Sheet unless repeated operational customization is added. |
-| `app/ui/views/SettingsView.tsx` | Simple Table | Settings reference table inside WorkstationFrame. |
-| `app/ui/views/KeyboardShortcutsView.tsx` | Read-only Exception | Static shortcut reference; customization controls are intentionally skipped. |
-| `app/ui/views/Plugins/CapabilitySheetView.tsx`, `app/ui/views/Plugins/ConnectSheet.tsx`, `app/ui/views/Keys/LlmArenaDetailSheet.tsx` | Read-only/Simple detail tables | Keep visual contract, but full Basic controls are not required unless they become operational data sheets. |
-| `app/ai_assistants/AIAssistantsConsoleClient.tsx` | Mixed simple detail tables | Treat each embedded table as Simple unless promoted to a reusable table sheet. |
+Current inventory must be generated from source:
 
-When introducing or promoting a table view, add the path here once it has passed
-the verification checklist in this document.
+```bash
+npm run table:sheet:audit -- --write
+```
+
+The generated report lives at `docs/engineering/table-sheet-inventory.md` and records every currently detected table/sheet surface, module, route, classification, implementation type, static audit status, and remaining notes.
+
+When introducing or promoting a table view:
+
+1. Add `@table-classification`, `@table-reason`, and any `@table-waivers` at the implementation file top.
+2. Run `npm run table:sheet:audit -- --write`.
+3. Fix blocking findings or document a deliberate ADR-backed exception.
+4. Commit the refreshed source-driven inventory report with the implementation.
 
 ---
 

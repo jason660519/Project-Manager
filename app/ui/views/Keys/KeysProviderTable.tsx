@@ -1400,7 +1400,7 @@ export function KeysProviderTable({
           </button>
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div className="pm-scroll min-h-0 flex-1 overflow-auto">
         <table className="table-fixed border-collapse text-left" style={{ width: table.getTotalSize() }}>
           <thead className="sticky top-0 z-40 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
             {table.getHeaderGroups().map((headerGroup) => (

@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { I18nProvider } from '../lib/i18n';
 import { IssuesTab } from '../app/project-progress-dashboard/_components/IssuesTab';
 import type { GithubIssue } from '../lib/types';
+import { isUuid } from '../lib/aiSdks/uuid';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -175,9 +176,12 @@ describe('IssuesTab', () => {
     seedCache([OPEN_ISSUE]);
     renderIssuesTab();
     await waitFor(() => {
+      expect(screen.getByText('UUID')).toBeInTheDocument();
       expect(screen.getByText('#1')).toBeInTheDocument();
       expect(screen.getByText('Fix login')).toBeInTheDocument();
     });
+    const uuidCell = screen.getAllByText(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)[0];
+    expect(isUuid(uuidCell.textContent ?? '')).toBe(true);
   });
 
   it('shows selected/open/closed issue counters', async () => {

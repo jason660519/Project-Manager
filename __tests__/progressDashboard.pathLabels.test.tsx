@@ -19,6 +19,7 @@ const row: PhaseRow = {
   source: 'feature',
   featureId: 'F01',
   sourceProjectRoot: '/source-project',
+  uuid: '3b241101-e2bb-4255-8caf-4136c566a962',
   id: 'F01',
   name: 'Feature',
   category: 'Core',
@@ -46,7 +47,7 @@ describe('project progress path labels', () => {
   });
 
   it('shows fixed document labels instead of raw paths', () => {
-    renderCell('spec');
+    renderCell('col-spec');
 
     expect(screen.getByText('feature-spec.md')).toBeInTheDocument();
     expect(screen.queryByText('.project-manager/features/F01/feature-spec.md')).toBeNull();
@@ -57,7 +58,7 @@ describe('project progress path labels', () => {
   });
 
   it('opens markdown artifacts in the right-side document panel', () => {
-    renderCell('spec');
+    renderCell('col-spec');
 
     fireEvent.click(screen.getByRole('button'));
 
@@ -67,7 +68,7 @@ describe('project progress path labels', () => {
   });
 
   it('links the Dev Logs label to the canonical dev-log.md file', () => {
-    renderCell('devLog');
+    renderCell('col-dev-log');
 
     expect(screen.getByText('dev-log.md')).toBeInTheDocument();
     expect(screen.getByRole('button')).toHaveAttribute(
@@ -77,7 +78,7 @@ describe('project progress path labels', () => {
   });
 
   it('shows Debug Retro and Test Scenarios as canonical artifact labels', () => {
-    renderCell('debugRetro');
+    renderCell('col-debug-retro');
     expect(screen.getByText('debug-retro.md')).toBeInTheDocument();
     expect(screen.queryByText('.project-manager/features/F01/debug-retro.md')).toBeNull();
     expect(screen.getByRole('button')).toHaveAttribute(
@@ -85,7 +86,7 @@ describe('project progress path labels', () => {
       '/source-project/.project-manager/features/F01/debug-retro.md',
     );
 
-    renderCell('testScenarios');
+    renderCell('col-test-scenarios');
     expect(screen.getByText('test-scenarios.md')).toBeInTheDocument();
     expect(screen.queryByText('.project-manager/features/F01/test-scenarios.md')).toBeNull();
     expect(screen.getAllByRole('button')[1]).toHaveAttribute(
@@ -95,16 +96,16 @@ describe('project progress path labels', () => {
   });
 
   it('shows README.md for the README column even when notes text exists', () => {
-    const readmeColumn = createDevelopmentColumns().find((col) => col.id === 'notes');
+    const readmeColumn = createDevelopmentColumns().find((col) => col.id === 'col-notes');
 
     expect(readmeColumn?.header).toBe('README');
-    renderCell('notes');
+    renderCell('col-notes');
     expect(screen.getByText('README.md')).toBeInTheDocument();
     expect(screen.queryByText(row.notes!)).toBeNull();
   });
 
   it('does not show notes text as a README fallback when readmePath is missing', () => {
-    renderCell('notes', { ...row, readmePath: undefined });
+    renderCell('col-notes', { ...row, readmePath: undefined });
 
     expect(screen.getByText('—')).toBeInTheDocument();
     expect(screen.queryByText(row.notes!)).toBeNull();
