@@ -887,9 +887,13 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
       }
       setGateRunMessage(null);
       setGatePhases((phases) => ({ ...phases, [gateId]: 'running' }));
-      gateSpawnPendingRef.current = true;
       try {
-        const result = await spawnStandardsGateRun(gateId, root, isTauri);
+        // Open the staging window only around the native spawn (after all
+        // preflight), so foreign dispatch exits during policy/inventory checks
+        // aren't cached. onBeforeNativeSpawn fires right before the spawn invoke.
+        const result = await spawnStandardsGateRun(gateId, root, isTauri, () => {
+          gateSpawnPendingRef.current = true;
+        });
         // Claim the token so the global listener routes this gate's events.
         gateProcessTokensRef.current.add(result.spawnToken);
         // Token claimed: close the staging window so later dispatch exits aren't cached.
@@ -954,9 +958,11 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
       });
       setGatePhases((phases) => ({ ...phases, [gate.id]: 'running' }));
 
-      gateSpawnPendingRef.current = true;
       try {
-        const result = await spawnStandardsGateRun(gate.id, root, isTauri);
+        // Open the staging window only around the native spawn (see handleRunStandardsGate).
+        const result = await spawnStandardsGateRun(gate.id, root, isTauri, () => {
+          gateSpawnPendingRef.current = true;
+        });
         // Claim the token and drain any exit that fired first (see handleRunStandardsGate).
         gateProcessTokensRef.current.add(result.spawnToken);
         // Token claimed: close the staging window so later dispatch exits aren't cached.

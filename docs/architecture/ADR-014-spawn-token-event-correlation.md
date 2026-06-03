@@ -40,9 +40,18 @@ correlates events to runs **by token, never by PID**.
    - `agent-stdout` / `agent-stderr`: `{ pid, spawnToken, line }`
    - `agent-exit`: `{ pid, spawnToken, code }`
 3. All renderer correlation keys move from PID to `spawnToken`. The gate
-   early-exit cache / waiter machinery in `MainClient` is re-keyed by token and
-   the `gateSpawnPendingRef` / `onBeforeNativeSpawn` capture window is **removed**
-   — token uniqueness, not a timing window, is what prevents cross-correlation.
+   early-exit cache / waiter machinery in `MainClient` is re-keyed by token.
+   Token uniqueness — not a timing window — is what prevents **cross-correlation**
+   (a stale token can never match a future run), so the window is no longer a
+   *correctness* mechanism. The `gateSpawnPendingRef` / `onBeforeNativeSpawn`
+   window is **retained on the gate path for a different, narrower purpose**:
+   to bound which unclaimed exits are staged in the gate's FIFO-capped cache.
+   Without it, every unrelated dispatch exit would be staged and a large
+   fast-exiting batch could FIFO-evict the gate's own staged exit before its
+   token is claimed (PR #16, Codex P2). Staging is therefore opened only around
+   the native spawn invoke (via `onBeforeNativeSpawn`) and closed the moment the
+   token is claimed. The dispatch/batch modals instead never evict a staged
+   *exit* (only stdout-only tokens) for the same reason.
 
 This is a **bridge event contract change**, recorded here per the bridge
 discipline (event payload shape is part of the contract).
@@ -75,7 +84,13 @@ discipline (event payload shape is part of the contract).
 - `spawnAgent` callers that only need the PID for display/kill destructure
   `const { pid } = await spawnAgent(...)`.
 - The bounded LRU (`GATE_EXIT_CACHE_CAP`) in `MainClient` remains as a memory
-  bound for unclaimed early exits, but is no longer a correctness device.
+  bound for unclaimed early exits, but is no longer a correctness device. Gate
+  staging is opened only around the native spawn (`onBeforeNativeSpawn`) so
+  foreign exits don't pressure it; the dispatch/batch modals never evict a
+  staged *exit* (only stdout-only tokens).
 - Regression coverage: `__tests__/BatchDispatchModal.state.test.tsx` proves a
-  reused PID with a different token is not cross-correlated;
+  reused PID with a different token is not cross-correlated, and that a staged
+  exit survives a foreign-stdout flood that overflows the cap;
+  `__tests__/spawnStandardsGate.test.ts` proves gate staging opens only after
+  preflight, right before the native spawn;
   `__tests__/bridgeEventListeners.test.ts` proves the payloads carry the token.

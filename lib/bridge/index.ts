@@ -323,6 +323,14 @@ export interface SpawnAgentOptions {
   args: string[];
   /** Absolute path to the project root */
   workingDir: string;
+  /**
+   * Fired synchronously after all bridge policy preflight, immediately before
+   * the native spawn invoke. Lets a caller open an event-staging window around
+   * ONLY the spawn invoke — not the preceding async policy checks — so unrelated
+   * concurrent exits aren't staged (and can't pressure a bounded cache) during
+   * preflight. See MainClient gateSpawnPendingRef.
+   */
+  onBeforeNativeSpawn?: () => void;
 }
 
 /**
@@ -347,6 +355,7 @@ export interface SpawnAgentResult {
 export async function spawnAgent(opts: SpawnAgentOptions): Promise<SpawnAgentResult> {
   if (isTauri()) {
     await assertCommandPolicyAllows(opts.command);
+    opts.onBeforeNativeSpawn?.();
     return invoke<SpawnAgentResult>('spawn_agent', {
       command: opts.command,
       args: opts.args,
