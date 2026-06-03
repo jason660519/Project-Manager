@@ -323,27 +323,31 @@ export interface SpawnAgentOptions {
   args: string[];
   /** Absolute path to the project root */
   workingDir: string;
-  /**
-   * Fired synchronously after all bridge policy preflight, immediately before
-   * the native spawn invoke that creates the PID. Lets a caller open an
-   * early-exit capture window around ONLY the PID-return race (agent-exit can
-   * arrive before this invoke resolves), not the preceding async policy checks.
-   */
-  onBeforeNativeSpawn?: () => void;
 }
 
 /**
- * Spawn an agent process and return its PID.
- * Stdout/stderr lines are emitted as Tauri events:
- *   - "agent-stdout" { pid, line }
- *   - "agent-stderr" { pid, line }
- *   - "agent-exit"   { pid, code }
+ * Result of a spawn. `pid` is the OS PID (used for {@link killProcess} and
+ * display); `spawnToken` is the process-unique, monotonically increasing
+ * correlation key Rust stamps onto every emitted event. Correlate events by
+ * `spawnToken` — never the reusable PID — so a recycled OS PID can't replay a
+ * stale exit onto an unrelated run. In browser mode both are 0.
  */
-export async function spawnAgent(opts: SpawnAgentOptions): Promise<number> {
+export interface SpawnAgentResult {
+  pid: number;
+  spawnToken: number;
+}
+
+/**
+ * Spawn an agent process and return `{ pid, spawnToken }`.
+ * Stdout/stderr lines are emitted as Tauri events, each carrying the token:
+ *   - "agent-stdout" { pid, spawnToken, line }
+ *   - "agent-stderr" { pid, spawnToken, line }
+ *   - "agent-exit"   { pid, spawnToken, code }
+ */
+export async function spawnAgent(opts: SpawnAgentOptions): Promise<SpawnAgentResult> {
   if (isTauri()) {
     await assertCommandPolicyAllows(opts.command);
-    opts.onBeforeNativeSpawn?.();
-    return invoke<number>('spawn_agent', {
+    return invoke<SpawnAgentResult>('spawn_agent', {
       command: opts.command,
       args: opts.args,
       workingDir: opts.workingDir,
@@ -361,7 +365,7 @@ export async function spawnAgent(opts: SpawnAgentOptions): Promise<number> {
     }),
   });
   if (!res.ok) throw new Error(await res.text());
-  return 0; // no real PID in browser mode
+  return { pid: 0, spawnToken: 0 }; // no real process in browser mode
 }
 
 export async function killProcess(pid: number): Promise<void> {
@@ -951,8 +955,8 @@ export async function augmentArgsWithMcp(
 
 // ── Event listeners ───────────────────────────────────────────────────────────
 
-export type AgentStdioPayload = { pid: number; line: string };
-export type AgentExitPayload = { pid: number; code: number };
+export type AgentStdioPayload = { pid: number; spawnToken: number; line: string };
+export type AgentExitPayload = { pid: number; spawnToken: number; code: number };
 export type FontZoomShortcutPayload = {
   action?: 'in' | 'out' | 'reset';
   direction?: 'in' | 'out';

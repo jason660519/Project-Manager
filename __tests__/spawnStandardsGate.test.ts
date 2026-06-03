@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { spawnAgent, evaluateTerminalCommandBridge, listGlobalCliInventory } = vi.hoisted(
   () => ({
-    spawnAgent: vi.fn().mockResolvedValue(4242),
+    spawnAgent: vi.fn().mockResolvedValue({ pid: 4242, spawnToken: 1 }),
     evaluateTerminalCommandBridge: vi.fn().mockResolvedValue({ decision: 'allowed' }),
     listGlobalCliInventory: vi.fn().mockResolvedValue([{ command: 'npm', path: '/usr/bin/npm' }]),
   }),
@@ -47,7 +47,16 @@ describe('spawnStandardsGateRun', () => {
       args: ['run', 'i18n:check'],
       workingDir: '/tmp/pm-root',
     });
+    // The early-exit window machinery is gone — no onBeforeNativeSpawn hook.
+    expect(spawnAgent.mock.calls[0]?.[0]).not.toHaveProperty('onBeforeNativeSpawn');
     expect(spawnAgent.mock.calls[0]?.[0]).not.toHaveProperty('skipSystemCliInventoryCheck');
+  });
+
+  it('returns the Rust-issued spawnToken alongside the pid', async () => {
+    spawnAgent.mockResolvedValueOnce({ pid: 4242, spawnToken: 99 });
+    const result = await spawnStandardsGateRun('i18n', '/tmp/pm-root', true);
+    expect(result.spawnToken).toBe(99);
+    expect(result.pid).toBe(4242);
   });
 
   it('does not spawn when npm is not exposed', async () => {
@@ -56,37 +65,6 @@ describe('spawnStandardsGateRun', () => {
     await expect(spawnStandardsGateRun('i18n', '/tmp/pm-root', true)).rejects.toBeInstanceOf(
       StandardsGateRunError,
     );
-    expect(spawnAgent).not.toHaveBeenCalled();
-  });
-
-  it('forwards onSpawnStart to spawnAgent.onBeforeNativeSpawn, after preflight', async () => {
-    const order: string[] = [];
-    evaluateTerminalCommandBridge.mockImplementationOnce(async () => {
-      order.push('preflight');
-      return { decision: 'allowed' };
-    });
-    // spawnAgent fires onBeforeNativeSpawn after its own bridge policy preflight,
-    // immediately before the native spawn — emulate that ordering here.
-    spawnAgent.mockImplementationOnce(async (opts: { onBeforeNativeSpawn?: () => void }) => {
-      opts.onBeforeNativeSpawn?.();
-      order.push('spawn');
-      return 4242;
-    });
-    await spawnStandardsGateRun('i18n', '/tmp/pm-root', true, () => order.push('onSpawnStart'));
-    // The early-exit capture window must open only around the real spawn — after
-    // all async preflight, just before the PID-return race — so dispatch exits
-    // during preflight are never staged (PR #15 review).
-    expect(order).toEqual(['preflight', 'onSpawnStart', 'spawn']);
-  });
-
-  it('never opens the spawn window when a policy layer blocks the gate', async () => {
-    const { loadSystemCliExposureMap } = await import('../lib/storage/system-cli');
-    vi.mocked(loadSystemCliExposureMap).mockReturnValueOnce({ npm: false });
-    const onSpawnStart = vi.fn();
-    await expect(
-      spawnStandardsGateRun('i18n', '/tmp/pm-root', true, onSpawnStart),
-    ).rejects.toBeInstanceOf(StandardsGateRunError);
-    expect(onSpawnStart).not.toHaveBeenCalled();
     expect(spawnAgent).not.toHaveBeenCalled();
   });
 });

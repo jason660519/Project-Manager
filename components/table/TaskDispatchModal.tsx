@@ -78,7 +78,11 @@ type RolePhase = 'idle' | 'pending' | 'running' | 'done' | 'error';
 
 interface RoleRunState {
   phase: RolePhase;
+  /** OS PID — retained for kill_process and PID display only. */
   activePid: number | null;
+  /** Spawn token — the correlation key for this role's agent events. PID reuse
+   *  can't cross-correlate because tokens are unique (see ADR-014). */
+  activeToken: number | null;
 }
 
 interface LogEntry {
@@ -181,9 +185,9 @@ export function TaskDispatchModal({
 
   // ── Per-role run state ────────────────────────────────────────────────────
   const [runStates, setRunStates] = useState<Record<HarnessTaskRole, RoleRunState>>({
-    planner: { phase: 'idle', activePid: null },
-    worker: { phase: 'idle', activePid: null },
-    evaluator: { phase: 'idle', activePid: null },
+    planner: { phase: 'idle', activePid: null, activeToken: null },
+    worker: { phase: 'idle', activePid: null, activeToken: null },
+    evaluator: { phase: 'idle', activePid: null, activeToken: null },
   });
 
   // ── Merged log panel ──────────────────────────────────────────────────────
@@ -350,17 +354,17 @@ export function TaskDispatchModal({
         if (!result.success || !result.command || !result.args) {
           throw new Error(result.message ?? `Unable to build command for ${adapter.name}`);
         }
-        const pid = await spawnAgent({ command: result.command, args: result.args, workingDir: projectRoot });
+        const { pid } = await spawnAgent({ command: result.command, args: result.args, workingDir: projectRoot });
         setLogs((prev) => [...prev, { role, line: `── ${ROLE_SHORT[role]} opened ${adapter.name} (PID ${pid}) ──` }]);
         onExecuted({ success: true, message: `${adapter.name} opened (PID: ${pid})`, command: result.command, args: result.args, dryRun: false, pid });
       } catch (err) {
         setLogs((prev) => [...prev, { role, line: `Error: ${err}` }]);
-        setRunStates((prev) => ({ ...prev, [role]: { phase: 'error' as const, activePid: null } }));
+        setRunStates((prev) => ({ ...prev, [role]: { phase: 'error' as const, activePid: null, activeToken: null } }));
       }
       return;
     }
 
-    setRunStates((prev) => ({ ...prev, [role]: { phase: 'pending' as const, activePid: null } }));
+    setRunStates((prev) => ({ ...prev, [role]: { phase: 'pending' as const, activePid: null, activeToken: null } }));
 
     try {
       const runtimeAdapter = createRuntimeAdapterFromConfig(adapter);
@@ -375,28 +379,33 @@ export function TaskDispatchModal({
       const { command, args: baseArgs } = result;
       const args = await augmentArgsWithMcp(command, baseArgs, collectEnabledMcpServers(projectRoot));
 
-      const unStdout = await onAgentStdout(({ pid: eventPid, line }) => {
-        setRunStates((cur) => {
-          if (cur[role].activePid !== null && eventPid !== cur[role].activePid) return cur;
-          return cur;
-        });
+      // Listeners are registered before the spawn resolves, so the token isn't
+      // known yet. Hold it in a closure-local that both handlers read live —
+      // correlate by token, never the reusable PID (ADR-014). Until the token is
+      // set, no event can match (events for this run can't precede the spawn
+      // that creates it).
+      let activeSpawnToken: number | null = null;
+
+      const unStdout = await onAgentStdout(({ pid: eventPid, spawnToken: eventToken, line }) => {
+        if (activeSpawnToken === null || eventToken !== activeSpawnToken) return;
         setLogs((prev) => [...prev, { role, line }]);
         onRunLog?.(eventPid, line);
       });
 
-      const unExit = await onAgentExit(({ pid: exitPid, code }) => {
-        setRunStates((cur) => {
-          if (cur[role].activePid !== null && exitPid !== cur[role].activePid) return cur;
-          const succeeded = code === 0;
-          const nextAssignments = { ...(feature.harnessAssignments ?? {}) };
-          nextAssignments[role] = {
-            ...nextAssignments[role],
-            activePid: undefined,
-            status: succeeded ? 'done' : 'error',
-          };
-          onFeatureUpdate?.(feature.id, { harnessAssignments: nextAssignments });
-          return { ...cur, [role]: { phase: (succeeded ? 'done' : 'error') as RolePhase, activePid: null } };
-        });
+      const unExit = await onAgentExit(({ pid: exitPid, spawnToken: exitToken, code }) => {
+        if (activeSpawnToken === null || exitToken !== activeSpawnToken) return;
+        const succeeded = code === 0;
+        const nextAssignments = { ...(feature.harnessAssignments ?? {}) };
+        nextAssignments[role] = {
+          ...nextAssignments[role],
+          activePid: undefined,
+          status: succeeded ? 'done' : 'error',
+        };
+        onFeatureUpdate?.(feature.id, { harnessAssignments: nextAssignments });
+        setRunStates((cur) => ({
+          ...cur,
+          [role]: { phase: (succeeded ? 'done' : 'error') as RolePhase, activePid: null, activeToken: null },
+        }));
         setLogs((prev) => [...prev, { role, line: `\n── ${ROLE_SHORT[role]} exited (PID ${exitPid}, code ${code}) ──` }]);
         onRunEnd?.(exitPid, code);
         if (role === 'worker') {
@@ -406,8 +415,9 @@ export function TaskDispatchModal({
 
       unlistenRefs.current.push(unStdout, unExit);
 
-      const pid = await spawnAgent({ command, args, workingDir: projectRoot });
-      setRunStates((prev) => ({ ...prev, [role]: { phase: 'running' as const, activePid: pid } }));
+      const { pid, spawnToken } = await spawnAgent({ command, args, workingDir: projectRoot });
+      activeSpawnToken = spawnToken;
+      setRunStates((prev) => ({ ...prev, [role]: { phase: 'running' as const, activePid: pid, activeToken: spawnToken } }));
       onRunStart?.(pid, feature.id, feature.name, command, args);
 
       const nextAssignments = { ...(feature.harnessAssignments ?? {}) };
@@ -421,7 +431,7 @@ export function TaskDispatchModal({
       onExecuted({ success: true, message: `${adapter.name} started (PID: ${pid})`, command, args, dryRun: false, pid });
     } catch (err) {
       setLogs((prev) => [...prev, { role, line: `Error: ${err}` }]);
-      setRunStates((prev) => ({ ...prev, [role]: { phase: 'error' as const, activePid: null } }));
+      setRunStates((prev) => ({ ...prev, [role]: { phase: 'error' as const, activePid: null, activeToken: null } }));
     }
   }, [adapters, buildAssignmentPatch, buildDagWorkflowSelection, buildExecutionPrompt, configByRole, feature, onExecuted, onFeatureUpdate, onRunEnd, onRunLog, onRunStart, projectRoot]);
 
@@ -446,7 +456,7 @@ export function TaskDispatchModal({
     await killProcess(killConfirmPid);
     for (const role of ROLES) {
       if (runStates[role].activePid === killConfirmPid) {
-        setRunStates((prev) => ({ ...prev, [role]: { phase: 'error' as const, activePid: null } }));
+        setRunStates((prev) => ({ ...prev, [role]: { phase: 'error' as const, activePid: null, activeToken: null } }));
         setLogs((prev) => [...prev, { role, line: `── ${ROLE_SHORT[role]} killed (PID ${killConfirmPid}) ──` }]);
       }
     }

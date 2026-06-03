@@ -138,7 +138,7 @@ async function handleRunCommand(args: string[]): Promise<string> {
   );
 
   try {
-    const pid = await spawnAgent({
+    const { pid } = await spawnAgent({
       command: agent.command,
       args: finalArgs,
       workingDir: root,

@@ -6,7 +6,7 @@ import { I18nProvider } from '../lib/i18n';
 
 const spawnAgentMock = vi.fn();
 const augmentArgsWithMcpMock = vi.fn().mockImplementation((_command, args) => Promise.resolve(args));
-let exitHandler: ((event: { pid: number; code: number }) => void) | null = null;
+let exitHandler: ((event: { pid: number; spawnToken: number; code: number }) => void) | null = null;
 
 vi.mock('../lib/bridge', () => ({
   augmentArgsWithMcp: augmentArgsWithMcpMock,
@@ -74,7 +74,7 @@ describe('BatchDispatchModal state handling', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     exitHandler = null;
-    spawnAgentMock.mockResolvedValue(101);
+    spawnAgentMock.mockResolvedValue({ pid: 101, spawnToken: 101 });
   });
 
   it('renders a close-only modal for an empty features list', () => {
@@ -119,7 +119,9 @@ describe('BatchDispatchModal state handling', () => {
 
   it('renders completed and failed summary counts', async () => {
     const user = userEvent.setup();
-    spawnAgentMock.mockResolvedValueOnce(201).mockResolvedValueOnce(202);
+    spawnAgentMock
+      .mockResolvedValueOnce({ pid: 201, spawnToken: 201 })
+      .mockResolvedValueOnce({ pid: 202, spawnToken: 202 });
 
     render(
       <I18nProvider>
@@ -131,8 +133,8 @@ describe('BatchDispatchModal state handling', () => {
     await waitFor(() => expect(exitHandler).not.toBeNull());
 
     act(() => {
-      exitHandler?.({ pid: 201, code: 0 });
-      exitHandler?.({ pid: 202, code: 1 });
+      exitHandler?.({ pid: 201, spawnToken: 201, code: 0 });
+      exitHandler?.({ pid: 202, spawnToken: 202, code: 1 });
     });
 
     expect(await screen.findByText('1 完成')).toBeInTheDocument();
@@ -143,7 +145,7 @@ describe('BatchDispatchModal state handling', () => {
     const user = userEvent.setup();
     spawnAgentMock
       .mockRejectedValueOnce(new Error('first failed'))
-      .mockResolvedValueOnce(302);
+      .mockResolvedValueOnce({ pid: 302, spawnToken: 302 });
 
     render(
       <I18nProvider>
@@ -155,5 +157,37 @@ describe('BatchDispatchModal state handling', () => {
 
     expect(await screen.findByText(/Error: Error: first failed/)).toBeInTheDocument();
     expect(await screen.findByText('PID 302')).toBeInTheDocument();
+  });
+
+  // Regression: the PID-reuse race class (PR #15, ADR-014). An exit stamped with
+  // the SAME OS PID but a DIFFERENT spawn token — what happens when the OS
+  // recycles a PID onto an unrelated process — must never be cross-correlated
+  // onto a live run. Only the matching token completes it.
+  it('ignores a reused PID with a different spawn token', async () => {
+    const user = userEvent.setup();
+    spawnAgentMock.mockResolvedValueOnce({ pid: 500, spawnToken: 42 });
+
+    render(
+      <I18nProvider>
+        <BatchDispatchModal {...baseProps} features={[makeFeature('F1')]} />
+      </I18nProvider>,
+    );
+
+    await user.click(screen.getByText('開始批次派遣'));
+    await waitFor(() => expect(exitHandler).not.toBeNull());
+    expect(await screen.findByText('PID 500')).toBeInTheDocument();
+
+    // Same PID, stale token from a since-dead process — must be ignored.
+    act(() => {
+      exitHandler?.({ pid: 500, spawnToken: 41, code: 0 });
+    });
+    expect(screen.queryByText('1 完成')).not.toBeInTheDocument();
+    expect(screen.getByText('PID 500')).toBeInTheDocument(); // still running
+
+    // Matching token completes the run.
+    act(() => {
+      exitHandler?.({ pid: 500, spawnToken: 42, code: 0 });
+    });
+    expect(await screen.findByText('1 完成')).toBeInTheDocument();
   });
 });

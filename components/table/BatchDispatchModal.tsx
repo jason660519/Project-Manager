@@ -174,11 +174,12 @@ export function BatchDispatchModal({
     // it once before spawning instead of per-feature.
     const mcpServers = collectEnabledMcpServers(projectRoot);
 
-    // Map pid → featureId for event routing
-    const pidToFeatureId = new Map<number, string>();
+    // Map spawnToken → featureId for event routing. Tokens are unique &
+    // monotonic, so a reused OS PID can't cross-correlate (ADR-014).
+    const tokenToFeatureId = new Map<number, string>();
 
-    const unStdout = await onAgentStdout(({ pid: eventPid, line }) => {
-      const featureId = pidToFeatureId.get(eventPid);
+    const unStdout = await onAgentStdout(({ pid: eventPid, spawnToken, line }) => {
+      const featureId = tokenToFeatureId.get(spawnToken);
       if (!featureId) return;
       setItems((prev) =>
         prev.map((item) =>
@@ -188,8 +189,8 @@ export function BatchDispatchModal({
       onRunLog?.(eventPid, line);
     });
 
-    const unExit = await onAgentExit(({ pid: exitPid, code }) => {
-      const featureId = pidToFeatureId.get(exitPid);
+    const unExit = await onAgentExit(({ pid: exitPid, spawnToken, code }) => {
+      const featureId = tokenToFeatureId.get(spawnToken);
       if (!featureId) return;
       const succeeded = code === 0;
       setItems((prev) =>
@@ -223,8 +224,8 @@ export function BatchDispatchModal({
           const baseArgs = await buildArgs(feature);
           const args = await augmentArgsWithMcp(adapter.command, baseArgs, mcpServers);
           onFeatureUpdate?.(feature.id, { status: 'in_progress' });
-          const pid = await spawnAgent({ command: adapter.command, args, workingDir: projectRoot });
-          pidToFeatureId.set(pid, feature.id);
+          const { pid, spawnToken } = await spawnAgent({ command: adapter.command, args, workingDir: projectRoot });
+          tokenToFeatureId.set(spawnToken, feature.id);
           setItems((prev) =>
             prev.map((i) =>
               i.feature.id === feature.id ? { ...i, phase: 'running', pid } : i,

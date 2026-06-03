@@ -35,7 +35,7 @@ vi.mock('../lib/bridge', () => ({
   safeUnlisten: vi.fn((fn: (() => void) | undefined) => {
     fn?.();
   }),
-  spawnAgent: vi.fn().mockResolvedValue(0),
+  spawnAgent: vi.fn().mockResolvedValue({ pid: 0, spawnToken: 0 }),
 }));
 
 vi.mock('../lib/adapters/registry', () => ({
@@ -223,7 +223,7 @@ describe('sendChatMessage', () => {
     const controller = new AbortController();
     vi.mocked(spawnAgent).mockImplementationOnce(async () => {
       controller.abort();
-      return 123;
+      return { pid: 123, spawnToken: 7 };
     });
 
     await expect(sendChatMessage({
