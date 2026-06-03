@@ -58,4 +58,32 @@ describe('spawnStandardsGateRun', () => {
     );
     expect(spawnAgent).not.toHaveBeenCalled();
   });
+
+  it('fires onSpawnStart after preflight and immediately before spawnAgent', async () => {
+    const order: string[] = [];
+    evaluateTerminalCommandBridge.mockImplementationOnce(async () => {
+      order.push('preflight');
+      return { decision: 'allowed' };
+    });
+    spawnAgent.mockImplementationOnce(async () => {
+      order.push('spawn');
+      return 4242;
+    });
+    await spawnStandardsGateRun('i18n', '/tmp/pm-root', true, () => order.push('onSpawnStart'));
+    // The early-exit capture window must open only around the real spawn — after
+    // all async preflight, just before the PID-return race — so dispatch exits
+    // during preflight are never staged (PR #15 review).
+    expect(order).toEqual(['preflight', 'onSpawnStart', 'spawn']);
+  });
+
+  it('never opens the spawn window when a policy layer blocks the gate', async () => {
+    const { loadSystemCliExposureMap } = await import('../lib/storage/system-cli');
+    vi.mocked(loadSystemCliExposureMap).mockReturnValueOnce({ npm: false });
+    const onSpawnStart = vi.fn();
+    await expect(
+      spawnStandardsGateRun('i18n', '/tmp/pm-root', true, onSpawnStart),
+    ).rejects.toBeInstanceOf(StandardsGateRunError);
+    expect(onSpawnStart).not.toHaveBeenCalled();
+    expect(spawnAgent).not.toHaveBeenCalled();
+  });
 });

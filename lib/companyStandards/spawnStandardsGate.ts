@@ -90,6 +90,11 @@ export async function spawnStandardsGateRun(
   gateId: StandardsGateId,
   workingDir: string,
   isTauri: boolean,
+  // Invoked synchronously immediately before the process is spawned, after all
+  // policy / inventory / terminal-bridge preflight has passed. Lets the caller
+  // open its early-exit capture window around ONLY the PID-return race, not the
+  // async preflight (see MainClient gateSpawnPendingRef).
+  onSpawnStart?: () => void,
 ): Promise<{
   pid: number;
   featureId: string;
@@ -123,6 +128,7 @@ export async function spawnStandardsGateRun(
   }
 
   const inv = getGateInvocation(gateId);
+  onSpawnStart?.();
   const pid = await spawnAgent({
     command: inv.command,
     args: inv.args,

@@ -877,12 +877,14 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
       }
       setGateRunMessage(null);
       setGatePhases((phases) => ({ ...phases, [gateId]: 'running' }));
-      // Open the early-exit capture window: drop any leftovers and let the
-      // global listener stage exits for the PID this spawn is about to return.
-      gateExitCodesRef.current.clear();
-      gateSpawnPendingRef.current = true;
       try {
-        const result = await spawnStandardsGateRun(gateId, root, isTauri);
+        // Open the early-exit capture window only around the actual spawn (after
+        // preflight), so dispatch exits during policy/inventory checks are never
+        // staged. onSpawnStart fires synchronously right before the PID is created.
+        const result = await spawnStandardsGateRun(gateId, root, isTauri, () => {
+          gateExitCodesRef.current.clear();
+          gateSpawnPendingRef.current = true;
+        });
         // Claim the PID so the global listener routes this gate's events.
         gateProcessPidsRef.current.add(result.pid);
         handleRunStart(result.pid, result.featureId, result.featureName, result.command, result.args);
@@ -940,11 +942,12 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
       });
       setGatePhases((phases) => ({ ...phases, [gate.id]: 'running' }));
 
-      // Open the early-exit capture window for this gate (see handleRunStandardsGate).
-      gateExitCodesRef.current.clear();
-      gateSpawnPendingRef.current = true;
       try {
-        const result = await spawnStandardsGateRun(gate.id, root, isTauri);
+        // Open the early-exit window only around the actual spawn (see handleRunStandardsGate).
+        const result = await spawnStandardsGateRun(gate.id, root, isTauri, () => {
+          gateExitCodesRef.current.clear();
+          gateSpawnPendingRef.current = true;
+        });
         // Claim the PID and replay any exit that fired first (see handleRunStandardsGate).
         gateProcessPidsRef.current.add(result.pid);
         handleRunStart(result.pid, result.featureId, result.featureName, result.command, result.args);
