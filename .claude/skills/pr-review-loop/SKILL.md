@@ -43,11 +43,13 @@ A finding is **current** only if it reviews `HEAD_SHA`:
 - Codex review summaries state `Reviewed commit: <sha>` in the body — match its prefix to `HEAD_SHA`.
 - For inline threads, treat a thread as current if it is unresolved AND not `isOutdated` (GraphQL `reviewThreads.nodes[].isOutdated`).
 
+`isOutdated` controls whether you **act** on a thread's content, **not** whether it counts for convergence: a push can make a thread outdated while it stays **unresolved**, and GitHub still surfaces it and blocks merge on repos that require conversation resolution. So an outdated-but-unresolved thread must still be **cleared** — verify its point is already addressed by the current code, post a one-line reply saying so, and resolve it (as already-addressed / informational). Never let convergence ignore an unresolved thread just because it's outdated.
+
 Before analyzing, ensure both bots have actually reviewed `HEAD_SHA` and CI has finished:
 - Poll `gh pr checks <PR>` until `verify` reaches a terminal state (it re-runs on every push).
 - If Codex hasn't reviewed `HEAD_SHA` yet, nudge it once: `gh pr comment <PR> --body "@codex review"`, then wait. Copilot re-reviews on push automatically.
 
-Do **not** proceed to Step B on findings that cite an older SHA — they are replays; skip them (and don't re-reply to already-resolved threads — that's noise).
+Do **not** apply findings that cite an older SHA to the code — they are replays. But still resolve their threads (already-addressed) if they're unresolved, and don't re-reply to threads that are already resolved (that's noise).
 
 ### Step B — Gather the current state (this is `check-pr`)
 
@@ -69,7 +71,7 @@ query($cursor: String) { repository(owner:"jason660519",name:"Project-Manager"){
 ### Step C — Exit conditions (check BEFORE fixing)
 
 Stop the loop and report if **any**:
-- **Converged:** zero unresolved current threads **across all pages** (Step B must have drained `hasNextPage`) **AND** `verify` = pass **AND** `GitGuardian Security Checks` = pass. ✅ (Use the exact check names as reported by `gh pr checks`.)
+- **Converged:** zero unresolved threads **across all pages** — **including `isOutdated` ones** (Step A resolves outdated-but-unresolved threads as already-addressed; Step B must drain `hasNextPage`) — **AND** `verify` = pass **AND** `GitGuardian Security Checks` = pass. ✅ (Use the exact check names as reported by `gh pr checks`.)
 - **Cap reached:** `iteration > max`. Report remaining findings.
 - **Churn / no progress:** the only findings this round are the **same class** already fixed in a prior round (fingerprint in `seenFindings`) — the loop is oscillating. **Stop and escalate to the human** with the recurring finding; do not keep patching the same spot. (On this repo the FIFO-eviction / spawn-token-race class recurred many times — recognize that pattern and surface it instead of looping forever.)
 
