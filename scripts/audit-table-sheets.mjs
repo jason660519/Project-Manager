@@ -54,6 +54,15 @@ const CLASSIFICATION_RULES = [
   [/app\/ui\/DashboardClient\.tsx$/, 'simple-wrapper'],
 ];
 
+// Evidence that a `col-id` value is a real UUID / deterministic id (table-governance.md §2.2)
+// rather than an array index or a human-readable label. Intentionally broad (any `*Id(`
+// generator, a `.uuid` accessor, the shared header constant) so the gate prefers
+// false-negatives over false-positives and stays trusted. col-id values are frequently
+// produced in a sibling column-definition file (`_lib/columns.tsx`), so this evidence is
+// searched directory-aware, not just in the table component file.
+const COL_ID_UUID_EVIDENCE =
+  /uuidv5|uuidv4|randomUUID|crypto\.randomUUID|COL_ID_COLUMN_HEADER|\.uuid\b|\buuid\b|\w+Id\(|rowKey/;
+
 const BASIC_REQUIREMENTS = [
   ['col-id', /['"]col-id['"]|COL_ID_COLUMN_HEADER/],
   ['table search/filter state', /searchText|globalFilter|projectSearch|issueSearch|filteredRows|filter/i],
@@ -148,19 +157,50 @@ function routeHint(path) {
   return '';
 }
 
-function auditSurface(path, content) {
+// A3 — reconcile the local audit vocabulary with the company gate's
+// (simple|basic|large|readonly). An explicit `large` banner must run the full Basic
+// Table Sheet checks; `readonly`/`read-only` are equivalent.
+function isBasicClass(classification) {
+  return classification === 'basic' || classification === 'large';
+}
+function isReadOnlyClass(classification) {
+  return classification === 'simple' || classification === 'read-only' || classification === 'readonly';
+}
+
+// A2 — col-id value evidence, searched in-file then directory-aware (sibling
+// column-definition files frequently own the actual value).
+function hasColIdUuidEvidence(path, content, uuidEvidenceDirs) {
+  if (COL_ID_UUID_EVIDENCE.test(content)) return true;
+  return uuidEvidenceDirs.has(dirname(path)) || uuidEvidenceDirs.has(dirname(dirname(path)));
+}
+
+function auditSurface(path, content, uuidEvidenceDirs) {
   const explicit = explicitClassification(content);
   const classification = explicit ?? inferredClassification(path);
   const findings = [];
   const warnings = [];
 
+  // A1 — an unclassified table under an operational route is a blocking finding, not a
+  // warning. This closes the "new table with no banner silently escapes every check" hole.
   if (!explicit && classification === 'unclassified') {
-    warnings.push('No @table-classification comment or inference rule.');
+    const operational = /^app\/(ui\/views|project-progress-dashboard)\//.test(path);
+    const hasRealTable = /useReactTable|DataTableShell|TableCore|<table\b/.test(content);
+    if (operational && hasRealTable) {
+      findings.push('Unclassified operational table — add an @table-classification + @table-reason banner (table-governance.md §7).');
+    } else {
+      warnings.push('No @table-classification comment or inference rule.');
+    }
   }
 
-  if (classification === 'basic') {
+  if (isBasicClass(classification)) {
     for (const [label, pattern] of BASIC_REQUIREMENTS) {
       if (!pattern.test(content)) findings.push(`Missing static signal: ${label}`);
+    }
+    // A2 — col-id present but no UUID/deterministic-id evidence anywhere reachable.
+    const declaresColId = /['"]col-id['"]|COL_ID_COLUMN_HEADER/.test(content);
+    const documentedColIdException = /@table-(reason|waivers):[\s\S]*?\b(issue number|external|non-uuid|not a uuid|uuid migration)\b/i.test(content);
+    if (declaresColId && !documentedColIdException && !hasColIdUuidEvidence(path, content, uuidEvidenceDirs)) {
+      findings.push('col-id value has no UUID/deterministic-id evidence in this file or its column-definition siblings (table-governance.md §2.2).');
     }
   }
 
@@ -170,7 +210,7 @@ function auditSurface(path, content) {
     }
   }
 
-  if ((classification === 'simple' || classification === 'read-only') && !/pm-scroll/.test(content)) {
+  if (isReadOnlyClass(classification) && !/pm-scroll/.test(content)) {
     warnings.push('Simple/read-only table has no pm-scroll signal; verify overflow is impossible or handled by parent.');
   }
 
@@ -262,11 +302,23 @@ function markdownReport(surfaces) {
 function main() {
   const options = parseArgs(process.argv.slice(2));
   const files = SCAN_ROOTS.flatMap((root) => walk(join(ROOT, root)));
-  const surfaces = files
-    .map((file) => [rel(file), readFileSync(file, 'utf8')])
+  const entries = files.map((file) => [rel(file), readFileSync(file, 'utf8')]);
+
+  // A2 — build a directory-aware index of files that carry col-id UUID evidence, so a
+  // table whose value is generated in a sibling column-definition file is not falsely
+  // flagged. Recorded at both the file's directory and its parent directory.
+  const uuidEvidenceDirs = new Set();
+  for (const [p, content] of entries) {
+    if (COL_ID_UUID_EVIDENCE.test(content)) {
+      uuidEvidenceDirs.add(dirname(p));
+      uuidEvidenceDirs.add(dirname(dirname(p)));
+    }
+  }
+
+  const surfaces = entries
     .filter(([path, content]) => hasTableSurface(path, content))
     .filter(([path]) => !path.startsWith('lib/generated/'))
-    .map(([path, content]) => auditSurface(path, content))
+    .map(([path, content]) => auditSurface(path, content, uuidEvidenceDirs))
     .sort((a, b) => a.module.localeCompare(b.module) || a.path.localeCompare(b.path));
 
   const blocking = surfaces.flatMap((surface) => surface.findings);

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fast pre-commit gate — static-export / hydration anti-patterns only.
+# Fast pre-commit gate — static-export / hydration anti-patterns + table-governance.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -11,3 +11,15 @@ fi
 
 echo "pre-commit: verify:static-export"
 npm run verify:static-export --silent
+
+# Table-governance: surface incomplete table-sheet fixes at commit time, not only at
+# verify:baseline. Source-driven local audit is always available; the company R1–R5 gate
+# runs when the shared standards repo is reachable. Both are fast static scans.
+echo "pre-commit: table:sheet:audit --check"
+node scripts/audit-table-sheets.mjs --check
+
+COMPANY_GATE="${COMPANY_STANDARDS_ROOT:-/Users/Company-AI-App-Standards}/scripts/check-table-governance.mjs"
+if [[ -f "$COMPANY_GATE" ]]; then
+  echo "pre-commit: company table-governance gate (R1–R5)"
+  node "$COMPANY_GATE" .
+fi

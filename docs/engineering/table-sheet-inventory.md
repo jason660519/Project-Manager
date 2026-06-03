@@ -1,7 +1,7 @@
 # Table Sheet Inventory
 
 > Status: Generated from current source
-> Generated at: 2026-06-03T06:58:28.330Z
+> Generated at: 2026-06-03T07:45:13.465Z
 > Source command: `npm run table:sheet:audit -- --write`
 
 This report is source-driven. Do not use old hand-maintained coverage snapshots as completion proof.
