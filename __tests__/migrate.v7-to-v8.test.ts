@@ -26,8 +26,8 @@ const sampleRunCommandJob = (): CronJob => ({
 });
 
 describe('migrate v7 → v8 (ADR-012 engineer cron dispatch)', () => {
-  it('exposes 9 as the current schema version', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(9);
+  it('exposes 10 as the current schema version', () => {
+    expect(CURRENT_SCHEMA_VERSION).toBe(10);
   });
 
   it('bumps schemaVersion to the current version on a v7 document', () => {
