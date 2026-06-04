@@ -13,12 +13,19 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Boxes, Download, Lock, Unlock, Upload } from 'lucide-react';
+import { Boxes, Download, Lock, RefreshCw, Unlock, Upload } from 'lucide-react';
 
 import { WorkstationFrame } from '../../../components/layout/WorkstationFrame';
 import { BottomSheetTabs, type SheetTabItem } from '../../../components/sheets/BottomSheetTabs';
 import { useInAppConfirm } from '../../../components/ui/InAppDialog';
 import { listLlmProviders, type LlmProviderId } from '../../../lib/keys/llmProviders';
+import {
+  getModelListState,
+  loadAllProviderMetadata,
+  subscribeProviderMetadataChanges,
+  type ProviderMetadataMap,
+} from '../../../lib/keys/providerMetadata';
+import { rescanAiProviderModels } from '../../../lib/aiSdks/rescan';
 import { useI18n } from '../../../lib/i18n';
 import {
   buildProviderModelCatalog,
@@ -46,16 +53,24 @@ import { AiSdkProviderSheet } from './AiSdks/AiSdkProviderSheet';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
-/** Set of row ids (UUIDs) belonging to a provider — catalog models + custom rows. */
-function providerRowIds(providerId: LlmProviderId, store: AiSdksConfig): Set<string> {
-  const ids = new Set(buildProviderModelCatalog(providerId).map((e) => e.id));
+/** Set of row ids (UUIDs) belonging to a provider — catalog + dynamic + custom rows. */
+function providerRowIds(
+  providerId: LlmProviderId,
+  store: AiSdksConfig,
+  dynamicModels: readonly string[],
+): Set<string> {
+  const ids = new Set(buildProviderModelCatalog(providerId, dynamicModels).map((e) => e.id));
   for (const m of store.customModels) if (m.providerId === providerId) ids.add(m.id);
   return ids;
 }
 
-function providerErrorCount(providerId: LlmProviderId, store: AiSdksConfig): number {
+function providerErrorCount(
+  providerId: LlmProviderId,
+  store: AiSdksConfig,
+  dynamicModels: readonly string[],
+): number {
   const specByKey = new Map(getParamSpecs(providerId).map((s) => [s.key, s]));
-  const ownIds = providerRowIds(providerId, store);
+  const ownIds = providerRowIds(providerId, store, dynamicModels);
   let count = 0;
   for (const [id, override] of Object.entries(store.models)) {
     if (!ownIds.has(id)) continue;
@@ -93,6 +108,23 @@ export function AiSdksView({
   );
   const skipSaveRef = useRef(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [metaMap, setMetaMap] = useState<ProviderMetadataMap>({});
+  const [rescanningIds, setRescanningIds] = useState<ReadonlySet<LlmProviderId>>(new Set());
+  const [rescanAllBusy, setRescanAllBusy] = useState(false);
+
+  useEffect(() => {
+    const reload = () => setMetaMap(loadAllProviderMetadata());
+    reload();
+    return subscribeProviderMetadataChanges(reload);
+  }, []);
+
+  const dynamicModelsFor = useCallback(
+    (id: LlmProviderId): string[] => {
+      const meta = metaMap[id];
+      return meta?.status === 'ok' ? meta.dynamicModels ?? [] : [];
+    },
+    [metaMap],
+  );
 
   // Initial load (and reload if projectRoot changes). Re-arm the save-skip flag
   // so the assignment from *this* load never triggers an immediate re-save.
@@ -189,23 +221,55 @@ export function AiSdksView({
     });
   }, []);
 
-  const addCategory = useCallback((category: string) => {
-    setStore((prev) =>
-      categoriesInclude(prev, category)
-        ? prev
-        : { ...prev, customCategories: [...prev.customCategories, category] },
-    );
-  }, []);
+  const formatRescanResult = useCallback(
+    (summary: Awaited<ReturnType<typeof rescanAiProviderModels>>) =>
+      copy.controls.rescanResult
+        .replace('{scanned}', String(summary.scanned))
+        .replace('{new}', String(summary.newModels))
+        .replace('{skipped}', String(summary.skipped))
+        .replace('{failed}', String(summary.failed.length)),
+    [copy.controls.rescanResult],
+  );
 
-  const restoreProviderDefaults = useCallback((providerId: LlmProviderId) => {
-    setStore((prev) => {
-      const ownIds = providerRowIds(providerId, prev);
-      const models = Object.fromEntries(
-        Object.entries(prev.models).filter(([id]) => !ownIds.has(id)),
-      );
-      return { ...prev, models };
-    });
-  }, []);
+  const runRescan = useCallback(
+    async (ids: LlmProviderId[]) => {
+      try {
+        const summary = await rescanAiProviderModels(ids);
+        setMetaMap(loadAllProviderMetadata());
+        setNotice(formatRescanResult(summary));
+      } catch (err) {
+        setNotice(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [formatRescanResult],
+  );
+
+  const handleRescanProvider = useCallback(
+    async (id: LlmProviderId) => {
+      setRescanningIds((current) => new Set(current).add(id));
+      try {
+        await runRescan([id]);
+      } finally {
+        setRescanningIds((current) => {
+          const next = new Set(current);
+          next.delete(id);
+          return next;
+        });
+      }
+    },
+    [runRescan],
+  );
+
+  const handleRescanAll = useCallback(async () => {
+    setRescanAllBusy(true);
+    setRescanningIds(new Set(providers.map((provider) => provider.id)));
+    try {
+      await runRescan(providers.map((provider) => provider.id));
+    } finally {
+      setRescanningIds(new Set());
+      setRescanAllBusy(false);
+    }
+  }, [providers, runRescan]);
 
   // ── Import / export ──────────────────────────────────────────────────────
   const handleExport = () => {
@@ -259,7 +323,7 @@ export function AiSdksView({
   const tabs: ReadonlyArray<SheetTabItem<AiSdksSheetSlug>> = useMemo(
     () =>
       providers.map((p) => {
-        const errors = providerErrorCount(p.id, store);
+        const errors = providerErrorCount(p.id, store, dynamicModelsFor(p.id));
         return {
           key: p.id,
           label: p.label,
@@ -269,7 +333,7 @@ export function AiSdksView({
           title: `${p.label} parameters`,
         };
       }),
-    [providers, store],
+    [providers, store, dynamicModelsFor],
   );
 
   const saveLabel =
@@ -291,6 +355,16 @@ export function AiSdksView({
                 {saveLabel}
               </span>
             )}
+            <button
+              type="button"
+              onClick={() => void handleRescanAll()}
+              disabled={readOnly || rescanAllBusy}
+              title={copy.controls.rescanAllTitle}
+              className="inline-flex h-8 items-center gap-1.5 border border-stone-200/18 px-2.5 text-xs text-stone-200 hover:bg-white/[0.04] disabled:opacity-50"
+            >
+              <RefreshCw size={13} className={rescanAllBusy ? 'animate-spin' : undefined} />
+              {copy.controls.rescanAll}
+            </button>
             <button
               type="button"
               onClick={() => setReadOnly((v) => !v)}
@@ -385,24 +459,19 @@ export function AiSdksView({
             categories={categories}
             readOnly={readOnly}
             copy={copy}
+            dynamicModels={dynamicModelsFor(p.id)}
+            modelListLabel={getModelListState(metaMap[p.id]).label}
+            rescanBusy={rescanningIds.has(p.id)}
+            onRescan={() => void handleRescanProvider(p.id)}
             onSetParam={setParam}
             onSetModelType={setModelType}
             onSetCandidate={setCandidate}
             onAddModel={(model) => addModel(p.id, model)}
-            onAddCategory={addCategory}
-            onRestoreProviderDefaults={() => restoreProviderDefaults(p.id)}
           />
         </div>
       ))}
       {importConfirm.dialog}
     </WorkstationFrame>
-  );
-}
-
-function categoriesInclude(store: AiSdksConfig, category: string): boolean {
-  return (
-    (DEFAULT_MODEL_TYPES as readonly string[]).includes(category) ||
-    store.customCategories.includes(category)
   );
 }
 

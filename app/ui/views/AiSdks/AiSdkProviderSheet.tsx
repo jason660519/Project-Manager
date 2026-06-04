@@ -28,6 +28,7 @@ import {
   EyeOff,
   Info,
   Plus,
+  RefreshCw,
   RotateCcw,
   Rows3,
   Snowflake,
@@ -83,12 +84,14 @@ interface AiSdkProviderSheetProps {
   categories: readonly string[];
   readOnly: boolean;
   copy: AiSdksCopy;
+  dynamicModels: readonly string[];
+  modelListLabel: string;
+  rescanBusy: boolean;
+  onRescan: () => void;
   onSetParam: (id: string, key: string, value: ParamValue) => void;
   onSetModelType: (id: string, modelType: string) => void;
   onSetCandidate: (id: string, candidate: boolean) => void;
   onAddModel: (model: string) => void;
-  onAddCategory: (category: string) => void;
-  onRestoreProviderDefaults: () => void;
 }
 
 const columnHelper = createColumnHelper<AiSdkRow>();
@@ -142,26 +145,29 @@ export function AiSdkProviderSheet({
   categories,
   readOnly,
   copy,
+  dynamicModels,
+  modelListLabel,
+  rescanBusy,
+  onRescan,
   onSetParam,
   onSetModelType,
   onSetCandidate,
   onAddModel,
-  onAddCategory,
-  onRestoreProviderDefaults,
 }: AiSdkProviderSheetProps) {
   const resizePrompt = useInAppPrompt();
   const specs = useMemo(() => getParamSpecs(providerId), [providerId]);
 
   const rows = useMemo<AiSdkRow[]>(() => {
-    const catalog = buildProviderModelCatalog(providerId).map((entry) => ({
+    const catalog = buildProviderModelCatalog(providerId, dynamicModels).map((entry) => ({
       id: entry.id,
       providerLabel: entry.providerLabel,
       model: entry.model,
       modelType: store.models[entry.id]?.modelType ?? entry.modelType,
       isCustom: false,
     }));
+    const catalogIds = new Set(catalog.map((row) => row.id));
     const custom = store.customModels
-      .filter((m) => m.providerId === providerId)
+      .filter((m) => m.providerId === providerId && !catalogIds.has(m.id))
       .map((m) => ({
         id: m.id,
         providerLabel: catalog[0]?.providerLabel ?? providerId,
@@ -170,7 +176,7 @@ export function AiSdkProviderSheet({
         isCustom: true,
       }));
     return [...catalog, ...custom];
-  }, [providerId, store]);
+  }, [providerId, store, dynamicModels]);
 
   const columnIds = useMemo(
     () => ['col-id', 'col-candidate', 'col-provider', 'col-model', 'col-type', ...specs.map((s) => `col-param-${s.key}`)],
@@ -228,8 +234,6 @@ export function AiSdkProviderSheet({
   }, [searchInput]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [newModel, setNewModel] = useState('');
-  const [newCategory, setNewCategory] = useState('');
   const [contextMenu, setContextMenu] = useState<
     | { type: 'column'; columnId: string; x: number; y: number }
     | { type: 'row'; rowId: string; x: number; y: number }
@@ -538,17 +542,14 @@ export function AiSdkProviderSheet({
 
   const selectedRow = selectedId ? rows.find((r) => r.id === selectedId) ?? null : null;
 
-  const handleAddModel = () => {
-    const value = newModel.trim();
-    if (!value) return;
-    onAddModel(value);
-    setNewModel('');
-  };
-  const handleAddCategory = () => {
-    const value = newCategory.trim();
-    if (!value) return;
-    onAddCategory(value);
-    setNewCategory('');
+  const handleAddModel = async () => {
+    const input = await resizePrompt.open({
+      title: copy.controls.addModel,
+      message: copy.controls.addModelPlaceholder,
+      confirmLabel: copy.controls.addModel,
+    });
+    const value = input?.trim();
+    if (value) onAddModel(value);
   };
 
   return (
@@ -678,50 +679,29 @@ export function AiSdkProviderSheet({
 
           {/* Dataset actions — visually separated from view controls */}
           <div className="ml-auto flex flex-wrap items-center gap-2 border-l border-stone-200/12 pl-2">
-            <div className="flex h-8 items-center border border-stone-200/18">
-              <input
-                value={newModel}
-                disabled={readOnly}
-                onChange={(e) => setNewModel(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAddModel()}
-                placeholder={copy.controls.addModelPlaceholder}
-                className="h-full w-36 bg-transparent px-2 text-xs text-stone-200 outline-none disabled:opacity-50"
-              />
-              <button
-                type="button"
-                onClick={handleAddModel}
-                disabled={readOnly}
-                className="inline-flex h-full items-center gap-1 border-l border-stone-200/18 px-2 text-[11px] text-stone-200 hover:bg-white/[0.04] disabled:opacity-50"
-              >
-                <Plus size={12} /> {copy.controls.addModel}
-              </button>
-            </div>
-            <div className="flex h-8 items-center border border-stone-200/18">
-              <input
-                value={newCategory}
-                disabled={readOnly}
-                onChange={(e) => setNewCategory(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
-                placeholder={copy.controls.addCategoryPlaceholder}
-                className="h-full w-28 bg-transparent px-2 text-xs text-stone-200 outline-none disabled:opacity-50"
-              />
-              <button
-                type="button"
-                onClick={handleAddCategory}
-                disabled={readOnly}
-                className="inline-flex h-full items-center gap-1 border-l border-stone-200/18 px-2 text-[11px] text-stone-200 hover:bg-white/[0.04] disabled:opacity-50"
-              >
-                <Plus size={12} /> {copy.controls.addCategory}
-              </button>
-            </div>
+            <span
+              className="text-[10px] uppercase tracking-[0.12em] text-stone-500"
+              title={copy.controls.rescanTitle}
+            >
+              {modelListLabel}
+            </span>
             <button
               type="button"
-              onClick={onRestoreProviderDefaults}
-              disabled={readOnly}
-              title={copy.controls.restoreDefaultsTitle}
+              onClick={onRescan}
+              disabled={readOnly || rescanBusy}
+              title={copy.controls.rescanTitle}
               className="inline-flex h-8 items-center gap-1 border border-stone-200/18 px-2 text-xs text-stone-200 hover:bg-white/[0.04] disabled:opacity-50"
             >
-              <RotateCcw size={13} /> {copy.controls.restoreDefaults}
+              <RefreshCw size={13} className={rescanBusy ? 'animate-spin' : undefined} /> {copy.controls.rescan}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleAddModel()}
+              disabled={readOnly}
+              title={copy.controls.addModelTitle}
+              className="inline-flex h-8 items-center gap-1 border border-stone-200/18 px-2 text-xs text-stone-200 hover:bg-white/[0.04] disabled:opacity-50"
+            >
+              <Plus size={13} /> {copy.controls.addModel}
             </button>
           </div>
         </div>

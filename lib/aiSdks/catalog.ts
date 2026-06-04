@@ -9,6 +9,8 @@
  *      tunable parameter surface is determined by the wire protocol.
  *   2. `buildModelCatalog()` — flattens every provider's `availableModels` into
  *      one row per model with a stable, globally-unique id.
+ *      `buildProviderModelCatalog()` optionally merges live dynamic models
+ *      (curated-first, deduped) for a single provider sheet.
  *
  * Server-safe (no `'use client'`, no window/bridge access) so route components
  * and tests can import it freely.
@@ -21,6 +23,7 @@ import {
   type LlmProviderSpec,
 } from '../keys/llmProviders';
 import { modelRowId } from './uuid';
+import { mergeCuratedAndDynamicModels } from '../keys/providerMetadata';
 
 /** Built-in model classification tags. Users may add custom categories on top. */
 export const DEFAULT_MODEL_TYPES = ['LLM', 'VLM', 'Coding Agent'] as const;
@@ -117,8 +120,8 @@ export function inferModelType(model: string): ModelType {
   return 'LLM';
 }
 
-function buildEntriesForProvider(provider: LlmProviderSpec): ModelCatalogEntry[] {
-  return provider.availableModels.map((model) => ({
+function buildEntriesForModels(provider: LlmProviderSpec, models: readonly string[]): ModelCatalogEntry[] {
+  return models.map((model) => ({
     id: modelRowId(provider.id, model),
     naturalKey: `${provider.id}:${model}`,
     providerId: provider.id,
@@ -130,11 +133,23 @@ function buildEntriesForProvider(provider: LlmProviderSpec): ModelCatalogEntry[]
 
 /** Every catalog model as a flat row list (all providers). */
 export function buildModelCatalog(): ModelCatalogEntry[] {
-  return listLlmProviders().flatMap(buildEntriesForProvider);
+  return listLlmProviders().flatMap((provider) =>
+    buildEntriesForModels(provider, provider.availableModels),
+  );
 }
 
-/** Catalog rows for a single provider sheet. */
-export function buildProviderModelCatalog(providerId: LlmProviderId): ModelCatalogEntry[] {
+/**
+ * Catalog rows for a single provider sheet. `dynamicModels` comes from the Keys
+ * live validation cache and is merged exactly like the Keys page model list.
+ */
+export function buildProviderModelCatalog(
+  providerId: LlmProviderId,
+  dynamicModels: readonly string[] = [],
+): ModelCatalogEntry[] {
   const provider = listLlmProviders().find((p) => p.id === providerId);
-  return provider ? buildEntriesForProvider(provider) : [];
+  if (!provider) return [];
+  return buildEntriesForModels(
+    provider,
+    mergeCuratedAndDynamicModels(provider.availableModels, dynamicModels),
+  );
 }

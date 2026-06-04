@@ -55,10 +55,14 @@ export interface Translations {
       restoreAll: string;
       addModel: string;
       addModelPlaceholder: string;
-      addCategory: string;
-      addCategoryPlaceholder: string;
-      restoreDefaults: string;
-      restoreDefaultsTitle: string;
+      addModelTitle: string;
+      rescan: string;
+      rescanTitle: string;
+      rescanAll: string;
+      rescanAllTitle: string;
+      rescanning: string;
+      /** "{scanned} scanned · {new} new · {skipped} skipped · {failed} failed" */
+      rescanResult: string;
       readOnly: string;
       edit: string;
       import: string;

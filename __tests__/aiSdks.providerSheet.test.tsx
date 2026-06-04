@@ -6,7 +6,7 @@ import { AiSdkProviderSheet } from '../app/ui/views/AiSdks/AiSdkProviderSheet';
 import { emptyAiSdksConfig } from '../lib/aiSdks/store';
 import { en } from '../lib/i18n/en';
 
-function renderSheet() {
+function renderSheet(overrides: Record<string, unknown> = {}) {
   return render(
     <AiSdkProviderSheet
       providerId="anthropic"
@@ -14,12 +14,15 @@ function renderSheet() {
       categories={['LLM', 'VLM']}
       readOnly={false}
       copy={en.aiSdks}
+      dynamicModels={[]}
+      modelListLabel="Catalogue"
+      rescanBusy={false}
+      onRescan={vi.fn()}
       onSetParam={vi.fn()}
       onSetModelType={vi.fn()}
       onSetCandidate={vi.fn()}
       onAddModel={vi.fn()}
-      onAddCategory={vi.fn()}
-      onRestoreProviderDefaults={vi.fn()}
+      {...overrides}
     />,
   );
 }
@@ -45,5 +48,23 @@ describe('AiSdkProviderSheet', () => {
 
     expect(screen.getByRole('menu', { name: en.aiSdks.menu.column })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: en.aiSdks.menu.sortAsc })).toBeInTheDocument();
+  });
+
+  it('shows Rescan and Add Model controls, not the removed legacy controls', () => {
+    renderSheet();
+
+    expect(screen.getByRole('button', { name: en.aiSdks.controls.rescan })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: en.aiSdks.controls.addModel })).toBeInTheDocument();
+    expect(screen.queryByText('Add type')).not.toBeInTheDocument();
+    expect(screen.queryByText('Restore defaults')).not.toBeInTheDocument();
+  });
+
+  it('invokes onRescan when Rescan is clicked', () => {
+    const onRescan = vi.fn();
+    renderSheet({ onRescan });
+
+    fireEvent.click(screen.getByRole('button', { name: en.aiSdks.controls.rescan }));
+
+    expect(onRescan).toHaveBeenCalledTimes(1);
   });
 });

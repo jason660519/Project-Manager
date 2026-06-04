@@ -46,4 +46,19 @@ describe('aiSdks catalog', () => {
     expect(inferModelType('qwen-coder-plus')).toBe('Coding Agent');
     expect(inferModelType('claude-sonnet-4-6')).toBe('LLM');
   });
+
+  it('merges dynamic models as catalog rows, curated-first and deduped', () => {
+    const curated = buildProviderModelCatalog('anthropic');
+    const known = curated[0].model;
+
+    const merged = buildProviderModelCatalog('anthropic', [known, 'claude-future-9', 'claude-future-9']);
+
+    expect(merged).toHaveLength(curated.length + 1);
+    expect(merged.slice(0, curated.length).map((row) => row.model)).toEqual(
+      curated.map((row) => row.model),
+    );
+    const newRow = merged.find((row) => row.model === 'claude-future-9')!;
+    expect(isUuid(newRow.id)).toBe(true);
+    expect(newRow.id).toBe(modelRowId('anthropic', 'claude-future-9'));
+  });
 });
