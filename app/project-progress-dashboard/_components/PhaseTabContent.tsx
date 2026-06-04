@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import type { ActiveRun, EngineerRole, Feature, FeaturePhase, FeaturePromptConfig } from '../../../lib/types';
 import { useI18n } from '../../../lib/i18n';
 import type { CustomProjectProgressRow, PhaseTablePrefs } from '../types';
+import { buildFeatureDependencyGraph, getFeatureDependencyIdentity } from '../_lib/dependencies';
 import { buildPhaseRows, type PhaseRow } from '../_lib/phaseRows';
 import { columnsForPhase } from '../_lib/columns';
 import {
@@ -23,6 +24,7 @@ interface PhaseTabContentProps {
   projectNames?: string[];
   projectRoot: string;
   features: Feature[];
+  dependencyFeatures?: Feature[];
   engineerRoles?: EngineerRole[];
   prefs: PhaseTablePrefs;
   patch: (next: Partial<PhaseTablePrefs>) => void;
@@ -37,7 +39,7 @@ interface PhaseTabContentProps {
 }
 
 export function PhaseTabContent({
-  phase, projectName, projectNames, projectRoot, features, engineerRoles, prefs, patch, reset,
+  phase, projectName, projectNames, projectRoot, features, dependencyFeatures, engineerRoles, prefs, patch, reset,
   onFeaturePromptSave, onFeaturePatch, activeRuns, onDispatchRow,
 }: PhaseTabContentProps) {
   const { t } = useI18n();
@@ -48,6 +50,10 @@ export function PhaseTabContent({
   const [showHiddenRows, setShowHiddenRows] = useState(false);
   const [addRowOpen, setAddRowOpen] = useState(false);
   const [notesPanelPath, setNotesPanelPath] = useState<string | null>(null);
+  const dependencyGraph = useMemo(
+    () => buildFeatureDependencyGraph(dependencyFeatures ?? features),
+    [dependencyFeatures, features],
+  );
 
   // All rows for this phase (features + custom rows).
   const allRows = useMemo(
@@ -80,7 +86,13 @@ export function PhaseTabContent({
       if (!showHiddenRows && hiddenSet.has(r.rowKey)) return false;
       if (q) {
         const catHay = phase === 'e2e_testing' ? e2eCategorySearchTokens(r.category) : r.category;
-        const hay = `${r.projectName ?? ''} ${r.id} ${r.name} ${catHay} ${r.locatedSection ?? ''}`.toLowerCase();
+        const upstream = (r.upstreamDependencies ?? []).map((dep) => `${dep.projectId ?? ''} ${dep.featureId}`).join(' ');
+        const downstream = r.feature
+          ? (dependencyGraph.downstreamByKey.get(getFeatureDependencyIdentity(r.feature).key) ?? [])
+            .map((dep) => `${dep.ref.projectId ?? ''} ${dep.ref.featureId}`)
+            .join(' ')
+          : '';
+        const hay = `${r.projectName ?? ''} ${r.id} ${r.name} ${catHay} ${r.locatedSection ?? ''} ${upstream} ${downstream}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -187,6 +199,7 @@ export function PhaseTabContent({
     projectRoot,
     engineerRoles,
     activeRuns,
+    dependencyGraph,
     hiddenRowKeysSet: hiddenSet,
     onToggleHideRow,
     onDeleteCustomRow,
@@ -195,7 +208,7 @@ export function PhaseTabContent({
     onChangePhase,
     onDispatch: onDispatchRow,
     onOpenNotePanel: (absPath: string) => setNotesPanelPath(absPath),
-  }), [projectRoot, engineerRoles, activeRuns, hiddenSet, onToggleHideRow, onDeleteCustomRow, onPatchFeature, onPatchCustomRow, onChangePhase, onDispatchRow]);
+  }), [projectRoot, engineerRoles, activeRuns, dependencyGraph, hiddenSet, onToggleHideRow, onDeleteCustomRow, onPatchFeature, onPatchCustomRow, onChangePhase, onDispatchRow]);
 
   return (
     <div className="flex flex-col gap-2">

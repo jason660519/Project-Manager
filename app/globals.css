@@ -112,6 +112,22 @@ textarea {
 .pm-scroll::-webkit-scrollbar-thumb:hover { background: rgba(214, 211, 209, 0.6); }
 .pm-scroll::-webkit-scrollbar-corner { background: transparent; }
 
+/* Thin persistent-bar variant. Same WKWebView trick as .pm-scroll (NO
+   scrollbar-width/-color, so the classic space-reserving bar stays visible),
+   but ~7px instead of 12px. Used on the BottomSheetTabs strip so its persistent
+   horizontal bar is visually lighter and clearly distinct from the 12px data
+   table scrollbar stacked just above it (avoids the "two chunky bars" look). */
+.pm-scroll-thin::-webkit-scrollbar { height: 7px; width: 7px; }
+.pm-scroll-thin::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.02); }
+.pm-scroll-thin::-webkit-scrollbar-thumb {
+  background: rgba(168, 162, 158, 0.35);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.pm-scroll-thin::-webkit-scrollbar-thumb:hover { background: rgba(214, 211, 209, 0.55); }
+.pm-scroll-thin::-webkit-scrollbar-corner { background: transparent; }
+
 /* ── FeatureDocPanel markdown prose ─────────────────────────────────────── */
 .pm-prose { color: rgb(214 211 209); font-size: 13px; line-height: 1.7; }
 .pm-prose h1 { font-size: 17px; font-weight: 700; color: rgb(245 245 244); margin: 0 0 12px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 6px; }

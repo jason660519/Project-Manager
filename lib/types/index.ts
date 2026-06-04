@@ -8,6 +8,18 @@ export type FeaturePhase = 'development' | 'e2e_testing' | 'deployment' | 'opera
 export type TestStatus = 'passed' | 'failed' | 'pending';
 export type DeployStatus = 'production' | 'staging' | 'not_deployed';
 export type HarnessTaskRole = 'planner' | 'worker' | 'evaluator';
+export type FeatureDependencyKind = 'hard' | 'soft';
+
+export interface FeatureDependencyRef {
+  /** Optional dashboard project id. Required when multiple selected projects share the same feature id. */
+  projectId?: string;
+  /** Human-readable feature id, e.g. F37. Do not use the technical UUID column here. */
+  featureId: string;
+  /** Hard dependencies block dispatch until done; soft dependencies warn only. Defaults to hard. */
+  kind?: FeatureDependencyKind;
+  /** Optional human-authored reason shown in tooltips or detail panels. */
+  reason?: string;
+}
 
 /** Auto-loop prompt config stored per feature (used by task/[rowId] page). */
 export interface FeaturePromptConfig {
@@ -103,6 +115,8 @@ export interface Feature {
   points?: number;
   /** Estimated source section / area where the feature lives. */
   locatedSection?: string;
+  /** Upstream feature dependencies used for dispatch planning (schema v9). */
+  upstreamDependencies?: FeatureDependencyRef[];
   // e2e_testing
   testCoverage?: number;
   testStatus?: TestStatus;
@@ -201,7 +215,7 @@ export interface ExecutionResult {
 export type AnyAdapterConfig = IDEAdapterConfig | AgentAdapterConfig | AgentAppAdapterConfig;
 
 export interface ProjectManagerConfig {
-  /** Increment when making breaking changes to the config structure. Current: 8 */
+  /** Increment when making breaking changes to the config structure. Current: 9 */
   schemaVersion: number;
   engineerRoles?: EngineerRole[];
   // ── Sync identity + audit fields (schema v2, ADR-006) ──────────────────

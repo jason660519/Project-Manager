@@ -1,23 +1,20 @@
 #!/usr/bin/env node
 
+import {
+  PM_SYSTEM_COMMANDS,
+  INSTALL_ACTIONS,
+  DRY_RUN_INSTALL_MESSAGE,
+  backupSteps,
+} from '../infra/supabase/pm-system-plans.mjs';
+
 const command = process.argv[2] ?? 'status';
 const flags = new Set(process.argv.slice(3));
 
-const knownCommands = new Set([
-  'install',
-  'start',
-  'stop',
-  'status',
-  'doctor',
-  'backup',
-  'restore',
-  'upgrade',
-  'logs',
-]);
+const knownCommands = new Set(PM_SYSTEM_COMMANDS);
 
 if (!knownCommands.has(command)) {
   console.error(`Unknown PM System command: ${command}`);
-  console.error('Supported commands: install, start, stop, status, doctor, backup, restore, upgrade, logs');
+  console.error(`Supported commands: ${PM_SYSTEM_COMMANDS.join(', ')}`);
   process.exit(2);
 }
 
@@ -26,7 +23,7 @@ if (!flags.has('--dry-run')) {
   process.exit(2);
 }
 
-const response = buildDryRunResponse(command);
+const response = buildDryRunResponse(command, flags);
 console.log(response.title);
 for (const line of response.lines) {
   console.log(line);
@@ -34,22 +31,15 @@ for (const line of response.lines) {
 
 process.exit(response.blocked ? 1 : 0);
 
-function buildDryRunResponse(commandName) {
+function buildDryRunResponse(commandName, commandFlags) {
   switch (commandName) {
     case 'install':
       return {
         blocked: false,
         title: 'PM System install plan: dry_run',
         lines: [
-          'Dry run only. No Docker, filesystem, network, or secret mutation will be performed.',
-          '- generate-local-secrets',
-          '- write-ops-env',
-          '- pull-supabase-images',
-          '- start-supabase-stack',
-          '- run-pm-migrations',
-          '- create-owner-account',
-          '- write-backend-profile',
-          '- run-health-checks',
+          DRY_RUN_INSTALL_MESSAGE,
+          ...INSTALL_ACTIONS.map((action) => `- ${action}`),
         ],
       };
     case 'doctor':
@@ -60,17 +50,17 @@ function buildDryRunResponse(commandName) {
           'Dry run only. Doctor will check runtime, ports, Auth, Postgres, migrations, Storage, Realtime, and connector state when live checks are enabled.',
         ],
       };
-    case 'backup':
+    case 'backup': {
+      // Step list is sourced from the shared planner, not hardcoded, so the CLI
+      // can never drift from planBackup(). `--no-storage` mirrors the planner's
+      // includeStorage flag instead of unconditionally exporting storage.
+      const includeStorage = !commandFlags.has('--no-storage');
       return {
         blocked: false,
         title: 'PM System backup plan: dry_run',
-        lines: [
-          '- export-postgres',
-          '- export-storage-artifacts',
-          '- write-backup-manifest',
-          '- verify-backup-manifest',
-        ],
+        lines: backupSteps(includeStorage).map((step) => `- ${step}`),
       };
+    }
     case 'restore':
       return {
         blocked: true,

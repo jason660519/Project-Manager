@@ -263,3 +263,29 @@ The scaffold is intentionally not a production-ready Supabase stack yet. It crea
 
 - Passed: `npm run test -- --run __tests__/pmSystemInstaller.plan.test.ts` (1 file, 24 tests).
 - Passed: `npm run typecheck`.
+
+## 2026-06-04 - Code Review Fixes (high-effort `/code-review`)
+
+### Context
+
+Ran a high-effort review of the F48 installer commit and fixed the findings. Chose the "honest minimal-viable + fix real bugs" scope (not building the full Supabase stack).
+
+### Implemented
+
+- **Drift / dead-code (altitude):** extracted the canonical dry-run step lists into a shared, dependency-free `infra/supabase/pm-system-plans.mjs` (+ `pm-system-plans.d.mts` types). Both the typed planner and `scripts/pm-system.mjs` now import it, so the CLI can no longer drift from the tested plans.
+- **Migration never executed:** compose mounted migrations into a nested sub-dir of `/docker-entrypoint-initdb.d` (which Postgres ignores). Now mounts `0001_pm_core.sql` and `seed.sql` as ordered top-level files. Documented that initdb runs first-init only and `upgrade` needs a real migration runner.
+- **Secret-scan bypass:** `auditScaffoldContent` exempted an entire file if it contained any one placeholder. Rewrote to scan per-line so a real secret beside a placeholder is still caught.
+- **Doctor false success:** the `ports` doctor check reported `pass` on empty/undefined port data. Now returns `warn` ("ports were not verified"), so doctor is never falsely `healthy`.
+- **RLS deny-all:** the migration enabled RLS with zero policies. Added membership-scoped read policies guarded by `auth.uid()` presence (loud notice + RLS left off when auth absent), so tables are never silently deny-all.
+- **Phantom services:** `getRequiredPortChecks()` reduced to the api/postgres/studio ports the compose actually starts; Storage/Realtime annotated as a reserved forward contract in env + docs. Honest WARNING comments added to the compose studio block and `kong.yml`.
+- **Invalid URL:** `createPmBackendProfilePair` now throws on a scheme-less host instead of writing a broken `supabaseUrl`.
+- **CLI backup divergence:** CLI backup dry-run now derives steps from the shared `backupSteps(includeStorage)` and honors `--no-storage`.
+- Added regression tests for: 3-port required checks, scheme-less host rejection, RLS policies present, per-line secret scan, doctor not-healthy on unchecked ports.
+
+### Verification Log
+
+- Passed: `npm run typecheck`.
+- Passed: `npm run test -- --run __tests__/pmSystemInstaller.plan.test.ts __tests__/pmSystemCli.test.ts` (2 files, 34 tests).
+- Passed: `npm run docs:site:sync` + `npm run docs:check`.
+- Passed: `node scripts/pm-system.mjs {install,backup --no-storage,restore} --dry-run` exit codes (0/0/1) and unknown/no-flag (2).
+- Pending: `npm run verify:baseline` (full gate) before commit/PR.

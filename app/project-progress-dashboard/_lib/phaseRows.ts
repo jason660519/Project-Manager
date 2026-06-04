@@ -1,4 +1,4 @@
-import type { Feature, FeaturePhase, FeatureStatus, IDEId } from '../../../lib/types';
+import type { Feature, FeatureDependencyRef, FeaturePhase, FeatureStatus, IDEId } from '../../../lib/types';
 import { uuidv5 } from '../../../lib/aiSdks/uuid';
 import type { CustomProjectProgressRow, PhaseRowMeta } from '../types';
 
@@ -15,6 +15,7 @@ export interface PhaseRow extends PhaseRowMeta {
   progress: number;      // 0-100
   points: number;        // SP weight for aggregations (defaults to 1)
   locatedSection?: string;
+  upstreamDependencies?: FeatureDependencyRef[];
   notes?: string;
   testCoverage?: number;
   testStatus?: Feature['testStatus'];
@@ -75,6 +76,7 @@ export function featureToPhaseRow(feature: Feature, defaultProjectName?: string)
     progress: Math.max(0, Math.min(100, feature.progress ?? 0)),
     points: safePoints(feature),
     locatedSection: feature.locatedSection,
+    upstreamDependencies: feature.upstreamDependencies ?? [],
     notes: feature.notes,
     readmePath: feature.readmePath
       ?? (feature.paths?.featureFolder

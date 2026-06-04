@@ -26,8 +26,22 @@ services:
       POSTGRES_DB: postgres
     volumes:
       - pm-postgres-data:/var/lib/postgresql/data
-      - ./migrations:/docker-entrypoint-initdb.d/pm-migrations:ro
+      # The Postgres entrypoint only executes files placed DIRECTLY in
+      # /docker-entrypoint-initdb.d (it ignores sub-directories), and only on the
+      # FIRST init of an empty data volume. Mounting individual files at the top
+      # level (not a nested dir) is what actually runs them; numeric prefixes set
+      # ordering so the schema is created before the seed. NOTE: this covers
+      # first-init only — `upgrade` against an existing volume needs a real
+      # migration runner (see docs/engineering/pm-system-installer.md).
+      - ./migrations/0001_pm_core.sql:/docker-entrypoint-initdb.d/01_pm_core.sql:ro
+      - ./seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
 
+  # NOTE: this scaffold only runs kong + postgres + studio. Auth (GoTrue),
+  # REST (PostgREST), Storage, and Realtime are NOT provisioned yet, and
+  # templates/kong.yml routes nothing — so data-plane API calls through
+  # http://kong:8000 will fail until those services and routes are added.
+  # The installer reflects this: getRequiredPortChecks() only requires the
+  # api/postgres/studio ports.
   studio:
     image: supabase/studio:latest
     restart: unless-stopped

@@ -5,7 +5,7 @@
   "properties": {
     "schemaVersion": {
       "type": "integer",
-      "description": "Schema version. Increment when making breaking changes to the config structure. Current: 8.",
+      "description": "Schema version. Increment when making breaking changes to the config structure. Current: 9.",
       "minimum": 1
     },
     "id": {
@@ -289,6 +289,11 @@
           "type": "string",
           "description": "Section, area, or route where the feature lives (v6)."
         },
+        "upstreamDependencies": {
+          "type": "array",
+          "description": "Feature dependency refs used for dispatch planning (v9). Persist upstream only; downstream is derived.",
+          "items": { "$ref": "#/definitions/featureDependencyRef" }
+        },
         "testCoverage": { "type": "number", "minimum": 0, "maximum": 100 },
         "testStatus": { "type": "string", "enum": ["passed", "failed", "pending"] },
         "deployStatus": { "type": "string", "enum": ["production", "staging", "not_deployed"] },
@@ -351,6 +356,29 @@
         }
       },
       "required": ["id", "name", "category", "status", "progress", "paths"]
+    },
+    "featureDependencyRef": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string",
+          "description": "Optional dashboard project id. Required when multiple selected projects share the same feature id."
+        },
+        "featureId": {
+          "type": "string",
+          "description": "Human-readable feature id such as F37. Do not store the technical UUID table id here."
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["hard", "soft"],
+          "description": "Hard dependencies block dispatch until done; soft dependencies warn only. Defaults to hard."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Optional human-authored dependency reason."
+        }
+      },
+      "required": ["featureId"]
     },
     "featureHarnessAssignment": {
       "type": "object",

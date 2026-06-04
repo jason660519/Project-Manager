@@ -164,13 +164,14 @@ describe('PM System Installer planning', () => {
     });
   });
 
-  it('provides default Supabase service port checks', () => {
+  it('requires only the ports the compose scaffold actually provisions', () => {
+    // Storage (5000) and Realtime (4000) are reserved for a future slice and are
+    // NOT started by docker-compose.pm-system.yml, so they must not be claimed
+    // as required/checked or doctor/install would report false success.
     expect(getRequiredPortChecks()).toEqual([
       { port: 8000, available: true, service: 'Supabase API gateway' },
       { port: 5432, available: true, service: 'Postgres' },
       { port: 54323, available: true, service: 'Supabase Studio' },
-      { port: 5000, available: true, service: 'Supabase Storage' },
-      { port: 4000, available: true, service: 'Supabase Realtime' },
     ]);
   });
 
@@ -207,6 +208,26 @@ describe('PM System Installer planning', () => {
       composeProjectName: 'pm-system',
       schemaVersion: 1,
     });
+  });
+
+  it('rejects a scheme-less host instead of writing a broken supabaseUrl', () => {
+    expect(() =>
+      createPmBackendProfilePair({
+        id: 'local-pm',
+        label: 'Local PM Backend',
+        mode: 'local-self-hosted',
+        host: 'localhost',
+        ports: DEFAULT_PM_BACKEND_PORTS,
+        composeProjectName: 'pm-system',
+        schemaVersion: 1,
+        secrets: {
+          supabaseAnonKey: 'anon-test-key',
+          serviceRoleKey: 'service-role-secret',
+          jwtSecret: 'jwt-secret',
+          databasePassword: 'db-password',
+        },
+      }),
+    ).toThrow(/must include an http\(s\):\/\/ scheme/);
   });
 
   it('renders ops env and a redacted support-safe variant', () => {
@@ -449,6 +470,49 @@ describe('PM System Installer planning', () => {
     expect(migration).toContain('create table if not exists public.agent_runs');
     expect(migration).toContain('alter table public.workspaces enable row level security');
     expect(migration).toContain('alter table public.workspace_memberships enable row level security');
+  });
+
+  it('defines membership-scoped RLS policies so RLS is never enabled with zero policies', () => {
+    const migration = readScaffold('infra/supabase/migrations/0001_pm_core.sql');
+
+    // Guards against the silent "RLS on + no policies = deny-all" trap.
+    expect(migration).toContain('create policy pm_memberships_read_own');
+    expect(migration).toContain('create policy pm_workspaces_read_member');
+    expect(migration).toContain('create policy pm_projects_read_member');
+    expect(migration).toContain('create policy pm_agent_runs_read_member');
+    // RLS is only enabled when auth is present; otherwise a loud notice, not a
+    // silent deny-all.
+    expect(migration).toContain("to_regprocedure('auth.uid()')");
+  });
+
+  it('flags a real secret even when the same file also contains an allowed placeholder', () => {
+    // Regression: a single allowed placeholder must not exempt the whole file
+    // from secret scanning.
+    const audit = auditScaffoldContent([
+      {
+        path: 'infra/supabase/leaky.env',
+        content:
+          'PM_BACKEND_JWT_SECRET=change-me-jwt-secret\nLEAKED_OPENAI_KEY=sk-ABCDEFG1234567890\n',
+      },
+    ]);
+
+    expect(audit.safe).toBe(false);
+    expect(audit.findings.join('\n')).toContain('infra/supabase/leaky.env:2');
+  });
+
+  it('does not report doctor ports as passing when no port data was checked', () => {
+    const response = buildPmSystemCliResponse({
+      command: 'doctor',
+      preflight: {
+        runtime: { kind: 'docker-compatible', version: '25.0.0' },
+        ports: [],
+      },
+    });
+
+    // Runtime is healthy, but ports were not verified — doctor must not claim a
+    // clean bill of health.
+    expect(response.title).not.toBe('PM System doctor: healthy');
+    expect(response.lines.join('\n')).toContain('ports were not verified');
   });
 
   it('builds a dry-run install CLI response without host mutation', () => {

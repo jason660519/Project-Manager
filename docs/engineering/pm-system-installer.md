@@ -114,6 +114,16 @@ The first implementation slice is side-effect-free:
 
 It models installer plans, backend profiles, doctor reports, backup/restore/upgrade plans, and maintenance policies. It does not call Docker, pull images, write secrets, or mutate host state.
 
+The dry-run step lists are defined once in `infra/supabase/pm-system-plans.mjs` and shared by both the typed planner and the runtime CLI (`scripts/pm-system.mjs`), so the CLI cannot drift from the tested plans.
+
+## Known Gaps (Current Scaffold)
+
+The `infra/supabase` compose scaffold is deliberately partial. Until a later slice closes these, the stack is not functional for authenticated clients:
+
+- Only `kong`, `postgres`, and `studio` are started. Auth (GoTrue), REST (PostgREST), Storage, and Realtime are not provisioned, and `templates/kong.yml` routes nothing — so data-plane API calls through `http://kong:8000` fail. `getRequiredPortChecks()` therefore requires only the api/postgres/studio ports; Storage/Realtime ports remain a forward contract only.
+- The Postgres entrypoint runs `/docker-entrypoint-initdb.d` scripts only on the **first** init of an empty volume. `0001_pm_core.sql` and `seed.sql` are mounted as top-level files so they execute on first init, but `upgrade` against an existing volume still needs a dedicated migration runner — `run-pm-migrations` is not yet backed by one.
+- RLS is enabled together with membership-scoped read policies (never enabled with zero policies). Write paths currently rely on the service-role key until write policies are added.
+
 ## Verification
 
 Focused verification:

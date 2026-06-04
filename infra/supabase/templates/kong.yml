@@ -2,7 +2,13 @@ _format_version: "2.1"
 _transform: true
 
 # Placeholder Kong declarative config for F48.
-# Replace with the complete Supabase self-hosted routing contract before live use.
+#
+# WARNING: with empty services/routes the gateway accepts connections on :8000
+# but proxies NOTHING — every PM data-plane API call (auth, REST, storage,
+# realtime) through http://kong:8000 will fail. This is intentional for the
+# current scaffold (those upstream services are not provisioned yet). Replace
+# with the complete Supabase self-hosted routing contract, and add the matching
+# services to docker-compose.pm-system.yml, before live use.
 services: []
 routes: []
 consumers: []

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { clsx } from 'clsx';
 import {
   augmentArgsWithMcp,
   killProcess,
@@ -21,6 +22,7 @@ import {
   createRuntimeAdapterFromConfig,
   getAdapterExecutionKind,
 } from '../../lib/adapters/registry';
+import type { DependencyDispatchReadiness } from '../../app/project-progress-dashboard/_lib/dependencies';
 import { listLlmProviders } from '../../lib/keys/llmProviders';
 import { prependAgentTeamContext } from '../../lib/dispatch/assembleAgentTeamPrompt';
 import { collectEnabledMcpServers } from '../../lib/storage/plugins';
@@ -72,6 +74,7 @@ interface TaskDispatchModalProps {
   onRunLog?: (pid: number, line: string) => void;
   onRunEnd?: (pid: number, exitCode: number) => void;
   onFeatureUpdate?: (featureId: string, update: DispatchFeatureUpdate) => void;
+  dispatchReadiness?: DependencyDispatchReadiness;
 }
 
 type RolePhase = 'idle' | 'pending' | 'running' | 'done' | 'error';
@@ -155,6 +158,7 @@ export function TaskDispatchModal({
   onRunLog,
   onRunEnd,
   onFeatureUpdate,
+  dispatchReadiness,
 }: TaskDispatchModalProps) {
   const { t } = useI18n();
   const d = t.dispatch;
@@ -333,6 +337,13 @@ export function TaskDispatchModal({
   }, [adapters, d, engineerRoles, feature, llmProviders, projectRoot]);
 
   const dispatchRole = useCallback(async (role: HarnessTaskRole) => {
+    if (dispatchReadiness?.state === 'blocked') {
+      setLogs((prev) => [
+        ...prev,
+        { role, line: `Dispatch blocked: ${dispatchReadiness.blockers.join('; ')}` },
+      ]);
+      return;
+    }
     const config = configByRole[role];
     const adapter = adapters.find((a) => a.id === config.selectedAdapterId);
     if (!adapter) return;
@@ -487,7 +498,7 @@ export function TaskDispatchModal({
       setLogs((prev) => [...prev, { role, line: `Error: ${err}` }]);
       setRunStates((prev) => ({ ...prev, [role]: { phase: 'error' as const, activePid: null, activeToken: null } }));
     }
-  }, [adapters, buildAssignmentPatch, buildDagWorkflowSelection, buildExecutionPrompt, configByRole, feature, onExecuted, onFeatureUpdate, onRunEnd, onRunLog, onRunStart, projectRoot]);
+  }, [adapters, buildAssignmentPatch, buildDagWorkflowSelection, buildExecutionPrompt, configByRole, dispatchReadiness, feature, onExecuted, onFeatureUpdate, onRunEnd, onRunLog, onRunStart, projectRoot]);
 
   const handleDispatchAll = useCallback(async () => {
     const promises: Promise<void>[] = [];
@@ -518,6 +529,13 @@ export function TaskDispatchModal({
   };
 
   const handleOpenInTerminal = async () => {
+    if (dispatchReadiness?.state === 'blocked') {
+      setLogs((prev) => [
+        ...prev,
+        { role: activeRole, line: `Dispatch blocked: ${dispatchReadiness.blockers.join('; ')}` },
+      ]);
+      return;
+    }
     const config = configByRole[activeRole];
     const adapter = adapters.find((a) => a.id === config.selectedAdapterId);
     if (!adapter) return;
@@ -565,6 +583,7 @@ export function TaskDispatchModal({
     !!feature.assignedTo &&
     feature.status === 'in_progress' &&
     !overrideConfirmed;
+  const isDependencyBlocked = dispatchReadiness?.state === 'blocked';
 
   const hasLogs = logs.length > 0;
 
@@ -622,6 +641,29 @@ export function TaskDispatchModal({
               >
                 {d.assignedToContinue}
               </button>
+            </div>
+          )}
+
+          {dispatchReadiness && dispatchReadiness.state !== 'ready' && (
+            <div
+              className={clsx(
+                'shrink-0 mx-6 mt-3 border px-4 py-3',
+                dispatchReadiness.state === 'blocked'
+                  ? 'border-red-400/30 bg-red-500/12'
+                  : 'border-amber-300/30 bg-amber-500/10',
+              )}
+            >
+              <p className={clsx(
+                'text-xs font-semibold',
+                dispatchReadiness.state === 'blocked' ? 'text-red-200' : 'text-amber-200',
+              )}>
+                {dispatchReadiness.state === 'blocked' ? 'Dependency guard blocked dispatch' : 'Dependency guard warning'}
+              </p>
+              <ul className="mt-1 space-y-0.5 text-[11px] text-stone-300">
+                {[...dispatchReadiness.blockers, ...dispatchReadiness.warnings].map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
             </div>
           )}
 
@@ -731,7 +773,7 @@ export function TaskDispatchModal({
           {runStates[activeRole].phase === 'idle' && isActiveAgentCli && (
             <button
               onClick={handleOpenInTerminal}
-              disabled={isAssignedBlocked || isActiveTargetBlocked}
+              disabled={isAssignedBlocked || isDependencyBlocked || isActiveTargetBlocked}
               className="border border-stone-200/25 px-4 py-2 text-sm font-medium text-stone-200 hover:bg-white/5 disabled:opacity-50"
             >
               {d.openTerminalBtn}
@@ -741,7 +783,7 @@ export function TaskDispatchModal({
           {runStates[activeRole].phase === 'idle' && adapters.length > 0 && (
             <button
               onClick={() => dispatchRole(activeRole)}
-              disabled={isAssignedBlocked || isActiveTargetBlocked || !activeAdapter}
+              disabled={isAssignedBlocked || isDependencyBlocked || isActiveTargetBlocked || !activeAdapter}
               className="border border-emerald-200/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
             >
               Dispatch {ROLE_SHORT[activeRole]}
@@ -751,7 +793,7 @@ export function TaskDispatchModal({
           {adapters.length > 0 && (
             <button
               onClick={handleDispatchAll}
-              disabled={ROLES.every((r) => runStates[r].phase === 'running' || runStates[r].phase === 'pending')}
+              disabled={isDependencyBlocked || ROLES.every((r) => runStates[r].phase === 'running' || runStates[r].phase === 'pending')}
               className="bg-stone-100 px-4 py-2 text-sm font-medium text-[rgb(var(--pm-panel))] hover:bg-amber-100 disabled:opacity-50"
             >
               Dispatch All

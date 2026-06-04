@@ -26,13 +26,13 @@ const sampleRunCommandJob = (): CronJob => ({
 });
 
 describe('migrate v7 → v8 (ADR-012 engineer cron dispatch)', () => {
-  it('exposes 8 as the current schema version', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(8);
+  it('exposes 9 as the current schema version', () => {
+    expect(CURRENT_SCHEMA_VERSION).toBe(9);
   });
 
-  it('bumps schemaVersion to 8 on a v7 document', () => {
+  it('bumps schemaVersion to the current version on a v7 document', () => {
     const out = migrateConfig(baseV7());
-    expect(out.schemaVersion).toBe(8);
+    expect(out.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
   });
 
   it('preserves existing run-command cron jobs untouched', () => {
@@ -59,7 +59,7 @@ describe('migrate v7 → v8 (ADR-012 engineer cron dispatch)', () => {
     const cfg = baseV7();
     delete (cfg as Record<string, unknown>).cronJobs;
     const out = migrateConfig(cfg);
-    expect(out.schemaVersion).toBe(8);
+    expect(out.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(out.cronJobs).toBeUndefined();
   });
 
@@ -71,7 +71,7 @@ describe('migrate v7 → v8 (ADR-012 engineer cron dispatch)', () => {
   it('is idempotent — re-running migrate on a v8 result is a no-op', () => {
     const first  = migrateConfig(baseV7({ cronJobs: [sampleRunCommandJob()] })) as ProjectManagerConfig;
     const second = migrateConfig(first) as ProjectManagerConfig;
-    expect(second.schemaVersion).toBe(8);
+    expect(second.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(second.cronJobs).toEqual(first.cronJobs);
   });
 

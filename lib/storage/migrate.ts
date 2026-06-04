@@ -24,7 +24,7 @@ interface RawConfig {
   [key: string]: unknown;
 }
 
-export const CURRENT_SCHEMA_VERSION = 8;
+export const CURRENT_SCHEMA_VERSION = 9;
 
 export function migrateConfig(raw: unknown): ProjectManagerConfig {
   const cfg = (raw && typeof raw === 'object' ? (raw as RawConfig) : {}) as RawConfig;
@@ -37,6 +37,7 @@ export function migrateConfig(raw: unknown): ProjectManagerConfig {
   if (version < 6) next = migrate_5_to_6(next);
   if (version < 7) next = migrate_6_to_7(next);
   if (version < 8) next = migrate_7_to_8(next);
+  if (version < 9) next = migrate_8_to_9(next);
   // Cast through unknown: `RawConfig` is intentionally a permissive bag,
   // and the migration steps above are responsible for ensuring the result
   // matches `ProjectManagerConfig`.
@@ -232,6 +233,27 @@ function migrate_7_to_8(cfg: RawConfig): RawConfig {
   const out: RawConfig = { ...cfg, schemaVersion: 8 };
   if (cronJobs !== undefined) out.cronJobs = cronJobs;
   return out;
+}
+
+/**
+ * v8 -> v9 (F49 Development Dependency Graph): adds per-feature upstream
+ * dependency refs. Downstream dependencies stay derived from this single source
+ * of truth, so the migration only back-fills an empty upstream list.
+ */
+function migrate_8_to_9(cfg: RawConfig): RawConfig {
+  const features = Array.isArray(cfg.features)
+    ? (cfg.features as Feature[]).map((feature) => ({
+        ...feature,
+        upstreamDependencies: Array.isArray(feature.upstreamDependencies)
+          ? feature.upstreamDependencies
+          : [],
+      }))
+    : [];
+  return {
+    ...cfg,
+    schemaVersion: 9,
+    features,
+  };
 }
 
 function annotateAdapterSupports(rows: unknown): unknown {

@@ -251,9 +251,9 @@ export function createDefaultAssistant(): AIAssistantConfig {
     },
     profileSources: [
       source('agents', 'AGENTS.md', true, 'next-message', 'Repo-level AI engineer workflow rules. Read-only in this console.'),
-      source('soul', '.project-manager/assistants/pm-assistant/profile/soul.md', false, 'next-message', 'Calm operational assistant. Use concise Traditional Chinese by default.'),
+      source('soul', '.project-manager/assistants/pm-assistant/profile/soul.md', false, 'next-message', '講嘢風格輕鬆自然，但講到 code 就會戴返工程師眼鏡認真對待。預設用繁體中文同用戶溝通，回答簡潔。'),
       source('tools', '.project-manager/assistants/pm-assistant/profile/tools.md', false, 'runtime-reload', 'Search and read-file tools are enabled. Command execution requires guarded approval.'),
-      source('identity', '.project-manager/assistants/pm-assistant/profile/identity.md', false, 'runtime-reload', 'Name: Project Manager Assistant. Scope: engineering operations and agent control.'),
+      source('identity', '.project-manager/assistants/pm-assistant/profile/identity.md', false, 'runtime-reload', '你係 Project Manager 嘅 AI 助手，我叫小龍蝦 🦞。Scope：engineering operations and agent control。'),
       source('user', '.project-manager/assistants/pm-assistant/profile/user.md', false, 'next-message', 'Prefer evidence-backed verification and concise Traditional Chinese summaries.'),
       source('heartbeat', '.project-manager/assistants/pm-assistant/profile/heartbeat.md', false, 'runtime-reload', 'Heartbeat jobs are disabled until an explicit automation is configured.'),
       source('memory', '.project-manager/assistants/pm-assistant/profile/memory.md', false, 'manual-review', 'Memory updates require review before merge.'),

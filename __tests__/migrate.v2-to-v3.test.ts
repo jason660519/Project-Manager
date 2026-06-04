@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { CURRENT_SCHEMA_VERSION, migrateConfig } from '../lib/storage/migrate';
 
-describe('migrateConfig v2 → v3 → v4 → v5 → v6 → v7', () => {
+describe('migrateConfig v2 → current schema', () => {
   it('exposes the current schema version constant', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(8);
+    expect(CURRENT_SCHEMA_VERSION).toBe(9);
   });
 
-  it('bumps schemaVersion to 7 on a v2 document', () => {
+  it('bumps schemaVersion to the current version on a v2 document', () => {
     const v2 = {
       schemaVersion: 2,
       id: 'aaa',
@@ -32,6 +32,7 @@ describe('migrateConfig v2 → v3 → v4 → v5 → v6 → v7', () => {
     });
     expect(out.features[0].phase).toBe('development');
     expect(out.features[0].points).toBe(1);
+    expect(out.features[0].upstreamDependencies).toEqual([]);
     expect(out.features[1].phase).toBe('e2e_testing');   // v4 renames legacy testing phase
     expect(out.features[2].points).toBe(5);            // existing value preserved
   });
@@ -119,6 +120,7 @@ describe('migrateConfig v2 → v3 → v4 → v5 → v6 → v7', () => {
     // v2 sync fields were also added during the v1 → v2 step.
     expect(typeof out.id).toBe('string');
     expect(typeof out.features[0].createdAt).toBe('string');
+    expect(out.features[0].upstreamDependencies).toEqual([]);
   });
 
   it('is idempotent — running a fully migrated document through the pipeline does not change it', () => {

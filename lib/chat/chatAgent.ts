@@ -44,11 +44,51 @@ const ROUTES: Record<string, string> = {
 // System Prompt v2
 // ---------------------------------------------------------------------------
 
+/** Fallback persona when no assistant profile content is configured. */
+const DEFAULT_PERSONA =
+  '你係 Project Manager 嘅 AI 助手，我叫小龍蝦 🦞\n講嘢風格輕鬆自然，但講到 code 就會戴返工程師眼鏡認真對待。用繁體中文同用戶溝通。';
+
+/** Max chars for the dynamic project-context layer (persona + override are never truncated). */
+const CONTEXT_LAYER_MAX_CHARS = 5500;
+
 /**
- * Build a rich Chinese-language system prompt with full project context.
- * Truncates at ~6000 chars to stay within reasonable token budgets.
+ * Profile-source kinds that contribute to the chat persona, in injection order.
+ * Other kinds (agents/tools/heartbeat/memory) are infra/tool config, not persona.
  */
-export function buildSystemPrompt(context: ChatContext): string {
+const PERSONA_SOURCE_KINDS = ['identity', 'soul', 'user'] as const;
+
+/**
+ * Resolve the persona layer from the currently-selected assistant's editable
+ * profile sources (Profile tab → localStorage console state). Falls back to
+ * {@link DEFAULT_PERSONA} when nothing usable is configured or on the server.
+ */
+export function resolveAssistantPersona(): string {
+  if (typeof window === 'undefined') return DEFAULT_PERSONA;
+  try {
+    const state = loadAIAssistantsConsoleState();
+    const assistant =
+      state.assistants.find((item) => item.id === state.selectedAssistantId) ??
+      state.assistants[0];
+    if (!assistant) return DEFAULT_PERSONA;
+    const persona = PERSONA_SOURCE_KINDS.map((kind) =>
+      assistant.profileSources.find((source) => source.kind === kind)?.content?.trim(),
+    )
+      .filter((content): content is string => Boolean(content))
+      .join('\n\n')
+      .trim();
+    return persona || DEFAULT_PERSONA;
+  } catch {
+    return DEFAULT_PERSONA;
+  }
+}
+
+/**
+ * Build the dynamic project-context layer (project, features, runs, capabilities).
+ * Persona is intentionally NOT included here — see {@link composeSystemPrompt}.
+ * Truncates to {@link CONTEXT_LAYER_MAX_CHARS} so it can never crowd out the
+ * persona or user override.
+ */
+export function buildProjectContext(context: ChatContext): string {
   const project = context.selectedProject;
   const features = context.features ?? project?.config.features ?? [];
   const selectedFeature = context.selectedFeature;
@@ -81,9 +121,6 @@ export function buildSystemPrompt(context: ChatContext): string {
   const dashboardNames = context.dashboardProjects ?? [];
 
   const parts: string[] = [
-    `你係 Project Manager 嘅 AI 助手，我叫小龍蝦 🦞`,
-    '講嘢風格輕鬆自然，但講到 code 就會戴返工程師眼鏡認真對待。用繁體中文同用戶溝通。',
-    '',
     '**專案資訊：**',
     `- 專案名稱：${project?.config.project.name ?? '未選擇'}`,
     `- 專案路徑：${project?.config.project.root ?? '無'}`,
@@ -140,11 +177,58 @@ export function buildSystemPrompt(context: ChatContext): string {
   );
 
   const full = parts.join('\n');
-  // Truncate to ~6000 chars if needed
-  if (full.length > 6000) {
-    return full.slice(0, 5997) + '...';
+  // Truncate the context layer only; persona + override are protected upstream.
+  if (full.length > CONTEXT_LAYER_MAX_CHARS) {
+    return full.slice(0, CONTEXT_LAYER_MAX_CHARS - 3) + '...';
   }
   return full;
+}
+
+/**
+ * Compose the full system prompt actually sent to the provider, in layers:
+ *   1. Persona  — from the selected assistant's profile (editable in Profile tab)
+ *   2. Context  — dynamic project/feature/runs info (auto-truncated)
+ *   3. Override — the Chat Settings textarea, appended LAST as highest-priority
+ *                 user instruction. Additive, not a replacement: it can instruct
+ *                 the model to ignore the above, but never silently erases persona.
+ *
+ * This is the single source of truth for the chat system prompt. The Profile
+ * persona, the project context, and the user override are no longer mutually
+ * exclusive (previously: `override || buildSystemPrompt`).
+ */
+export function composeSystemPrompt(context: ChatContext, overrideText?: string): string {
+  const persona = resolveAssistantPersona();
+  const projectContext = buildProjectContext(context);
+  const override = overrideText?.trim();
+
+  const layers = [persona, projectContext];
+  if (override) {
+    layers.push(
+      ['---', '**使用者附加指示（最高優先；與上文衝突時以此為準）：**', override].join('\n'),
+    );
+  }
+  const prompt = layers.filter(Boolean).join('\n\n');
+
+  if (typeof window !== 'undefined') {
+    // Observability: make "what actually got sent" inspectable (dev console).
+    console.debug('[chat] system prompt composed', {
+      personaChars: persona.length,
+      contextChars: projectContext.length,
+      overrideChars: override?.length ?? 0,
+      personaSource: persona === DEFAULT_PERSONA ? 'default' : 'profile',
+      totalChars: prompt.length,
+    });
+  }
+  return prompt;
+}
+
+/**
+ * @deprecated Use {@link composeSystemPrompt}. Retained as a thin alias so the
+ * legacy "persona + context" prompt remains available; it now sources persona
+ * from the assistant profile rather than a hardcoded string.
+ */
+export function buildSystemPrompt(context: ChatContext): string {
+  return composeSystemPrompt(context);
 }
 
 // ---------------------------------------------------------------------------
@@ -668,7 +752,7 @@ async function callChatApi(
   attachments?: SendChatMessageRequest['attachments'],
 ): Promise<Pick<SendChatMessageResult, 'content' | 'provider' | 'model' | 'routeDecision'>> {
   // Build messages array WITHOUT system prompt (passed separately via systemPrompt field)
-  const systemPrompt = chatSettingsOverride?.systemPrompt || buildSystemPrompt(context);
+  const systemPrompt = composeSystemPrompt(context, chatSettingsOverride?.systemPrompt);
   const messages: { role: 'user' | 'assistant'; content: string }[] = [];
 
   for (const m of history) {
@@ -933,8 +1017,8 @@ async function callAgentApi(
   abortSignal?: AbortSignal,
   attachments?: SendChatMessageRequest['attachments'],
 ): Promise<AgentStreamResult> {
-  const systemPrompt = chatSettingsOverride?.systemPrompt || buildSystemPrompt(context);
-  
+  const systemPrompt = composeSystemPrompt(context, chatSettingsOverride?.systemPrompt);
+
   const messages: { role: 'user' | 'assistant'; content: string }[] = [];
   for (const m of history) {
     if (m.role === 'user') messages.push({ role: 'user', content: m.content });

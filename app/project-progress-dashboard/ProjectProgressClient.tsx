@@ -8,6 +8,7 @@ import type {
 } from '../../lib/types';
 import { PHASE_IDS, SHEET_IDS, type TabId } from './types';
 import type { CustomProjectProgressRow } from './types';
+import { buildFeatureDependencyGraph, dispatchReadinessForFeature } from './_lib/dependencies';
 import { usePhasePreferences } from './_lib/usePhasePreferences';
 import { computePhaseCounts, type PhaseRow } from './_lib/phaseRows';
 import { SheetTabs } from './_components/SheetTabs';
@@ -103,6 +104,7 @@ export function ProjectProgressClient({
   const [exportOpen, setExportOpen] = useState(false);
   const [dispatchRow, setDispatchRow] = useState<PhaseRow | null>(null);
   const [dispatchIssue, setDispatchIssue] = useState<{ title: string } | null>(null);
+  const dependencyGraph = useMemo(() => buildFeatureDependencyGraph(features), [features]);
 
   const isPhaseTab = isFeaturePhaseTab(activeTab);
   const activePhase = isPhaseTab ? activeTab : 'development';
@@ -225,6 +227,7 @@ export function ProjectProgressClient({
                 projectNames={dashboardProjectNames}
                 projectRoot={projectRoot}
                 features={phaseFeatures}
+                dependencyFeatures={features}
                 engineerRoles={engineerRoles}
                 prefs={activePhasePrefs.prefs}
                 patch={activePhasePrefs.patch}
@@ -270,6 +273,7 @@ export function ProjectProgressClient({
           onClose={() => setDispatchRow(null)}
           onExecuted={() => {}}
           onFeatureUpdate={(featureId, update) => onFeaturePatch(featureId, update)}
+          dispatchReadiness={dispatchReadinessForFeature(dispatchRow.feature, dependencyGraph, activeRuns)}
           onRunStart={onRunStart}
           onRunLog={onRunLog}
           onRunEnd={onRunEnd}

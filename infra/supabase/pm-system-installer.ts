@@ -1,3 +1,14 @@
+import {
+  backupSteps,
+  DRY_RUN_INSTALL_MESSAGE,
+  INSTALL_ACTIONS,
+  PM_SYSTEM_COMMANDS,
+  RESTORE_STEPS,
+  UPGRADE_STEPS,
+} from './pm-system-plans.mjs';
+
+export { PM_SYSTEM_COMMANDS };
+
 export type PmBackendDeploymentMode = 'local-self-hosted' | 'vm-self-hosted' | 'supabase-cloud';
 
 export type DockerRuntimeKind = 'docker-desktop' | 'orbstack' | 'rancher-desktop' | 'podman' | 'docker-compatible';
@@ -218,29 +229,6 @@ export interface PmSystemCliResponse {
   lines: string[];
 }
 
-const INSTALL_ACTIONS: InstallerPlanAction[] = [
-  'generate-local-secrets',
-  'write-ops-env',
-  'pull-supabase-images',
-  'start-supabase-stack',
-  'run-pm-migrations',
-  'create-owner-account',
-  'write-backend-profile',
-  'run-health-checks',
-];
-
-export const PM_SYSTEM_COMMANDS: readonly PmSystemCommand[] = [
-  'install',
-  'start',
-  'stop',
-  'status',
-  'doctor',
-  'backup',
-  'restore',
-  'upgrade',
-  'logs',
-];
-
 export const DEFAULT_PM_BACKEND_PORTS: PmBackendPorts = {
   api: 8000,
   postgres: 5432,
@@ -275,12 +263,15 @@ export const PM_SUPABASE_SCAFFOLD_FILES: readonly ScaffoldFile[] = [
 export function getRequiredPortChecks(
   ports: PmBackendPorts = DEFAULT_PM_BACKEND_PORTS,
 ): PortCheck[] {
+  // Only the services the compose scaffold actually starts (kong/postgres/studio)
+  // are required for install. Storage (5000) and Realtime (4000) remain part of
+  // the port contract in DEFAULT_PM_BACKEND_PORTS / env, but they are reserved
+  // for a future slice and must not be claimed as "checked" until the compose
+  // stack provisions them — otherwise doctor/install report false success.
   return [
     { port: ports.api, available: true, service: 'Supabase API gateway' },
     { port: ports.postgres, available: true, service: 'Postgres' },
     { port: ports.studio, available: true, service: 'Supabase Studio' },
-    { port: ports.storage, available: true, service: 'Supabase Storage' },
-    { port: ports.realtime, available: true, service: 'Supabase Realtime' },
   ];
 }
 
@@ -324,7 +315,7 @@ export function planPmSystemInstall(preflight: InstallerPreflight): InstallerPla
       status: 'dry_run',
       actions: [...INSTALL_ACTIONS],
       blocked: false,
-      messages: ['Dry run only. No Docker, filesystem, network, or secret mutation will be performed.'],
+      messages: [DRY_RUN_INSTALL_MESSAGE],
     };
   }
 
@@ -351,6 +342,15 @@ export function toRendererSafeBackendProfile(
 export function createPmBackendProfilePair(
   input: PmBackendProfilePairInput,
 ): PmBackendProfilePair {
+  if (!/^https?:\/\//i.test(input.host)) {
+    // The field is named `host`, which invites bare values like "localhost".
+    // Building `${host}:${port}` from a scheme-less host yields an invalid URL
+    // (e.g. "localhost:8000") that fetch/WebView cannot resolve. Fail loudly
+    // instead of writing a broken supabaseUrl into the renderer profile.
+    throw new Error(
+      `PM backend host must include an http(s):// scheme; received "${input.host}".`,
+    );
+  }
   const supabaseUrl = `${input.host.replace(/\/+$/, '')}:${input.ports.api}`;
   const renderer = toRendererSafeBackendProfile({
     id: input.id,
@@ -488,16 +488,9 @@ export function planBackup({
   includeStorage,
   retentionDays,
 }: BackupPlanInput): BackupPlan {
-  const steps = [
-    'export-postgres',
-    ...(includeStorage ? ['export-storage-artifacts'] : []),
-    'write-backup-manifest',
-    'verify-backup-manifest',
-  ];
-
   return {
     destination,
-    steps,
+    steps: backupSteps(includeStorage),
     retentionDays,
     safeToRun: destination.trim().length > 0 && retentionDays > 0,
   };
@@ -525,13 +518,7 @@ export function planRestore({
 
   return {
     blocked: false,
-    steps: [
-      'stop-supabase-stack',
-      'restore-postgres',
-      'restore-storage-artifacts',
-      'run-health-checks',
-      'write-restore-audit-event',
-    ],
+    steps: [...RESTORE_STEPS],
     message: 'Restore can proceed with explicit confirmation.',
   };
 }
@@ -559,14 +546,7 @@ export function planUpgrade({
 
   return {
     blocked: false,
-    steps: [
-      'pull-target-images',
-      'stop-supabase-stack',
-      'start-supabase-stack',
-      'run-pm-migrations',
-      'run-health-checks',
-      'write-upgrade-audit-event',
-    ],
+    steps: [...UPGRADE_STEPS],
     message: `Upgrade to ${targetVersion} can proceed.`,
   };
 }
@@ -585,18 +565,59 @@ export function auditScaffoldContent(files: Array<{ path: string; content: strin
     'change-me-jwt-secret',
   ];
 
-  const findings = files.flatMap((file) => {
-    const allowed = allowedPlaceholders.some((placeholder) => file.content.includes(placeholder));
-    if (allowed) return [];
-
-    return suspiciousPatterns
-      .filter((pattern) => pattern.test(file.content))
-      .map((pattern) => `${file.path} contains suspicious secret-like content: ${pattern.source}`);
-  });
+  // Scan line-by-line. A known placeholder only exempts the line it appears on,
+  // not the whole file — otherwise a single `change-me-*` placeholder would
+  // silently disable secret detection for every other line, which defeats the
+  // entire purpose of this guard (a real secret pasted next to a placeholder
+  // would pass).
+  const findings = files.flatMap((file) =>
+    file.content.split('\n').flatMap((line, index) => {
+      if (allowedPlaceholders.some((placeholder) => line.includes(placeholder))) {
+        return [];
+      }
+      return suspiciousPatterns
+        .filter((pattern) => pattern.test(line))
+        .map(
+          (pattern) =>
+            `${file.path}:${index + 1} contains suspicious secret-like content: ${pattern.source}`,
+        );
+    }),
+  );
 
   return {
     safe: findings.length === 0,
     findings,
+  };
+}
+
+function buildPortsDoctorCheck(ports: PortCheck[] | undefined): DoctorCheck {
+  const portList = ports ?? [];
+  // No port data is NOT a pass. Reporting "pass" when nothing was checked is a
+  // false success, which the runbook explicitly forbids — surface it as a
+  // warning so the overall doctor status is at most `degraded`, never healthy.
+  if (portList.length === 0) {
+    return {
+      id: 'ports',
+      status: 'warn',
+      message: 'No port preflight data was provided; required ports were not verified.',
+      recovery: 'Run a port preflight (getRequiredPortChecks) before trusting doctor output.',
+    };
+  }
+
+  const conflicted = portList.filter((port) => !port.available);
+  if (conflicted.length > 0) {
+    return {
+      id: 'ports',
+      status: 'fail',
+      message: `Required ports unavailable: ${conflicted.map((port) => port.port).join(', ')}.`,
+      recovery: 'Free the conflicting ports or change the PM backend port profile.',
+    };
+  }
+
+  return {
+    id: 'ports',
+    status: 'pass',
+    message: 'Required port preflight completed.',
   };
 }
 
@@ -631,14 +652,7 @@ export function buildPmSystemCliResponse(request: PmSystemCliRequest): PmSystemC
             ? undefined
             : 'Install or start a Docker-compatible runtime, then run doctor again.',
         },
-        {
-          id: 'ports',
-          status: (request.preflight?.ports ?? []).some((port) => !port.available) ? 'fail' : 'pass',
-          message: 'Required port preflight completed.',
-          recovery: (request.preflight?.ports ?? []).some((port) => !port.available)
-            ? 'Free the conflicting ports or change the PM backend port profile.'
-            : undefined,
-        },
+        buildPortsDoctorCheck(request.preflight?.ports),
       ]);
       return {
         command: 'doctor',

@@ -7,7 +7,7 @@ const STORAGE_PREFIX = 'projectManager.progressDashboard.phase.';
 describe('usePhasePreferences', () => {
   it('seeds defaults on first read', () => {
     const { result } = renderHook(() => usePhasePreferences('development'));
-    expect(result.current.prefs.colWidths.length).toBeGreaterThan(0);
+    expect(result.current.prefs.colWidths.length).toBe(23);
     expect(result.current.prefs.customRows).toEqual([]);
     expect(result.current.prefs.hiddenRowKeys).toEqual([]);
   });

@@ -8,6 +8,14 @@ import type {
   HarnessRoleStatus, HarnessTaskRole, TestStatus,
 } from '../../../lib/types';
 import type { CustomProjectProgressRow } from '../types';
+import {
+  dependencyInputValue,
+  dependencyRefLabel,
+  getFeatureDependencyIdentity,
+  parseDependencyInput,
+  type FeatureDependencyGraph,
+  type ResolvedFeatureDependency,
+} from './dependencies';
 import type { PhaseRow } from './phaseRows';
 import { COL_ID_COLUMN_HEADER } from '../../../components/table/colId';
 import { PathLink, resolveProjectPath } from './pathLinks';
@@ -24,6 +32,7 @@ export interface ColumnHandlers {
   projectRoot: string;
   engineerRoles?: EngineerRole[];
   activeRuns?: ActiveRun[];
+  dependencyGraph?: FeatureDependencyGraph;
   hiddenRowKeysSet: Set<string>;
   onToggleHideRow: (rowKey: string) => void;
   onDeleteCustomRow: (rowId: string) => void;
@@ -143,6 +152,145 @@ function EditableSelect<T extends string>({
         <option key={o.value} value={o.value}>{o.label}</option>
       ))}
     </select>
+  );
+}
+
+function DependencyBadge({
+  dependency,
+  direction,
+}: {
+  dependency: ResolvedFeatureDependency;
+  direction: 'upstream' | 'downstream';
+}) {
+  const target = direction === 'upstream' ? dependency.feature : undefined;
+  const label = target
+    ? getFeatureDependencyIdentity(target).displayId
+    : dependencyRefLabel(dependency.ref);
+  const title = [
+    dependency.kind === 'soft' ? 'Soft dependency' : 'Hard dependency',
+    target?.name,
+    dependency.missing ? 'Missing reference' : undefined,
+    dependency.self ? 'Self dependency' : undefined,
+  ].filter(Boolean).join(' · ');
+  return (
+    <span
+      className={clsx(
+        'inline-flex h-6 max-w-[120px] items-center gap-1 truncate rounded border px-1.5 text-[11px]',
+        dependency.missing || dependency.self
+          ? 'border-red-400/30 bg-red-500/12 text-red-200'
+          : dependency.kind === 'soft'
+            ? 'border-amber-300/30 bg-amber-500/10 text-amber-200'
+            : 'border-cyan-200/25 bg-cyan-500/10 text-cyan-100',
+      )}
+      title={title}
+    >
+      <span className="font-mono text-[10px]">{dependency.kind === 'soft' ? 'S' : 'H'}</span>
+      <span className="truncate">{label}</span>
+    </span>
+  );
+}
+
+function UpstreamDependenciesCell({ row, handlers }: { row: PhaseRow; handlers: ColumnHandlers }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(dependencyInputValue(row.upstreamDependencies));
+  const graph = handlers.dependencyGraph;
+  const identity = row.feature ? getFeatureDependencyIdentity(row.feature) : undefined;
+  const dependencies = identity && graph ? graph.upstreamByKey.get(identity.key) ?? [] : [];
+  const issues = identity && graph ? graph.issuesByKey.get(identity.key) ?? [] : [];
+
+  useEffect(() => {
+    if (!editing) setDraft(dependencyInputValue(row.upstreamDependencies));
+  }, [editing, row.upstreamDependencies]);
+
+  if (row.source !== 'feature') {
+    return <span className="text-xs text-stone-500">—</span>;
+  }
+
+  if (editing) {
+    return (
+      <input
+        value={draft}
+        placeholder="F37, F42?"
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          setEditing(false);
+          const refs = parseDependencyInput(draft);
+          const self = identity && refs.some((ref) => (
+            getFeatureDependencyIdentity(row.feature!).key === `${ref.projectId ?? identity.projectId ?? ''}::${ref.featureId}`
+          ));
+          if (self) return;
+          patchRow(row, { upstreamDependencies: refs }, handlers);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+          if (e.key === 'Escape') {
+            setDraft(dependencyInputValue(row.upstreamDependencies));
+            setEditing(false);
+          }
+          e.stopPropagation();
+        }}
+        onClick={(e) => e.stopPropagation()}
+        className="h-6 w-full min-w-[140px] rounded border border-emerald-300/40 bg-[rgb(var(--pm-code))]/95 px-2 text-xs text-stone-100 focus:outline-none"
+        title="Comma-separated refs. Add ? or :soft for soft dependencies."
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        setEditing(true);
+      }}
+      className="flex min-h-6 max-w-full flex-wrap items-center gap-1 rounded border border-transparent px-1 py-0.5 text-left hover:border-stone-200/20"
+      title={issues.length > 0 ? 'Dependency graph has repairable issues' : 'Edit upstream dependencies'}
+    >
+      {dependencies.length === 0 ? (
+        <span className="text-xs text-stone-500">—</span>
+      ) : dependencies.map((dependency) => (
+        <DependencyBadge key={`${dependency.targetKey}:${dependency.kind}`} dependency={dependency} direction="upstream" />
+      ))}
+      {issues.some((issue) => issue.kind === 'cycle') && (
+        <span className="inline-flex h-6 items-center rounded border border-red-400/30 bg-red-500/12 px-1.5 text-[11px] text-red-200">
+          cycle
+        </span>
+      )}
+    </button>
+  );
+}
+
+function DownstreamDependenciesCell({ row, handlers }: { row: PhaseRow; handlers: ColumnHandlers }) {
+  if (row.source !== 'feature' || !row.feature || !handlers.dependencyGraph) {
+    return <span className="text-xs text-stone-500">—</span>;
+  }
+  const identity = getFeatureDependencyIdentity(row.feature);
+  const dependencies = handlers.dependencyGraph.downstreamByKey.get(identity.key) ?? [];
+  if (dependencies.length === 0) return <span className="text-xs text-stone-500">—</span>;
+  return (
+    <div className="flex max-w-full flex-wrap items-center gap-1">
+      {dependencies.map((dependency) => {
+        const owner = handlers.dependencyGraph?.identities.get(dependency.ownerKey);
+        const ownerRef = owner
+          ? { projectId: owner.projectId, featureId: owner.featureId, kind: dependency.kind }
+          : dependency.ref;
+        return (
+          <span
+            key={`${dependency.ownerKey}:${dependency.kind}`}
+            className={clsx(
+              'inline-flex h-6 max-w-[120px] items-center gap-1 truncate rounded border px-1.5 text-[11px]',
+              dependency.kind === 'soft'
+                ? 'border-amber-300/30 bg-amber-500/10 text-amber-200'
+                : 'border-emerald-200/25 bg-emerald-500/10 text-emerald-100',
+            )}
+            title={owner?.feature.name ?? 'Dependent feature'}
+          >
+            <span className="font-mono text-[10px]">{dependency.kind === 'soft' ? 'S' : 'H'}</span>
+            <span className="truncate">{dependencyRefLabel(ownerRef)}</span>
+          </span>
+        );
+      })}
+    </div>
   );
 }
 
@@ -724,6 +872,17 @@ export function createDevelopmentColumns(projectNameLabel?: string): ColumnDef[]
     { id: 'col-checklist', header: 'Checklist', accessor: (r) => (
       r.feature?.acceptanceChecklist?.filter((i) => i.passes).length ?? 0
     ), cell: (r, h) => (r.source === 'feature' ? <AcceptanceChecklistCell row={r} handlers={h} /> : <span className="text-xs text-stone-500">—</span>) },
+    {
+      id: 'col-upstream-deps',
+      header: 'Upstream Dependencies',
+      accessor: (r) => dependencyInputValue(r.upstreamDependencies),
+      cell: (r, h) => <UpstreamDependenciesCell row={r} handlers={h} />,
+    },
+    {
+      id: 'col-downstream-deps',
+      header: 'Downstream Dependencies',
+      cell: (r, h) => <DownstreamDependenciesCell row={r} handlers={h} />,
+    },
     { id: 'col-section', header: 'Located Section', accessor: (r) => r.locatedSection ?? '', cell: (r, h) => (
       <EditableText
         value={r.locatedSection}
