@@ -4,19 +4,19 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-06-03T16:39:14.460Z",
+    "generatedAt": "2026-06-04T02:30:26.724Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
     "manifestAudience": "internal",
-    "totalDocuments": 89,
-    "totalFolders": 13,
-    "publicDocuments": 29,
+    "totalDocuments": 96,
+    "totalFolders": 14,
+    "publicDocuments": 36,
     "internalDocuments": 59,
     "restrictedDocuments": 1,
     "publishableDocuments": 12,
-    "reviewRequiredDocuments": 51,
-    "warningCount": 115
+    "reviewRequiredDocuments": 58,
+    "warningCount": 117
   },
   "folders": [
     {
@@ -26,7 +26,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "sourcePath": "docs",
       "label": "All Docs",
       "title": "Documentation",
-      "summary": "89 documentation files indexed from docs.",
+      "summary": "96 documentation files indexed from docs.",
       "parentSlug": null,
       "folderSlugs": [
         "architecture",
@@ -43,14 +43,14 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "file-naming-standards"
       ],
       "classificationCounts": {
-        "public": 29,
+        "public": 36,
         "internal": 59,
         "restricted": 1
       },
       "publishableCount": 12,
-      "reviewRequiredCount": 51,
+      "reviewRequiredCount": 58,
       "visibilityCounts": {
-        "public": 29,
+        "public": 36,
         "internal": 59,
         "restricted": 1
       },
@@ -266,10 +266,11 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "sourcePath": "docs/guides",
       "label": "Guides",
       "title": "Guides",
-      "summary": "25 documentation files indexed from docs/guides.",
+      "summary": "32 documentation files indexed from docs/guides.",
       "parentSlug": "",
       "folderSlugs": [
         "guides/features",
+        "guides/solutions",
         "guides/standards"
       ],
       "docIds": [
@@ -277,14 +278,14 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "guides/index"
       ],
       "classificationCounts": {
-        "public": 25,
+        "public": 32,
         "internal": 0,
         "restricted": 0
       },
       "publishableCount": 11,
-      "reviewRequiredCount": 14,
+      "reviewRequiredCount": 21,
       "visibilityCounts": {
-        "public": 25,
+        "public": 32,
         "internal": 0,
         "restricted": 0
       },
@@ -347,6 +348,42 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "Mentions local key storage",
         "Mentions environment files",
         "Mentions roadmap, pricing, investor, or strategy material"
+      ]
+    },
+    {
+      "id": "guides/solutions",
+      "slug": "guides/solutions",
+      "route": "/documentation/guides/solutions",
+      "sourcePath": "docs/guides/solutions",
+      "label": "Solutions",
+      "title": "Solutions",
+      "summary": "7 documentation files indexed from docs/guides/solutions.",
+      "parentSlug": "guides",
+      "folderSlugs": [],
+      "docIds": [
+        "guides/solutions/coordinator-agent-framework",
+        "guides/solutions/fragmented-tools",
+        "guides/solutions/index",
+        "guides/solutions/live-agent-observability",
+        "guides/solutions/multi-project-multi-task",
+        "guides/solutions/prompt-context-automation",
+        "guides/solutions/realtime-voice-asr-tts"
+      ],
+      "classificationCounts": {
+        "public": 7,
+        "internal": 0,
+        "restricted": 0
+      },
+      "publishableCount": 0,
+      "reviewRequiredCount": 7,
+      "visibilityCounts": {
+        "public": 7,
+        "internal": 0,
+        "restricted": 0
+      },
+      "warnings": [
+        "Public candidate needs review before external publishing",
+        "Mentions execution or command policy"
       ]
     },
     {
@@ -1038,7 +1075,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "Mentions secrets, tokens, or credentials",
         "Mentions execution or command policy"
       ],
-      "updatedAt": "2026-06-03T16:39:14.460Z"
+      "updatedAt": "2026-06-03T16:46:39.639Z"
     },
     {
       "id": "architecture/architecture-overview",
@@ -1612,7 +1649,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "Mentions local key storage",
         "Mentions execution or command policy"
       ],
-      "updatedAt": "2026-06-03T15:14:13.384Z"
+      "updatedAt": "2026-06-03T16:46:39.639Z"
     },
     {
       "id": "engineering/security-and-secrets",
@@ -2615,7 +2652,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "title": "Index",
       "summary": "Documentation page generated from the repo docs folder.",
       "content": "",
-      "contentHash": "d316d8ba3553a56c",
+      "contentHash": "dc9004106663fff3",
       "readingMinutes": 1,
       "classification": "public",
       "classificationSource": "frontmatter",
@@ -2634,7 +2671,231 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "guides"
       ],
       "warnings": [],
-      "updatedAt": "2026-05-25T06:39:55.000Z"
+      "updatedAt": "2026-06-04T02:27:02.500Z"
+    },
+    {
+      "id": "guides/solutions/coordinator-agent-framework",
+      "slug": "guides/solutions/coordinator-agent-framework",
+      "route": "/documentation/guides/solutions/coordinator-agent-framework",
+      "sourcePath": "docs/guides/solutions/coordinator-agent-framework.md",
+      "folderSlug": "guides/solutions",
+      "folderPath": "docs/guides/solutions",
+      "title": "Coordinator + AI Agents framework",
+      "summary": "Even when a team uses AI regularly, workflows tend to be ad-hoc: - Every engineer invents their own prompt and process. - Cross-project processes (refactors, audits, migrations) are hard...",
+      "content": "\n# Coordinator + AI Agents framework\n\n## Pain scenario\n\nEven when a team uses AI regularly, workflows tend to be ad-hoc:\n\n- Every engineer invents their own prompt and process.\n- Cross-project processes (refactors, audits, migrations) are hard to reuse.\n- Delegation is implicit (“go do X”) rather than explicit (“produce artifacts A/B/C”).\n\n## Project Manager solution\n\nProject Manager enables structured, reusable execution via:\n\n- Coordinators that split work, manage dependencies, and enforce guardrails.\n- Built-in and user-defined AI Agents for repeatable roles (planner, implementer, reviewer, tester).\n- Declared artifacts and run summaries so outcomes are durable and auditable.\n\n## Implementation flow\n\n```mermaid\nflowchart LR\n  A[\"Define workflow template\"] --> B[\"Assign roles (AI agents)\"]\n  B --> C[\"Define artifacts + acceptance gates\"]\n  C --> D[\"Run via Coordinator\"]\n  D --> E[\"Collect logs + artifacts\"]\n  E --> F[\"Review + iterate\"]\n```\n\n### Steps\n\n1. Start with one repeatable workflow (for example: “feature implementation with review and verification”).\n2. Define the required artifacts (spec updates, diffs, verification output, release notes).\n3. Encode guardrails (scope limits, approval gates, verification requirements).\n4. Use the Coordinator to run roles in a predictable order and persist outputs.\n\n## Visual aids\n\n### Workflow DAG (illustration)\n\n```mermaid\nflowchart LR\n  start((\"Start\")) --> planner[\"Planner\"]\n  planner --> implA[\"Implement\"]\n  implA --> review[\"Review\"]\n  review --> verify[\"Verification\"]\n  verify --> done((\"Done\"))\n```\n\n### Role + artifact contract (illustration)\n\n<svg viewBox=\"0 0 900 380\" width=\"100%\" role=\"img\" aria-label=\"Illustrated role and artifact contract for a coordinator-managed workflow.\">\n  <rect x=\"0\" y=\"0\" width=\"900\" height=\"380\" rx=\"14\" fill=\"#0b0f19\" />\n  <rect x=\"18\" y=\"18\" width=\"864\" height=\"344\" rx=\"12\" fill=\"#111827\" />\n\n  <text x=\"40\" y=\"52\" fill=\"#e5e7eb\" font-size=\"14\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Workflow contract</text>\n  <text x=\"40\" y=\"76\" fill=\"#9ca3af\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Roles produce declared artifacts</text>\n\n  <rect x=\"40\" y=\"96\" width=\"250\" height=\"260\" rx=\"12\" fill=\"#0f172a\" stroke=\"#1f2937\" />\n  <text x=\"58\" y=\"126\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Roles</text>\n  <rect x=\"58\" y=\"140\" width=\"214\" height=\"34\" rx=\"10\" fill=\"#111827\" stroke=\"#1f2937\" />\n  <text x=\"70\" y=\"162\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Planner</text>\n  <rect x=\"58\" y=\"184\" width=\"214\" height=\"34\" rx=\"10\" fill=\"#111827\" stroke=\"#1f2937\" />\n  <text x=\"70\" y=\"206\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Implementer</text>\n  <rect x=\"58\" y=\"228\" width=\"214\" height=\"34\" rx=\"10\" fill=\"#111827\" stroke=\"#1f2937\" />\n  <text x=\"70\" y=\"250\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Reviewer</text>\n  <rect x=\"58\" y=\"272\" width=\"214\" height=\"34\" rx=\"10\" fill=\"#111827\" stroke=\"#1f2937\" />\n  <text x=\"70\" y=\"294\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Verifier</text>\n\n  <rect x=\"310\" y=\"96\" width=\"572\" height=\"260\" rx=\"12\" fill=\"#0f172a\" stroke=\"#1f2937\" />\n  <text x=\"328\" y=\"126\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Artifacts & gates</text>\n  <rect x=\"328\" y=\"140\" width=\"536\" height=\"34\" rx=\"10\" fill=\"#111827\" stroke=\"#1f2937\" />\n  <text x=\"342\" y=\"162\" fill=\"#e5e7eb\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Plan: steps + verification matrix</text>\n  <rect x=\"328\" y=\"184\" width=\"536\" height=\"34\" rx=\"10\" fill=\"#111827\" stroke=\"#1f2937\" />\n  <text x=\"342\" y=\"206\" fill=\"#e5e7eb\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Diff: scoped code changes</text>\n  <rect x=\"328\" y=\"228\" width=\"536\" height=\"34\" rx=\"10\" fill=\"#111827\" stroke=\"#1f2937\" />\n  <text x=\"342\" y=\"250\" fill=\"#e5e7eb\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Review: findings + open risks</text>\n  <rect x=\"328\" y=\"272\" width=\"536\" height=\"34\" rx=\"10\" fill=\"#111827\" stroke=\"#1f2937\" />\n  <text x=\"342\" y=\"294\" fill=\"#e5e7eb\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Verify: commands + pass/fail evidence</text>\n  <rect x=\"328\" y=\"316\" width=\"536\" height=\"26\" rx=\"10\" fill=\"#064e3b\" opacity=\"0.7\" />\n  <text x=\"342\" y=\"334\" fill=\"#d1fae5\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Gate: do not ship without verification</text>\n</svg>\n\n## Navigate\n\n- Previous: [Live agent observability](./live-agent-observability)\n- Next: [Real-time voice (ASR + TTS)](./realtime-voice-asr-tts)\n\n",
+      "contentHash": "69b6a1ae64728653",
+      "readingMinutes": 3,
+      "classification": "public",
+      "classificationSource": "frontmatter",
+      "classificationConfidence": 0.95,
+      "classificationReason": "Public-facing solution flow page for Coordinator + AI Agents framework.",
+      "matchedPolicyRule": "CLS-FRONTMATTER-OVERRIDE",
+      "publish": false,
+      "reviewStatus": "draft",
+      "needsReview": true,
+      "visibility": "public",
+      "audience": [
+        "users",
+        "customers"
+      ],
+      "tags": [
+        "guides",
+        "table"
+      ],
+      "warnings": [],
+      "updatedAt": "2026-06-04T02:29:32.175Z"
+    },
+    {
+      "id": "guides/solutions/fragmented-tools",
+      "slug": "guides/solutions/fragmented-tools",
+      "route": "/documentation/guides/solutions/fragmented-tools",
+      "sourcePath": "docs/guides/solutions/fragmented-tools.md",
+      "folderSlug": "guides/solutions",
+      "folderPath": "docs/guides/solutions",
+      "title": "Fragmented tools → One control surface",
+      "summary": "Engineering work is split across docs, trackers, terminals, and ad-hoc scripts. The team can execute tasks, but cannot reliably answer: - What is the current plan for this feature? - Whic...",
+      "content": "\n# Fragmented tools → One control surface\n\n## Pain scenario\n\nEngineering work is split across docs, trackers, terminals, and ad-hoc scripts. The team can execute tasks, but cannot reliably answer:\n\n- What is the current plan for this feature?\n- Which projects are blocked, and why?\n- What is running right now, and what did it produce?\n\nThe result is context switching, duplicated coordination, and lost artifacts.\n\n## Project Manager solution\n\nProject Manager acts as a desktop mission-control surface that unifies:\n\n- Specs and project context\n- Feature/task selection and dispatch\n- Execution monitoring and artifacts\n\nInstead of “find the right tool first”, the workflow starts from a single operational surface.\n\n## Implementation flow\n\n```mermaid\nflowchart TD\n  A[\"Import / locate specs\"] --> B[\"Create / select Feature\"]\n  B --> C[\"Review prompt context preview\"]\n  C --> D[\"Dispatch to IDE / agent runtime\"]\n  D --> E[\"Monitor live logs + artifacts\"]\n  E --> F[\"Record progress back to feature folder\"]\n```\n\n### Steps\n\n1. Consolidate “source of truth” documents per project (specs, policies, notes) into a discoverable structure.\n2. Ensure each project has a `.project-manager` feature folder for artifacts and logs.\n3. Use the dashboard to select a feature, preview the prompt context, then dispatch.\n4. Observe output in live logs and persist artifacts into the feature folder.\n\n## Visual aids\n\n### Control-surface snapshot (illustration)\n\n<svg viewBox=\"0 0 900 380\" width=\"100%\" role=\"img\" aria-label=\"Illustrated dashboard surface that unifies specs, dispatch, and logs.\">\n  <rect x=\"0\" y=\"0\" width=\"900\" height=\"380\" rx=\"14\" fill=\"#0b0f19\" />\n  <rect x=\"18\" y=\"18\" width=\"230\" height=\"344\" rx=\"10\" fill=\"#111827\" />\n  <rect x=\"264\" y=\"18\" width=\"618\" height=\"44\" rx=\"10\" fill=\"#111827\" />\n  <rect x=\"264\" y=\"76\" width=\"618\" height=\"286\" rx=\"10\" fill=\"#111827\" />\n\n  <text x=\"34\" y=\"48\" fill=\"#e5e7eb\" font-size=\"16\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Workspace</text>\n  <text x=\"34\" y=\"84\" fill=\"#9ca3af\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Projects</text>\n  <rect x=\"34\" y=\"94\" width=\"198\" height=\"30\" rx=\"7\" fill=\"#0f172a\" stroke=\"#1f2937\" />\n  <text x=\"44\" y=\"114\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Project A</text>\n  <text x=\"34\" y=\"148\" fill=\"#9ca3af\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Artifacts</text>\n  <rect x=\"34\" y=\"158\" width=\"198\" height=\"30\" rx=\"7\" fill=\"#0f172a\" stroke=\"#1f2937\" />\n  <text x=\"44\" y=\"178\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Specs</text>\n  <rect x=\"34\" y=\"194\" width=\"198\" height=\"30\" rx=\"7\" fill=\"#0f172a\" stroke=\"#1f2937\" />\n  <text x=\"44\" y=\"214\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Features</text>\n  <rect x=\"34\" y=\"230\" width=\"198\" height=\"30\" rx=\"7\" fill=\"#0f172a\" stroke=\"#1f2937\" />\n  <text x=\"44\" y=\"250\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Logs</text>\n\n  <text x=\"284\" y=\"46\" fill=\"#e5e7eb\" font-size=\"14\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Project Manager Control Surface</text>\n  <rect x=\"274\" y=\"92\" width=\"598\" height=\"74\" rx=\"10\" fill=\"#0f172a\" stroke=\"#1f2937\" />\n  <text x=\"294\" y=\"120\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Specs + Context</text>\n  <text x=\"294\" y=\"144\" fill=\"#9ca3af\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Auto-assembled prompt preview</text>\n\n  <rect x=\"274\" y=\"178\" width=\"380\" height=\"168\" rx=\"10\" fill=\"#0f172a\" stroke=\"#1f2937\" />\n  <text x=\"294\" y=\"208\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Dispatch</text>\n  <text x=\"294\" y=\"232\" fill=\"#9ca3af\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">IDE / Agent runtime selection</text>\n  <rect x=\"294\" y=\"252\" width=\"340\" height=\"26\" rx=\"7\" fill=\"#111827\" stroke=\"#1f2937\" />\n  <text x=\"306\" y=\"270\" fill=\"#e5e7eb\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Cursor · Claude · xmux</text>\n\n  <rect x=\"666\" y=\"178\" width=\"206\" height=\"168\" rx=\"10\" fill=\"#0f172a\" stroke=\"#1f2937\" />\n  <text x=\"686\" y=\"208\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Observability</text>\n  <text x=\"686\" y=\"232\" fill=\"#9ca3af\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Live logs + artifacts</text>\n  <rect x=\"686\" y=\"248\" width=\"166\" height=\"8\" rx=\"4\" fill=\"#065f46\" />\n  <rect x=\"686\" y=\"266\" width=\"150\" height=\"8\" rx=\"4\" fill=\"#1f2937\" />\n  <rect x=\"686\" y=\"284\" width=\"172\" height=\"8\" rx=\"4\" fill=\"#1f2937\" />\n  <rect x=\"686\" y=\"302\" width=\"128\" height=\"8\" rx=\"4\" fill=\"#1f2937\" />\n</svg>\n\n## Navigate\n\n- Previous: [Overview](./)\n- Next: [Multi-project multitasking](./multi-project-multi-task)\n\n",
+      "contentHash": "3c243d7744c13f72",
+      "readingMinutes": 3,
+      "classification": "public",
+      "classificationSource": "frontmatter",
+      "classificationConfidence": 0.95,
+      "classificationReason": "Public-facing solution flow page for fragmented tooling pain point.",
+      "matchedPolicyRule": "CLS-FRONTMATTER-OVERRIDE",
+      "publish": false,
+      "reviewStatus": "draft",
+      "needsReview": true,
+      "visibility": "public",
+      "audience": [
+        "users",
+        "customers"
+      ],
+      "tags": [
+        "guides"
+      ],
+      "warnings": [
+        "Public candidate needs review before external publishing",
+        "Mentions execution or command policy"
+      ],
+      "updatedAt": "2026-06-04T02:27:46.223Z"
+    },
+    {
+      "id": "guides/solutions/index",
+      "slug": "guides/solutions/index",
+      "route": "/documentation/guides/solutions/index",
+      "sourcePath": "docs/guides/solutions/index.md",
+      "folderSlug": "guides/solutions",
+      "folderPath": "docs/guides/solutions",
+      "title": "Pain Points & Solutions",
+      "summary": "This section maps common engineering team pain points to Project Manager solution patterns. Each page includes: - A real-world scenario that captures the pain. - The Project Manager solut...",
+      "content": "\n# Pain Points & Solutions\n\nThis section maps common engineering team pain points to Project Manager solution patterns. Each page includes:\n\n- A real-world scenario that captures the pain.\n- The Project Manager solution and what it changes.\n- A step-by-step rollout flow.\n- Visual aids (flow diagrams + UI-style illustrations).\n\n## Pages\n\n1. [Fragmented tools → One control surface](./fragmented-tools)\n2. [Multi-project multitasking](./multi-project-multi-task)\n3. [Prompt context automation](./prompt-context-automation)\n4. [Live agent observability](./live-agent-observability)\n5. [Coordinator + AI Agents framework](./coordinator-agent-framework)\n6. [Real-time voice (ASR + TTS)](./realtime-voice-asr-tts)\n\n",
+      "contentHash": "061eb3aecf0c05cf",
+      "readingMinutes": 1,
+      "classification": "public",
+      "classificationSource": "frontmatter",
+      "classificationConfidence": 0.95,
+      "classificationReason": "Public-facing mapping of common pain points to Project Manager solution flows.",
+      "matchedPolicyRule": "CLS-FRONTMATTER-OVERRIDE",
+      "publish": false,
+      "reviewStatus": "draft",
+      "needsReview": true,
+      "visibility": "public",
+      "audience": [
+        "users",
+        "customers"
+      ],
+      "tags": [
+        "guides"
+      ],
+      "warnings": [],
+      "updatedAt": "2026-06-04T02:27:10.838Z"
+    },
+    {
+      "id": "guides/solutions/live-agent-observability",
+      "slug": "guides/solutions/live-agent-observability",
+      "route": "/documentation/guides/solutions/live-agent-observability",
+      "sourcePath": "docs/guides/solutions/live-agent-observability.md",
+      "folderSlug": "guides/solutions",
+      "folderPath": "docs/guides/solutions",
+      "title": "Live agent observability",
+      "summary": "When AI agents run “somewhere else” (an IDE extension, a background process, a remote tool), teams lose visibility: - You cannot see what is happening right now. - Failures are discovered...",
+      "content": "\n# Live agent observability\n\n## Pain scenario\n\nWhen AI agents run “somewhere else” (an IDE extension, a background process, a remote tool), teams lose visibility:\n\n- You cannot see what is happening right now.\n- Failures are discovered late, after minutes or hours.\n- Artifacts and logs are scattered and hard to audit.\n\n## Project Manager solution\n\nProject Manager provides a built-in observability surface:\n\n- Live log streaming while work is executing.\n- Clear run status and the ability to stop a runaway process.\n- A consistent place to find artifacts produced by the run.\n\n## Implementation flow\n\n```mermaid\nsequenceDiagram\n  participant U as User\n  participant PM as Project Manager\n  participant R as Runtime (IDE/Agent)\n  U->>PM: Dispatch task\n  PM->>R: Start process\n  loop While running\n    R-->>PM: Stream logs/events\n    PM-->>U: Show live output + status\n  end\n  R-->>PM: Artifacts + exit status\n  PM-->>U: Persisted run record + links\n```\n\n### Steps\n\n1. Treat every dispatch as a run with a stable identity (task, project, start time).\n2. Stream logs in real time so users can catch failures early.\n3. Capture artifacts in a predictable folder so audits are simple.\n4. Provide a controlled stop/kill path when the run is wrong or stuck.\n\n## Visual aids\n\n### Live logs (illustration)\n\n<svg viewBox=\"0 0 900 400\" width=\"100%\" role=\"img\" aria-label=\"Illustrated live logs surface with streaming output and a stop button.\">\n  <rect x=\"0\" y=\"0\" width=\"900\" height=\"400\" rx=\"14\" fill=\"#0b0f19\" />\n  <rect x=\"18\" y=\"18\" width=\"864\" height=\"54\" rx=\"12\" fill=\"#111827\" />\n  <text x=\"40\" y=\"52\" fill=\"#e5e7eb\" font-size=\"14\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Runs</text>\n  <rect x=\"776\" y=\"30\" width=\"106\" height=\"30\" rx=\"10\" fill=\"#7f1d1d\" />\n  <text x=\"804\" y=\"50\" fill=\"#fee2e2\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Stop</text>\n\n  <rect x=\"18\" y=\"86\" width=\"864\" height=\"296\" rx=\"12\" fill=\"#111827\" />\n  <rect x=\"40\" y=\"112\" width=\"820\" height=\"244\" rx=\"12\" fill=\"#0b1220\" stroke=\"#1f2937\" />\n  <text x=\"60\" y=\"140\" fill=\"#86efac\" font-size=\"12\" font-family=\"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas\">[run] starting…</text>\n  <text x=\"60\" y=\"164\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas\">[ctx] loaded: feature-spec.md</text>\n  <text x=\"60\" y=\"188\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas\">[plan] steps: 6</text>\n  <text x=\"60\" y=\"212\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas\">[exec] applying patch…</text>\n  <text x=\"60\" y=\"236\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas\">[test] npm run verify:baseline</text>\n  <text x=\"60\" y=\"260\" fill=\"#86efac\" font-size=\"12\" font-family=\"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas\">[ok] done</text>\n\n  <rect x=\"60\" y=\"292\" width=\"188\" height=\"10\" rx=\"5\" fill=\"#065f46\" />\n  <rect x=\"256\" y=\"292\" width=\"146\" height=\"10\" rx=\"5\" fill=\"#1f2937\" />\n  <rect x=\"408\" y=\"292\" width=\"212\" height=\"10\" rx=\"5\" fill=\"#1f2937\" />\n  <rect x=\"626\" y=\"292\" width=\"108\" height=\"10\" rx=\"5\" fill=\"#1f2937\" />\n  <rect x=\"740\" y=\"292\" width=\"118\" height=\"10\" rx=\"5\" fill=\"#1f2937\" />\n</svg>\n\n## Navigate\n\n- Previous: [Prompt context automation](./prompt-context-automation)\n- Next: [Coordinator + AI Agents framework](./coordinator-agent-framework)\n\n",
+      "contentHash": "acf14475258404ac",
+      "readingMinutes": 2,
+      "classification": "public",
+      "classificationSource": "frontmatter",
+      "classificationConfidence": 0.95,
+      "classificationReason": "Public-facing solution flow page for agent observability pain point.",
+      "matchedPolicyRule": "CLS-FRONTMATTER-OVERRIDE",
+      "publish": false,
+      "reviewStatus": "draft",
+      "needsReview": true,
+      "visibility": "public",
+      "audience": [
+        "users",
+        "customers"
+      ],
+      "tags": [
+        "guides",
+        "table"
+      ],
+      "warnings": [],
+      "updatedAt": "2026-06-04T02:29:02.694Z"
+    },
+    {
+      "id": "guides/solutions/multi-project-multi-task",
+      "slug": "guides/solutions/multi-project-multi-task",
+      "route": "/documentation/guides/solutions/multi-project-multi-task",
+      "sourcePath": "docs/guides/solutions/multi-project-multi-task.md",
+      "folderSlug": "guides/solutions",
+      "folderPath": "docs/guides/solutions",
+      "title": "Multi-project multitasking",
+      "summary": "Most developer tools are optimised for one repository at a time. When you operate across multiple projects, you end up with: - Parallel “mental tabs” with no single place to see what is a...",
+      "content": "\n# Multi-project multitasking\n\n## Pain scenario\n\nMost developer tools are optimised for one repository at a time. When you operate across multiple projects, you end up with:\n\n- Parallel “mental tabs” with no single place to see what is active.\n- Slow context switches (window juggling, terminal history hunting, re-opening docs).\n- Progress that lives in people’s heads rather than as durable artifacts.\n\n## Project Manager solution\n\nProject Manager is built around a workstation model that makes multi-project operations first-class:\n\n- One portfolio dashboard to see cross-project progress.\n- Consistent feature folders and artifacts across projects.\n- A unified dispatch flow to IDEs and agent runtimes.\n\n## Implementation flow\n\n```mermaid\nflowchart LR\n  A[\"Register project roots\"] --> B[\"Auto-scan + load config\"]\n  B --> C[\"Aggregate portfolio view\"]\n  C --> D[\"Filter + pick next task\"]\n  D --> E[\"Dispatch + monitor\"]\n  E --> F[\"Persist artifacts per project\"]\n```\n\n### Steps\n\n1. Add multiple project roots so the dashboard can treat them as one portfolio.\n2. Ensure each project has a consistent `.project-manager/config.json` and feature folder structure.\n3. Use the dashboard filters to slice by lifecycle phase, status, or project.\n4. Dispatch work and treat the generated artifacts as the durable progress trail.\n\n## Visual aids\n\n### Portfolio dashboard (illustration)\n\n<svg viewBox=\"0 0 900 420\" width=\"100%\" role=\"img\" aria-label=\"Illustrated portfolio dashboard with multiple projects and a unified filter bar.\">\n  <rect x=\"0\" y=\"0\" width=\"900\" height=\"420\" rx=\"14\" fill=\"#0b0f19\" />\n  <rect x=\"18\" y=\"18\" width=\"864\" height=\"60\" rx=\"12\" fill=\"#111827\" />\n  <text x=\"40\" y=\"52\" fill=\"#e5e7eb\" font-size=\"14\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Portfolio</text>\n  <rect x=\"140\" y=\"32\" width=\"220\" height=\"32\" rx=\"10\" fill=\"#0f172a\" stroke=\"#1f2937\" />\n  <text x=\"154\" y=\"52\" fill=\"#9ca3af\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Search projects / features…</text>\n  <rect x=\"372\" y=\"32\" width=\"132\" height=\"32\" rx=\"10\" fill=\"#0f172a\" stroke=\"#1f2937\" />\n  <text x=\"386\" y=\"52\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Status</text>\n  <rect x=\"514\" y=\"32\" width=\"132\" height=\"32\" rx=\"10\" fill=\"#0f172a\" stroke=\"#1f2937\" />\n  <text x=\"528\" y=\"52\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Phase</text>\n  <rect x=\"656\" y=\"32\" width=\"110\" height=\"32\" rx=\"10\" fill=\"#064e3b\" />\n  <text x=\"672\" y=\"52\" fill=\"#d1fae5\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Dispatch</text>\n\n  <rect x=\"18\" y=\"92\" width=\"864\" height=\"310\" rx=\"12\" fill=\"#111827\" />\n  <rect x=\"40\" y=\"118\" width=\"820\" height=\"44\" rx=\"10\" fill=\"#0f172a\" stroke=\"#1f2937\" />\n  <text x=\"58\" y=\"146\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Project</text>\n  <text x=\"260\" y=\"146\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Feature</text>\n  <text x=\"560\" y=\"146\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Status</text>\n  <text x=\"690\" y=\"146\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Updated</text>\n\n  <g>\n    <rect x=\"40\" y=\"172\" width=\"820\" height=\"50\" rx=\"10\" fill=\"#0b1220\" stroke=\"#1f2937\" />\n    <text x=\"58\" y=\"202\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Project A</text>\n    <text x=\"260\" y=\"202\" fill=\"#9ca3af\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">F12 · Import spec drafts</text>\n    <rect x=\"560\" y=\"186\" width=\"92\" height=\"22\" rx=\"11\" fill=\"#0ea5e9\" opacity=\"0.18\" />\n    <text x=\"572\" y=\"202\" fill=\"#7dd3fc\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">In progress</text>\n    <text x=\"690\" y=\"202\" fill=\"#9ca3af\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">2h ago</text>\n  </g>\n  <g>\n    <rect x=\"40\" y=\"228\" width=\"820\" height=\"50\" rx=\"10\" fill=\"#0b1220\" stroke=\"#1f2937\" />\n    <text x=\"58\" y=\"258\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Project B</text>\n    <text x=\"260\" y=\"258\" fill=\"#9ca3af\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">F03 · Fix dispatch regression</text>\n    <rect x=\"560\" y=\"242\" width=\"74\" height=\"22\" rx=\"11\" fill=\"#10b981\" opacity=\"0.18\" />\n    <text x=\"572\" y=\"258\" fill=\"#86efac\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Done</text>\n    <text x=\"690\" y=\"258\" fill=\"#9ca3af\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">1d ago</text>\n  </g>\n  <g>\n    <rect x=\"40\" y=\"284\" width=\"820\" height=\"50\" rx=\"10\" fill=\"#0b1220\" stroke=\"#1f2937\" />\n    <text x=\"58\" y=\"314\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Project C</text>\n    <text x=\"260\" y=\"314\" fill=\"#9ca3af\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">F07 · Add plugin contract</text>\n    <rect x=\"560\" y=\"298\" width=\"86\" height=\"22\" rx=\"11\" fill=\"#ef4444\" opacity=\"0.18\" />\n    <text x=\"572\" y=\"314\" fill=\"#fca5a5\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Blocked</text>\n    <text x=\"690\" y=\"314\" fill=\"#9ca3af\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">3d ago</text>\n  </g>\n</svg>\n\n## Navigate\n\n- Previous: [Fragmented tools → One control surface](./fragmented-tools)\n- Next: [Prompt context automation](./prompt-context-automation)\n\n",
+      "contentHash": "42fff95cb0e6dda7",
+      "readingMinutes": 3,
+      "classification": "public",
+      "classificationSource": "frontmatter",
+      "classificationConfidence": 0.95,
+      "classificationReason": "Public-facing solution flow page for multi-project multitasking pain point.",
+      "matchedPolicyRule": "CLS-FRONTMATTER-OVERRIDE",
+      "publish": false,
+      "reviewStatus": "draft",
+      "needsReview": true,
+      "visibility": "public",
+      "audience": [
+        "users",
+        "customers"
+      ],
+      "tags": [
+        "guides"
+      ],
+      "warnings": [],
+      "updatedAt": "2026-06-04T02:28:12.614Z"
+    },
+    {
+      "id": "guides/solutions/prompt-context-automation",
+      "slug": "guides/solutions/prompt-context-automation",
+      "route": "/documentation/guides/solutions/prompt-context-automation",
+      "sourcePath": "docs/guides/solutions/prompt-context-automation.md",
+      "folderSlug": "guides/solutions",
+      "folderPath": "docs/guides/solutions",
+      "title": "Prompt context automation",
+      "summary": "AI-assisted execution fails most often before it starts: every dispatch requires a human to gather context and build a prompt. Typical failure modes: - Missing spec excerpts or stale link...",
+      "content": "\n# Prompt context automation\n\n## Pain scenario\n\nAI-assisted execution fails most often before it starts: every dispatch requires a human to gather context and build a prompt.\n\nTypical failure modes:\n\n- Missing spec excerpts or stale links.\n- Inconsistent “definitions of done” between runs.\n- Repeating the same context packaging work for every task.\n\n## Project Manager solution\n\nProject Manager treats context as a first-class input:\n\n- Auto-assembles relevant files and metadata into a prompt context bundle.\n- Supports reusable Coordinator + AI Agent templates so the same patterns repeat reliably.\n- Makes prompt preview explicit before execution.\n\n## Implementation flow\n\n```mermaid\nflowchart TD\n  A[\"Select feature\"] --> B[\"Resolve project + feature artifacts\"]\n  B --> C[\"Assemble context bundle\\n(spec, TDD, dev logs, policies)\"]\n  C --> D[\"Generate prompt preview\"]\n  D --> E{\"User approves?\"}\n  E -- yes --> F[\"Dispatch to IDE / agent\"]\n  E -- no --> G[\"Adjust scope / inputs\"]\n  G --> C\n```\n\n### Steps\n\n1. Standardise what “context” means in your team (spec, TDD, relevant code areas, policies, recent logs).\n2. Keep context sources in stable locations (feature folder + known document roots).\n3. Use prompt preview as the checkpoint: confirm scope, artifacts, and expected output format.\n4. Dispatch only after context looks correct; treat the preview as the “contract” for the run.\n\n## Visual aids\n\n### Prompt preview (illustration)\n\n<svg viewBox=\"0 0 900 380\" width=\"100%\" role=\"img\" aria-label=\"Illustrated prompt preview showing a context bundle and guardrail approval controls.\">\n  <rect x=\"0\" y=\"0\" width=\"900\" height=\"380\" rx=\"14\" fill=\"#0b0f19\" />\n  <rect x=\"18\" y=\"18\" width=\"864\" height=\"344\" rx=\"12\" fill=\"#111827\" />\n  <text x=\"40\" y=\"52\" fill=\"#e5e7eb\" font-size=\"14\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Prompt preview</text>\n  <text x=\"40\" y=\"76\" fill=\"#9ca3af\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Auto-assembled context bundle</text>\n\n  <rect x=\"40\" y=\"96\" width=\"520\" height=\"224\" rx=\"12\" fill=\"#0f172a\" stroke=\"#1f2937\" />\n  <text x=\"58\" y=\"126\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Included artifacts</text>\n  <rect x=\"58\" y=\"140\" width=\"484\" height=\"28\" rx=\"8\" fill=\"#111827\" stroke=\"#1f2937\" />\n  <text x=\"70\" y=\"158\" fill=\"#e5e7eb\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">feature-spec.md</text>\n  <rect x=\"58\" y=\"176\" width=\"484\" height=\"28\" rx=\"8\" fill=\"#111827\" stroke=\"#1f2937\" />\n  <text x=\"70\" y=\"194\" fill=\"#e5e7eb\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">tdd-spec.md</text>\n  <rect x=\"58\" y=\"212\" width=\"484\" height=\"28\" rx=\"8\" fill=\"#111827\" stroke=\"#1f2937\" />\n  <text x=\"70\" y=\"230\" fill=\"#e5e7eb\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">dev-log.md</text>\n  <rect x=\"58\" y=\"248\" width=\"484\" height=\"28\" rx=\"8\" fill=\"#111827\" stroke=\"#1f2937\" />\n  <text x=\"70\" y=\"266\" fill=\"#e5e7eb\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">company-standards.md</text>\n\n  <rect x=\"574\" y=\"96\" width=\"308\" height=\"224\" rx=\"12\" fill=\"#0f172a\" stroke=\"#1f2937\" />\n  <text x=\"592\" y=\"126\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Guardrails</text>\n  <text x=\"592\" y=\"150\" fill=\"#9ca3af\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Scope</text>\n  <rect x=\"592\" y=\"158\" width=\"272\" height=\"26\" rx=\"8\" fill=\"#111827\" stroke=\"#1f2937\" />\n  <text x=\"604\" y=\"176\" fill=\"#e5e7eb\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Only files in selected feature</text>\n  <text x=\"592\" y=\"212\" fill=\"#9ca3af\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Output</text>\n  <rect x=\"592\" y=\"220\" width=\"272\" height=\"26\" rx=\"8\" fill=\"#111827\" stroke=\"#1f2937\" />\n  <text x=\"604\" y=\"238\" fill=\"#e5e7eb\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Artifacts + summary required</text>\n\n  <rect x=\"574\" y=\"332\" width=\"148\" height=\"28\" rx=\"10\" fill=\"#064e3b\" />\n  <text x=\"598\" y=\"351\" fill=\"#d1fae5\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Approve</text>\n  <rect x=\"734\" y=\"332\" width=\"148\" height=\"28\" rx=\"10\" fill=\"#1f2937\" />\n  <text x=\"760\" y=\"351\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Edit</text>\n</svg>\n\n## Navigate\n\n- Previous: [Multi-project multitasking](./multi-project-multi-task)\n- Next: [Live agent observability](./live-agent-observability)\n\n",
+      "contentHash": "0a90667a9f409ce3",
+      "readingMinutes": 3,
+      "classification": "public",
+      "classificationSource": "frontmatter",
+      "classificationConfidence": 0.95,
+      "classificationReason": "Public-facing solution flow page for prompt context automation pain point.",
+      "matchedPolicyRule": "CLS-FRONTMATTER-OVERRIDE",
+      "publish": false,
+      "reviewStatus": "draft",
+      "needsReview": true,
+      "visibility": "public",
+      "audience": [
+        "users",
+        "customers"
+      ],
+      "tags": [
+        "guides",
+        "table"
+      ],
+      "warnings": [],
+      "updatedAt": "2026-06-04T02:28:40.280Z"
+    },
+    {
+      "id": "guides/solutions/realtime-voice-asr-tts",
+      "slug": "guides/solutions/realtime-voice-asr-tts",
+      "route": "/documentation/guides/solutions/realtime-voice-asr-tts",
+      "sourcePath": "docs/guides/solutions/realtime-voice-asr-tts.md",
+      "folderSlug": "guides/solutions",
+      "folderPath": "docs/guides/solutions",
+      "title": "Real-time voice (ASR + TTS)",
+      "summary": "Many products expose voice as “recording mode”: 1. Start recording 2. Speak 3. Stop recording 4. Wait for transcription This creates friction and prevents fast correction. If transcriptio...",
+      "content": "\n# Real-time voice (ASR + TTS)\n\n## Pain scenario\n\nMany products expose voice as “recording mode”:\n\n1. Start recording\n2. Speak\n3. Stop recording\n4. Wait for transcription\n\nThis creates friction and prevents fast correction. If transcription is wrong, the user often must re-record or manually edit a delayed result.\n\n## Project Manager solution\n\nProject Manager uses real-time voice interaction:\n\n- Real-time ASR: spoken content appears as you speak.\n- Immediate corrections: typos and recognition errors can be fixed early.\n- Optional TTS: the system can read back confirmations, summaries, or next steps.\n\n## Implementation flow\n\n```mermaid\nflowchart TD\n  A[\"Mic on\"] --> B[\"Streaming audio frames\"]\n  B --> C[\"ASR partial transcript\"]\n  C --> D[\"Live text display\"]\n  D --> E[\"Inline correction / confirmation\"]\n  E --> F[\"Commit final text\"]\n  F --> G[\"Dispatch / log / summarize\"]\n  G --> H[\"TTS feedback (optional)\"]\n```\n\n### Steps\n\n1. Present a live transcript surface that updates continuously (partial → final).\n2. Provide an inline correction affordance while the user is still speaking.\n3. Commit the final transcript as the canonical instruction (stored and auditable).\n4. Use TTS for low-friction confirmations and summaries when the user is hands-busy.\n\n## Visual aids\n\n### Live transcript with inline correction (illustration)\n\n<svg viewBox=\"0 0 900 380\" width=\"100%\" role=\"img\" aria-label=\"Illustrated live transcript view with real-time corrections and an optional read-back toggle.\">\n  <rect x=\"0\" y=\"0\" width=\"900\" height=\"380\" rx=\"14\" fill=\"#0b0f19\" />\n  <rect x=\"18\" y=\"18\" width=\"864\" height=\"344\" rx=\"12\" fill=\"#111827\" />\n\n  <text x=\"40\" y=\"52\" fill=\"#e5e7eb\" font-size=\"14\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Voice</text>\n  <text x=\"40\" y=\"76\" fill=\"#9ca3af\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Real-time transcript + correction</text>\n\n  <rect x=\"40\" y=\"96\" width=\"560\" height=\"220\" rx=\"12\" fill=\"#0f172a\" stroke=\"#1f2937\" />\n  <text x=\"60\" y=\"130\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas\">“Update the PRD solution table and add URLs…”</text>\n  <rect x=\"58\" y=\"148\" width=\"520\" height=\"30\" rx=\"10\" fill=\"#111827\" stroke=\"#1f2937\" />\n  <text x=\"70\" y=\"169\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas\">…and generate each page for pain points</text>\n\n  <rect x=\"58\" y=\"196\" width=\"520\" height=\"40\" rx=\"12\" fill=\"#0b1220\" stroke=\"#1f2937\" />\n  <text x=\"70\" y=\"221\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas\">“flow char”</text>\n  <rect x=\"180\" y=\"206\" width=\"132\" height=\"22\" rx=\"11\" fill=\"#7c2d12\" opacity=\"0.25\" />\n  <text x=\"192\" y=\"222\" fill=\"#fdba74\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">typo detected</text>\n  <rect x=\"322\" y=\"206\" width=\"158\" height=\"22\" rx=\"11\" fill=\"#064e3b\" opacity=\"0.35\" />\n  <text x=\"334\" y=\"222\" fill=\"#a7f3d0\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">suggest: flowchart</text>\n\n  <rect x=\"620\" y=\"96\" width=\"242\" height=\"220\" rx=\"12\" fill=\"#0f172a\" stroke=\"#1f2937\" />\n  <text x=\"640\" y=\"130\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Feedback</text>\n  <rect x=\"640\" y=\"146\" width=\"202\" height=\"28\" rx=\"10\" fill=\"#111827\" stroke=\"#1f2937\" />\n  <text x=\"652\" y=\"165\" fill=\"#e5e7eb\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Read-back (TTS)</text>\n  <rect x=\"640\" y=\"186\" width=\"202\" height=\"76\" rx=\"12\" fill=\"#111827\" stroke=\"#1f2937\" />\n  <text x=\"652\" y=\"212\" fill=\"#9ca3af\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">“OK. I will update the docs</text>\n  <text x=\"652\" y=\"232\" fill=\"#9ca3af\" font-size=\"11\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">site and link the pages.”</text>\n\n  <rect x=\"620\" y=\"332\" width=\"116\" height=\"28\" rx=\"10\" fill=\"#064e3b\" />\n  <text x=\"646\" y=\"351\" fill=\"#d1fae5\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Commit</text>\n  <rect x=\"746\" y=\"332\" width=\"116\" height=\"28\" rx=\"10\" fill=\"#1f2937\" />\n  <text x=\"772\" y=\"351\" fill=\"#e5e7eb\" font-size=\"12\" font-family=\"system-ui, -apple-system, Segoe UI, Roboto\">Cancel</text>\n</svg>\n\n## Navigate\n\n- Previous: [Coordinator + AI Agents framework](./coordinator-agent-framework)\n- Next: [Overview](./)\n\n",
+      "contentHash": "5b9bc08821d792cd",
+      "readingMinutes": 3,
+      "classification": "public",
+      "classificationSource": "frontmatter",
+      "classificationConfidence": 0.95,
+      "classificationReason": "Public-facing solution flow page for real-time voice interaction (ASR + TTS).",
+      "matchedPolicyRule": "CLS-FRONTMATTER-OVERRIDE",
+      "publish": false,
+      "reviewStatus": "draft",
+      "needsReview": true,
+      "visibility": "public",
+      "audience": [
+        "users",
+        "customers"
+      ],
+      "tags": [
+        "guides",
+        "table"
+      ],
+      "warnings": [],
+      "updatedAt": "2026-06-04T02:30:01.245Z"
     },
     {
       "id": "guides/standards/index",
@@ -2873,10 +3134,10 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "folderSlug": "product",
       "folderPath": "docs/product",
       "title": "Project Manager PRD - Product Requirements Document",
-      "summary": "Version: v0.1 Date: 2026-05-12 Status: Draft Project Manager is a local mission-control app for engineering teams that unifies specs, tasks, and AI-agent execution in one desktop workflow...",
-      "content": "\n# Project Manager PRD - Product Requirements Document\n\nVersion: v0.1  \nDate: 2026-05-12  \nStatus: Draft\n\n---\n\n## English Version\n\n## 1. Product Overview\n\n### 1.1 One-Line Definition\n\nProject Manager is a local mission-control app for engineering teams that unifies specs, tasks, and AI-agent execution in one desktop workflow.\n\n### 1.2 Problem Statement\n\n| Current Pain | Project Manager Solution |\n| --- | --- |\n| Specs in docs, tasks in trackers, execution in terminal | One desktop control surface |\n| Manual prompt context assembly for each dispatch | Context-aware prompt generation |\n| No visibility into running agents | Built-in live execution logs |\n| No unified progress across projects | Multi-project dashboard via `.project-manager.json` |\n\n### 1.3 Core Principles\n\n1. Progress as Code via project-scoped config.\n2. Context-aware dispatch for higher first-pass quality.\n3. Adapter architecture for multiple IDE/agent tools.\n4. Local-first and privacy-first execution model.\n\n## 2. Goals and Success Metrics\n\n### 2.1 MVP Goals\n\n- Complete loop: review -> select feature -> dispatch -> monitor.\n- Import specs from Word/Excel into feature drafts.\n- Desktop-first shipping, macOS priority.\n\n### 2.2 KPIs\n\n| Metric | Target |\n| --- | --- |\n| Clicks to dispatch one task | <= 3 |\n| Spec import to feature draft | < 30s |\n| Installer size | < 20 MB |\n| Active usage | 5 days/week |\n\n## 3. Functional Requirements\n\n### P0 (MVP)\n\n- F-01 Local project scan and config loading.\n- F-02 Feature dashboard with status filters.\n- F-03 Agent dispatch with prompt preview.\n- F-04 Live log streaming and process kill.\n- F-05 Settings for API key, default adapter, project roots.\n\n### P1\n\n- F-06 AI spec import (`.docx`, `.xlsx`, `.md`).\n- F-07 Live sync from config file changes.\n- F-08 Dispatch history and run records.\n- F-09 Weekly report generation.\n\n### P2\n\n- F-10 Global hotkey overlay.\n- F-11 System tray runtime summary.\n- F-12 Webhook/MCP status receiver.\n\n## 4. Non-Functional Requirements\n\n| Category | Requirement |\n| --- | --- |\n| Performance | Initial load < 2s; smooth at 100 features |\n| Security | API keys in OS keychain, not plain files |\n| Privacy | Local-first data flow; minimal API payload |\n| Offline | Dashboard and dispatch still usable |\n| Platform | macOS first, Windows next |\n| Package size | Keep under 20 MB target |\n\n## 5. Out of Scope\n\n- No centralized backend/database in MVP.\n- No real-time multi-user collaboration.\n- No built-in IDE code editing.\n- No custom model training.\n- No mobile app.\n\n## 6. Architecture Summary\n\n```\n[Tauri Shell]\n  ├── [Next.js / React Frontend]\n  └── [Rust Backend (Tauri Commands)]\n        ├── FS read/write/watch\n        ├── Process spawn/kill/stream\n        ├── Document parsing\n        └── Keychain access\n```\n\n## 7. Confirmed Decisions\n\n| ID | Decision |\n| --- | --- |\n| Q1 | Schema versioning required (`schemaVersion`) |\n| Q2 | Prompt assembly in frontend TypeScript |\n| Q3 | AI API call via Rust commands only |\n| Q4 | MVP beta uses AI persona simulation |\n\n---\n\n## 中文版本\n\n## 1. 產品概述\n\n### 1.1 一句話定義\n\nProject Manager 是工程師的本機任務指揮中心，把規格、任務與 AI Agent 執行整合成單一桌面流程。\n\n### 1.2 問題陳述\n\n| 現有痛點 | Project Manager 解法 |\n| --- | --- |\n| 規格、任務、執行分散在不同工具 | 提供單一桌面控制面板 |\n| 每次派任務都要手動組 Prompt | 自動組裝上下文與 Prompt |\n| 看不到 Agent 執行過程 | 內建即時執行日誌 |\n| 難以掌握跨專案進度 | 用 `.project-manager.json` 聚合檢視 |\n\n### 1.3 核心理念\n\n1. Progress as Code：進度跟著專案設定檔走。\n2. Context-Aware Dispatch：提升首次派遣成功率。\n3. Adapter Pattern：支援多種 IDE/Agent。\n4. Local-First：優先保留本機資料與隱私。\n\n## 2. 目標與成功指標\n\n### 2.1 MVP 目標\n\n- 完成查看 -> 選擇 -> 派遣 -> 監控的完整迴圈。\n- 支援從 Word/Excel 匯入需求草稿。\n- 以桌面版為主，macOS 優先。\n\n### 2.2 KPI\n\n| 指標 | 目標 |\n| --- | --- |\n| 單任務派遣點擊數 | <= 3 |\n| 規格匯入到草稿時間 | < 30 秒 |\n| 安裝包大小 | < 20 MB |\n| 活躍使用頻率 | 每週 5 天 |\n\n## 3. 功能需求\n\n### P0（MVP）\n\n- F-01 本機專案掃描與設定載入。\n- F-02 Feature Dashboard 與狀態篩選。\n- F-03 Agent 派遣與 Prompt 預覽。\n- F-04 Live Log 串流與程序終止。\n- F-05 API key、預設 adapter、專案根目錄設定。\n\n### P1\n\n- F-06 AI 規格匯入（`.docx`、`.xlsx`、`.md`）。\n- F-07 設定檔變更即時同步。\n- F-08 派遣歷史與執行紀錄。\n- F-09 週報產生。\n\n### P2\n\n- F-10 全域快捷鍵 overlay。\n- F-11 系統托盤執行摘要。\n- F-12 Webhook/MCP 狀態接收。\n\n## 4. 非功能需求\n\n| 類別 | 需求 |\n| --- | --- |\n| 效能 | 首屏小於 2 秒，100 筆 Feature 流暢 |\n| 安全 | API key 存入 OS keychain |\n| 隱私 | 本機優先，API 僅傳必要內容 |\n| 離線 | Dashboard 與派遣可在離線使用 |\n| 平台 | macOS 優先，Windows 次之 |\n| 安裝包 | 目標小於 20 MB |\n\n## 5. 範圍外\n\n- MVP 不做中心化後端與資料庫。\n- 不做多人即時協作。\n- 不做 IDE 內建編輯器。\n- 不做自訓練模型。\n- 不做行動版。\n\n## 6. 架構摘要\n\n```\n[Tauri Shell]\n  ├── [Next.js / React Frontend]\n  └── [Rust Backend (Tauri Commands)]\n        ├── 檔案讀寫與監聽\n        ├── 程序啟停與串流\n        ├── 文件解析\n        └── keychain 存取\n```\n\n## 7. 已確認決策\n\n| 編號 | 決策 |\n| --- | --- |\n| Q1 | 需要 schemaVersion 做版本化 |\n| Q2 | Prompt 組裝放前端 TypeScript |\n| Q3 | AI API 只走 Rust command |\n| Q4 | MVP beta 採 AI persona 模擬 |\n",
-      "contentHash": "ea2e9139796586b6",
-      "readingMinutes": 4,
+      "summary": "Version: v0.1\\ Date: 2026-05-12\\ Status: Draft *** Project Manager is a local mission-control app for engineering teams that unifies specs, tasks, and AI-agent execution in one desktop wo...",
+      "content": "\n# Project Manager PRD - Product Requirements Document\n\nVersion: v0.1\\\nDate: 2026-05-12\\\nStatus: Draft\n\n***\n\n## English Version\n\n## 1. Product Overview\n\n### 1.1 One-Line Definition\n\nProject Manager is a local mission-control app for engineering teams that unifies specs, tasks, and AI-agent execution in one desktop workflow.\n\n### 1.2 Problem Statement\n\n| Current Pain                                                                                                                         | Project Manager Solution                                                                                  | Solution Detail & Flow URL |\n| ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- | -------------------------- |\n| Specs, regulations, projects, tasks, and execution are fragmented across tools, making progress hard to connect                      | One desktop control surface to unify view, dispatch, and tracking                                         | https://jason660519.github.io/Project-Manager/solutions/fragmented-tools |\n| Multi-task and multi-project work is cumbersome; IDE/TUI-first workflows make parallel tracking and fast context switching difficult | A workspace and dashboard built for multi-project, multi-task execution                                   | https://jason660519.github.io/Project-Manager/solutions/multi-project-multi-task |\n| Manual context and prompt assembly for every dispatch is time-consuming and inconsistent                                             | Automatic context assembly and prompt generation for higher first-pass quality                            | https://jason660519.github.io/Project-Manager/solutions/prompt-context-automation |\n| No visibility into running agents, making bottlenecks hard to detect and audits hard to perform                                      | Built-in live execution logs and status observability                                                     | https://jason660519.github.io/Project-Manager/solutions/live-agent-observability |\n| Lack of a customizable planning and collaboration framework; workflows are hard to reuse and scale across projects                   | Built-in and user-defined Coordinators + AI Agents to modularize decomposition, delegation, and execution | https://jason660519.github.io/Project-Manager/solutions/coordinator-agent-framework |\n| Voice interaction is often “recording mode” (start/stop), with limited real-time feedback and correction                             | Real-time ASR + TTS: live transcript display with immediate typo correction                               | https://jason660519.github.io/Project-Manager/solutions/realtime-voice-asr-tts |\n\n#### 1.2.1 Requirements — Solution Detail & Flow URL\n\n1. Add a dedicated field **Solution Detail & Flow URL** to the right of the existing Solution field. It must accept and persist a valid URL, and render as a clickable link in the frontend UI.\n2. For every project’s property configuration in the system, enumerate each project’s pain points and generate a dedicated HTML page per pain point that covers: the mapped solution, implementation details, and the end-to-end rollout flow.\n3. Each HTML page must be rich and visual: full scenario description, detailed solution explanation, step-by-step flow nodes, and supporting visuals (flow diagrams, screenshots). The page must be responsive across devices and include navigation to move between pages.\n4. After generating each page, automatically backfill the page’s URL into the corresponding project record’s **Solution Detail & Flow URL** field, linking the data.\n5. After all pages are delivered, run functional testing to validate: URL field persistence + navigation, page availability, complete asset loading, and expected usability and visual quality.\n\n### 1.3 Core Principles\n\n1. Progress as Code via project-scoped config.\n2. Context-aware dispatch for higher first-pass quality.\n3. Adapter architecture for multiple IDE/agent tools.\n4. Local-first and privacy-first execution model.\n\n## 2. Goals and Success Metrics\n\n### 2.1 MVP Goals\n\n- Complete loop: review -> select feature -> dispatch -> monitor.\n- Import specs from Word/Excel into feature drafts.\n- Desktop-first shipping, macOS priority.\n\n### 2.2 KPIs\n\n| Metric                       | Target      |\n| ---------------------------- | ----------- |\n| Clicks to dispatch one task  | <= 3        |\n| Spec import to feature draft | < 30s       |\n| Installer size               | < 20 MB     |\n| Active usage                 | 5 days/week |\n\n## 3. Functional Requirements\n\n### P0 (MVP)\n\n- F-01 Local project scan and config loading.\n- F-02 Feature dashboard with status filters.\n- F-03 Agent dispatch with prompt preview.\n- F-04 Live log streaming and process kill.\n- F-05 Settings for API key, default adapter, project roots.\n\n### P1\n\n- F-06 AI spec import (`.docx`, `.xlsx`, `.md`).\n- F-07 Live sync from config file changes.\n- F-08 Dispatch history and run records.\n- F-09 Weekly report generation.\n\n### P2\n\n- F-10 Global hotkey overlay.\n- F-11 System tray runtime summary.\n- F-12 Webhook/MCP status receiver.\n\n## 4. Non-Functional Requirements\n\n| Category     | Requirement                                |\n| ------------ | ------------------------------------------ |\n| Performance  | Initial load < 2s; smooth at 100 features  |\n| Security     | API keys in OS keychain, not plain files   |\n| Privacy      | Local-first data flow; minimal API payload |\n| Offline      | Dashboard and dispatch still usable        |\n| Platform     | macOS first, Windows next                  |\n| Package size | Keep under 20 MB target                    |\n\n## 5. Out of Scope\n\n- No centralized backend/database in MVP.\n- No real-time multi-user collaboration.\n- No built-in IDE code editing.\n- No custom model training.\n- No mobile app.\n\n## 6. Architecture Summary\n\n```\n[Tauri Shell]\n  ├── [Next.js / React Frontend]\n  └── [Rust Backend (Tauri Commands)]\n        ├── FS read/write/watch\n        ├── Process spawn/kill/stream\n        ├── Document parsing\n        └── Keychain access\n```\n\n## 7. Confirmed Decisions\n\n| ID | Decision                                     |\n| -- | -------------------------------------------- |\n| Q1 | Schema versioning required (`schemaVersion`) |\n| Q2 | Prompt assembly in frontend TypeScript       |\n| Q3 | AI API call via Rust commands only           |\n| Q4 | MVP beta uses AI persona simulation          |\n\n***\n\n## 中文版本\n\n## 1. 產品概述\n\n### 1.1 一句話定義\n\nProject Manager 是工程師的專案管理指揮中心，把各類工程專案(包括但不限於軟體工程,建築設計工程...等等)、設計規範、以User 設計的Coordinators調度系統預設的AI Engineers或User自定義的AI Agents 執行跨專案跨sessions的系統級工程設計規劃管理的Desktop Apps。\n\n### 1.2 問題陳述\n\n| 現有痛點                                    | Project Manager 解法                           | 解法細節與流程說明的URL |\n| --------------------------------------- | -------------------------------------------- | ------------- |\n| 公司的設計規範、政府法規、專案、任務、執行分散在不同工具，資訊與進度難以串起來 | 提供單一桌面控制面板，統一檢視、派遣與追蹤                        | https://jason660519.github.io/Project-Manager/solutions/fragmented-tools |\n| 多任務與跨專案管理不便，傳統 IDE/TUI 不利於並行追蹤與快速切換     | 以跨專案、多任務為核心的工作區與 Dashboard 聚合進度              | https://jason660519.github.io/Project-Manager/solutions/multi-project-multi-task |\n| 看不到 Agent 執行過程，無法即時定位卡點與回溯              | 內建即時執行日誌與狀態觀測，支援過程追蹤與問題定位                    | https://jason660519.github.io/Project-Manager/solutions/live-agent-observability |\n| 缺少可客製化的規劃與協作框架，難以重用流程並擴展跨專案能力           | 支援內建與自定義 Coordinator + AI Agents，模組化拆解、分派與執行 | https://jason660519.github.io/Project-Manager/solutions/coordinator-agent-framework |\n| 語音互動多為錄音模式（啟動／說完／結束），缺少即時回饋與修正          | 即時 ASR + TTS：說話內容實時顯示，並支援錯別字即時修正             | https://jason660519.github.io/Project-Manager/solutions/realtime-voice-asr-tts |\n\n#### 1.2.1 需求 — 解法細節與流程說明的URL\n\n1. 在現有「解法」欄位右側新增獨立欄位「解法細節與流程說明的URL」。欄位需支援輸入並存儲有效 URL，前端展示需可點擊跳轉；同時新增資料庫字段存儲該 URL，確保資料持久性。\n2. 針對系統中所有專案的屬性配置，逐一梳理每個專案對應的痛點，為每一個痛點及其匹配的解法、實施細節、落地流程單獨生成一個獨立 HTML 頁面。\n3. 每個獨立 HTML 頁面需實現圖文並茂的展示效果：包含完整的痛點場景描述、詳細解法說明、分步驟的實施流程節點，並配套流程示意圖、實施節點截圖等視覺素材；頁面需具備響式佈局，兼容不同設備訪問，並添加導航元素，方便在多個痛點解法頁面間切換。\n4. 每個 HTML 頁面生成完成後，自動將對應頁面的訪問 URL 回填至該痛點所屬專案記錄的「解法細節與流程說明的URL」欄位中，完成資料關聯。\n5. 所有頁面開發完成後需進行功能測試，驗證 URL 欄位的資料存儲與跳轉功能正常；所有 HTML 頁面可正常訪問、圖文資源加載完整、頁面展示符合預期的美觀與可用性標準。\n\n### 1.3 核心理念\n\n1. Progress as Code：進度跟著專案設定檔走。\n2. Context-Aware Dispatch：提升首次派遣成功率。\n3. Adapter Pattern：支援多種 IDE/Agent。\n4. Hybrid Cloud + Local-First：混合雲架構＋優先保留本機資料與隱私。\n\n## 2. 目標與成功指標\n\n### 2.1 MVP 目標\n\n- 完成查看 -> 選擇 -> 派遣 -> 監控的完整迴圈。\n- 支援從 Github/Excel 匯入專案。\n- 以桌面版為主，macOS 優先。\n\n### 2.2 KPI\n\n| 指標        | 目標      |\n| --------- | ------- |\n| 單任務派遣點擊數  | <= 3    |\n| 規格匯入到草稿時間 | < 30 秒  |\n| 安裝包大小     | < 20 MB |\n| 活躍使用頻率    | 每週 5 天  |\n\n## 3. 功能需求\n\n### P0（MVP）\n\n- F-01 本機專案掃描與設定載入。\n- F-02 Feature Dashboard 與狀態篩選。\n- F-03 Agent 派遣與 Prompt 預覽。\n- F-04 Live Log 串流與程序終止。\n- F-05 API key、預設 adapter、專案根目錄設定。\n\n### P1\n\n- F-06 AI 規格匯入（`.docx`、`.xlsx`、`.md`）。\n- F-07 設定檔變更即時同步。\n- F-08 派遣歷史與執行紀錄。\n- F-09 週報產生。\n\n### P2\n\n- F-10 全域快捷鍵 overlay。\n- F-11 系統托盤執行摘要。\n- F-12 Webhook/MCP 狀態接收。\n\n## 4. 非功能需求\n\n| 類別  | 需求                        |\n| --- | ------------------------- |\n| 效能  | 首屏小於 2 秒，100 筆 Feature 流暢 |\n| 安全  | API key 存入 OS keychain    |\n| 隱私  | 本機優先，API 僅傳必要內容           |\n| 離線  | Dashboard 與派遣可在離線使用       |\n| 平台  | macOS 優先，Windows 次之       |\n| 安裝包 | 目標小於 20 MB                |\n\n## 5. 範圍外\n\n- MVP 不做中心化後端與資料庫。\n- 不做多人即時協作。\n- 不做 IDE 內建編輯器。\n- 不做自訓練模型。\n- 不做行動版。\n\n## 6. 架構摘要\n\n```\n[Tauri Shell]\n  ├── [Next.js / React Frontend]\n  └── [Rust Backend (Tauri Commands)]\n        ├── 檔案讀寫與監聽\n        ├── 程序啟停與串流\n        ├── 文件解析\n        └── keychain 存取\n```\n\n## 7. 已確認決策\n\n| 編號 | 決策                       |\n| -- | ------------------------ |\n| Q1 | 需要 schemaVersion 做版本化    |\n| Q2 | Prompt 組裝放前端 TypeScript  |\n| Q3 | AI API 只走 Rust command   |\n| Q4 | MVP beta 採 AI persona 模擬 |\n",
+      "contentHash": "37e290546c72be59",
+      "readingMinutes": 6,
       "classification": "internal",
       "classificationSource": "frontmatter",
       "classificationConfidence": 0.96,
@@ -2898,7 +3159,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "Mentions local key storage",
         "Mentions execution or command policy"
       ],
-      "updatedAt": "2026-05-23T17:13:56.000Z"
+      "updatedAt": "2026-06-04T02:30:26.724Z"
     },
     {
       "id": "product/readme",
@@ -3544,6 +3805,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
     "engineering",
     "guides",
     "guides/features",
+    "guides/solutions",
     "guides/standards",
     "integrations",
     "product",
@@ -3611,6 +3873,13 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
     "guides/features/xmux",
     "guides/getting-started",
     "guides/index",
+    "guides/solutions/coordinator-agent-framework",
+    "guides/solutions/fragmented-tools",
+    "guides/solutions/index",
+    "guides/solutions/live-agent-observability",
+    "guides/solutions/multi-project-multi-task",
+    "guides/solutions/prompt-context-automation",
+    "guides/solutions/realtime-voice-asr-tts",
     "guides/standards/index",
     "guides/standards/industry-localization-practices",
     "guides/standards/multilingual-interface-architecture",

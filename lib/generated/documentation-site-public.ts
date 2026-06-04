@@ -4,19 +4,19 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-06-03T16:39:14.460Z",
+    "generatedAt": "2026-06-04T02:30:26.724Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
     "manifestAudience": "public",
     "totalDocuments": 12,
     "totalFolders": 5,
-    "publicDocuments": 29,
+    "publicDocuments": 36,
     "internalDocuments": 59,
     "restrictedDocuments": 1,
     "publishableDocuments": 12,
-    "reviewRequiredDocuments": 51,
-    "warningCount": 115
+    "reviewRequiredDocuments": 58,
+    "warningCount": 117
   },
   "folders": [
     {
@@ -397,7 +397,7 @@ export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
       "title": "Index",
       "summary": "Documentation page generated from the repo docs folder.",
       "content": "",
-      "contentHash": "d316d8ba3553a56c",
+      "contentHash": "dc9004106663fff3",
       "readingMinutes": 1,
       "classification": "public",
       "classificationSource": "frontmatter",
@@ -416,7 +416,7 @@ export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
         "guides"
       ],
       "warnings": [],
-      "updatedAt": "2026-05-25T06:39:55.000Z"
+      "updatedAt": "2026-06-04T02:27:02.500Z"
     },
     {
       "id": "guides/standards/index",
