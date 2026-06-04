@@ -6,6 +6,7 @@ import {
   DRY_RUN_INSTALL_MESSAGE,
   backupSteps,
 } from '../infra/supabase/pm-system-plans.mjs';
+import { collectInstallerPreflight } from '../infra/supabase/pm-system-preflight.mjs';
 
 const command = process.argv[2] ?? 'status';
 const flags = new Set(process.argv.slice(3));
@@ -23,7 +24,7 @@ if (!flags.has('--dry-run')) {
   process.exit(2);
 }
 
-const response = buildDryRunResponse(command, flags);
+const response = await buildDryRunResponse(command, flags);
 console.log(response.title);
 for (const line of response.lines) {
   console.log(line);
@@ -31,25 +32,35 @@ for (const line of response.lines) {
 
 process.exit(response.blocked ? 1 : 0);
 
-function buildDryRunResponse(commandName, commandFlags) {
+async function buildDryRunResponse(commandName, commandFlags) {
   switch (commandName) {
-    case 'install':
+    case 'install': {
+      const preflightLines = commandFlags.has('--skip-preflight')
+        ? ['Preflight skipped by --skip-preflight.']
+        : await buildPreflightLines();
       return {
-        blocked: false,
+        blocked: preflightLines.some((line) => line.startsWith('BLOCKED')),
         title: 'PM System install plan: dry_run',
         lines: [
           DRY_RUN_INSTALL_MESSAGE,
+          ...preflightLines,
           ...INSTALL_ACTIONS.map((action) => `- ${action}`),
         ],
       };
-    case 'doctor':
+    }
+    case 'doctor': {
+      const preflightLines = commandFlags.has('--skip-preflight')
+        ? ['Preflight skipped by --skip-preflight.']
+        : await buildPreflightLines();
       return {
-        blocked: false,
+        blocked: preflightLines.some((line) => line.startsWith('BLOCKED')),
         title: 'PM System doctor plan: dry_run',
         lines: [
           'Dry run only. Doctor will check runtime, ports, Auth, Postgres, migrations, Storage, Realtime, and connector state when live checks are enabled.',
+          ...preflightLines,
         ],
       };
+    }
     case 'backup': {
       // Step list is sourced from the shared planner, not hardcoded, so the CLI
       // can never drift from planBackup(). `--no-storage` mirrors the planner's
@@ -86,4 +97,23 @@ function buildDryRunResponse(commandName, commandFlags) {
         ],
       };
   }
+}
+
+async function buildPreflightLines() {
+  const preflight = await collectInstallerPreflight({ dryRun: true });
+  const lines = [];
+
+  if (preflight.runtime) {
+    lines.push(`PASS runtime: ${preflight.runtime.kind} ${preflight.runtime.version}`);
+  } else {
+    lines.push('BLOCKED runtime: no Docker-compatible runtime detected');
+  }
+
+  for (const port of preflight.ports) {
+    lines.push(
+      `${port.available ? 'PASS' : 'BLOCKED'} port ${port.port}: ${port.service}`,
+    );
+  }
+
+  return lines;
 }

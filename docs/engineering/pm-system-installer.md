@@ -88,6 +88,16 @@ Before install:
 4. Detect existing stack and volumes.
 5. Require explicit owner approval before mutation.
 
+## Live-safe Preflight
+
+`npm run pm-system -- doctor --dry-run` and `npm run pm-system -- install --dry-run` may perform safe local preflight checks:
+
+- check whether `docker` or `podman` responds
+- check whether required ports are available
+- print blocked/pass diagnostics
+
+These checks must not pull images, start containers, write env files, generate secrets, run migrations, or mutate volumes. Use `--skip-preflight` only for deterministic tests or docs examples where local machine state should not affect output.
+
 ## Doctor Status
 
 Doctor status must not produce false success:
@@ -110,9 +120,12 @@ Doctor status must not produce false success:
 The first implementation slice is side-effect-free:
 
 - `infra/supabase/pm-system-installer.ts`
+- `infra/supabase/pm-system-preflight.mjs`
 - `__tests__/pmSystemInstaller.plan.test.ts`
+- `__tests__/pmSystemPreflight.test.ts`
+- `__tests__/pmSystemCli.test.ts`
 
-It models installer plans, backend profiles, doctor reports, backup/restore/upgrade plans, and maintenance policies. It does not call Docker, pull images, write secrets, or mutate host state.
+It models installer plans, backend profiles, doctor reports, backup/restore/upgrade plans, live-safe preflight, and maintenance policies. It does not pull images, start containers, write secrets, or mutate host state.
 
 The dry-run step lists are defined once in `infra/supabase/pm-system-plans.mjs` and shared by both the typed planner and the runtime CLI (`scripts/pm-system.mjs`), so the CLI cannot drift from the tested plans.
 

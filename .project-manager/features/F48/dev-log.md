@@ -246,6 +246,27 @@ F46 is owned by another engineer. F48 must avoid mobile remote files and F46 art
 - Passed: `npm run typecheck`.
 - Passed: `npm run docs:check`.
 
+## 2026-06-04 - Live-safe Preflight Slice
+
+### Implemented
+
+- Added `infra/supabase/pm-system-preflight.mjs`.
+- Added `infra/supabase/pm-system-preflight.d.mts`.
+- Added `__tests__/pmSystemPreflight.test.ts`.
+- Wired `scripts/pm-system.mjs` so `install --dry-run` and `doctor --dry-run` can perform live-safe checks for Docker/Podman and required ports.
+- Added `--skip-preflight` for deterministic tests and docs examples.
+- Updated `docs/engineering/pm-system-installer.md` with live-safe preflight rules.
+- Updated F48 Development metadata to 88% progress.
+
+### Verification Log
+
+- Passed: `npm run test -- --run __tests__/pmSystemInstaller.plan.test.ts __tests__/pmSystemCli.test.ts __tests__/pmSystemPreflight.test.ts` (3 files, 40 tests).
+- Passed: `npm run typecheck`.
+- Passed: `npm run docs:check`.
+- Passed: `npm run docs:site:sync`.
+- Passed: `npm run pm-system -- doctor --dry-run --skip-preflight`.
+- Ran: `npm run pm-system -- doctor --dry-run`; result correctly blocked with `no Docker-compatible runtime detected` while reporting required ports available. Exit code 1 is expected for blocked doctor output.
+
 ### Safety Note
 
 The scaffold is intentionally not a production-ready Supabase stack yet. It creates a reviewable file boundary for the next implementation slice without pulling images, starting containers, or writing real secrets.

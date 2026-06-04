@@ -10,12 +10,21 @@ function runPmSystem(args: string[]) {
 
 describe('PM System dry-run CLI wrapper', () => {
   it('prints an install dry-run plan without host mutation', () => {
-    const result = runPmSystem(['install', '--dry-run']);
+    const result = runPmSystem(['install', '--dry-run', '--skip-preflight']);
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('PM System install plan: dry_run');
     expect(result.stdout).toContain('No Docker, filesystem, network, or secret mutation');
+    expect(result.stdout).toContain('Preflight skipped by --skip-preflight.');
     expect(result.stdout).toContain('- run-pm-migrations');
+  });
+
+  it('prints a deterministic doctor dry-run when preflight is skipped', () => {
+    const result = runPmSystem(['doctor', '--dry-run', '--skip-preflight']);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('PM System doctor plan: dry_run');
+    expect(result.stdout).toContain('Preflight skipped by --skip-preflight.');
   });
 
   it('requires dry-run until live service control is implemented', () => {
