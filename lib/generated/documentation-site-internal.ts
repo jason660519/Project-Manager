@@ -4,7 +4,7 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-06-04T04:50:42.340Z",
+    "generatedAt": "2026-06-04T04:56:53.205Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
@@ -1114,7 +1114,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "Mentions secrets, tokens, or credentials",
         "Mentions execution or command policy"
       ],
-      "updatedAt": "2026-06-04T04:50:42.339Z"
+      "updatedAt": "2026-06-04T04:56:53.203Z"
     },
     {
       "id": "architecture/adr-016-supabase-cloud-control-plane-and-developer-runner",
@@ -1150,7 +1150,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "Mentions local key storage",
         "Mentions execution or command policy"
       ],
-      "updatedAt": "2026-06-04T04:50:42.340Z"
+      "updatedAt": "2026-06-04T04:56:53.203Z"
     },
     {
       "id": "architecture/architecture-overview",
@@ -1219,7 +1219,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "table"
       ],
       "warnings": [],
-      "updatedAt": "2026-06-04T04:50:42.317Z"
+      "updatedAt": "2026-06-04T04:56:53.203Z"
     },
     {
       "id": "archive/archived-20260512-05-adr-tauri",
@@ -1456,7 +1456,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "table"
       ],
       "warnings": [],
-      "updatedAt": "2026-06-04T03:21:50.669Z"
+      "updatedAt": "2026-06-04T04:56:53.203Z"
     },
     {
       "id": "engineering/hermes-agent-plugin",
@@ -1957,7 +1957,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "table"
       ],
       "warnings": [],
-      "updatedAt": "2026-06-04T03:21:57.373Z"
+      "updatedAt": "2026-06-04T04:56:53.204Z"
     },
     {
       "id": "engineering/update-project-progress-dashboard-guide",
@@ -2162,7 +2162,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "Mentions secrets, tokens, or credentials",
         "Mentions local key storage"
       ],
-      "updatedAt": "2026-06-04T04:50:42.317Z"
+      "updatedAt": "2026-06-04T04:56:53.204Z"
     },
     {
       "id": "guides/features/chat",
@@ -3642,7 +3642,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "Mentions local service ports",
         "Mentions execution or command policy"
       ],
-      "updatedAt": "2026-06-04T03:22:38.734Z"
+      "updatedAt": "2026-06-04T04:56:53.204Z"
     },
     {
       "id": "project-process/2026-05-29-vlm-arena-image-persistence-report",
@@ -3709,7 +3709,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "Mentions secrets, tokens, or credentials",
         "Mentions local service ports"
       ],
-      "updatedAt": "2026-06-04T03:22:38.734Z"
+      "updatedAt": "2026-06-04T04:56:53.205Z"
     },
     {
       "id": "project-process/commands/daily-report",
