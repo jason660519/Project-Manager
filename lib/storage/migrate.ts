@@ -24,7 +24,7 @@ interface RawConfig {
   [key: string]: unknown;
 }
 
-export const CURRENT_SCHEMA_VERSION = 9;
+export const CURRENT_SCHEMA_VERSION = 10;
 
 export function migrateConfig(raw: unknown): ProjectManagerConfig {
   const cfg = (raw && typeof raw === 'object' ? (raw as RawConfig) : {}) as RawConfig;
@@ -38,6 +38,7 @@ export function migrateConfig(raw: unknown): ProjectManagerConfig {
   if (version < 7) next = migrate_6_to_7(next);
   if (version < 8) next = migrate_7_to_8(next);
   if (version < 9) next = migrate_8_to_9(next);
+  if (version < 10) next = migrate_9_to_10(next);
   // Cast through unknown: `RawConfig` is intentionally a permissive bag,
   // and the migration steps above are responsible for ensuring the result
   // matches `ProjectManagerConfig`.
@@ -254,6 +255,17 @@ function migrate_8_to_9(cfg: RawConfig): RawConfig {
     schemaVersion: 9,
     features,
   };
+}
+
+/**
+ * v9 → v10 (ADR-016, Engineer Browser + External-File Access): adds optional
+ * `browserAccess` and `externalFileAccess` policies to `EngineerRole`. Both are
+ * optional and carry "no access" semantics when absent (browser disabled, no
+ * external paths), so the migration is a pure version bump — no row rewriting.
+ * Idempotent: re-running on a v10 config returns it unchanged.
+ */
+function migrate_9_to_10(cfg: RawConfig): RawConfig {
+  return { ...cfg, schemaVersion: 10 };
 }
 
 function annotateAdapterSupports(rows: unknown): unknown {
