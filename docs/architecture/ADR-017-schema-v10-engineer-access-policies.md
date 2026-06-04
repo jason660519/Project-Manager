@@ -61,20 +61,47 @@ into the agent CLI's own permission mechanism, or (future) by an OS sandbox.
    optional with "no access" defaults, so the migration is a **pure version
    bump** — no row rewriting. Idempotent.
 
-This ADR ships **L2a enforcement**:
+### Delivery status — FOUNDATION ONLY (enforcement deferred)
 
-- **Browser** — ENFORCED for browsers **PM launches itself** (xmux embedded
-  webview / `shell:allow-open`): the launch is gated by `browserAccess`. For an
-  agent-owned browser tool (e.g. a browser MCP) the policy is ADVISORY only.
-- **External files** — ENFORCED for adapters whose CLI exposes a native
-  permission mechanism PM knows how to translate to
-  (`augmentArgsWithFileAccessPolicy`, mirroring `augmentArgsWithMcp`). For every
-  other adapter the policy is ADVISORY (prompt-injected). The detail sheet
-  states which of the two applies for the selected adapter.
+> ⚠️ This commit lands the **data/contract foundation only**: the schema v10
+> fields, the supporting types, the `v9 → v10` migration, the bridge helper
+> `augmentArgsWithFileAccessPolicy`, and the Rust commands
+> (`list_installed_browsers`, the policy-config writer). **No enforcement is
+> wired yet, and no detail-sheet UI ships in this commit.** Until the wiring
+> below lands, `browserAccess` and `externalFileAccess` are **persisted but
+> inert** — they impose no restriction at runtime. Nothing in PM claims, in UI
+> or behaviour, that a role is sandboxed; treating these fields as active
+> enforcement would itself be the security-illusion defect this ADR warns
+> against, so they are explicitly documented as not-yet-enforced.
+
+The **target L2a enforcement** (a follow-up, not this commit) is:
+
+- **Browser** — to be ENFORCED for browsers **PM launches itself** (xmux
+  embedded webview / `shell:allow-open`) by gating the launch on `browserAccess`.
+  For an agent-owned browser tool (e.g. a browser MCP) the policy is ADVISORY
+  only. *Not yet wired: `browserAccess` is read by no launch path today.*
+- **External files** — to be ENFORCED for adapters whose CLI exposes a native
+  permission mechanism PM can translate to, by calling
+  `augmentArgsWithFileAccessPolicy` from the dispatch path (mirroring
+  `augmentArgsWithMcp`). For every other adapter the policy is ADVISORY
+  (prompt-injected). *Not yet wired: `augmentArgsWithFileAccessPolicy` is
+  defined but called by no dispatch path today.*
+
+Follow-up work (tracked, out of scope for this foundation commit):
+1. Call `augmentArgsWithFileAccessPolicy` in `TaskDispatchModal` /
+   `BatchDispatchModal` next to the existing `augmentArgsWithMcp` calls.
+2. Gate PM-mediated browser/`open_path` launches on `browserAccess`.
+3. Add the engineer detail-sheet sections + the per-adapter ENFORCED/ADVISORY
+   badge described below.
 
 ---
 
 ## Fail-Closed Enforcement (non-negotiable)
+
+> Describes the **intended design** of `augmentArgsWithFileAccessPolicy`, which
+> is built fail-closed. It is **not yet exercised** because no dispatch path
+> calls it yet (see Delivery status above); this contract governs the follow-up
+> wiring.
 
 `augmentArgsWithMcp` ends in `catch { return baseArgs; }` — correct for MCP,
 where a failed write just degrades a *feature*. **The permission path must NOT
@@ -135,15 +162,21 @@ logged error. It never silently falls back to unrestricted args.
 ## Consequences
 
 **Positive**
-- Engineers gain a real browser allowlist (enforced where PM launches) and a
-  structured external-file policy (enforced for supported adapters).
-- The honest ENFORCED/ADVISORY split prevents a false sense of security.
+- Lands the persisted contract (schema v10 fields + migration + types) and the
+  enforcement primitives (`augmentArgsWithFileAccessPolicy`,
+  `list_installed_browsers`) so the follow-up wiring needs no further schema bump.
+- The planned ENFORCED/ADVISORY split is designed up front to prevent a false
+  sense of security once enforcement is wired.
 
 **Negative**
 - The migration chain grows by another hop; per ADR-002 this is past the
   threshold to consider migration consolidation.
-- Enforcement is only as strong as the spawned agent's own permission system
-  until L2b lands. This limitation is surfaced in the UI, not hidden.
+- **The policies are inert until the follow-up wiring lands** — a role that
+  sets `browserAccess` / `externalFileAccess` today gets no runtime restriction.
+  This is documented (Delivery status) rather than hidden, but consumers must
+  not treat v10 presence as active enforcement.
+- Once wired, enforcement is only as strong as the spawned agent's own
+  permission system until the L2b OS sandbox lands.
 
 ---
 
