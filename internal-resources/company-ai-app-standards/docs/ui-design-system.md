@@ -24,16 +24,16 @@ These tokens are a default starting point, not a mandatory palette. Each app may
 
 | Token | Value | Use |
 |---|---:|---|
-| App background | `#071b18` | Root app background |
-| Rail background | `#061512` | Left icon rail |
+| App background | `rgb(7 27 24)` | Root app background |
+| Rail background | `rgb(6 21 18)` | Left icon rail |
 | Panel background | `rgba(255,255,255,0.05)` | Main content panels |
 | Panel border | `rgba(231,229,228,0.13)` | Section and panel borders |
-| Strong text | `#f5f5f4` | Headings and primary labels |
+| Strong text | `rgb(245 245 244)` | Headings and primary labels |
 | Muted text | `rgba(214,211,209,0.75)` | Secondary metadata |
-| Amber accent | `#fef3c7` | App mark, beta label, key highlights |
-| Active blue | `#2563eb` | Primary CTA and active step |
-| Success | `#14532d` | Ready, connected, granted |
-| Danger | `#7f1d1d` | Failed, missing, destructive |
+| Amber accent | `rgb(254 243 199)` | App mark, beta label, key highlights |
+| Active blue | `rgb(37 99 235)` | Primary CTA and active step |
+| Success | `rgb(20 83 45)` | Ready, connected, granted |
+| Danger | `rgb(127 29 29)` | Failed, missing, destructive |
 
 Add shared tokens here before spreading new colors across apps. Add product-specific tokens in the app repo and document the reason in `DESIGN.md` or an ADR.
 

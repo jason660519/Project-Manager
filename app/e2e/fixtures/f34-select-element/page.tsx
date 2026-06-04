@@ -1,15 +1,10 @@
 export default function F34SelectElementFixturePage() {
   return (
-    <main style={{ fontFamily: 'system-ui, sans-serif', padding: 24 }}>
+    <main className="p-6 font-sans">
       <section
         id="first-card"
         data-e2e-target="first"
-        style={{
-          border: '1px solid #94a3b8',
-          borderRadius: 8,
-          marginBottom: 16,
-          padding: 16,
-        }}
+        className="mb-4 rounded-lg border border-slate-400 p-4"
       >
         <h1>F34 Select Element Fixture</h1>
         <p>This card is the first native select target.</p>
@@ -21,11 +16,7 @@ export default function F34SelectElementFixturePage() {
       <section
         id="second-card"
         data-e2e-target="second"
-        style={{
-          border: '1px solid #38bdf8',
-          borderRadius: 8,
-          padding: 16,
-        }}
+        className="rounded-lg border border-sky-400 p-4"
       >
         <h2>Second target</h2>
         <p>Repeated selection should not reuse stale native callback state.</p>

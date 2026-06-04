@@ -230,7 +230,7 @@ for (const selector of window.__pmXmuxE2ESelectElementSelectors) {
   }, []);
 
   return (
-    <main style={{ background: '#0f172a', color: '#e2e8f0', minHeight: '100vh', padding: 24 }}>
+    <main className="min-h-screen bg-slate-900 p-6 text-slate-200">
       <h1>F34 Tauri Native Select Element E2E</h1>
       <p data-testid="runtime">Runtime: {isTauriRuntime() ? 'tauri' : 'browser'}</p>
       <p data-testid="report-path">Report: {reportPath || 'not requested'}</p>
