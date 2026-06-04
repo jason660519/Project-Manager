@@ -722,7 +722,7 @@
       "id": "F17",
       "locatedSection": "components/MermaidBlock",
       "name": "Decoupled Mermaid Integration",
-      "notes": "Hardening offline Mermaid rendering for public docs and feature document panels.",
+      "notes": "Mermaid renderer hardened; baseline and cross-browser smoke passed; manual Tauri/real-browser smoke pending before 100%.",
       "paths": {
         "implementation": "components/MermaidBlock.tsx",
         "spec": ".project-manager/features/F17/feature-spec.md",
@@ -734,9 +734,9 @@
       },
       "phase": "development",
       "points": 3,
-      "progress": 10,
+      "progress": 90,
       "status": "in_progress",
-      "updatedAt": "2026-06-04T03:42:44.807Z",
+      "updatedAt": "2026-06-04T04:06:23.405Z",
       "readmePath": ".project-manager/features/F17/README.md",
       "updatedBy": "Codex",
       "metadata": {
@@ -1443,6 +1443,70 @@
         ],
         "kickoffAt": "2026-06-04T02:53:25.737Z"
       }
+    },
+    {
+      "id": "F46",
+      "name": "PM Mobile Voice Remote Control",
+      "category": "Mobile/Remote Control",
+      "status": "in_progress",
+      "progress": 10,
+      "phase": "development",
+      "points": 8,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F46/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F46/",
+        "spec": ".project-manager/features/F46/feature-spec.md",
+        "tdd": ".project-manager/features/F46/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F46/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F46/",
+        "implementation": "docs/architecture/ADR-015-mobile-voice-remote-control.md",
+        "test": "__tests__/mobileVoiceRemoteControl.intent.test.ts"
+      },
+      "notes": "Plan mobile voice remote control through desktop gateway, pairing, guarded intents, and channel MVP",
+      "createdAt": "2026-06-04T04:32:44.042Z",
+      "updatedAt": "2026-06-04T04:32:44.042Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "docs/architecture/ADR-015-mobile-voice-remote-control.md",
+          "__tests__/mobileVoiceRemoteControl.intent.test.ts",
+          ".project-manager/features/F46/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-04T04:32:44.042Z"
+      }
+    },
+    {
+      "id": "F47",
+      "name": "Supabase Cloud Auth and Developer Runner Storage Architecture",
+      "category": "Architecture/Auth",
+      "status": "in_progress",
+      "progress": 30,
+      "phase": "development",
+      "points": 8,
+      "locatedSection": "app/login",
+      "readmePath": ".project-manager/features/F47/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F47/",
+        "spec": ".project-manager/features/F47/feature-spec.md",
+        "tdd": ".project-manager/features/F47/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F47/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F47/",
+        "implementation": "app/login/page.tsx",
+        "test": "__tests__/auth.supabase-role-routing.test.tsx"
+      },
+      "notes": "Added ADR, Supabase login setup state, role permissions, and focused role-routing tests.",
+      "createdAt": "2026-06-04T04:42:17.509Z",
+      "updatedAt": "2026-06-04T04:46:40.135Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "app/login/page.tsx",
+          "__tests__/auth.supabase-role-routing.test.tsx",
+          ".project-manager/features/F47/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-04T04:42:17.509Z"
+      }
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",
@@ -1453,6 +1517,6 @@
     "root": "/Users/Project-Manager"
   },
   "schemaVersion": 8,
-  "updatedAt": "2026-06-04T03:42:44.807Z",
+  "updatedAt": "2026-06-04T04:46:40.135Z",
   "updatedBy": "Codex"
 }
