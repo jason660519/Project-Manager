@@ -14,10 +14,8 @@ import { ensureEngineerRoles } from './mergeEngineerRoles';
  * `<root>/.project-manager.json`) resolve to the same sample.
  */
 const BUNDLED_BY_PROJECT_ROOT: Record<string, ProjectManagerConfig> = {
-  '/Volumes/KLEVV-4T-1/Real Estate Management Projects/Owner-Property-Management-AI-SPA':
+  '/Users/Project-Manager/internal-resources/projects/owner-property-management-ai-spa':
     ensureEngineerRoles(sampleConfig1 as ProjectManagerConfig),
-  '/Volumes/KLEVV-4T-1/Project-Manager':
-    ensureEngineerRoles(sampleConfig2 as ProjectManagerConfig),
   '/Users/Project-Manager':
     ensureEngineerRoles(sampleConfig2 as ProjectManagerConfig),
 };

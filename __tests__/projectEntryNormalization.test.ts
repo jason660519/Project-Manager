@@ -39,12 +39,12 @@ describe('normalizeProjectEntries', () => {
   it('dedupes legacy and canonical config paths while preserving the stable first id', () => {
     const legacy = entry({
       id: 'project-manager',
-      configPath: '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager.json',
+      configPath: '/Users/Project-Manager/.project-manager.json',
       config: config('Project Manager', [feature('F01')]),
     });
     const canonical = entry({
       id: 'proj-registry',
-      configPath: '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager/config.json',
+      configPath: '/Users/Project-Manager/.project-manager/config.json',
       config: config('Project Manager', [feature('F01'), feature('F13', 'deployment')]),
     });
 
@@ -53,7 +53,7 @@ describe('normalizeProjectEntries', () => {
     expect(result.projects).toHaveLength(1);
     expect(result.projects[0].id).toBe('project-manager');
     expect(result.projects[0].configPath).toBe(
-      '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager/config.json',
+      '/Users/Project-Manager/.project-manager/config.json',
     );
     expect(result.projects[0].config.features.map((f) => f.id)).toEqual(['F01', 'F13']);
     expect(result.idMap.get('proj-registry')).toBe('project-manager');

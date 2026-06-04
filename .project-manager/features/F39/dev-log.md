@@ -22,7 +22,7 @@ Prior art (2026-05-18): OpenClaw/Hermes registered as disabled-by-default CLI pl
 - `cmd_core` / `cmd_all` unconditionally invoke both sidecars after PM start.
 - Plugin catalog persisted to localStorage only — bash cannot read toggles.
 - `IntegrationsDetailSheet` already renders runtime lifecycle commands (Install, Doctor, Start gateway).
-- `PluginsHubView` hardcodes `PROJECT_MANAGER_ROOT = '/Volumes/KLEVV-4T-1/Project-Manager'`.
+- `PluginsHubView` hardcodes `PROJECT_MANAGER_ROOT = '/Users/Project-Manager'`.
 
 ### Planned Work
 

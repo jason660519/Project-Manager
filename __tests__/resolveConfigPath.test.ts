@@ -20,8 +20,8 @@ describe('resolveConfigPath', () => {
   });
 
   it('handles the real-world fixture path the user reported', () => {
-    expect(resolveConfigPath('/Volumes/KLEVV-4T-1/Realestate_Management_Apps')).toBe(
-      '/Volumes/KLEVV-4T-1/Realestate_Management_Apps/.project-manager/config.json',
+    expect(resolveConfigPath('/Users/Project-Manager/internal-resources/workspaces/realestate-management-apps')).toBe(
+      '/Users/Project-Manager/internal-resources/workspaces/realestate-management-apps/.project-manager/config.json',
     );
   });
 

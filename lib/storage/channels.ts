@@ -24,7 +24,7 @@ const DEFAULT_COMMAND_MAPPINGS: CommandMapping[] = [
   { id: 'help',   trigger: '/help',   action: 'help',         description: 'List available commands',          enabled: true  },
   { id: 'status', trigger: '/status', action: 'get_status',   description: 'Get all feature statuses',         enabled: true  },
   { id: 'report', trigger: '/report', action: 'daily_report', description: 'Send today\'s progress report',    enabled: true  },
-  { id: 'run',    trigger: '/run',    action: 'run_feature',  description: 'Trigger a feature agent run',      enabled: false },
+  { id: 'run',    trigger: '/run',    action: 'run_feature',  description: 'Request a guarded feature run',     enabled: false },
 ];
 
 const DEFAULT_CATALOG: ChannelCatalog = {

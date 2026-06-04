@@ -33,6 +33,13 @@ Project Manager-specific implementation rules live in:
 - `./.claude/skills/verify-before-complete/SKILL.md`
 - `./.agents/skills/verify-before-complete/SKILL.md`
 
+## Internal Resource Paths
+
+Project Manager must not depend on removable-volume absolute paths. Resources
+that used to live on external storage are internalized under `./internal-resources/`;
+see `./docs/engineering/external-ssd-internalization-report.md` before adding,
+moving, or reintroducing project/sample resource paths.
+
 ## Completion gate (mandatory)
 
 Before claiming **done**, marking a feature **100%**, or offering **commit/PR**:

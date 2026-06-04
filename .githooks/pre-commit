@@ -16,10 +16,10 @@ npm run verify:static-export --silent
 # verify:baseline. Source-driven local audit is always available; the company R1–R5 gate
 # runs when the shared standards repo is reachable. Both are fast static scans.
 echo "pre-commit: table:sheet:audit --check"
-node scripts/audit-table-sheets.mjs --check
+npm run table:sheet:audit --silent -- --check
 
 COMPANY_GATE="${COMPANY_STANDARDS_ROOT:-/Users/Company-AI-App-Standards}/scripts/check-table-governance.mjs"
 if [[ -f "$COMPANY_GATE" ]]; then
   echo "pre-commit: company table-governance gate (R1–R5)"
-  node "$COMPANY_GATE" .
+  npm exec --silent -- node "$COMPANY_GATE" .
 fi

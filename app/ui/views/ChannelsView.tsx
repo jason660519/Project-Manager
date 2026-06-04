@@ -35,7 +35,6 @@ import {
   type UnlistenFn,
   onTelegramMessage,
   onTelegramStatus,
-  spawnAgent,
   telegramSendMessage,
   telegramStartPoll,
   telegramStatusAll,
@@ -43,6 +42,7 @@ import {
 } from '../../../lib/bridge';
 import { getProjectsRepository } from '../../../lib/storage';
 import type { Feature, FeatureStatus, ProjectEntry } from '../../../lib/types';
+import { parseMobileRemoteIntent } from '../../../lib/mobileRemote/intents';
 import { useInAppAlert } from '../../../components/ui/InAppDialog';
 
 // ── Platform metadata ─────────────────────────────────────────────────────────
@@ -661,7 +661,7 @@ function ChannelsSection({
 
 const ACTION_LABELS: Record<string, string> = {
   get_status:   'Get all feature statuses',
-  run_feature:  'Trigger feature agent run',
+  run_feature:  'Request guarded feature run',
   daily_report: 'Send daily progress report',
   help:         'List available commands',
   custom:       'Custom action',
@@ -910,7 +910,15 @@ async function handleRunCommand(args: string[]): Promise<string> {
   if (args.length === 0) {
     return 'Usage: /run <featureId>\nExample: /run F18';
   }
-  const targetId = args[0].toLowerCase();
+  const parsed = parseMobileRemoteIntent(`/run ${args.join(' ')}`);
+  if (parsed.status === 'blocked') {
+    return `Blocked: ${parsed.reason}`;
+  }
+  if (parsed.status !== 'parsed' || parsed.intent?.type !== 'run_feature') {
+    return parsed.reason ?? 'Run requests need a feature id.';
+  }
+
+  const targetId = parsed.intent.featureId.toLowerCase();
   const projects = await getProjectsRepository().listProjects();
 
   let match: { project: ProjectEntry; feature: Feature } | null = null;
@@ -929,29 +937,16 @@ async function handleRunCommand(args: string[]): Promise<string> {
   }
   const agent = agents[0];
   const root = match.project.config.project.root;
-  const prompt =
-    `[Telegram /run] 請繼續開發 [${match.feature.id}] ${match.feature.name}。\n` +
-    `目前進度：${match.feature.progress}%\n` +
-    `實作路徑：${match.feature.paths.implementation ?? '未指定'}` +
-    (match.feature.notes ? `\n備註：${match.feature.notes}` : '');
-
-  const finalArgs = agent.argsTemplate.map((a) =>
-    a
-      .replaceAll('{prompt}', prompt)
-      .replaceAll('{featureId}', match!.feature.id)
-      .replaceAll('{root}', root),
-  );
-
-  try {
-    const { pid } = await spawnAgent({
-      command: agent.command,
-      args: finalArgs,
-      workingDir: root,
-    });
-    return `✅ Dispatched [${match.feature.id}] ${match.feature.name} to ${agent.name} (PID ${pid}).\nCheck Logs view in the desktop app for live output.`;
-  } catch (e) {
-    return `Failed to dispatch: ${e}`;
-  }
+  return [
+    `Guarded run request prepared for [${match.feature.id}] ${match.feature.name}.`,
+    `Project: ${match.project.config.project.name}`,
+    `Agent: ${agent.name}`,
+    `Command: ${agent.command}`,
+    `Working directory: ${root}`,
+    '',
+    'Mobile / channel requests do not start local agents directly yet.',
+    'Open Project Manager Desktop to review and approve the run.',
+  ].join('\n');
 }
 
 // ── Command routing ───────────────────────────────────────────────────────────

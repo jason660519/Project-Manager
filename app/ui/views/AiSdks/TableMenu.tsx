@@ -1,14 +1,9 @@
 'use client';
 
 /**
- * Small accessible popover menu used for the AI SDKs table's column menu, row
- * menu, and hidden-item recovery menus. Satisfies the company governance
- * requirement that spreadsheet controls (sort/filter/resize/hide/freeze/restore)
- * are reachable through an explicit, keyboard-operable menu button — not only a
- * mouse right-click.
- *
- * Keyboard: Enter/Space/ArrowDown opens; ArrowUp/ArrowDown move between items;
- * Escape closes and returns focus to the trigger; Tab or outside click closes.
+ * Toolbar dropdown for hidden-column/row recovery in AI SDKs sheets.
+ * Column/row spreadsheet actions (sort, resize, hide, freeze) use right-click
+ * context menus per company table-governance — not header/row ⋮ icons.
  */
 
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';

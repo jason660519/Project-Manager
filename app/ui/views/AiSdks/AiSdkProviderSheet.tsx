@@ -13,7 +13,8 @@
  * `.project-manager/features/F43/README.md` for the classification + documented
  * exceptions): table-scoped debounced search, category filter with chips +
  * clear, freeze cols, column resize, density / per-row height, hide + restore
- * columns and rows, column & row context menus, default/asc/desc sort arrows
+ * columns and rows, column & row right-click context menus (no ⋮ icons on headers/rows),
+ * default/asc/desc sort arrows
  * with `aria-sort`, Reset view, and auto-saved view preferences
  * (`useAiSdksTablePrefs`). Row click / "View details" opens the metadata panel.
  */
@@ -26,7 +27,6 @@ import {
   Eye,
   EyeOff,
   Info,
-  MoreVertical,
   Plus,
   RotateCcw,
   Rows3,
@@ -105,6 +105,35 @@ function rangeText(spec: ParamSpec): string {
   const min = spec.min !== undefined ? spec.min : '−∞';
   const max = spec.max !== undefined ? spec.max : '∞';
   return `${min} … ${max}`;
+}
+
+const CONTEXT_MENU_MARGIN = 8;
+const CONTEXT_MENU_WIDTH = 220;
+const CONTEXT_MENU_ITEM_HEIGHT = 30;
+const CONTEXT_MENU_SEPARATOR_HEIGHT = 9;
+const CONTEXT_MENU_VERTICAL_PADDING = 8;
+
+function estimateContextMenuHeight(items: TableMenuItem[]) {
+  return items.reduce(
+    (height, item) =>
+      height + ('separator' in item ? CONTEXT_MENU_SEPARATOR_HEIGHT : CONTEXT_MENU_ITEM_HEIGHT),
+    CONTEXT_MENU_VERTICAL_PADDING,
+  );
+}
+
+function getSafeContextMenuPosition(clientX: number, clientY: number, items: TableMenuItem[]) {
+  if (typeof window === 'undefined') return { x: clientX, y: clientY };
+
+  const maxX = Math.max(CONTEXT_MENU_MARGIN, window.innerWidth - CONTEXT_MENU_WIDTH - CONTEXT_MENU_MARGIN);
+  const maxY = Math.max(
+    CONTEXT_MENU_MARGIN,
+    window.innerHeight - estimateContextMenuHeight(items) - CONTEXT_MENU_MARGIN,
+  );
+
+  return {
+    x: Math.max(CONTEXT_MENU_MARGIN, Math.min(clientX, maxX)),
+    y: Math.max(CONTEXT_MENU_MARGIN, Math.min(clientY, maxY)),
+  };
 }
 
 export function AiSdkProviderSheet({
@@ -201,6 +230,11 @@ export function AiSdkProviderSheet({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [newModel, setNewModel] = useState('');
   const [newCategory, setNewCategory] = useState('');
+  const [contextMenu, setContextMenu] = useState<
+    | { type: 'column'; columnId: string; x: number; y: number }
+    | { type: 'row'; rowId: string; x: number; y: number }
+    | null
+  >(null);
 
   const hiddenRowSet = useMemo(() => new Set(hiddenRowIds), [hiddenRowIds]);
   const filtersActive = typeFilter !== 'all' || search.trim() !== '';
@@ -257,27 +291,12 @@ export function AiSdkProviderSheet({
         id: 'col-id',
         header: copy.columns.id,
         cell: (info) => (
-          <div className="flex items-center gap-1.5">
-            <RowMenu
-              rowId={info.row.original.id}
-              model={info.row.original.model}
-              copy={copy}
-              canHide={filteredRows.length > 1}
-              hiddenRowIds={hiddenRowIds}
-              rowLabelById={(id) => rows.find((r) => r.id === id)?.model ?? id}
-              onViewDetails={() => setSelectedId(info.row.original.id)}
-              onResizeRow={() => void promptResizeRow(info.row.original.id)}
-              onHideRow={() => hideRow(info.row.original.id)}
-              onRestoreRow={restoreRow}
-              onRestoreAllRows={() => setHiddenRowIds([])}
-            />
-            <span
-              className="truncate font-mono text-[11px] text-stone-400"
-              title={`${providerId}:${info.row.original.model}`}
-            >
-              {info.getValue()}
-            </span>
-          </div>
+          <span
+            className="block truncate font-mono text-[11px] text-stone-400"
+            title={`${providerId}:${info.row.original.model}`}
+          >
+            {info.getValue()}
+          </span>
         ),
       }),
       // Candidate checkbox — when checked, the model joins the AI Assistant's
@@ -480,6 +499,43 @@ export function AiSdkProviderSheet({
     return items;
   };
 
+  const rowMenuItems = (rowId: string): TableMenuItem[] => {
+    const m = copy.menu;
+    const items: TableMenuItem[] = [
+      { key: 'details', label: m.viewDetails, icon: <Info size={12} />, onSelect: () => setSelectedId(rowId) },
+      { key: 'resize', label: m.resizeRow, onSelect: () => void promptResizeRow(rowId) },
+      {
+        key: 'hide',
+        label: m.hideRow,
+        icon: <EyeOff size={12} />,
+        disabled: filteredRows.length <= 1,
+        onSelect: () => hideRow(rowId),
+      },
+    ];
+    if (hiddenRowIds.length > 0) {
+      items.push({ key: 'sep-restore', separator: true });
+      hiddenRowIds.forEach((id) =>
+        items.push({
+          key: `restore-${id}`,
+          label: `${m.restoreRows}: ${rows.find((r) => r.id === id)?.model ?? id}`,
+          icon: <Eye size={12} />,
+          onSelect: () => restoreRow(id),
+        }),
+      );
+      items.push({ key: 'restore-all', label: copy.controls.restoreAll, onSelect: () => setHiddenRowIds([]) });
+    }
+    return items;
+  };
+
+  const contextMenuItems = contextMenu
+    ? contextMenu.type === 'column'
+      ? columnMenuItems(contextMenu.columnId)
+      : rowMenuItems(contextMenu.rowId)
+    : [];
+  const contextColumnId = contextMenu?.type === 'column' ? contextMenu.columnId : null;
+  const contextRowId = contextMenu?.type === 'row' ? contextMenu.rowId : null;
+  const contextTargetClass = 'outline outline-1 -outline-offset-1 outline-emerald-300/45 bg-emerald-500/10';
+
   const selectedRow = selectedId ? rows.find((r) => r.id === selectedId) ?? null : null;
 
   const handleAddModel = () => {
@@ -496,7 +552,7 @@ export function AiSdkProviderSheet({
   };
 
   return (
-    <div className="flex h-full min-h-0 w-full">
+    <div className="flex h-full min-h-0 w-full" onClick={() => setContextMenu(null)}>
       {/* min-w-0 lets this flex item clamp to the available width instead of
           growing to the table's content width — so the table pane (not the page)
           owns the horizontal scroll and the .pm-scroll bar becomes reachable. */}
@@ -708,37 +764,44 @@ export function AiSdkProviderSheet({
                       <th
                         key={header.id}
                         aria-sort={header.column.getCanSort() ? ariaSort : undefined}
-                        className={`relative overflow-hidden select-none border-r border-stone-200/10 px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-400 ${frozenClass(header.column.id, true)}`}
+                        data-context-target={contextColumnId === header.column.id ? 'column' : undefined}
+                        className={`relative overflow-hidden select-none border-r border-stone-200/10 px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-400 ${frozenClass(header.column.id, true)} ${
+                          contextColumnId === header.column.id ? contextTargetClass : ''
+                        }`}
                         style={cellStyle(header.column.id)}
+                        onContextMenu={(event) => {
+                          event.preventDefault();
+                          const items = columnMenuItems(header.column.id);
+                          const position = getSafeContextMenuPosition(event.clientX, event.clientY, items);
+                          setContextMenu({
+                            type: 'column',
+                            columnId: header.column.id,
+                            x: position.x,
+                            y: position.y,
+                          });
+                        }}
                       >
-                        <div className="flex items-center justify-between gap-1">
-                          <button
-                            type="button"
-                            onClick={header.column.getToggleSortingHandler()}
-                            disabled={!header.column.getCanSort()}
-                            className="flex min-w-0 flex-1 items-center gap-1.5 text-left disabled:cursor-default"
-                          >
-                            <span className="truncate">
-                              {flexRender(header.column.columnDef.header, header.getContext())}
+                        <button
+                          type="button"
+                          onClick={header.column.getToggleSortingHandler()}
+                          disabled={!header.column.getCanSort()}
+                          className="flex w-full min-w-0 items-center gap-1.5 text-left disabled:cursor-default"
+                        >
+                          <span className="truncate">
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                          </span>
+                          {header.column.getCanSort() && (
+                            <span className="shrink-0 text-stone-500">
+                              {sorted === 'asc' ? (
+                                <ArrowUp size={12} className="text-emerald-200" />
+                              ) : sorted === 'desc' ? (
+                                <ArrowDown size={12} className="text-emerald-200" />
+                              ) : (
+                                <ChevronsUpDown size={12} className="opacity-50" />
+                              )}
                             </span>
-                            {header.column.getCanSort() && (
-                              <span className="shrink-0 text-stone-500">
-                                {sorted === 'asc' ? (
-                                  <ArrowUp size={12} className="text-emerald-200" />
-                                ) : sorted === 'desc' ? (
-                                  <ArrowDown size={12} className="text-emerald-200" />
-                                ) : (
-                                  <ChevronsUpDown size={12} className="opacity-50" />
-                                )}
-                              </span>
-                            )}
-                          </button>
-                          <TableMenu
-                            triggerLabel={`${copy.menu.column}: ${colLabel.get(header.column.id) ?? header.column.id}`}
-                            trigger={<MoreVertical size={13} />}
-                            items={columnMenuItems(header.column.id)}
-                          />
-                        </div>
+                          )}
+                        </button>
                         {header.column.getCanResize() && (
                           <button
                             type="button"
@@ -760,16 +823,33 @@ export function AiSdkProviderSheet({
                 return (
                   <tr
                     key={row.id}
+                    data-context-target={contextRowId === row.original.id ? 'row' : undefined}
                     onClick={() => setSelectedId(row.original.id)}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      const items = rowMenuItems(row.original.id);
+                      const position = getSafeContextMenuPosition(event.clientX, event.clientY, items);
+                      setContextMenu({
+                        type: 'row',
+                        rowId: row.original.id,
+                        x: position.x,
+                        y: position.y,
+                      });
+                    }}
                     style={{ height }}
                     className={`cursor-pointer border-b border-stone-200/10 transition-colors hover:bg-white/[0.045] ${
                       selectedId === row.original.id ? 'bg-emerald-500/5' : ''
-                    }`}
+                    } ${contextRowId === row.original.id ? contextTargetClass : ''}`}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <td
                         key={cell.id}
-                        className={`relative isolate overflow-hidden border-r border-stone-200/10 px-3 py-1.5 align-middle text-sm text-stone-300 ${frozenClass(cell.column.id)}`}
+                        className={`relative isolate overflow-hidden border-r border-stone-200/10 px-3 py-1.5 align-middle text-sm text-stone-300 ${frozenClass(cell.column.id)} ${
+                          contextColumnId === cell.column.id || contextRowId === row.original.id
+                            ? contextTargetClass
+                            : ''
+                        }`}
                         style={cellStyle(cell.column.id)}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -865,61 +945,44 @@ export function AiSdkProviderSheet({
           </div>
         </aside>
       )}
+      {contextMenu && (
+        <div
+          role="menu"
+          aria-label={contextMenu.type === 'column' ? copy.menu.column : copy.menu.row}
+          className="fixed z-50 min-w-[220px] border border-stone-200/20 bg-[rgb(var(--pm-panel))] py-1 text-xs text-stone-200 shadow-xl"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          {contextMenuItems.map((item) =>
+            'separator' in item ? (
+              <div key={item.key} role="separator" className="my-1 border-t border-stone-200/12" />
+            ) : (
+              <button
+                key={item.key}
+                type="button"
+                role="menuitem"
+                disabled={item.disabled}
+                onClick={() => {
+                  if (item.disabled) return;
+                  item.onSelect();
+                  setContextMenu(null);
+                }}
+                className={`flex w-full items-center gap-2 px-3 py-1.5 text-left disabled:cursor-not-allowed disabled:opacity-40 ${
+                  item.danger
+                    ? 'text-rose-200 hover:bg-rose-500/15'
+                    : 'text-stone-200 hover:bg-white/[0.06]'
+                }`}
+              >
+                <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center text-stone-400">
+                  {item.icon ?? (item.checked ? '✓' : null)}
+                </span>
+                <span className="flex-1 truncate">{item.label}</span>
+              </button>
+            ),
+          )}
+        </div>
+      )}
       {resizePrompt.dialog}
     </div>
-  );
-}
-
-// ── Row context menu (explicit, keyboard-operable; company 2.9 / 3.2) ─────────
-function RowMenu({
-  rowId,
-  model,
-  copy,
-  canHide,
-  hiddenRowIds,
-  rowLabelById,
-  onViewDetails,
-  onResizeRow,
-  onHideRow,
-  onRestoreRow,
-  onRestoreAllRows,
-}: {
-  rowId: string;
-  model: string;
-  copy: AiSdksCopy;
-  canHide: boolean;
-  hiddenRowIds: string[];
-  rowLabelById: (id: string) => string;
-  onViewDetails: () => void;
-  onResizeRow: () => void;
-  onHideRow: () => void;
-  onRestoreRow: (id: string) => void;
-  onRestoreAllRows: () => void;
-}) {
-  const m = copy.menu;
-  const items: TableMenuItem[] = [
-    { key: 'details', label: m.viewDetails, icon: <Info size={12} />, onSelect: onViewDetails },
-    { key: 'resize', label: m.resizeRow, onSelect: onResizeRow },
-    { key: 'hide', label: m.hideRow, icon: <EyeOff size={12} />, disabled: !canHide, onSelect: onHideRow },
-  ];
-  if (hiddenRowIds.length > 0) {
-    items.push({ key: 'sep', separator: true });
-    hiddenRowIds.forEach((id) =>
-      items.push({
-        key: `restore-${id}`,
-        label: `${m.restoreRows}: ${rowLabelById(id)}`,
-        icon: <Eye size={12} />,
-        onSelect: () => onRestoreRow(id),
-      }),
-    );
-    items.push({ key: 'restore-all', label: copy.controls.restoreAll, onSelect: onRestoreAllRows });
-  }
-  return (
-    <TableMenu
-      triggerLabel={`${m.row}: ${model}`}
-      trigger={<MoreVertical size={12} />}
-      align="left"
-      items={items}
-    />
   );
 }

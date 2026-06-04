@@ -36,7 +36,7 @@ describe('connected instances integration sheet (F24)', () => {
   });
 
   it('seeds local Project Manager, Hermes, and OpenClaw runtime rows', () => {
-    expect(row('project-manager-local').installPath).toBe('/Volumes/KLEVV-4T-1/Project-Manager');
+    expect(row('project-manager-local').installPath).toBe('/Users/Project-Manager');
     expect(row('hermes-local-dashboard').port).toBe('9119');
     expect(row('openclaw-local-dashboard').installPath).toBe('http://127.0.0.1:18790/');
     expect(row('openclaw-local-dashboard').port).toBe('18790');

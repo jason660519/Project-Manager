@@ -10,7 +10,7 @@ export const COMMAND_ACTION_OPTIONS: { value: CommandAction; label: string; desc
   { value: 'help', label: 'help', description: 'List every enabled command' },
   { value: 'get_status', label: 'get_status', description: 'Project / feature status summary' },
   { value: 'daily_report', label: 'daily_report', description: 'Last-7-days feature updates' },
-  { value: 'run_feature', label: 'run_feature', description: 'Dispatch a feature agent (writes to disk)' },
+  { value: 'run_feature', label: 'run_feature', description: 'Request a guarded feature run' },
   { value: 'custom', label: 'custom', description: 'No built-in handler yet — placeholder' },
 ];
 

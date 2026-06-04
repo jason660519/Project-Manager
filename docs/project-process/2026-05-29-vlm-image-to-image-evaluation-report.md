@@ -1,7 +1,7 @@
 # VLM Arena Image-to-Image Evaluation Alignment Report
 
-> Date: 2026-05-29  
-> Scope: Keys / VLM Arena  
+> Date: 2026-05-29
+> Scope: Keys / VLM Arena
 > Reference: `http://localhost:3001/superadmin/settings/api_key_and_model_setting#image-to-image-evaluation`
 
 ## Reference Decomposition
@@ -54,5 +54,5 @@ The reference implementation evaluates image-to-image models as a row-based benc
 
 ## Notes
 
-- The reference page itself redirects to login in the browser, so the implementation was decomposed from the local source checkout behind that route: `/Volumes/KLEVV-4T-1/Real Estate Management Projects/Owner-Property-Management-AI-SPA`.
+- The reference page itself redirects to login in the browser, so the implementation was decomposed from the local source checkout behind that route: `/Users/Project-Manager/internal-resources/projects/owner-property-management-ai-spa`.
 - Project Manager now contains client-side provider adapters for Gemini image output, OpenAI image edits, and Qwen multimodal generation, matching the reference request/response normalization.

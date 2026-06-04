@@ -37,7 +37,7 @@ Parallel unrelated worktree items (not F43): `governedProjectsMetric`, `CompanyS
 
 ### Open decisions for implementer
 
-- Resolve `pmRepoRoot`: constant `/Users/Project-Manager` in view vs bridge-detected app root (config uses `/Volumes/KLEVV-4T-1/Project-Manager` on some machines — prefer same root as `spawnAgent` cwd elsewhere in app).
+- Resolve `pmRepoRoot`: constant `/Users/Project-Manager` in view vs bridge-detected app root (config uses `/Users/Project-Manager` on some machines — prefer same root as `spawnAgent` cwd elsewhere in app).
 - Whether run-all continues after fail (default: no).
 
 ### Verification log (kickoff)

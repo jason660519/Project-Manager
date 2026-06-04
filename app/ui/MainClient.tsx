@@ -176,7 +176,7 @@ const SEED_PROJECTS: ProjectEntry[] = [
     id: 'owner-property',
     config: ensureEngineerRoles(sampleConfig1 as ProjectManagerConfig),
     configPath:
-      '/Volumes/KLEVV-4T-1/Real Estate Management Projects/Owner-Property-Management-AI-SPA/.project-manager/config.json',
+      '/Users/Project-Manager/internal-resources/projects/owner-property-management-ai-spa/.project-manager/config.json',
   },
   {
     id: 'project-manager',

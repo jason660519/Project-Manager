@@ -1,7 +1,7 @@
 # LLM Arena Reference Flow Breakdown
 
-> Date: 2026-05-29  
-> Reference: `/Volumes/KLEVV-4T-1/Real Estate Management Projects/Owner-Property-Management-AI-SPA/apps/superadmin`  
+> Date: 2026-05-29
+> Reference: `/Users/Project-Manager/internal-resources/projects/owner-property-management-ai-spa/apps/superadmin`
 > Page: `http://localhost:3001/superadmin/settings/api_key_and_model_setting#evaluations-global`
 
 ## Business Flow

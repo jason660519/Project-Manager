@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mermaid Renderer Fixture</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      background: #071b18;
+      color: #f5f5f4;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    body {
+      margin: 0;
+      padding: 24px;
+      background: #071b18;
+    }
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+    h1 {
+      margin: 0 0 16px;
+      font-size: 22px;
+      font-weight: 650;
+    }
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    a {
+      border: 1px solid rgba(231, 229, 228, 0.18);
+      padding: 4px 8px;
+      color: #a7f3d0;
+      font-size: 12px;
+      text-decoration: none;
+    }
+    .fixture {
+      margin: 16px 0;
+      border: 1px solid rgba(231, 229, 228, 0.14);
+      background: rgba(255, 255, 255, 0.04);
+      padding: 12px;
+    }
+    .fixture-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
+    .status {
+      border: 1px solid rgba(231, 229, 228, 0.18);
+      padding: 2px 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      color: rgba(214, 211, 209, 0.78);
+    }
+    .fixture[data-status="pass"] .status {
+      border-color: rgba(16, 185, 129, 0.35);
+      color: #a7f3d0;
+    }
+    .fixture[data-status="diagnostic"] .status,
+    .fixture[data-status="fail"] .status {
+      border-color: rgba(251, 191, 36, 0.35);
+      color: #fef3c7;
+    }
+    iframe {
+      width: 100%;
+      min-height: 1px;
+      border: 0;
+      background: transparent;
+    }
+    pre {
+      margin: 10px 0 0;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      border: 1px solid rgba(251, 191, 36, 0.24);
+      background: rgba(251, 191, 36, 0.06);
+      padding: 10px;
+      color: #fef3c7;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Mermaid Renderer Fixture</h1>
+    <nav id="fixture-nav"></nav>
+    <div id="fixture-root"></div>
+  </main>
+
+  <script>
+    const fixtures = [
+      {
+        id: 'flowchart',
+        label: 'Flowchart',
+        required: true,
+        code: `flowchart TD
+  A[Open documentation] --> B{Mermaid block?}
+  B -->|Yes| C[Sandbox iframe]
+  B -->|No| D[Plain Markdown]
+  C --> E[Visible SVG]`
+      },
+      {
+        id: 'sequence',
+        label: 'Sequence Diagram',
+        required: true,
+        code: `sequenceDiagram
+  participant User
+  participant Docs
+  participant Renderer
+  User->>Docs: Open product page
+  Docs->>Renderer: postMessage(render)
+  Renderer-->>Docs: postMessage(resize)`
+      },
+      {
+        id: 'gantt',
+        label: 'Gantt Chart',
+        required: true,
+        code: `gantt
+  title Mermaid hardening
+  dateFormat  YYYY-MM-DD
+  section Delivery
+  Spec and tests :done, 2026-06-04, 1d
+  Browser smoke :active, 2026-06-04, 1d`
+      },
+      {
+        id: 'swimlane',
+        label: 'Swimlane Flowchart',
+        required: true,
+        code: `flowchart LR
+  subgraph Reader
+    A[Open docs]
+    B[Read diagram]
+  end
+  subgraph ProjectManager
+    C[Markdown parser]
+    D[MermaidBlock]
+  end
+  subgraph Renderer
+    E[Sandbox iframe]
+    F[SVG]
+  end
+  A --> C --> D --> E --> F --> B`
+      },
+      {
+        id: 'state',
+        label: 'State Diagram',
+        required: true,
+        code: `stateDiagram-v2
+  [*] --> Loading
+  Loading --> Rendered
+  Loading --> Error
+  Error --> Loading: code changed`
+      },
+      {
+        id: 'class',
+        label: 'Class Diagram',
+        required: true,
+        code: `classDiagram
+  class MermaidBlock
+  class SandboxedRenderer
+  MermaidBlock --> SandboxedRenderer`
+      },
+      {
+        id: 'architecture',
+        label: 'Architecture Diagram',
+        required: false,
+        code: `architecture-beta
+  group app(cloud)[Project Manager]
+  service docs(server)[Documentation] in app
+  service iframe(internet)[Sandbox Renderer] in app
+  service vendor(disk)[Vendored Mermaid] in app
+  docs:R --> L:iframe
+  iframe:R --> L:vendor`
+      }
+    ];
+
+    const selectedId = new URLSearchParams(window.location.search).get('fixture') || fixtures[0].id;
+    const fixture = fixtures.find((item) => item.id === selectedId) || fixtures[0];
+    const nav = document.getElementById('fixture-nav');
+    const root = document.getElementById('fixture-root');
+    const requestId = `${fixture.id}-${Date.now()}`;
+
+    for (const item of fixtures) {
+      const link = document.createElement('a');
+      link.href = `?fixture=${encodeURIComponent(item.id)}`;
+      link.textContent = item.label;
+      nav.appendChild(link);
+    }
+
+    const section = document.createElement('section');
+    section.className = 'fixture';
+    section.dataset.fixture = fixture.id;
+    section.dataset.required = String(fixture.required);
+    section.dataset.status = 'pending';
+    section.innerHTML = `
+      <div class="fixture-header">
+        <strong>${fixture.label}</strong>
+        <span class="status">pending</span>
+      </div>
+    `;
+
+    const iframe = document.createElement('iframe');
+    iframe.title = `${fixture.label} Mermaid fixture`;
+    iframe.scrolling = 'no';
+    iframe.setAttribute('sandbox', 'allow-scripts');
+    section.appendChild(iframe);
+    root.appendChild(section);
+
+    function setStatus(status, detail) {
+      section.dataset.status = status;
+      section.querySelector('.status').textContent = detail || status;
+      document.body.dataset.fixturesComplete = 'true';
+    }
+
+    window.addEventListener('message', (event) => {
+      if (iframe.contentWindow !== event.source) return;
+      const data = event.data || {};
+
+      if (data.type === 'ready') {
+        iframe.contentWindow.postMessage({
+          type: 'render',
+          id: fixture.id,
+          requestId,
+          code: fixture.code
+        }, '*');
+        return;
+      }
+
+      if (data.id !== fixture.id || data.requestId !== requestId) return;
+
+      if (data.type === 'resize' && Number.isFinite(data.height) && data.height > 0) {
+        iframe.style.height = `${Math.ceil(data.height)}px`;
+        setStatus('pass', `pass ${Math.ceil(data.height)}px`);
+        return;
+      }
+
+      if (data.type === 'error') {
+        setStatus(fixture.required ? 'fail' : 'diagnostic', fixture.required ? 'fail' : 'diagnostic');
+        const pre = document.createElement('pre');
+        pre.textContent = data.error || 'Unknown Mermaid renderer error';
+        section.appendChild(pre);
+      }
+    });
+
+    setTimeout(() => {
+      if (section.dataset.status !== 'pending') return;
+      setStatus(fixture.required ? 'fail' : 'diagnostic', fixture.required ? 'fail timeout' : 'diagnostic timeout');
+      const pre = document.createElement('pre');
+      pre.textContent = 'Fixture did not receive a renderer response before timeout.';
+      section.appendChild(pre);
+    }, 12000);
+
+    iframe.src = `./index.html?fixture=${encodeURIComponent(fixture.id)}&run=${Date.now()}`;
+  </script>
+</body>
+</html>

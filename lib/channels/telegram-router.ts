@@ -2,7 +2,8 @@ import type { ChannelCatalog } from '../types/channels';
 import type { Feature, FeatureStatus, ProjectEntry } from '../types';
 import { getChannelSecret } from '../storage/channels';
 import { getProjectsRepository } from '../storage';
-import { type TelegramMessagePayload, spawnAgent, telegramSendMessage } from '../bridge';
+import { type TelegramMessagePayload, telegramSendMessage } from '../bridge';
+import { parseMobileRemoteIntent } from '../mobileRemote/intents';
 
 function countByStatus(features: Feature[]): Record<FeatureStatus, number> {
   const counts: Record<FeatureStatus, number> = {
@@ -105,7 +106,15 @@ async function handleRunCommand(args: string[]): Promise<string> {
   if (args.length === 0) {
     return 'Usage: /run <featureId>\nExample: /run F18';
   }
-  const targetId = args[0].toLowerCase();
+  const parsed = parseMobileRemoteIntent(`/run ${args.join(' ')}`);
+  if (parsed.status === 'blocked') {
+    return `Blocked: ${parsed.reason}`;
+  }
+  if (parsed.status !== 'parsed' || parsed.intent?.type !== 'run_feature') {
+    return parsed.reason ?? 'Run requests need a feature id.';
+  }
+
+  const targetId = parsed.intent.featureId.toLowerCase();
   const projects = await getProjectsRepository().listProjects();
 
   let match: { project: ProjectEntry; feature: Feature } | null = null;
@@ -124,28 +133,50 @@ async function handleRunCommand(args: string[]): Promise<string> {
   }
   const agent = agents[0];
   const root = match.project.config.project.root;
-  const prompt =
-    `[Telegram /run] 請繼續開發 [${match.feature.id}] ${match.feature.name}。\n` +
-    `目前進度：${match.feature.progress}%\n` +
-    `實作路徑：${match.feature.paths.implementation ?? '未指定'}` +
-    (match.feature.notes ? `\n備註：${match.feature.notes}` : '');
+  return [
+    `Guarded run request prepared for [${match.feature.id}] ${match.feature.name}.`,
+    `Project: ${match.project.config.project.name}`,
+    `Agent: ${agent.name}`,
+    `Command: ${agent.command}`,
+    `Working directory: ${root}`,
+    '',
+    'Mobile / channel requests do not start local agents directly yet.',
+    'Open Project Manager Desktop to review and approve the run.',
+  ].join('\n');
+}
 
-  const finalArgs = agent.argsTemplate.map((a) =>
-    a
-      .replaceAll('{prompt}', prompt)
-      .replaceAll('{featureId}', match!.feature.id)
-      .replaceAll('{root}', root),
-  );
+export async function resolveTelegramCommandReply(
+  messageText: string,
+  catalog: ChannelCatalog,
+): Promise<string> {
+  const enabled = catalog.commandMappings.filter((m) => m.enabled);
+  const parts = messageText.trim().split(/\s+/);
+  const firstToken = (parts[0] ?? '').toLowerCase();
+  const cmdArgs = parts.slice(1);
+  const matched = enabled.find((m) => m.trigger.toLowerCase() === firstToken);
+
+  if (!matched) {
+    return `Unknown command "${firstToken}". Try /help to see what's available.`;
+  }
 
   try {
-    const { pid } = await spawnAgent({
-      command: agent.command,
-      args: finalArgs,
-      workingDir: root,
-    });
-    return `✅ Dispatched [${match.feature.id}] ${match.feature.name} to ${agent.name} (PID ${pid}).\nCheck Logs view in the desktop app for live output.`;
+    switch (matched.action) {
+      case 'help':
+        return (
+          'Project Manager commands:\n' +
+          enabled.map((m) => `${m.trigger} — ${m.description}`).join('\n')
+        );
+      case 'get_status':
+        return handleStatusCommand(cmdArgs);
+      case 'daily_report':
+        return handleReportCommand();
+      case 'run_feature':
+        return handleRunCommand(cmdArgs);
+      default:
+        return `Action "${matched.action}" not implemented yet.`;
+    }
   } catch (e) {
-    return `Failed to dispatch: ${e}`;
+    return `Command failed: ${e}`;
   }
 }
 
@@ -163,39 +194,7 @@ export async function routeTelegramCommand(
   const botToken = getChannelSecret(channel.id, 'botToken');
   if (!botToken) return;
 
-  const enabled = catalog.commandMappings.filter((m) => m.enabled);
-  const parts = msg.text.trim().split(/\s+/);
-  const firstToken = (parts[0] ?? '').toLowerCase();
-  const cmdArgs = parts.slice(1);
-  const matched = enabled.find((m) => m.trigger.toLowerCase() === firstToken);
-
-  let reply: string;
-  if (!matched) {
-    reply = `Unknown command "${firstToken}". Try /help to see what's available.`;
-  } else {
-    try {
-      switch (matched.action) {
-        case 'help':
-          reply =
-            'Project Manager commands:\n' +
-            enabled.map((m) => `${m.trigger} — ${m.description}`).join('\n');
-          break;
-        case 'get_status':
-          reply = await handleStatusCommand(cmdArgs);
-          break;
-        case 'daily_report':
-          reply = await handleReportCommand();
-          break;
-        case 'run_feature':
-          reply = await handleRunCommand(cmdArgs);
-          break;
-        default:
-          reply = `Action "${matched.action}" not implemented yet.`;
-      }
-    } catch (e) {
-      reply = `Command failed: ${e}`;
-    }
-  }
+  const reply = await resolveTelegramCommandReply(msg.text, catalog);
 
   try {
     await telegramSendMessage(botToken, msg.chatId, reply);

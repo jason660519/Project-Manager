@@ -128,7 +128,7 @@ Switch to the **Commands** sheet in the bottom tab strip to manage what triggers
 | `help` | Replies with the list of currently-enabled triggers and descriptions. |
 | `get_status` | Returns a per-project summary of feature counts (`in_progress`, `done`, `todo`). `/status <project name>` drills into one project. |
 | `daily_report` | Lists features that have been updated in the last 7 days, sorted newest first. |
-| `run_feature` | Usage: `/run <featureId>` — dispatches the feature to the project's first configured agent and returns the PID. |
+| `run_feature` | Usage: `/run <featureId>` — prepares a guarded run request with project, agent, command, and working-directory details. It does not start a local agent from the phone; review and approval stay in Project Manager Desktop. |
 | `custom` | Reserved for user-defined actions; the bot will reply that the action is not yet implemented. |
 
 The default mapping table seeds `/help`, `/status`, `/report`, and `/run` on first run; you can disable any of them with the row toggle or add new triggers with **+ Add command**.

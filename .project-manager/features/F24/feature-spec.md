@@ -22,7 +22,7 @@ Create an Integrations Hub sheet named `Connected Instances` that explains where
 - Add a bottom sheet tab labeled `Connected Instances`.
 - Render rows in the existing Integrations Hub table pattern.
 - Seed rows from known Project Manager runtime endpoints:
-  - Project Manager local runtime at `/Volumes/KLEVV-4T-1/Project-Manager`
+  - Project Manager local runtime at `/Users/Project-Manager`
   - Hermes Agent Dashboard at `http://127.0.0.1:9119`
   - OpenClaw Dashboard at `http://127.0.0.1:18790/`
   - Living Room Server `rick@192.168.1.6`

@@ -61,7 +61,7 @@ Root cause: user ran `./start_project_manager.sh openclaw` without Node installe
 
 - Detail sheet shows **Autostart on stack launch** toggle for project-scoped sidecar plugins (`openclaw`, `hermes-agent`).
 - When binary not detected, show guidance banner pointing to Install lifecycle command.
-- Pass PM repo root from `MainClient` for mirror writes and terminal cwd (remove hardcoded `/Volumes/KLEVV-4T-1/...`).
+- Pass PM repo root from `MainClient` for mirror writes and terminal cwd (remove hardcoded `external SSD absolute path`).
 
 ## Technical Requirements
 

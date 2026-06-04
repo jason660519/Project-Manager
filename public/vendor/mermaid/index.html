@@ -30,10 +30,26 @@
   <div id="container"></div>
 
   <script>
-    // Initialize Mermaid with dark theme configurations to match Project Manager's design
+    const RENDER_TIMEOUT_MS = 8000;
+
+    function withTimeout(promise, timeoutMs) {
+      let timeoutId;
+      const timeout = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error(`Mermaid render timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+      });
+      return Promise.race([promise, timeout]).finally(() => {
+        clearTimeout(timeoutId);
+      });
+    }
+
+    // Initialize Mermaid with dark theme configurations to match Project Manager's design.
     mermaid.initialize({
       startOnLoad: false,
       theme: 'dark',
+      securityLevel: 'strict',
+      htmlLabels: false,
       themeVariables: {
         background: 'transparent',
         primaryColor: 'rgb(110 231 183)',
@@ -44,7 +60,7 @@
     });
 
     window.addEventListener('message', async (event) => {
-      const { type, code, id } = event.data || {};
+      const { type, code, id, requestId } = event.data || {};
       if (type !== 'render') return;
 
       const container = document.getElementById('container');
@@ -53,17 +69,26 @@
       try {
         // Render the diagram to SVG string.
         // In Mermaid, the first argument to render must be a unique ID starting with a letter.
-        const { svg } = await mermaid.render(`mg-${id}`, code);
+        const { svg } = await withTimeout(
+          mermaid.render(`mg-${id}-${requestId}`, code),
+          RENDER_TIMEOUT_MS
+        );
         
         container.innerHTML = svg;
 
-        // Measure the container's height after insertion
-        // Since max-width: 100% may scale the SVG, let's use getBoundingClientRect for absolute precision.
-        setTimeout(() => {
-          const rect = container.getBoundingClientRect();
-          const height = Math.ceil(rect.height);
-          window.parent.postMessage({ type: 'resize', height, id }, '*');
-        }, 50); // Small timeout to ensure browser paints and layout settles
+        const reportSize = () => {
+          const svgNode = container.querySelector('svg');
+          const rect = (svgNode || container).getBoundingClientRect();
+          const viewBoxHeight = svgNode && svgNode.viewBox && svgNode.viewBox.baseVal
+            ? svgNode.viewBox.baseVal.height
+            : 0;
+          const height = Math.max(1, Math.ceil(rect.height || viewBoxHeight));
+          window.parent.postMessage({ type: 'resize', height, id, requestId }, '*');
+        };
+
+        requestAnimationFrame(() => {
+          setTimeout(reportSize, 50);
+        });
       } catch (err) {
         // Extract a clean error string
         let errorMsg = err.message || String(err);
@@ -73,7 +98,7 @@
           errorMsg = errorMsg.split('\n')[0];
         }
 
-        window.parent.postMessage({ type: 'error', error: errorMsg, id }, '*');
+        window.parent.postMessage({ type: 'error', error: errorMsg, id, requestId }, '*');
       }
     });
 
