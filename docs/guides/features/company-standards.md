@@ -71,10 +71,24 @@ Four at-a-glance numbers across the top:
 
 This section lists the checks Project Manager expects engineers to run before shipping standards-sensitive work. In the **Tauri desktop app**, each blocking gate card exposes **Run**; the section header exposes **Run blocking gates** (serial: i18n → standards → docs, stop on first failure). Output streams to **Logs** via the existing `spawnAgent` pipeline. **Browser dev mode** (`npm run dev`) shows the same commands but disables Run — copy the command to a terminal instead.
 
+Project Manager now separates daily verification from governance reporting:
+
+- `npm run verify:quick` is the local changed-file gate for development and
+  pre-commit feedback.
+- `npm run verify:baseline` remains the PR/main landing gate.
+- Company Standards recurring scans are the right place for cross-app standards
+  drift, color-token advisories, file naming trends, and app profile adoption
+  reports.
+
+Scheduled governance does not replace per-diff correctness checks such as
+typecheck, tests, Rust checks, static-export hygiene, schema/bridge review, or
+manual UI smoke.
+
 Registry and policy: [`standardsGates.ts`](../../../lib/companyStandards/standardsGates.ts), [`executionPolicy.ts`](../../../lib/companyStandards/executionPolicy.ts), [`spawnStandardsGate.ts`](../../../lib/companyStandards/spawnStandardsGate.ts). Features **F43** (gate UI) and **F44** (execution policy stack — no CLI bypass). See [Execution Policy](./execution-policy.md).
 
 | Gate | Command | Scope | Status |
 |---|---|---|---|
+| Quick changed-file verification | `npm run verify:quick` | Project Manager local diff | Local fast gate |
 | UI i18n hardcoded-copy gate | `npm run i18n:check` | Project Manager local | Active blocker |
 | Composite standards gate | `npm run standards:check` | PM plus company baseline | Active blocker |
 | Documentation governance | `npm run docs:check` | Repo documentation | Active blocker |

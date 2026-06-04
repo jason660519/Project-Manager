@@ -17,6 +17,7 @@
     "feature:resume": "node scripts/resume-feature-checkpoint.mjs",
     "bridge:typecheck": "tsc --noEmit --project ../shared-bridge/tsconfig.json",
     "standards:check": "/Users/Company-AI-App-Standards/scripts/company-standards.sh check .",
+    "verify:quick": "bash scripts/verify-quick.sh",
     "verify:baseline": "bash scripts/verify-baseline.sh",
     "verify:dev-issues": "node scripts/check-next-dev-issues.mjs",
     "verify:restart-pm": "bash scripts/restart-project-manager-after-tests.sh npm run verify:baseline",

@@ -55,7 +55,8 @@ git merge origin/main --no-edit
 
 ## Step 3: Verification gauntlet (all must be green)
 
-Run the single consolidated gate:
+Run the single consolidated gate once, after Step 2 has synced `origin/main`
+into the branch:
 
 ```bash
 npm run verify:baseline
@@ -64,6 +65,11 @@ npm run verify:baseline
 This executes: `typecheck`, `standards:check`, `docs:check`, static-export hygiene scan, full `npm test`, `cargo check` (when `cargo` is on PATH), and `npm run build`.
 
 **Any failure → STOP.** Paste the failing output. Do not commit a red baseline.
+
+Do not re-run full baseline separately for commit, push, and PR creation after
+this point unless files change, the branch is re-synced, or a previous failure
+required a fix. The purpose is one verified merged-state gate, not repeated
+release builds around each git sub-step.
 
 **Equivalent manual run** (only if debugging one step):
 
@@ -84,6 +90,14 @@ npm run build
 - Schema-only change → run everything anyway.
 
 When skipping, **say so explicitly** in the output (`"Skipped: cargo test (doc-only change)"`).
+
+For development or pre-commit fast feedback before invoking `ship`, prefer:
+
+```bash
+npm run verify:quick
+```
+
+`verify:quick` is not a substitute for this Step 3 final baseline.
 
 ---
 

@@ -1,8 +1,8 @@
 # Verification Runbook
 
 > Status: Active  
-> Last updated: 2026-06-03
-> Primary files: `package.json`, `scripts/docs-governance-check.sh`, `src-tauri/Cargo.toml`, `vitest.config.ts`
+> Last updated: 2026-06-04
+> Primary files: `package.json`, `scripts/verify-quick.sh`, `scripts/verify-baseline.sh`, `scripts/docs-governance-check.sh`, `src-tauri/Cargo.toml`, `vitest.config.ts`
 
 ---
 
@@ -10,7 +10,20 @@
 
 ## 1. Standard Check Order
 
-Run these before handing off meaningful changes:
+Use the tier that matches the workflow stage:
+
+```bash
+npm run verify:quick
+```
+
+Use `verify:quick` during development or before a local commit when the goal is
+to catch changed-file risks without paying for the full release gate. It
+classifies the current diff and runs the relevant subset: docs governance for
+docs-only work, shell/Node syntax checks for script changes, TypeScript and
+client hygiene for TS/UI changes, Rust `cargo check` for Tauri changes, and full
+baseline for schema/storage/config-shape changes.
+
+Run the full gate before handing off meaningful completion or landing work:
 
 ```bash
 npm run verify:baseline
@@ -31,13 +44,16 @@ cargo check --manifest-path src-tauri/Cargo.toml
 npm run build
 ```
 
-Use narrower checks for small documentation-only changes, but `docs:check` and `standards:check` should still run.
+Use `verify:quick` for narrow local checks, but do not treat it as release
+readiness. PR/main landing still requires one `verify:baseline` after syncing
+the branch with `origin/main`.
 
 ## 2. What Each Check Covers
 
 | Command | Covers | Notes |
 | --- | --- | --- |
 | `npm run guard:legacy-surfaces` | Retired Coding Editor entry, current `/xmux` route, draggable dashboard sheets | Also runs automatically before `npm run build`. |
+| `npm run verify:quick` | Changed-file-aware local verification | Use during development and before local commits; escalates schema/storage changes to full baseline. |
 | `npm run docs:check` | Filename safety, repo-local docs layout, bilingual heading order | Required after docs edits. |
 | `npm run standards:check` | Company baseline standards | May report P2 advisory findings. |
 | `npm run typecheck` | Next typegen and TypeScript correctness | Required after TS or UI edits. |
@@ -52,11 +68,16 @@ Use narrower checks for small documentation-only changes, but `docs:check` and `
 For docs-only changes:
 
 ```bash
-npm run docs:check
-npm run standards:check
+npm run verify:quick
 ```
 
 If docs include code snippets that refer to command names or schema fields, also run targeted searches against source files to confirm names are current.
+
+`verify:quick` runs `docs:check` for docs-only changes and explicitly skips
+typecheck, tests, Rust, and build. Company Standards full/advisory scans should
+run before standards-sensitive landing work or in scheduled governance; they do
+not need to block every local docs-only commit unless the docs change standards
+policy itself.
 
 ## 4. Release Readiness
 
@@ -81,6 +102,17 @@ Automated tests alone are **not** sufficient for UI work. This section exists be
 
 ### 6.1 Mandatory automated gate
 
+During development:
+
+```bash
+npm run verify:quick
+```
+
+This is the fast feedback gate. It may be enough to decide the next coding step,
+but it is not enough to claim the feature is complete.
+
+Before completion or landing:
+
 ```bash
 npm run verify:baseline
 ```
@@ -92,6 +124,10 @@ All steps must exit 0 before:
 - offering git commit or PR (user must still explicitly request commit/PR)
 
 Skill: `.claude/skills/verify-before-complete/SKILL.md`. Cursor rule: `.cursor/rules/verify-before-complete.mdc`.
+
+For a commit-only request where the user is not asking to ship or open a PR,
+`verify:quick` may be used as a pre-commit fast gate if the final response
+states exactly what it covered. Do not call that "full verification passed."
 
 ### 6.2 Static-export hygiene (inside baseline)
 
@@ -167,6 +203,18 @@ Workflow: `.github/workflows/verify-baseline.yml`
 
 Runs on every **pull request** and **push to `main`**: `npm run verify:baseline` (typecheck, docs, hygiene, full tests, `cargo check`, static build). Company `standards:check` is skipped in CI (`VERIFY_SKIP_STANDARDS=1`) because the standards repo path is machine-local; run `npm run standards:check` locally before ship.
 
+### 7.1a Scheduled Company Standards Governance
+
+Company Standards governance is the right home for recurring cross-app checks:
+
+- `company-standards.sh check .` full/advisory scans.
+- Color-token drift and P2 advisory reports.
+- File naming and documentation layout trend reports across governed apps.
+- App profile adoption and standards package extraction readiness.
+
+Scheduled governance supplements PR checks; it does not replace per-diff
+typecheck, tests, build, Rust, static-export, schema, bridge, or manual UI smoke.
+
 ### 7.2 Pre-commit hook (optional, recommended)
 
 Install once per clone:
@@ -185,7 +233,16 @@ To bypass in an emergency (discouraged): `git commit --no-verify` — document w
 
 ## 1. Standard Check Order
 
-有實質變更時，交付前執行：
+開發中或 local commit 前需要快速回饋時，執行：
+
+```bash
+npm run verify:quick
+```
+
+`verify:quick` 會依 changed files 選擇 docs、script syntax、TypeScript/client
+hygiene、Rust check，或在 schema/storage 風險時升級到 full baseline。
+
+完成交付或 landing 前執行：
 
 ```bash
 npm run verify:baseline
@@ -206,13 +263,15 @@ cargo check --manifest-path src-tauri/Cargo.toml
 npm run build
 ```
 
-小型 docs-only changes 可以跑較窄的檢查，但仍應執行 `docs:check` 與 `standards:check`。
+小型 local 檢查可跑 `verify:quick`，但 PR/main landing 仍必須在同步 `origin/main`
+後跑一次 `verify:baseline`。
 
 ## 2. 各檢查涵蓋範圍
 
 | Command | Covers | 說明 |
 | --- | --- | --- |
 | `npm run guard:legacy-surfaces` | Retired Coding Editor entry、current `/xmux` route、draggable dashboard sheets | `npm run build` 前會自動執行。 |
+| `npm run verify:quick` | Changed-file-aware local verification | 開發中與 local commit 前使用；schema/storage changes 會升級 full baseline。 |
 | `npm run docs:check` | Filename safety、repo-local docs layout、bilingual heading order | Docs edits 後必跑。 |
 | `npm run standards:check` | Company baseline standards | 可能回報 P2 advisory findings。 |
 | `npm run typecheck` | Next typegen 與 TypeScript correctness | TS 或 UI edits 後必跑。 |
@@ -227,11 +286,15 @@ npm run build
 Docs-only changes：
 
 ```bash
-npm run docs:check
-npm run standards:check
+npm run verify:quick
 ```
 
 如果文件中的 code snippets 提到 command names 或 schema fields，也要針對 source files 做 targeted searches，確認名稱仍是最新。
+
+`verify:quick` 在 docs-only changes 會執行 `docs:check`，並明確略過 typecheck、
+tests、Rust 與 build。Company Standards full/advisory scans 適合在
+standards-sensitive landing 前或 scheduled governance 中執行；除非文件本身改到
+standards policy，否則不需要阻塞每個 local docs-only commit。
 
 ## 4. Release Readiness
 

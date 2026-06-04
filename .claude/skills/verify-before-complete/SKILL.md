@@ -13,6 +13,16 @@ This skill closes the gap between "tests passed" and "app actually opens".
 
 ## Step 1: Automated baseline (required)
 
+During development or before a local commit, a fast changed-file gate is
+available:
+
+```bash
+npm run verify:quick
+```
+
+This can guide implementation and catch local regressions, but it is not enough
+to claim completion or full readiness.
+
 From repo root:
 
 ```bash
@@ -78,7 +88,7 @@ Before setting `.project-manager/config.json` progress to **100%** or phase `don
 |---|---|
 | Nothing about git | **Never** commit or open PR |
 | "ship it" / "land this" | Run `ship` skill (which re-runs verify baseline) |
-| "commit" | Commit only after Step 1–3 green |
+| "commit" | Use `verify:quick` for fast local commit prep only if you report its scope; use Step 1–3 before saying ready to PR/ship |
 
 **Forbidden phrases without green baseline + UI smoke (when UI touched):**
 

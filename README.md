@@ -113,6 +113,7 @@ npm run tauri:build           # Builds production installer (.app / .exe; reject
 
 - `npm run guard:legacy-surfaces`
 - `npm run branch:check`
+- `npm run verify:quick`
 - `npm run typecheck`
 - `npm run build`
 - `npm run docs:check`

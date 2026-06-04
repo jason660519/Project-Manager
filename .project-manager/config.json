@@ -1397,6 +1397,38 @@
         ],
         "kickoffAt": "2026-06-03T03:36:12.534Z"
       }
+    },
+    {
+      "id": "F45",
+      "name": "Tiered Verification Workflow",
+      "category": "Engineering Workflow",
+      "status": "completed",
+      "progress": 100,
+      "phase": "done",
+      "points": 5,
+      "locatedSection": "docs/engineering",
+      "readmePath": ".project-manager/features/F45/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F45/",
+        "spec": ".project-manager/features/F45/feature-spec.md",
+        "tdd": ".project-manager/features/F45/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F45/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F45/",
+        "implementation": "scripts/verify-quick.sh",
+        "test": "scripts/verify-quick.sh"
+      },
+      "notes": "Split ship verification into quick, landing, and scheduled governance gates.",
+      "createdAt": "2026-06-04T02:53:25.737Z",
+      "updatedAt": "2026-06-04T03:00:30Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "scripts/verify-quick.sh",
+          "scripts/verify-quick.sh",
+          ".project-manager/features/F45/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-04T02:53:25.737Z"
+      }
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",
@@ -1407,6 +1439,6 @@
     "root": "/Volumes/KLEVV-4T-1/Project-Manager"
   },
   "schemaVersion": 8,
-  "updatedAt": "2026-06-03T03:36:12.534Z",
-  "updatedBy": "Cursor"
+  "updatedAt": "2026-06-04T03:00:30Z",
+  "updatedBy": "Codex"
 }
