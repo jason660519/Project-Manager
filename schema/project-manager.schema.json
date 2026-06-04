@@ -5,7 +5,7 @@
   "properties": {
     "schemaVersion": {
       "type": "integer",
-      "description": "Schema version. Increment when making breaking changes to the config structure. Current: 9.",
+      "description": "Schema version. Increment when making breaking changes to the config structure. Current: 10.",
       "minimum": 1
     },
     "id": {
@@ -220,9 +220,54 @@
           "type": "array",
           "description": "Capability assignments per role (schema v7). Each references a `passed` candidate from the matching sheet.",
           "items": { "$ref": "#/definitions/roleCapability" }
+        },
+        "browserAccess": {
+          "$ref": "#/definitions/browserAccessPolicy",
+          "description": "Browser allowlist for PM-mediated search/launch (schema v10, ADR-017). Absent = disabled."
+        },
+        "externalFileAccess": {
+          "$ref": "#/definitions/externalFileAccessPolicy",
+          "description": "External (non-project) directory access policy (schema v10, ADR-017). Absent = no external access."
         }
       },
       "required": ["id", "name", "slug", "skills", "commands", "systemPrompt", "referenceFiles"]
+    },
+    "browserAccessPolicy": {
+      "type": "object",
+      "description": "Which installed browsers an engineer may use (schema v10, ADR-017).",
+      "properties": {
+        "enabled": { "type": "boolean", "description": "Master switch. Default false — no browser access." },
+        "allowedBrowserIds": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Allowed browser ids — subset of detected InstalledBrowser.id (e.g. macOS bundle ids)."
+        }
+      },
+      "required": ["enabled", "allowedBrowserIds"]
+    },
+    "externalFileAccessPolicy": {
+      "type": "object",
+      "description": "External (non-project) directory access policy (schema v10, ADR-017).",
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/externalFileAccessEntry" }
+        },
+        "requireConfirmForUnlisted": {
+          "type": "boolean",
+          "description": "Stored intent for a future runtime authorization prompt (L2b). Inert in v10."
+        }
+      },
+      "required": ["entries", "requireConfirmForUnlisted"]
+    },
+    "externalFileAccessEntry": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string", "description": "Absolute path to an external (non-project) directory." },
+        "kind": { "type": "string", "enum": ["local-dir", "gdrive", "onedrive", "icloud", "other"] },
+        "permission": { "type": "string", "enum": ["read", "write", "deny"], "description": "deny always wins over read/write." }
+      },
+      "required": ["path", "kind", "permission"]
     },
     "feature": {
       "type": "object",

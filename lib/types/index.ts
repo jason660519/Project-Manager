@@ -215,7 +215,7 @@ export interface ExecutionResult {
 export type AnyAdapterConfig = IDEAdapterConfig | AgentAdapterConfig | AgentAppAdapterConfig;
 
 export interface ProjectManagerConfig {
-  /** Increment when making breaking changes to the config structure. Current: 9 */
+  /** Increment when making breaking changes to the config structure. Current: 10 */
   schemaVersion: number;
   engineerRoles?: EngineerRole[];
   // ── Sync identity + audit fields (schema v2, ADR-006) ──────────────────
@@ -245,6 +245,68 @@ export interface WorkingScope {
    * strict — dispatch modal shows a red warning when the feature path is outside scope.
    */
   mode: 'soft' | 'strict';
+}
+
+// ── Engineer external access policies (schema v10, ADR-017) ──────────────────
+
+/** A browser PM detected as installed on the host (returned by `listInstalledBrowsers`). */
+export interface InstalledBrowser {
+  /** Stable id — platform bundle id on macOS (e.g. "com.google.Chrome"). */
+  id: string;
+  /** Human-readable name (e.g. "Google Chrome"). */
+  name: string;
+  /** Absolute path to the discovered app bundle / executable. */
+  path: string;
+  /** Best-effort version string; absent when it can't be read. */
+  version?: string;
+}
+
+/**
+ * Which installed browsers an engineer may use for search/launch.
+ *
+ * ENFORCED for browsers PM launches itself (xmux embedded webview / shell open).
+ * For agent-owned browser tooling (e.g. a browser MCP inside a spawned CLI) this
+ * is ADVISORY only — injected into the dispatch prompt, not a hard wall.
+ */
+export interface BrowserAccessPolicy {
+  /** Master switch. Default (absent) is treated as `false` — no browser access. */
+  enabled: boolean;
+  /** Allowed browser ids — a subset of detected `InstalledBrowser.id` values. */
+  allowedBrowserIds: string[];
+}
+
+/** Permission level for one external path. `deny` always wins over `read`/`write`. */
+export type ExternalFilePermission = 'read' | 'write' | 'deny';
+
+/** Coarse classification of an external location — for UI grouping only. */
+export type ExternalFileKind = 'local-dir' | 'gdrive' | 'onedrive' | 'icloud' | 'other';
+
+export interface ExternalFileAccessEntry {
+  /** Absolute path to an external (non-project) directory. */
+  path: string;
+  kind: ExternalFileKind;
+  permission: ExternalFilePermission;
+}
+
+/**
+ * External (non-project) file access policy for an engineer.
+ *
+ * ENFORCED at dispatch for adapters whose CLI exposes a native permission
+ * mechanism PM knows how to translate to (see `augmentArgsWithFileAccessPolicy`);
+ * ADVISORY (prompt-injected) for every other adapter. The detail sheet surfaces
+ * which of the two applies per selected adapter.
+ *
+ * Note: distinct from `WorkingScope`, which restricts *project-internal* modify
+ * paths. This policy governs *external* (non-project) directories.
+ */
+export interface ExternalFileAccessPolicy {
+  entries: ExternalFileAccessEntry[];
+  /**
+   * Stored intent for a future runtime authorization prompt (L2b OS-sandbox era).
+   * NOT yet live: there is no Rust→UI auth loop, so the editor renders this
+   * disabled. Persisted now so enabling L2b later needs no schema bump.
+   */
+  requireConfirmForUnlisted: boolean;
 }
 
 /** One entry in an engineer role's primary model or ordered fallback chain. */
@@ -338,6 +400,10 @@ export interface EngineerRole {
   defaultAgentId?: string;
   notes?: string;
   workingScope?: WorkingScope;
+  /** Browser allowlist for PM-mediated search/launch (schema v10, ADR-017). Absent = disabled. */
+  browserAccess?: BrowserAccessPolicy;
+  /** External (non-project) directory access policy (schema v10, ADR-017). Absent = no external access. */
+  externalFileAccess?: ExternalFileAccessPolicy;
   /** Primary LLM model used when dispatching to this engineer. Stored on the role so dispatch modal stays simple. */
   primaryModel?: ModelFallbackEntry;
   /** Ordered fallback chain tried when primaryModel API call fails. Applies to direct LLM calls only, not CLI agent spawns. */

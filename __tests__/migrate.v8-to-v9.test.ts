@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { CURRENT_SCHEMA_VERSION, migrateConfig } from '../lib/storage/migrate';
 
 describe('migrate v8 → v9 (F49 feature dependencies)', () => {
-  it('exposes 9 as the current schema version', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(9);
+  it('exposes 10 as the current schema version', () => {
+    expect(CURRENT_SCHEMA_VERSION).toBe(10);
   });
 
   it('back-fills empty upstreamDependencies on legacy features', () => {
@@ -18,7 +18,7 @@ describe('migrate v8 → v9 (F49 feature dependencies)', () => {
       adapters: { ides: [], agents: [] },
     });
 
-    expect(out.schemaVersion).toBe(9);
+    expect(out.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(out.features[0].upstreamDependencies).toEqual([]);
     expect(out.features[1].upstreamDependencies).toEqual([]);
   });
@@ -45,7 +45,7 @@ describe('migrate v8 → v9 (F49 feature dependencies)', () => {
       adapters: { ides: [], agents: [] },
     });
 
-    expect(out.schemaVersion).toBe(9);
+    expect(out.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(out.features[0].upstreamDependencies).toEqual([
       { featureId: 'F35', kind: 'hard', reason: 'Workflow templates provide the dispatch DAG language.' },
       { projectId: 'project-a', featureId: 'F01', kind: 'soft' },

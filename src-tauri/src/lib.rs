@@ -695,6 +695,98 @@ async fn write_file(path: String, content: String) -> Result<(), String> {
         .map_err(|e| format!("Cannot write {path}: {e}"))
 }
 
+/// A browser detected as installed on the host (schema v10 / ADR-017).
+#[derive(Serialize, Clone)]
+struct InstalledBrowser {
+    /// Stable id — platform bundle id on macOS (e.g. "com.google.Chrome").
+    id: String,
+    name: String,
+    /// Absolute path to the discovered app bundle.
+    path: String,
+    /// Best-effort version string; `None` when it can't be read.
+    version: Option<String>,
+}
+
+/// Detect installed web browsers on the host.
+///
+/// macOS only for now (ADR-017): scans a fixed set of known browser bundles
+/// under the standard Applications directories. Returns an empty vec — NOT an
+/// error — when none are found or on non-macOS platforms, so the UI can
+/// distinguish "none installed" from a genuine failure. Version is best-effort.
+#[tauri::command]
+async fn list_installed_browsers() -> Result<Vec<InstalledBrowser>, String> {
+    #[cfg(target_os = "macos")]
+    {
+        Ok(detect_macos_browsers())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Ok(Vec::new())
+    }
+}
+
+/// Known macOS browsers as (bundle id, display name, `.app` bundle name).
+#[cfg(target_os = "macos")]
+const KNOWN_MACOS_BROWSERS: &[(&str, &str, &str)] = &[
+    ("com.apple.Safari", "Safari", "Safari.app"),
+    ("com.google.Chrome", "Google Chrome", "Google Chrome.app"),
+    ("com.microsoft.edgemac", "Microsoft Edge", "Microsoft Edge.app"),
+    ("org.mozilla.firefox", "Firefox", "Firefox.app"),
+    ("com.brave.Browser", "Brave Browser", "Brave Browser.app"),
+    ("company.thebrowser.Browser", "Arc", "Arc.app"),
+    ("com.operasoftware.Opera", "Opera", "Opera.app"),
+    ("org.chromium.Chromium", "Chromium", "Chromium.app"),
+    ("com.vivaldi.Vivaldi", "Vivaldi", "Vivaldi.app"),
+];
+
+#[cfg(target_os = "macos")]
+fn detect_macos_browsers() -> Vec<InstalledBrowser> {
+    // Search roots in priority order. Safari historically lives in /Applications
+    // but moved under /System/Applications on recent macOS.
+    let mut roots: Vec<PathBuf> = vec![
+        PathBuf::from("/Applications"),
+        PathBuf::from("/System/Applications"),
+    ];
+    if let Some(home) = std::env::var_os("HOME") {
+        roots.push(PathBuf::from(home).join("Applications"));
+    }
+
+    let mut found: Vec<InstalledBrowser> = Vec::new();
+    for (id, name, bundle) in KNOWN_MACOS_BROWSERS {
+        if let Some(path) = roots.iter().map(|r| r.join(bundle)).find(|p| p.exists()) {
+            let version = read_bundle_version(&path);
+            found.push(InstalledBrowser {
+                id: (*id).to_string(),
+                name: (*name).to_string(),
+                path: path.to_string_lossy().into_owned(),
+                version,
+            });
+        }
+    }
+    found
+}
+
+/// Best-effort read of `CFBundleShortVersionString` from an app bundle's Info.plist.
+#[cfg(target_os = "macos")]
+fn read_bundle_version(app_path: &Path) -> Option<String> {
+    let info = app_path.join("Contents/Info");
+    let out = std::process::Command::new("defaults")
+        .arg("read")
+        .arg(&info)
+        .arg("CFBundleShortVersionString")
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let v = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if v.is_empty() {
+        None
+    } else {
+        Some(v)
+    }
+}
+
 #[derive(Serialize, Clone)]
 struct EnvFileInfo {
     path: String,
@@ -4181,6 +4273,37 @@ async fn write_mcp_config(
     Ok(path.to_string_lossy().to_string())
 }
 
+/// Write a temporary engineer file-access policy config (e.g. a Claude Code
+/// settings file) for PM to hand to a child CLI at dispatch time. Mirrors
+/// `write_mcp_config`: unique file under the OS temp dir, old files pruned.
+///
+/// `content` is assembled on the renderer side (ADR-003 — policy translation
+/// lives in TypeScript) and written verbatim. `extension` selects the suffix
+/// (e.g. "json"). Returns the absolute path of the written file.
+#[tauri::command]
+async fn write_engineer_policy_config(
+    content: String,
+    extension: String,
+) -> Result<String, String> {
+    let dir = std::env::temp_dir().join("project-manager-policy");
+    tokio::fs::create_dir_all(&dir)
+        .await
+        .map_err(|e| format!("Cannot create policy temp dir: {e}"))?;
+    cleanup_old_mcp_configs(&dir).await;
+
+    let trimmed = extension.trim().trim_start_matches('.');
+    let ext = if trimmed.is_empty() { "json" } else { trimmed };
+    let nano = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let path = dir.join(format!("policy-{nano}.{ext}"));
+    tokio::fs::write(&path, content)
+        .await
+        .map_err(|e| format!("Cannot write {}: {e}", path.display()))?;
+    Ok(path.to_string_lossy().to_string())
+}
+
 fn is_markdown_path(path: &str) -> bool {
     Path::new(path)
         .extension()
@@ -5392,6 +5515,39 @@ async fn skill_move_files(
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
+mod browser_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn list_installed_browsers_never_errors() {
+        // Detection must degrade to an empty list, never an error — the UI
+        // relies on Ok([]) meaning "none found", not "scan failed".
+        assert!(list_installed_browsers().await.is_ok());
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn read_bundle_version_missing_path_is_none() {
+        let missing = Path::new("/Applications/__pm_nonexistent_browser__.app");
+        assert_eq!(read_bundle_version(missing), None);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn detect_macos_browsers_returns_known_unique_ids() {
+        let found = detect_macos_browsers();
+        let known: std::collections::HashSet<&str> =
+            KNOWN_MACOS_BROWSERS.iter().map(|(id, _, _)| *id).collect();
+        let mut seen = std::collections::HashSet::new();
+        for b in &found {
+            assert!(known.contains(b.id.as_str()), "unexpected id {}", b.id);
+            assert!(seen.insert(b.id.clone()), "duplicate id {}", b.id);
+            assert!(!b.path.is_empty(), "empty path for {}", b.id);
+        }
+    }
+}
+
+#[cfg(test)]
 mod skill_tests {
     use super::*;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -6150,6 +6306,7 @@ pub fn run() {
             list_directory_entries,
             read_file,
             write_file,
+            list_installed_browsers,
             append_pm_operation_log,
             scan_env_files,
             project_manager_root,
@@ -6164,6 +6321,7 @@ pub fn run() {
             mcp_logs,
             mcp_logs_dir,
             write_mcp_config,
+            write_engineer_policy_config,
             open_path,
             open_in_editor,
             capture_screenshot,

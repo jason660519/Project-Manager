@@ -9,7 +9,11 @@
 import { defaultDiscoveryPlan } from '../integrations/discovery/presets';
 import type { DiscoveryPlan } from '../integrations/discovery/types';
 import { migrateConfig } from '../storage';
-import type { ProjectManagerConfig } from '../types';
+import type {
+  ExternalFileAccessPolicy,
+  InstalledBrowser,
+  ProjectManagerConfig,
+} from '../types';
 import { KEY_PERSONAL_SYSTEM_CLI_EXPOSURE } from '../storage/keys';
 import { validateWorkspaceFolderPath } from '../xmux/workspacePaths';
 
@@ -976,6 +980,132 @@ export async function augmentArgsWithMcp(
   } catch {
     return baseArgs;
   }
+}
+
+// ── Engineer browser + external-file access (schema v10, ADR-017) ────────────
+
+/**
+ * Detect installed browsers on the host (macOS only for now). Returns `[]`
+ * outside Tauri or when none are found — never throws for "none installed", so
+ * callers can distinguish empty from error.
+ */
+export async function listInstalledBrowsers(): Promise<InstalledBrowser[]> {
+  if (!isTauri()) return [];
+  return invoke<InstalledBrowser[]>('list_installed_browsers');
+}
+
+/**
+ * Thrown when a file-access policy COULD NOT be applied to a known, enforceable
+ * command. The dispatch MUST abort on this — never fall back to unrestricted
+ * args (that would run the agent unsandboxed while the UI claims otherwise).
+ * See ADR-017 "Fail-Closed Enforcement".
+ */
+export class FileAccessPolicyApplyError extends Error {
+  constructor(
+    message: string,
+    readonly command: string,
+    readonly cause?: unknown,
+  ) {
+    super(message);
+    this.name = 'FileAccessPolicyApplyError';
+  }
+}
+
+/**
+ * CLI commands PM knows how to hand a native file-access permission config.
+ * Each maps to the temp-file extension + the flag template (with a
+ * `{policyPath}` placeholder). Commands NOT listed here cannot be enforced —
+ * their policy degrades to prompt-injection + an ADVISORY badge in the UI.
+ */
+const FILE_ACCESS_INJECTABLE_COMMANDS: Record<
+  string,
+  { extension: string; flag: string[] }
+> = {
+  claude: { extension: 'json', flag: ['--settings', '{policyPath}'] },
+};
+
+/** Whether PM can translate an external-file policy into `command`'s native permissions. */
+export function supportsFileAccessEnforcement(command: string): boolean {
+  return command in FILE_ACCESS_INJECTABLE_COMMANDS;
+}
+
+/**
+ * Pure translation of an external-file policy into a Claude Code settings
+ * object (`permissions.allow` / `permissions.deny`). Exported for unit tests.
+ *
+ * Rule semantics (best-effort for the `claude` adapter, may track the CLI):
+ *   - `deny`  → deny Read + Edit + Write under the path (deny ALWAYS wins).
+ *   - `read`  → allow Read; deny Edit + Write.
+ *   - `write` → allow Read + Edit + Write.
+ * Deny rules take precedence in Claude's permission model, so an explicit
+ * `deny` entry can never be widened by a broader `read`/`write` entry.
+ */
+export function buildClaudeFileAccessSettings(
+  policy: ExternalFileAccessPolicy,
+): { permissions: { allow: string[]; deny: string[] } } {
+  const allow: string[] = [];
+  const deny: string[] = [];
+  for (const entry of policy.entries) {
+    const p = entry.path.trim();
+    if (!p) continue;
+    const glob = `${p.replace(/\/+$/, '')}/**`;
+    if (entry.permission === 'deny') {
+      deny.push(`Read(${glob})`, `Edit(${glob})`, `Write(${glob})`);
+    } else if (entry.permission === 'read') {
+      allow.push(`Read(${glob})`);
+      deny.push(`Edit(${glob})`, `Write(${glob})`);
+    } else {
+      allow.push(`Read(${glob})`, `Edit(${glob})`, `Write(${glob})`);
+    }
+  }
+  return { permissions: { allow, deny } };
+}
+
+/** Write a temp engineer-policy config file and return its absolute path. Tauri only. */
+export async function writeEngineerPolicyConfig(
+  content: string,
+  extension: string,
+): Promise<string> {
+  if (!isTauri()) throw new Error('writeEngineerPolicyConfig requires Tauri runtime');
+  return invoke<string>('write_engineer_policy_config', { content, extension });
+}
+
+/**
+ * Translate an engineer's external-file policy into `command`'s native
+ * permission config and inject the flag. FAIL-CLOSED, unlike `augmentArgsWithMcp`:
+ *
+ *   - No policy / no entries          → return baseArgs (nothing to enforce).
+ *   - Command not enforceable         → return baseArgs (caller injects into the
+ *                                        prompt + shows an ADVISORY badge).
+ *   - Outside Tauri (dry-run dispatch)→ return baseArgs (no process actually spawns).
+ *   - Enforceable command, write fails→ THROW FileAccessPolicyApplyError → abort.
+ *
+ * Never silently returns unrestricted args for an enforceable command. See
+ * ADR-017.
+ */
+export async function augmentArgsWithFileAccessPolicy(
+  command: string,
+  baseArgs: string[],
+  policy: ExternalFileAccessPolicy | undefined,
+): Promise<string[]> {
+  if (!policy || policy.entries.length === 0) return baseArgs;
+  const template = FILE_ACCESS_INJECTABLE_COMMANDS[command];
+  if (!template) return baseArgs; // advisory-only adapter; enforced via prompt instead
+  if (!isTauri()) return baseArgs; // browser dispatch is a dry-run; nothing spawns
+
+  let path: string;
+  try {
+    const content = JSON.stringify(buildClaudeFileAccessSettings(policy), null, 2);
+    path = await writeEngineerPolicyConfig(content, template.extension);
+  } catch (e) {
+    throw new FileAccessPolicyApplyError(
+      `Could not apply file-access policy for "${command}" — dispatch aborted to avoid running unrestricted.`,
+      command,
+      e,
+    );
+  }
+  const policyArgs = template.flag.map((a) => a.replaceAll('{policyPath}', path));
+  return [...baseArgs, ...policyArgs];
 }
 
 // ── Event listeners ───────────────────────────────────────────────────────────
