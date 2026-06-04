@@ -4,7 +4,7 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-06-04T09:37:39.785Z",
+    "generatedAt": "2026-06-04T09:47:03.801Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
@@ -229,7 +229,7 @@ export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
         "table"
       ],
       "warnings": [],
-      "updatedAt": "2026-06-04T07:06:18.272Z"
+      "updatedAt": "2026-06-04T09:39:12.077Z"
     },
     {
       "id": "guides/features/dispatch",

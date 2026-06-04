@@ -215,7 +215,7 @@ Company Standards governance is the right home for recurring cross-app checks:
 Scheduled governance supplements PR checks; it does not replace per-diff
 typecheck, tests, build, Rust, static-export, schema, bridge, or manual UI smoke.
 
-### 7.2 Pre-commit hook (optional, recommended)
+### 7.2 Local git hooks (optional, recommended)
 
 Install once per clone:
 
@@ -223,9 +223,12 @@ Install once per clone:
 npm run githooks:install
 ```
 
-Hooks live in `.githooks/pre-commit` and run **`npm run verify:static-export`** when staged files include `.ts` / `.tsx`. Fast guard against client `fs` leaks and hydration footguns.
+Hooks live under `.githooks/`:
 
-To bypass in an emergency (discouraged): `git commit --no-verify` — document why in the PR.
+- `pre-commit` runs **`npm run verify:static-export`** when staged files include `.ts` / `.tsx`, plus table-governance static checks for table surfaces. Fast guard against client `fs` leaks, hydration footguns, and incomplete table baseline fixes.
+- `pre-push` runs **`npm run verify:quick`** for regular branch pushes, and escalates to **`npm run verify:baseline`** when pushing `main`. Set `PM_PRE_PUSH_BASELINE=1` to force the full baseline before any branch push.
+
+To bypass in an emergency (discouraged): `git commit --no-verify` or `PM_SKIP_PRE_PUSH_VERIFY=1 git push` — document why in the PR.
 
 ---
 
