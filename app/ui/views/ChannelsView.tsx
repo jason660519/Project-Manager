@@ -41,8 +41,12 @@ import {
   telegramStopPoll,
 } from '../../../lib/bridge';
 import { getProjectsRepository } from '../../../lib/storage';
-import type { Feature, FeatureStatus, ProjectEntry } from '../../../lib/types';
+import type { Feature, FeatureStatus } from '../../../lib/types';
 import { parseMobileRemoteIntent } from '../../../lib/mobileRemote/intents';
+import {
+  formatFeatureRunRequestReply,
+  prepareFeatureRunRequest,
+} from '../../../lib/mobileRemote/runRequests';
 import { useInAppAlert } from '../../../components/ui/InAppDialog';
 
 // ── Platform metadata ─────────────────────────────────────────────────────────
@@ -918,35 +922,10 @@ async function handleRunCommand(args: string[]): Promise<string> {
     return parsed.reason ?? 'Run requests need a feature id.';
   }
 
-  const targetId = parsed.intent.featureId.toLowerCase();
   const projects = await getProjectsRepository().listProjects();
-
-  let match: { project: ProjectEntry; feature: Feature } | null = null;
-  for (const p of projects) {
-    const f = p.config.features.find((x) => x.id.toLowerCase() === targetId);
-    if (f) {
-      match = { project: p, feature: f };
-      break;
-    }
-  }
-  if (!match) return `Feature "${args[0]}" not found in any project.`;
-
-  const agents = match.project.config.adapters.agents;
-  if (agents.length === 0) {
-    return `${match.project.config.project.name} has no agents configured. Add one in Plugins → Marketplace.`;
-  }
-  const agent = agents[0];
-  const root = match.project.config.project.root;
-  return [
-    `Guarded run request prepared for [${match.feature.id}] ${match.feature.name}.`,
-    `Project: ${match.project.config.project.name}`,
-    `Agent: ${agent.name}`,
-    `Command: ${agent.command}`,
-    `Working directory: ${root}`,
-    '',
-    'Mobile / channel requests do not start local agents directly yet.',
-    'Open Project Manager Desktop to review and approve the run.',
-  ].join('\n');
+  return formatFeatureRunRequestReply(
+    prepareFeatureRunRequest(parsed.intent.featureId, projects),
+  );
 }
 
 // ── Command routing ───────────────────────────────────────────────────────────

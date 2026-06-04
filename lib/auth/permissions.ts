@@ -121,3 +121,52 @@ export function getDeniedCapabilityMessage(capability: ProjectManagerCapability)
       return 'Your workspace role does not grant this capability.';
   }
 }
+
+export type WorkspaceAccessStatus =
+  | 'setup_required'
+  | 'membership_required'
+  | 'allowed'
+  | 'denied';
+
+export interface WorkspaceAccessInput {
+  supabaseConfigured: boolean;
+  role?: WorkspaceRole | null;
+  requiredCapability: ProjectManagerCapability;
+}
+
+export interface WorkspaceAccessResult {
+  status: WorkspaceAccessStatus;
+  message: string;
+}
+
+export function evaluateWorkspaceAccess({
+  supabaseConfigured,
+  role,
+  requiredCapability,
+}: WorkspaceAccessInput): WorkspaceAccessResult {
+  if (!supabaseConfigured) {
+    return {
+      status: 'setup_required',
+      message: 'Supabase cloud auth is not configured for this environment.',
+    };
+  }
+
+  if (!role) {
+    return {
+      status: 'membership_required',
+      message: 'Sign in and select a workspace before opening this console.',
+    };
+  }
+
+  if (!roleHasCapability(role, requiredCapability)) {
+    return {
+      status: 'denied',
+      message: getDeniedCapabilityMessage(requiredCapability),
+    };
+  }
+
+  return {
+    status: 'allowed',
+    message: `${getRoleConsoleLabel(role)} access granted.`,
+  };
+}

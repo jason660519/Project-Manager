@@ -1,9 +1,19 @@
 import type { ChannelCatalog } from '../types/channels';
-import type { Feature, FeatureStatus, ProjectEntry } from '../types';
+import type { Feature, FeatureStatus } from '../types';
 import { getChannelSecret } from '../storage/channels';
 import { getProjectsRepository } from '../storage';
 import { type TelegramMessagePayload, telegramSendMessage } from '../bridge';
 import { parseMobileRemoteIntent } from '../mobileRemote/intents';
+import {
+  formatFeatureRunRequestReply,
+  prepareFeatureRunRequest,
+} from '../mobileRemote/runRequests';
+import {
+  appendMobileRemoteAuditEvent,
+  policyDecisionFromParse,
+  resultStateFromPolicy,
+} from '../mobileRemote/audit';
+import { appendMobileRemoteApproval } from '../mobileRemote/approvalQueue';
 
 function countByStatus(features: Feature[]): Record<FeatureStatus, number> {
   const counts: Record<FeatureStatus, number> = {
@@ -114,35 +124,10 @@ async function handleRunCommand(args: string[]): Promise<string> {
     return parsed.reason ?? 'Run requests need a feature id.';
   }
 
-  const targetId = parsed.intent.featureId.toLowerCase();
   const projects = await getProjectsRepository().listProjects();
-
-  let match: { project: ProjectEntry; feature: Feature } | null = null;
-  for (const p of projects) {
-    const f = p.config.features.find((x) => x.id.toLowerCase() === targetId);
-    if (f) {
-      match = { project: p, feature: f };
-      break;
-    }
-  }
-  if (!match) return `Feature "${args[0]}" not found in any project.`;
-
-  const agents = match.project.config.adapters.agents;
-  if (agents.length === 0) {
-    return `${match.project.config.project.name} has no agents configured. Add one in Plugins → Marketplace.`;
-  }
-  const agent = agents[0];
-  const root = match.project.config.project.root;
-  return [
-    `Guarded run request prepared for [${match.feature.id}] ${match.feature.name}.`,
-    `Project: ${match.project.config.project.name}`,
-    `Agent: ${agent.name}`,
-    `Command: ${agent.command}`,
-    `Working directory: ${root}`,
-    '',
-    'Mobile / channel requests do not start local agents directly yet.',
-    'Open Project Manager Desktop to review and approve the run.',
-  ].join('\n');
+  return formatFeatureRunRequestReply(
+    prepareFeatureRunRequest(parsed.intent.featureId, projects),
+  );
 }
 
 export async function resolveTelegramCommandReply(
@@ -195,6 +180,35 @@ export async function routeTelegramCommand(
   if (!botToken) return;
 
   const reply = await resolveTelegramCommandReply(msg.text, catalog);
+  const parsed = parseMobileRemoteIntent(msg.text);
+  const policyDecision = policyDecisionFromParse({
+    parseStatus: parsed.status,
+    intent: parsed.intent,
+  });
+  appendMobileRemoteAuditEvent({
+    deviceId: `telegram:${msg.channelId}:${msg.chatId}`,
+    channel: 'telegram',
+    rawInputKind: 'text',
+    rawInput: msg.text,
+    parseStatus: parsed.status,
+    intent: parsed.intent,
+    policyDecision,
+    resultState: resultStateFromPolicy(policyDecision),
+    responsePreview: reply.slice(0, 500),
+    errorMessage: parsed.reason,
+  });
+  if (
+    policyDecision === 'guarded' &&
+    (parsed.intent?.type === 'run_feature' || parsed.intent?.type === 'run_gate')
+  ) {
+    appendMobileRemoteApproval({
+      source: 'telegram',
+      deviceId: `telegram:${msg.channelId}:${msg.chatId}`,
+      rawInput: msg.text,
+      intent: parsed.intent,
+      responsePreview: reply.slice(0, 1000),
+    });
+  }
 
   try {
     await telegramSendMessage(botToken, msg.chatId, reply);

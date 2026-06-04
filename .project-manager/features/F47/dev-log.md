@@ -103,3 +103,98 @@ This keeps Rust valuable without forcing it to duplicate ordinary cloud CRUD.
 2. Add Supabase env documentation and decide whether local development uses a real Supabase project, local Supabase CLI, or mocked fixtures.
 3. Add workspace membership query abstraction and route guards for `/developer`, `/portal`, and `/admin`.
 4. Add runner pairing state model and blocked-state tests.
+
+## 2026-06-04 - Route Guard Scaffold
+
+### Implemented
+
+- Added pure workspace access evaluator in `lib/auth/permissions.ts`.
+- Added protected route shell in `app/auth/WorkspaceAccessSurface.tsx`.
+- Added guarded placeholder routes:
+  - `app/developer/page.tsx`
+  - `app/portal/page.tsx`
+  - `app/admin/page.tsx`
+- Expanded `__tests__/auth.supabase-role-routing.test.tsx` to cover setup-required, membership-required, allowed, and denied states.
+- Updated F47 Development metadata to 45% progress.
+
+### Verification Log
+
+- Passed: `npm run test -- --run __tests__/auth.supabase-role-routing.test.tsx` (1 file, 5 tests).
+- Passed: `npm run typecheck`.
+- Passed: `npm run verify:dev-issues -- --routes /login,/developer,/portal,/admin`; all routes reported Next dev Issues: 0.
+- Passed: Browser smoke for `/developer`, `/portal`, and `/admin`; each route rendered its heading and `Access blocked` state, withholding protected controls until Supabase session and workspace membership checks are wired.
+
+### Follow-Ups
+
+1. Replace the temporary `currentRole = null` protected-route state with a real Supabase session + workspace membership query.
+2. Add workspace selector behavior after sign-in.
+3. Add runner status model so Developer Console can distinguish missing, paired/offline, blocked-project, and ready states.
+
+## 2026-06-04 - Workspace Membership Abstraction
+
+### Implemented
+
+- Added `lib/auth/workspaceMemberships.ts`.
+- Added `__tests__/auth.workspaceMemberships.test.ts`.
+- Defined the expected `workspace_memberships` query boundary:
+  - `workspace_id`
+  - `role`
+  - related workspace `name`
+- Added normalization that accepts only known workspace roles and drops malformed rows.
+- Added visible error handling so a Supabase query/RLS failure returns `{ memberships: [], error }` instead of throwing into the UI.
+- Updated F47 Development metadata to 55% progress.
+
+### Verification Log
+
+- Passed: `npm run test -- --run __tests__/auth.supabase-role-routing.test.tsx __tests__/auth.workspaceMemberships.test.ts` (2 files, 8 tests).
+- Passed: `npm run typecheck`.
+
+### Coordination Note
+
+F46 is being developed by another engineer. This slice intentionally touched only F47 auth/route-guard files and F47 metadata; it did not modify F46 artifacts or mobile remote implementation files.
+
+## 2026-06-04 - Developer Runner Status Model
+
+### Implemented
+
+- Added `lib/auth/runnerStatus.ts`.
+- Added `__tests__/auth.runnerStatus.test.ts`.
+- Defined dispatch gating for:
+  - missing runner
+  - paired but offline runner
+  - online runner with blocked project root
+  - ready runner
+  - runner status error
+- Updated F47 Development metadata to 65% progress.
+
+### Verification Log
+
+- Passed: `npm run test -- --run __tests__/auth.supabase-role-routing.test.tsx __tests__/auth.workspaceMemberships.test.ts __tests__/auth.runnerStatus.test.ts` (3 files, 13 tests).
+- Passed: `npm run typecheck`.
+
+### Coordination Note
+
+F46 remains owned by another engineer. This slice stayed in F47 auth/runner boundary files only.
+
+## 2026-06-04 - Supabase Cloud Auth Runbook
+
+### Implemented
+
+- Added `docs/engineering/supabase-cloud-auth.md`.
+- Documented public Supabase browser env vars, service-role key restrictions, minimum cloud tables, membership query contract, route guard capability map, Developer Runner states, RLS requirements, local development modes, and focused verification commands.
+- Updated F47 Development metadata to 70% progress.
+
+### Verification Log
+
+- Passed: `npm run docs:check`.
+- Passed: `npm run docs:site:sync`.
+
+## 2026-06-04 - Focused Verification Pass
+
+### Verification Log
+
+- Passed: `npm run test -- --run __tests__/auth.supabase-role-routing.test.tsx __tests__/auth.workspaceMemberships.test.ts __tests__/auth.runnerStatus.test.ts` (3 files, 13 tests).
+- Passed: `npm run typecheck`.
+- Passed: `npm run docs:check`.
+- Passed: `npm run verify:dev-issues -- --routes /login,/developer,/portal,/admin`; all four routes reported Next dev Issues: 0.
+- Not run: `npm run verify:baseline` because F47 is still in progress at 70%; baseline remains mandatory before claiming completion or preparing commit/PR.

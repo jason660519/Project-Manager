@@ -4,19 +4,19 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-06-04T04:56:53.205Z",
+    "generatedAt": "2026-06-04T05:23:36.836Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
     "manifestAudience": "internal",
-    "totalDocuments": 99,
+    "totalDocuments": 100,
     "totalFolders": 14,
     "publicDocuments": 36,
-    "internalDocuments": 62,
+    "internalDocuments": 63,
     "restrictedDocuments": 1,
     "publishableDocuments": 12,
-    "reviewRequiredDocuments": 60,
-    "warningCount": 122
+    "reviewRequiredDocuments": 61,
+    "warningCount": 123
   },
   "folders": [
     {
@@ -26,7 +26,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "sourcePath": "docs",
       "label": "All Docs",
       "title": "Documentation",
-      "summary": "99 documentation files indexed from docs.",
+      "summary": "100 documentation files indexed from docs.",
       "parentSlug": null,
       "folderSlugs": [
         "architecture",
@@ -44,14 +44,14 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       ],
       "classificationCounts": {
         "public": 36,
-        "internal": 62,
+        "internal": 63,
         "restricted": 1
       },
       "publishableCount": 12,
-      "reviewRequiredCount": 60,
+      "reviewRequiredCount": 61,
       "visibilityCounts": {
         "public": 36,
-        "internal": 62,
+        "internal": 63,
         "restricted": 1
       },
       "warnings": [
@@ -235,6 +235,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "engineering/runtime-bridge",
         "engineering/security-and-secrets",
         "engineering/storage-and-schema",
+        "engineering/supabase-cloud-auth",
         "engineering/table-sheet-inventory",
         "engineering/table-standards",
         "engineering/technical-documentation-audit",
@@ -244,14 +245,14 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       ],
       "classificationCounts": {
         "public": 0,
-        "internal": 21,
+        "internal": 22,
         "restricted": 0
       },
       "publishableCount": 0,
-      "reviewRequiredCount": 12,
+      "reviewRequiredCount": 13,
       "visibilityCounts": {
         "public": 0,
-        "internal": 21,
+        "internal": 22,
         "restricted": 0
       },
       "warnings": [
@@ -1826,6 +1827,40 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       ],
       "warnings": [],
       "updatedAt": "2026-05-28T20:10:59.000Z"
+    },
+    {
+      "id": "engineering/supabase-cloud-auth",
+      "slug": "engineering/supabase-cloud-auth",
+      "route": "/documentation/engineering/supabase-cloud-auth",
+      "sourcePath": "docs/engineering/supabase-cloud-auth.md",
+      "folderSlug": "engineering",
+      "folderPath": "docs/engineering",
+      "title": "Supabase Cloud Auth Runbook",
+      "summary": "This runbook describes the first Supabase integration boundary for Project Manager's cloud workspace direction. It supports ADR-016 and F47. Supabase owns cloud identity and collaborative...",
+      "content": "# Supabase Cloud Auth Runbook\n\n> Status: Draft for F47  \n> Owner: Project Manager engineering  \n> Last updated: 2026-06-04\n\n## Purpose\n\nThis runbook describes the first Supabase integration boundary for Project Manager's cloud workspace direction. It supports ADR-016 and F47.\n\nSupabase owns cloud identity and collaborative product state. Rust/Tauri remains the Developer Runner for local repo access, process execution, OS Keychain, and local cache.\n\n## Public Browser Configuration\n\nClient-rendered code may use only public Supabase values:\n\n```bash\nNEXT_PUBLIC_SUPABASE_URL=\nNEXT_PUBLIC_SUPABASE_ANON_KEY=\n```\n\nRules:\n\n- The anon key is acceptable in browser code only when Row Level Security policies are correct.\n- Never expose service-role keys in browser code, static exports, feature artifacts, logs, screenshots, or test fixtures.\n- Use mocked Supabase clients in unit tests unless a live integration test is explicitly marked and isolated.\n\n## Minimum Cloud Tables\n\nThe first route-guard slice expects this conceptual data model:\n\n| Table | Purpose |\n| --- | --- |\n| `workspaces` | Workspace identity and display name. |\n| `workspace_memberships` | User-to-workspace membership with role. |\n| `projects` | Cloud project metadata and solution detail URLs. |\n| `features` | Cloud feature/task state during migration. |\n| `agent_runs` | Run metadata, runner ID, status, duration, result summary. |\n| `audit_logs` | Role changes, dispatch requests, runner pairing, and privileged actions. |\n\nRaw execution logs should not be stored as unbounded Postgres rows. Store run metadata in Postgres and place large logs in object storage or local runner artifacts with retention rules.\n\n## Membership Query Contract\n\nThe first client abstraction is `listWorkspaceMemberships()` in `lib/auth/workspaceMemberships.ts`.\n\nExpected query shape:\n\n```text\nworkspace_memberships\n  workspace_id\n  role\n  workspaces(name)\n```\n\nKnown roles:\n\n- `owner`\n- `admin`\n- `developer`\n- `reviewer`\n- `viewer`\n- `user`\n\nMalformed rows and unknown roles are dropped client-side. RLS should also prevent a user from reading memberships that do not belong to them.\n\n## Route Guard Boundary\n\nInitial protected routes:\n\n| Route | Required capability |\n| --- | --- |\n| `/developer` | `view:developer-console` |\n| `/portal` | `view:portal` |\n| `/admin` | `view:admin-console` |\n\nUntil Supabase session and membership checks are wired, routes must render explicit blocked states and withhold protected controls.\n\n## Developer Runner Boundary\n\nDeveloper dispatch requires both workspace permission and runner readiness.\n\nThe runner status model lives in `lib/auth/runnerStatus.ts` and distinguishes:\n\n- `missing`\n- `paired_offline`\n- `project_blocked`\n- `ready`\n- `error`\n\nOnly `ready` allows dispatch.\n\n## RLS Policy Requirements\n\nBefore connecting production data:\n\n1. Enable RLS on workspace-owned tables.\n2. Users may read only workspaces where they have membership.\n3. General Users may read project progress, reports, and solution URLs only.\n4. Developers may access project execution surfaces only when workspace/project permissions allow it.\n5. Admin/Owner permissions are required for membership, settings, integration, and audit management.\n6. All privileged writes must be auditable.\n\n## Local Development\n\nSupported local development modes:\n\n| Mode | Use |\n| --- | --- |\n| Mocked clients | Unit tests and route-guard logic. |\n| Shared dev Supabase project | Manual sign-in and route smoke. |\n| Local Supabase CLI | Future integration testing when schema migrations exist. |\n\nDo not require Docker for general User portal flows. Docker/local Supabase may be a developer convenience, not the default product dependency.\n\n## Verification\n\nFocused checks for F47:\n\n```bash\nnpm run test -- --run __tests__/auth.supabase-role-routing.test.tsx __tests__/auth.workspaceMemberships.test.ts __tests__/auth.runnerStatus.test.ts\nnpm run typecheck\nnpm run verify:dev-issues -- --routes /login,/developer,/portal,/admin\n```\n\nFull completion still requires:\n\n```bash\nnpm run verify:baseline\n```\n",
+      "contentHash": "2821bc714a679f1e",
+      "readingMinutes": 3,
+      "classification": "internal",
+      "classificationSource": "policy",
+      "classificationConfidence": 0.95,
+      "classificationReason": "Engineering runbooks and implementation contracts are internal by default.",
+      "matchedPolicyRule": "CLS-INTERNAL-ENGINEERING",
+      "publish": false,
+      "reviewStatus": "ai-classified",
+      "needsReview": true,
+      "visibility": "internal",
+      "audience": [
+        "engineers",
+        "operators"
+      ],
+      "tags": [
+        "engineering",
+        "table"
+      ],
+      "warnings": [
+        "Mentions local key storage"
+      ],
+      "updatedAt": "2026-06-04T05:23:36.836Z"
     },
     {
       "id": "engineering/table-sheet-inventory",
@@ -3955,6 +3990,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
     "engineering/runtime-bridge",
     "engineering/security-and-secrets",
     "engineering/storage-and-schema",
+    "engineering/supabase-cloud-auth",
     "engineering/table-sheet-inventory",
     "engineering/table-standards",
     "engineering/technical-documentation-audit",

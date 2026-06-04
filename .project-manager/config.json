@@ -1449,7 +1449,7 @@
       "name": "PM Mobile Voice Remote Control",
       "category": "Mobile/Remote Control",
       "status": "in_progress",
-      "progress": 10,
+      "progress": 20,
       "phase": "development",
       "points": 8,
       "locatedSection": "Project Dashboard > Development",
@@ -1463,9 +1463,9 @@
         "implementation": "docs/architecture/ADR-015-mobile-voice-remote-control.md",
         "test": "__tests__/mobileVoiceRemoteControl.intent.test.ts"
       },
-      "notes": "Plan mobile voice remote control through desktop gateway, pairing, guarded intents, and channel MVP",
+      "notes": "Phase 0 guarded mobile/channel run requests implemented; desktop approval path next",
       "createdAt": "2026-06-04T04:32:44.042Z",
-      "updatedAt": "2026-06-04T04:32:44.042Z",
+      "updatedAt": "2026-06-04T05:21:33.623Z",
       "updatedBy": "Codex",
       "metadata": {
         "evidencePaths": [
@@ -1481,10 +1481,10 @@
       "name": "Supabase Cloud Auth and Developer Runner Storage Architecture",
       "category": "Architecture/Auth",
       "status": "in_progress",
-      "progress": 30,
+      "progress": 70,
       "phase": "development",
       "points": 8,
-      "locatedSection": "app/login",
+      "locatedSection": "docs/engineering",
       "readmePath": ".project-manager/features/F47/README.md",
       "paths": {
         "featureFolder": ".project-manager/features/F47/",
@@ -1492,20 +1492,52 @@
         "tdd": ".project-manager/features/F47/tdd-spec.md",
         "testScenarios": ".project-manager/features/F47/test-scenarios.md",
         "developmentLogSummaryFolder": ".project-manager/features/F47/",
-        "implementation": "app/login/page.tsx",
-        "test": "__tests__/auth.supabase-role-routing.test.tsx"
+        "implementation": "docs/engineering/supabase-cloud-auth.md",
+        "test": "__tests__/auth.runnerStatus.test.ts"
       },
-      "notes": "Added ADR, Supabase login setup state, role permissions, and focused role-routing tests.",
+      "notes": "Added Supabase cloud auth runbook covering env, RLS, membership, route guards, and runner readiness.",
       "createdAt": "2026-06-04T04:42:17.509Z",
-      "updatedAt": "2026-06-04T04:46:40.135Z",
+      "updatedAt": "2026-06-04T05:23:49.411Z",
       "updatedBy": "Codex",
       "metadata": {
         "evidencePaths": [
-          "app/login/page.tsx",
-          "__tests__/auth.supabase-role-routing.test.tsx",
+          "docs/engineering/supabase-cloud-auth.md",
+          "__tests__/auth.runnerStatus.test.ts",
           ".project-manager/features/F47/dev-log.md"
         ],
         "kickoffAt": "2026-06-04T04:42:17.509Z"
+      }
+    },
+    {
+      "id": "F48",
+      "name": "Self-hosted Supabase PM System Installer",
+      "category": "Infrastructure/Installer",
+      "status": "in_progress",
+      "progress": 30,
+      "phase": "development",
+      "points": 8,
+      "locatedSection": "infra/supabase",
+      "readmePath": ".project-manager/features/F48/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F48/",
+        "spec": ".project-manager/features/F48/feature-spec.md",
+        "tdd": ".project-manager/features/F48/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F48/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F48/",
+        "implementation": "infra/supabase/pm-system-installer.ts",
+        "test": "__tests__/pmSystemInstaller.plan.test.ts"
+      },
+      "notes": "Added side-effect-free installer planner, backend profile sanitizer, command registry, and maintenance policies.",
+      "createdAt": "2026-06-04T06:00:50.115Z",
+      "updatedAt": "2026-06-04T06:03:09.979Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "infra/supabase/pm-system-installer.ts",
+          "__tests__/pmSystemInstaller.plan.test.ts",
+          ".project-manager/features/F48/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-04T06:00:50.115Z"
       }
     }
   ],
@@ -1517,6 +1549,6 @@
     "root": "/Users/Project-Manager"
   },
   "schemaVersion": 8,
-  "updatedAt": "2026-06-04T04:46:40.135Z",
+  "updatedAt": "2026-06-04T06:03:09.979Z",
   "updatedBy": "Codex"
 }

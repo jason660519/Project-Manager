@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { LoginEntry } from '../app/login/LoginEntry';
 import {
+  evaluateWorkspaceAccess,
   getDeniedCapabilityMessage,
   getRoleConsoleLabel,
   resolveWorkspaceDestination,
@@ -26,6 +27,40 @@ describe('Supabase role routing and permission scaffolding', () => {
     expect(roleHasCapability('viewer', 'keys:manage')).toBe(false);
     expect(roleHasCapability('reviewer', 'settings:manage')).toBe(false);
     expect(roleHasCapability('admin', 'members:manage')).toBe(true);
+  });
+
+  it('evaluates setup, membership, allowed, and denied route guard states', () => {
+    expect(
+      evaluateWorkspaceAccess({
+        supabaseConfigured: false,
+        role: 'developer',
+        requiredCapability: 'view:developer-console',
+      }).status,
+    ).toBe('setup_required');
+
+    expect(
+      evaluateWorkspaceAccess({
+        supabaseConfigured: true,
+        role: null,
+        requiredCapability: 'view:portal',
+      }).status,
+    ).toBe('membership_required');
+
+    expect(
+      evaluateWorkspaceAccess({
+        supabaseConfigured: true,
+        role: 'developer',
+        requiredCapability: 'view:developer-console',
+      }).status,
+    ).toBe('allowed');
+
+    expect(
+      evaluateWorkspaceAccess({
+        supabaseConfigured: true,
+        role: 'user',
+        requiredCapability: 'view:developer-console',
+      }).status,
+    ).toBe('denied');
   });
 
   it('uses explicit console labels and denial messages', () => {

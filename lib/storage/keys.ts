@@ -26,6 +26,8 @@ export const KEY_SHARED_CAPABILITIES = 'projectManager.shared.capabilities';
 export const KEY_SHARED_SKILLS_DIR = 'projectManager.shared.skillsDir';
 export const KEY_PERSONAL_SYSTEM_CLI_EXPOSURE = 'projectManager.personal.systemCliExposure';
 export const KEY_PERSONAL_AI_CLI_PRESET_ALLOWLIST = 'projectManager.personal.aiCliPresetAllowlist';
+export const KEY_PERSONAL_MOBILE_REMOTE_AUDIT = 'projectManager.personal.mobileRemoteAudit';
+export const KEY_PERSONAL_MOBILE_REMOTE_APPROVALS = 'projectManager.personal.mobileRemoteApprovals';
 
 export const LEGACY_KEY_PROJECTS = 'devpilot-projects';
 export const LEGACY_KEY_SELECTED_PROJECT_ID = 'devpilot-selected-project-id';
