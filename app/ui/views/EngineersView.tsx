@@ -27,6 +27,7 @@ import {
   loadCapabilityCatalog,
   type CapabilityCatalog,
 } from '../../../lib/storage/capabilities';
+import { listExposedSystemCliCommands } from '../../../lib/storage/system-cli';
 import type { AnyAdapterConfig, EngineerRole } from '../../../lib/types';
 
 import { AbilityToolsTable } from './Engineers/AbilityToolsTable';
@@ -51,13 +52,18 @@ export function EngineersView({ roles, agents, onRolesChange, embedded = false }
     schemaVersion: 1,
     candidates: [],
   });
+  const [exposedCommands, setExposedCommands] = useState<string[]>([]);
 
-  // Load + refresh the capability catalog so /integrations-hub state changes
-  // propagate when the user returns to the Engineers view.
+  // Load + refresh the capability catalog and the globally exposed System CLI
+  // allowlist so /integrations-hub state changes propagate when the user
+  // returns to the Engineers view.
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    setCapabilityCatalog(loadCapabilityCatalog());
-    const refresh = () => setCapabilityCatalog(loadCapabilityCatalog());
+    const refresh = () => {
+      setCapabilityCatalog(loadCapabilityCatalog());
+      setExposedCommands(listExposedSystemCliCommands());
+    };
+    refresh();
     window.addEventListener('focus', refresh);
     return () => window.removeEventListener('focus', refresh);
   }, []);
@@ -161,6 +167,7 @@ export function EngineersView({ roles, agents, onRolesChange, embedded = false }
           roles={roles}
           agents={agents}
           providers={providers}
+          exposedCommands={exposedCommands}
           selectedRoleId={selectedId}
           onRowClick={handleRowClick}
         />

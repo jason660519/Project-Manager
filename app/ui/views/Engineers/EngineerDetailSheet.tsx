@@ -24,6 +24,7 @@ import {
   Plus,
   RefreshCw,
   Sparkles,
+  Terminal,
   Trash2,
   X,
 } from 'lucide-react';
@@ -39,6 +40,7 @@ import {
   loadCapabilityCatalog,
   type CapabilityCatalog,
 } from '../../../../lib/storage/capabilities';
+import { listExposedSystemCliCommands } from '../../../../lib/storage/system-cli';
 import type {
   AnyAdapterConfig,
   CapabilityKind,
@@ -48,7 +50,7 @@ import type {
   WorkingScope,
 } from '../../../../lib/types';
 import { AgentArchitecturePanel } from './AgentArchitecturePanel';
-import { slugColor, slugify } from './shared';
+import { partitionEngineerCommands, slugColor, slugify } from './shared';
 
 // ── Form state ────────────────────────────────────────────────────────────────
 
@@ -71,6 +73,7 @@ interface FormState {
   scopeMode: 'soft' | 'strict';
   scopeInput: string;
   capabilities: RoleCapability[];
+  commands: string[];
 }
 
 function roleToForm(role: EngineerRole): FormState {
@@ -93,6 +96,7 @@ function roleToForm(role: EngineerRole): FormState {
     scopeMode: role.workingScope?.mode ?? 'soft',
     scopeInput: '',
     capabilities: role.capabilities ?? [],
+    commands: role.commands ?? [],
   };
 }
 
@@ -110,7 +114,9 @@ function formToRole(id: string, form: FormState, existing: EngineerRole): Engine
       const refs = form.skillRefs.split('\n').map((s) => s.trim()).filter(Boolean);
       return refs.length > 0 ? refs : undefined;
     })(),
-    commands: existing.commands,
+    commands: Array.from(new Set(form.commands.map((c) => c.trim()).filter(Boolean))).sort((a, b) =>
+      a.localeCompare(b),
+    ),
     systemPrompt: form.systemPrompt,
     referenceFiles: existing.referenceFiles,
     defaultAgentId: form.defaultAgentId || undefined,
@@ -206,15 +212,30 @@ function EngineerDetailBody({ role, agents, onSave, onDelete }: EngineerDetailBo
     schemaVersion: 1,
     candidates: [],
   });
+  const [exposedCommands, setExposedCommands] = useState<string[]>([]);
   const [attachScreenshot, setAttachScreenshot] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    setCapabilityCatalog(loadCapabilityCatalog());
-    const refresh = () => setCapabilityCatalog(loadCapabilityCatalog());
+    const refresh = () => {
+      setCapabilityCatalog(loadCapabilityCatalog());
+      setExposedCommands(listExposedSystemCliCommands());
+    };
+    refresh();
     window.addEventListener('focus', refresh);
     return () => window.removeEventListener('focus', refresh);
   }, []);
+
+  const toggleCommand = (cmd: string) => {
+    setForm((prev) => {
+      const has = prev.commands.includes(cmd);
+      return {
+        ...prev,
+        commands: has ? prev.commands.filter((c) => c !== cmd) : [...prev.commands, cmd],
+      };
+    });
+    setDirty(true);
+  };
 
   const providers = listLlmProviders();
 
@@ -990,6 +1011,89 @@ function EngineerDetailBody({ role, agents, onSave, onDelete }: EngineerDetailBo
           </span>
         </div>
       </div>
+
+      {/* Commands Allowlist */}
+      {(() => {
+        const { active, stale } = partitionEngineerCommands(form.commands, exposedCommands);
+        const selectedCount = active.length + stale.length;
+        return (
+          <div
+            id="engineer-section-commands"
+            className="scroll-mt-3 space-y-3 border border-stone-200/15 bg-[rgb(var(--pm-card-3))]/40 p-3"
+          >
+            <div className="flex items-center gap-2">
+              <Terminal size={13} className="text-stone-400" />
+              <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">
+                Commands Allowlist
+              </span>
+              <span className="ml-auto text-[10px] text-stone-600">
+                {selectedCount > 0 ? `${selectedCount} selected` : 'Subset of globally exposed CLIs'}
+              </span>
+            </div>
+
+            {exposedCommands.length === 0 ? (
+              <p className="text-[10px] text-stone-500">
+                No commands are globally exposed yet. Enable them in{' '}
+                <span className="text-stone-400">Plugins &gt; Commands</span> (Global CLI Inventory)
+                first — this role can only allow a subset of exposed commands.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {exposedCommands.map((cmd) => {
+                  const checked = active.includes(cmd);
+                  return (
+                    <button
+                      key={cmd}
+                      type="button"
+                      onClick={() => toggleCommand(cmd)}
+                      aria-pressed={checked}
+                      className={[
+                        'inline-flex items-center gap-1 border px-2 py-0.5 font-mono text-[10px] transition-colors',
+                        checked
+                          ? 'border-emerald-300/35 bg-emerald-950/40 text-emerald-200/85'
+                          : 'border-stone-200/15 text-stone-500 hover:border-stone-200/30 hover:text-stone-300',
+                      ].join(' ')}
+                    >
+                      {checked && <span aria-hidden>✓</span>}
+                      {cmd}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {stale.length > 0 && (
+              <div className="space-y-1.5 border-t border-amber-300/15 pt-2">
+                <span className="text-[10px] uppercase tracking-[0.12em] text-amber-300/70">
+                  No longer in global policy
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {stale.map((cmd) => (
+                    <span
+                      key={cmd}
+                      className="inline-flex items-center gap-1 border border-amber-300/35 bg-amber-950/30 px-2 py-0.5 font-mono text-[10px] text-amber-200/80"
+                    >
+                      {cmd}
+                      <button
+                        type="button"
+                        onClick={() => toggleCommand(cmd)}
+                        className="ml-0.5 text-amber-300/60 hover:text-red-400"
+                        aria-label={`Remove ${cmd}`}
+                      >
+                        <X size={9} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <p className="text-[10px] text-stone-600">
+                  These were allowed before but are no longer exposed globally. Re-expose them in the
+                  Integrations Hub, or remove them from this role.
+                </p>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Notes */}
       <FormField label="Notes">

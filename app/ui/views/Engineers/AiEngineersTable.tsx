@@ -24,15 +24,19 @@ import {
 
 import type { AnyAdapterConfig, EngineerRole } from '../../../../lib/types';
 import type { LlmProviderId, LlmProviderSpec } from '../../../../lib/keys/llmProviders';
-import { slugColor } from './shared';
+import { partitionEngineerCommands, slugColor } from './shared';
 
 interface AiEngineersTableProps {
   roles: EngineerRole[];
   agents: AnyAdapterConfig[];
   providers: readonly LlmProviderSpec[];
+  /** Globally exposed System CLI commands — used to flag stale per-role entries. */
+  exposedCommands: readonly string[];
   selectedRoleId: string | null;
   onRowClick: (role: EngineerRole) => void;
 }
+
+const MAX_COMMAND_CHIPS = 3;
 
 const columnHelper = createColumnHelper<EngineerRole>();
 
@@ -114,6 +118,52 @@ function ScopeCell({ role }: { role: EngineerRole }) {
   );
 }
 
+function CommandsCell({
+  role,
+  exposedCommands,
+}: {
+  role: EngineerRole;
+  exposedCommands: readonly string[];
+}) {
+  const { active, stale } = partitionEngineerCommands(role.commands, exposedCommands);
+  const total = active.length + stale.length;
+  if (total === 0) {
+    return <span className="text-xs text-stone-500">—</span>;
+  }
+  // Active first, then stale — show the first few as chips, collapse the rest.
+  const ordered = [
+    ...active.map((c) => ({ cmd: c, stale: false })),
+    ...stale.map((c) => ({ cmd: c, stale: true })),
+  ];
+  const shown = ordered.slice(0, MAX_COMMAND_CHIPS);
+  const overflow = total - shown.length;
+  const tooltip = [
+    active.length > 0 ? `Allowed: ${active.join(', ')}` : null,
+    stale.length > 0 ? `Not in global policy: ${stale.join(', ')}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+  return (
+    <div className="flex max-w-[220px] flex-wrap items-center gap-1" title={tooltip}>
+      {shown.map(({ cmd, stale: isStale }) => (
+        <span
+          key={cmd}
+          className={`inline-flex items-center border px-1.5 py-0.5 font-mono text-[10px] ${
+            isStale
+              ? 'border-amber-300/35 text-amber-200/80'
+              : 'border-stone-200/18 text-stone-300'
+          }`}
+        >
+          {cmd}
+        </span>
+      ))}
+      {overflow > 0 && (
+        <span className="font-mono text-[10px] text-stone-500">+{overflow}</span>
+      )}
+    </div>
+  );
+}
+
 function AgentCell({
   role,
   agents,
@@ -132,6 +182,7 @@ export function AiEngineersTable({
   roles,
   agents,
   providers,
+  exposedCommands,
   selectedRoleId,
   onRowClick,
 }: AiEngineersTableProps) {
@@ -168,12 +219,19 @@ export function AiEngineersTable({
         cell: ({ row }) => <ScopeCell role={row.original} />,
       }),
       columnHelper.display({
+        id: 'col-commands',
+        header: 'Commands Allowlist',
+        cell: ({ row }) => (
+          <CommandsCell role={row.original} exposedCommands={exposedCommands} />
+        ),
+      }),
+      columnHelper.display({
         id: 'col-chevron',
         header: '',
         cell: () => <ChevronRight size={14} className="text-stone-600" />,
       }),
     ],
-    [agents, providers],
+    [agents, providers, exposedCommands],
   );
 
   const table = useReactTable({
