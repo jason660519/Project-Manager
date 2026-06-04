@@ -25,6 +25,9 @@ features:
   - title: Unified Dispatch
     details: Hand off tasks to Cursor, Codex, Claude, or any registered agent via a single guarded execution flow.
     link: /features/dispatch
+  - title: Pain Points & Solutions
+    details: Scenario-driven walkthroughs that map common engineering pain points to Project Manager workflows, with step-by-step implementation flows.
+    link: /solutions/
   - title: Documentation Hub
     details: Browse every shipped guide directly inside the app. Stays in sync with this site.
     link: /features/documentation

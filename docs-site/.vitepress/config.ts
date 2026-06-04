@@ -34,6 +34,7 @@ export default defineConfig({
     nav: [
       { text: 'Getting Started', link: '/getting-started' },
       { text: 'Features', link: '/features/xmux' },
+      { text: 'Solutions', link: '/solutions/' },
       { text: 'Standards', link: '/standards/' },
       { text: 'GitHub', link: 'https://github.com/jason660519/Project-Manager' },
     ],
@@ -42,6 +43,18 @@ export default defineConfig({
       {
         text: 'Overview',
         items: [{ text: 'Getting Started', link: '/getting-started' }],
+      },
+      {
+        text: 'Pain points & solutions',
+        items: [
+          { text: 'Overview', link: '/solutions/' },
+          { text: 'Fragmented tools → One control surface', link: '/solutions/fragmented-tools' },
+          { text: 'Multi-project multitasking', link: '/solutions/multi-project-multi-task' },
+          { text: 'Prompt context automation', link: '/solutions/prompt-context-automation' },
+          { text: 'Live agent observability', link: '/solutions/live-agent-observability' },
+          { text: 'Coordinator + AI Agents framework', link: '/solutions/coordinator-agent-framework' },
+          { text: 'Real-time voice (ASR + TTS)', link: '/solutions/realtime-voice-asr-tts' },
+        ],
       },
       {
         text: 'Project view',
