@@ -23,12 +23,12 @@ function project(root: string, configPath: string): ProjectEntry {
 describe('xmux workspace path derivation', () => {
   it('uses a normal local project root for folder tabs', () => {
     const result = deriveProjectWorkspacePath(
-      project('/Volumes/KLEVV-4T-1/Project-Manager', '/unused/.project-manager/config.json'),
+      project('/Users/Project-Manager', '/unused/.project-manager/config.json'),
     );
 
     expect(result).toMatchObject({
       ok: true,
-      cwd: '/Volumes/KLEVV-4T-1/Project-Manager',
+      cwd: '/Users/Project-Manager',
       source: 'project.root',
     });
   });
@@ -36,26 +36,26 @@ describe('xmux workspace path derivation', () => {
   it('normalizes a root accidentally stored as the canonical config path', () => {
     const result = deriveProjectWorkspacePath(
       project(
-        '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager/config.json',
+        '/Users/Project-Manager/.project-manager/config.json',
         '/unused/.project-manager/config.json',
       ),
     );
 
     expect(result).toMatchObject({
       ok: true,
-      cwd: '/Volumes/KLEVV-4T-1/Project-Manager',
+      cwd: '/Users/Project-Manager',
       source: 'project.root',
     });
   });
 
   it('falls back to configPath when project.root is empty or relative', () => {
     const result = deriveProjectWorkspacePath(
-      project('Project-Manager', '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager/config.json'),
+      project('Project-Manager', '/Users/Project-Manager/.project-manager/config.json'),
     );
 
     expect(result).toMatchObject({
       ok: true,
-      cwd: '/Volumes/KLEVV-4T-1/Project-Manager',
+      cwd: '/Users/Project-Manager',
       source: 'configPath',
     });
     expect(result.ok && result.warning).toContain('project.root');
@@ -63,12 +63,12 @@ describe('xmux workspace path derivation', () => {
 
   it('keeps spaces and non-ASCII path segments intact', () => {
     const result = deriveProjectWorkspacePath(
-      project('/Volumes/KLEVV-4T-1/客戶 專案 [alpha]', '/unused/.project-manager/config.json'),
+      project('/Users/Project-Manager/internal-resources/test-fixtures/client-alpha', '/unused/.project-manager/config.json'),
     );
 
     expect(result).toMatchObject({
       ok: true,
-      cwd: '/Volumes/KLEVV-4T-1/客戶 專案 [alpha]',
+      cwd: '/Users/Project-Manager/internal-resources/test-fixtures/client-alpha',
     });
   });
 

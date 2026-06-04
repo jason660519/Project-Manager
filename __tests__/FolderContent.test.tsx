@@ -26,7 +26,7 @@ describe('FolderContent', () => {
     listDirectoryEntriesMock.mockResolvedValueOnce([
       {
         name: 'src',
-        path: '/Volumes/KLEVV-4T-1/客戶 專案 [alpha]/src',
+        path: '/Users/Project-Manager/internal-resources/test-fixtures/client-alpha/src',
         isDir: true,
         isSymlink: false,
       },
@@ -35,13 +35,13 @@ describe('FolderContent', () => {
     render(
       <FolderContent
         itemId="folder-special"
-        rootPath="/Volumes/KLEVV-4T-1/客戶 專案 [alpha]"
+        rootPath="/Users/Project-Manager/internal-resources/test-fixtures/client-alpha"
       />,
     );
 
     await waitFor(() => {
       expect(listDirectoryEntriesMock).toHaveBeenCalledWith(
-        '/Volumes/KLEVV-4T-1/客戶 專案 [alpha]',
+        '/Users/Project-Manager/internal-resources/test-fixtures/client-alpha',
       );
     });
     expect(await screen.findByText('src')).toBeInTheDocument();

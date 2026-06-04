@@ -722,17 +722,31 @@
       "id": "F17",
       "locatedSection": "components/MermaidBlock",
       "name": "Decoupled Mermaid Integration",
-      "notes": "",
+      "notes": "Hardening offline Mermaid rendering for public docs and feature document panels.",
       "paths": {
         "implementation": "components/MermaidBlock.tsx",
-        "spec": "",
-        "test": "__tests__/mermaidBlock.rendering.test.tsx"
+        "spec": ".project-manager/features/F17/feature-spec.md",
+        "test": "__tests__/mermaidBlock.rendering.test.tsx",
+        "featureFolder": ".project-manager/features/F17/",
+        "tdd": ".project-manager/features/F17/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F17/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F17/"
       },
       "phase": "development",
-      "points": 1,
-      "progress": 100,
-      "status": "done",
-      "updatedAt": "2026-05-25T00:00:00.000Z"
+      "points": 3,
+      "progress": 10,
+      "status": "in_progress",
+      "updatedAt": "2026-06-04T03:42:44.807Z",
+      "readmePath": ".project-manager/features/F17/README.md",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "components/MermaidBlock.tsx",
+          "__tests__/mermaidBlock.rendering.test.tsx",
+          ".project-manager/features/F17/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-04T03:42:44.807Z"
+      }
     },
     {
       "category": "Documentation",
@@ -1436,9 +1450,9 @@
     "defaultIDE": "Cursor",
     "githubUrl": "https://github.com/jason660519/Project-Manager",
     "name": "@project-manager/app",
-    "root": "/Volumes/KLEVV-4T-1/Project-Manager"
+    "root": "/Users/Project-Manager"
   },
   "schemaVersion": 8,
-  "updatedAt": "2026-06-04T03:00:30Z",
+  "updatedAt": "2026-06-04T03:42:44.807Z",
   "updatedBy": "Codex"
 }

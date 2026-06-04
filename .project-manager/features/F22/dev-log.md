@@ -143,7 +143,7 @@
 | Check | Result |
 | --- | --- |
 | Direct provider probe from Project Manager `.env` | Kimi `200`, Perplexity `200` |
-| Browser E2E `.env` source | Modal scans `/Volumes/KLEVV-4T-1/Project-Manager` |
+| Browser E2E `.env` source | Modal scans `/Users/Project-Manager` |
 | Browser E2E validation progress | Spinner and elapsed seconds visible while validating |
 | Browser E2E Kimi row | `Verified`, `just now`, 9 live models |
 | Browser E2E Perplexity row | `Verified`, `just now`, 5 live models |

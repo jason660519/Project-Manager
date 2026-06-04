@@ -22,6 +22,7 @@ A cross-project engineering dashboard: ingests specs (Word/Excel/MD/Folder) → 
 | `docs/architecture/ADR-*.md` | Closed architecture decisions |
 | `docs/engineering/` | Operational docs for bridge, storage, ingestion, secrets |
 | `.project-manager/features/<ID>/` | Per-feature docs (README, feature-spec, tdd-spec, debug-retro, test-scenarios, dev-log, notes) |
+| `internal-resources/` | Project-local snapshots and placeholders replacing previous removable-storage resource dependencies |
 
 ## Architecture
 
@@ -36,6 +37,7 @@ Source (Word/Excel/MD/Folder)
 ## Key Conventions
 
 - **Design system**: read `DESIGN.md` + `docs/design/shared-ai-desktop-style.md` before any UI change.
+- **Internal resources**: do not add removable-volume absolute paths. Use `internal-resources/` for Project Manager-owned snapshots/placeholders and update `docs/engineering/external-ssd-internalization-report.md`.
 - **Table/sheet views**: read `/Users/Company-AI-App-Standards/docs/patterns/table-governance.md` first, then follow `docs/engineering/table-standards.md` and the `table-and-sheet-layout` skill. Any `app/ui/views/` page with a table or tabs MUST use `WorkstationFrame` + `BottomSheetTabs`; tab strips sit at the panel **bottom** (Excel-style).
 - **Feature folders**: canonical path `.project-manager/features/<ID>/`. Artifacts: `README.md`, `feature-spec.md`, `tdd-spec.md`, `debug-retro.md`, `test-scenarios.md`, `dev-log.md`, `notes.md`.
 - **Static export**: `app/api/` only runs under `next dev`. Anything shipped belongs in Rust.

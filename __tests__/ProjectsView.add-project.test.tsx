@@ -217,7 +217,7 @@ describe('Add Project modal — manual add path normalization', () => {
     readConfigMock.mockResolvedValueOnce({
       schemaVersion: 2,
       id: 'fixture-id',
-      project: { name: 'Realestate', root: '/Volumes/KLEVV-4T-1/Realestate_Management_Apps', defaultIDE: 'Cursor' },
+      project: { name: 'Realestate', root: '/Users/Project-Manager/internal-resources/workspaces/realestate-management-apps', defaultIDE: 'Cursor' },
       features: [],
       adapters: { ides: [], agents: [] },
     });
@@ -231,13 +231,13 @@ describe('Add Project modal — manual add path normalization', () => {
     ) as HTMLInputElement;
 
     // The user pastes the FIXTURE folder path (mirrors the bug screenshot).
-    await user.type(manualInput, '/Volumes/KLEVV-4T-1/Realestate_Management_Apps');
+    await user.type(manualInput, '/Users/Project-Manager/internal-resources/workspaces/realestate-management-apps');
 
     await user.click(getModalSubmit());
 
     await waitFor(() => {
       expect(readConfigMock).toHaveBeenCalledWith(
-        '/Volumes/KLEVV-4T-1/Realestate_Management_Apps/.project-manager/config.json',
+        '/Users/Project-Manager/internal-resources/workspaces/realestate-management-apps/.project-manager/config.json',
       );
     });
 
@@ -248,7 +248,7 @@ describe('Add Project modal — manual add path normalization', () => {
     // The stored configPath should be the normalized file path inside the dashboard folder.
     const entry = onAddProject.mock.calls[0][0];
     expect(entry.configPath).toBe(
-      '/Volumes/KLEVV-4T-1/Realestate_Management_Apps/.project-manager/config.json',
+      '/Users/Project-Manager/internal-resources/workspaces/realestate-management-apps/.project-manager/config.json',
     );
   });
 
@@ -256,7 +256,7 @@ describe('Add Project modal — manual add path normalization', () => {
     readConfigMock.mockResolvedValueOnce({
       schemaVersion: 2,
       id: 'fixture-id',
-      project: { name: 'Project Manager', root: '/Volumes/KLEVV-4T-1/Project-Manager', defaultIDE: 'Cursor' },
+      project: { name: 'Project Manager', root: '/Users/Project-Manager', defaultIDE: 'Cursor' },
       features: [],
       adapters: { ides: [], agents: [] },
     });
@@ -268,12 +268,12 @@ describe('Add Project modal — manual add path normalization', () => {
 
     await user.type(
       screen.getByPlaceholderText('/path/to/project (auto-detects .project-manager/)'),
-      '/Volumes/KLEVV-4T-1/Project-Manager',
+      '/Users/Project-Manager',
     );
     await user.click(getModalSubmit());
 
     await waitFor(() => {
-      expect(detectGithubRepoUrlMock).toHaveBeenCalledWith('/Volumes/KLEVV-4T-1/Project-Manager');
+      expect(detectGithubRepoUrlMock).toHaveBeenCalledWith('/Users/Project-Manager');
       expect(onAddProject).toHaveBeenCalledWith(
         expect.objectContaining({
           config: expect.objectContaining({
@@ -338,7 +338,7 @@ describe('Add Project modal — manual add path normalization', () => {
 
   it('registers the folder when dashboard config is missing (setup deferred)', async () => {
     readConfigMock.mockRejectedValueOnce(
-      new Error('Cannot read /Volumes/KLEVV-4T-1/Realestate_Management_Apps/.project-manager/config.json: No such file or directory (os error 2)'),
+      new Error('Cannot read /Users/Project-Manager/internal-resources/workspaces/realestate-management-apps/.project-manager/config.json: No such file or directory (os error 2)'),
     );
 
     const user = userEvent.setup();
@@ -349,14 +349,14 @@ describe('Add Project modal — manual add path normalization', () => {
       '/path/to/project (auto-detects .project-manager/)',
     ) as HTMLInputElement;
 
-    await user.type(manualInput, '/Volumes/KLEVV-4T-1/Realestate_Management_Apps');
+    await user.type(manualInput, '/Users/Project-Manager/internal-resources/workspaces/realestate-management-apps');
     await user.click(getModalSubmit());
 
     await waitFor(() => {
       expect(onAddProject).toHaveBeenCalledWith(
         expect.objectContaining({
           configMissing: true,
-          configPath: '/Volumes/KLEVV-4T-1/Realestate_Management_Apps/.project-manager/config.json',
+          configPath: '/Users/Project-Manager/internal-resources/workspaces/realestate-management-apps/.project-manager/config.json',
         }),
       );
     });

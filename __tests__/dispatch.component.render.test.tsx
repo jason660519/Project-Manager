@@ -90,7 +90,7 @@ describe('TaskDispatchModal [render]', () => {
   const baseProps = {
     feature: MOCK_FEATURE,
     adapters: MOCK_ADAPTERS,
-    projectRoot: '/Volumes/KLEVV-4T-1/Project-Manager',
+    projectRoot: '/Users/Project-Manager',
     defaultIDE: 'Cursor' as const,
     onClose: vi.fn(),
     onExecuted: vi.fn(),

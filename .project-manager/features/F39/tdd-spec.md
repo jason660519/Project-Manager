@@ -24,7 +24,7 @@
 | --- | --- | --- |
 | C1 | `projectScopedBin('openclaw', '/tmp/pm')` | `/tmp/pm/.project-manager/bin/openclaw` |
 | C2 | `projectScopedBin('hermes')` without root | `.project-manager/bin/hermes` (relative fallback) |
-| C3 | DEFAULT_CLIS hermes/openclaw commands | No hardcoded `/Volumes/KLEVV-4T-1/...` path |
+| C3 | DEFAULT_CLIS hermes/openclaw commands | No hardcoded `external SSD absolute path` path |
 
 ## Suite D: Shell plugin-state contract (integration / script)
 

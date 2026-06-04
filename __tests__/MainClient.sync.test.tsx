@@ -270,12 +270,12 @@ describe('web registry sync', () => {
         category: 'Development',
       })),
     ];
-    const configPath = '/Volumes/KLEVV-4T-1/Project-Manager/.project-manager/config.json';
+    const configPath = '/Users/Project-Manager/.project-manager/config.json';
     const baseConfig = {
       schemaVersion: 6,
       project: {
         name: 'Project Manager',
-        root: '/Volumes/KLEVV-4T-1/Project-Manager',
+        root: '/Users/Project-Manager',
         defaultIDE: 'Cursor',
         githubUrl: 'https://github.com/jason660519/Project-Manager',
       },

@@ -1,0 +1,335 @@
+{
+  "adapters": {
+    "agents": [
+      {
+        "argsTemplate": [
+          "--cwd",
+          "{root}",
+          "{prompt}"
+        ],
+        "command": "claude-code",
+        "id": "agent01",
+        "name": "Claude Code",
+        "type": "agent"
+      }
+    ],
+    "ides": [
+      {
+        "command": "code .",
+        "id": "ide01",
+        "name": "VSCode",
+        "type": "ide"
+      }
+    ]
+  },
+  "capabilityCandidates": [
+    {
+      "id": "anthropic:claude-opus-4-7",
+      "label": "Claude Opus 4.7 (Anthropic)",
+      "modelId": "claude-opus-4-7",
+      "providerId": "anthropic",
+      "sheet": "vla",
+      "state": "not_tested"
+    },
+    {
+      "id": "anthropic:claude-sonnet-4-6",
+      "label": "Claude Sonnet 4.6 (Anthropic)",
+      "modelId": "claude-sonnet-4-6",
+      "providerId": "anthropic",
+      "sheet": "vla",
+      "state": "not_tested"
+    },
+    {
+      "id": "anthropic:claude-opus-4-1",
+      "label": "Claude Opus 4.1 (Anthropic)",
+      "modelId": "claude-opus-4-1",
+      "providerId": "anthropic",
+      "sheet": "vla",
+      "state": "not_tested"
+    },
+    {
+      "id": "anthropic:claude-haiku-4-5-20251001",
+      "label": "Claude Haiku 4.5 (Anthropic)",
+      "modelId": "claude-haiku-4-5-20251001",
+      "providerId": "anthropic",
+      "sheet": "vla",
+      "state": "not_tested"
+    },
+    {
+      "id": "openai:gpt-5.5",
+      "label": "GPT-5.5 (OpenAI)",
+      "modelId": "gpt-5.5",
+      "providerId": "openai",
+      "sheet": "vla",
+      "state": "not_tested"
+    },
+    {
+      "id": "openai:gpt-4o",
+      "label": "GPT-4o (OpenAI)",
+      "modelId": "gpt-4o",
+      "providerId": "openai",
+      "sheet": "vla",
+      "state": "not_tested"
+    },
+    {
+      "id": "gemini:gemini-2.5-pro",
+      "label": "Gemini 2.5 Pro (Google)",
+      "modelId": "gemini-2.5-pro",
+      "providerId": "gemini",
+      "sheet": "vla",
+      "state": "not_tested"
+    },
+    {
+      "id": "gemini:gemini-2.5-flash",
+      "label": "Gemini 2.5 Flash (Google)",
+      "modelId": "gemini-2.5-flash",
+      "providerId": "gemini",
+      "sheet": "vla",
+      "state": "not_tested"
+    },
+    {
+      "id": "macos:say",
+      "label": "macOS `say` (system TTS, offline)",
+      "sheet": "tts",
+      "state": "not_tested"
+    },
+    {
+      "config": {
+        "kind": "microphone"
+      },
+      "id": "tools:microphone:default-input",
+      "label": "Microphone (default input device)",
+      "sheet": "tools",
+      "state": "not_tested"
+    },
+    {
+      "id": "macos:synthetic-input",
+      "label": "macOS synthetic input (mouse + keyboard via enigo)",
+      "sheet": "hands",
+      "state": "not_tested"
+    }
+  ],
+  "createdAt": "2026-05-25T08:28:00.727Z",
+  "features": [
+    {
+      "category": "Core/Auth",
+      "createdAt": "2026-05-25T08:28:00.727Z",
+      "id": "F01",
+      "metadata": {
+        "evidencePaths": [
+          "README.md",
+          "apps/mobile/src/screens/auth/LoginScreen.tsx"
+        ],
+        "initializationConfidence": 0.8,
+        "initializationValidation": {
+          "confidence": 0.97,
+          "evidencePaths": [
+            "apps/mobile/src/hooks/useAuth.ts",
+            "apps/mobile/src/screens/auth/LoginScreen.tsx",
+            "README.md"
+          ],
+          "featureId": "F01",
+          "issues": [
+            {
+              "code": "missing_located_section",
+              "message": "No locatedSection was assigned.",
+              "severity": "warning"
+            }
+          ],
+          "needsReview": false
+        }
+      },
+      "name": "User Authentication",
+      "notes": "Provides login and registration functionality.",
+      "paths": {
+        "implementation": "apps/mobile/src/hooks/useAuth.ts",
+        "spec": "",
+        "tdd": "",
+        "test": "apps/mobile/src/screens/auth/LoginScreen.tsx"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-25T08:28:00.727Z"
+    },
+    {
+      "category": "Backend/API",
+      "createdAt": "2026-05-25T08:28:00.727Z",
+      "id": "F02",
+      "locatedSection": "docs",
+      "metadata": {
+        "evidencePaths": [
+          "docs/DOCUMENT_UPLOAD_README.md",
+          "apps/mobile/src/components/documents/DocumentUploader.tsx"
+        ],
+        "initializationConfidence": 0.9,
+        "initializationValidation": {
+          "confidence": 1,
+          "evidencePaths": [
+            "apps/mobile/src/components/documents/DocumentUploader.tsx",
+            "apps/mobile/src/screens/dashboard/DocumentsScreen.tsx"
+          ],
+          "featureId": "F02",
+          "issues": [
+            {
+              "code": "path_not_found",
+              "message": "Path \"docs/DOCUMENT_UPLOAD_README.md\" was not found in the project inventory.",
+              "path": "docs/DOCUMENT_UPLOAD_README.md",
+              "severity": "error"
+            }
+          ],
+          "needsReview": true
+        }
+      },
+      "name": "Document Management",
+      "notes": "Feature for uploading and managing documents.",
+      "paths": {
+        "implementation": "apps/mobile/src/components/documents/DocumentUploader.tsx",
+        "spec": "docs/DOCUMENT_UPLOAD_README.md",
+        "tdd": "",
+        "test": "apps/mobile/src/screens/dashboard/DocumentsScreen.tsx"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 60,
+      "status": "in_progress",
+      "updatedAt": "2026-05-25T08:28:00.727Z"
+    },
+    {
+      "category": "Microservices",
+      "createdAt": "2026-05-25T08:28:00.727Z",
+      "id": "F03",
+      "metadata": {
+        "evidencePaths": [
+          "README.md",
+          "apps/mobile/src/services/ocrService.ts"
+        ],
+        "initializationConfidence": 0.85,
+        "initializationValidation": {
+          "confidence": 1,
+          "evidencePaths": [
+            "apps/mobile/src/services/ocrService.ts",
+            "apps/mobile/src/components/documents/OCRProcessingIndicator.tsx",
+            "README.md"
+          ],
+          "featureId": "F03",
+          "issues": [
+            {
+              "code": "missing_located_section",
+              "message": "No locatedSection was assigned.",
+              "severity": "warning"
+            }
+          ],
+          "needsReview": false
+        }
+      },
+      "name": "OCR Processing",
+      "notes": "OCR for automatic document text extraction.",
+      "paths": {
+        "implementation": "apps/mobile/src/services/ocrService.ts",
+        "spec": "",
+        "tdd": "",
+        "test": "apps/mobile/src/components/documents/OCRProcessingIndicator.tsx"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 50,
+      "status": "in_progress",
+      "updatedAt": "2026-05-25T08:28:00.727Z"
+    },
+    {
+      "category": "Core/Auth",
+      "createdAt": "2026-05-25T08:28:00.727Z",
+      "id": "F04",
+      "metadata": {
+        "evidencePaths": [
+          "apps/mobile/src/lib/supabase.ts"
+        ],
+        "initializationConfidence": 0.9,
+        "initializationValidation": {
+          "confidence": 1,
+          "evidencePaths": [
+            "apps/mobile/src/lib/supabase.ts"
+          ],
+          "featureId": "F04",
+          "issues": [
+            {
+              "code": "missing_located_section",
+              "message": "No locatedSection was assigned.",
+              "severity": "warning"
+            }
+          ],
+          "needsReview": false
+        }
+      },
+      "name": "Supabase Integration",
+      "notes": "Handles authentication and storage with Supabase.",
+      "paths": {
+        "implementation": "apps/mobile/src/lib/supabase.ts",
+        "spec": "apps/mobile/src/lib/supabase.ts",
+        "tdd": "",
+        "test": ""
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 100,
+      "status": "done",
+      "updatedAt": "2026-05-25T08:28:00.727Z"
+    },
+    {
+      "category": "Frontend/UI",
+      "createdAt": "2026-05-25T08:28:00.727Z",
+      "id": "F05",
+      "metadata": {
+        "evidencePaths": [
+          "DASHBOARD_INTEGRATION_EXAMPLE.md"
+        ],
+        "initializationConfidence": 0.75,
+        "initializationValidation": {
+          "confidence": 0.67,
+          "evidencePaths": [
+            "apps/mobile/src/screens/dashboard/LandlordDashboard.tsx"
+          ],
+          "featureId": "F05",
+          "issues": [
+            {
+              "code": "missing_located_section",
+              "message": "No locatedSection was assigned.",
+              "severity": "warning"
+            },
+            {
+              "code": "path_not_found",
+              "message": "Path \"DASHBOARD_INTEGRATION_EXAMPLE.md\" was not found in the project inventory.",
+              "path": "DASHBOARD_INTEGRATION_EXAMPLE.md",
+              "severity": "error"
+            }
+          ],
+          "needsReview": true
+        }
+      },
+      "name": "Dashboard Development",
+      "notes": "Initial implementation of landlord and superadmin dashboards.",
+      "paths": {
+        "implementation": "apps/mobile/src/screens/dashboard/LandlordDashboard.tsx",
+        "spec": "DASHBOARD_INTEGRATION_EXAMPLE.md",
+        "tdd": "",
+        "test": "apps/mobile/src/screens/dashboard/LandlordDashboard.tsx"
+      },
+      "phase": "development",
+      "points": 1,
+      "progress": 40,
+      "status": "in_progress",
+      "updatedAt": "2026-05-25T08:28:00.727Z"
+    }
+  ],
+  "id": "7e6615dc-8aef-43f6-aa5a-85c04fc3fb4d",
+  "project": {
+    "defaultIDE": "VSCode",
+    "githubUrl": "https://github.com/jason660519/Owner-Property-Management-AI-SPA",
+    "name": "owner-property-management-ai-spa",
+    "root": "/Users/Project-Manager/internal-resources/projects/owner-property-management-ai-spa"
+  },
+  "schemaVersion": 8,
+  "updatedAt": "2026-05-25T08:28:00.727Z"
+}
