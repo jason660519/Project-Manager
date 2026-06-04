@@ -38,7 +38,7 @@ describe('Project progress sheet tabs', () => {
     const buttons = screen.getAllByRole('button');
     expect(within(buttons[0]).getByText('Projects')).toBeInTheDocument();
     expect(within(buttons[1]).getByText('Issues')).toBeInTheDocument();
-    expect(within(buttons[2]).getByText('Development')).toBeInTheDocument();
+    expect(within(buttons[2]).getByText('Development Progress')).toBeInTheDocument();
   });
 
   it('emits the projects tab id when Projects is clicked', async () => {

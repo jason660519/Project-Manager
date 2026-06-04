@@ -97,3 +97,169 @@ F46 is owned by another engineer. F48 must avoid mobile remote files and F46 art
 - Passed: `npm run typecheck`.
 - Passed: `npm run docs:check`.
 - Not run: `npm run verify:baseline` because F48 is in progress at 30%; baseline remains mandatory before claiming completion or preparing commit/PR.
+
+## 2026-06-04 - Backend Profile Pair Slice
+
+### Implemented
+
+- Added default PM backend port model for API gateway, Postgres, Studio, Storage, and Realtime.
+- Added backend profile pair generation:
+  - renderer-safe profile with URL and anon key only
+  - ops-only profile with service-role key, JWT secret, database password, ports, compose project, and schema version
+- Added ops env rendering for local install files.
+- Added redacted ops env rendering for support/doctor output.
+- Expanded `__tests__/pmSystemInstaller.plan.test.ts` to 12 tests.
+- Updated F48 Development metadata to 40% progress.
+
+### Verification Log
+
+- Passed: `npm run test -- --run __tests__/pmSystemInstaller.plan.test.ts` (1 file, 12 tests).
+- Passed: `npm run typecheck`.
+
+## 2026-06-04 - Backend Doctor Report Slice
+
+### Implemented
+
+- Added PM backend doctor report model with:
+  - healthy
+  - degraded
+  - failed
+- Added doctor checks for runtime, ports, auth, Postgres, migrations, storage, realtime, and connector.
+- Added helper to list blocking failed checks.
+- Added helper to collect recovery actions.
+- Expanded `__tests__/pmSystemInstaller.plan.test.ts` to 15 tests.
+- Updated F48 Development metadata to 45% progress.
+
+### Verification Log
+
+- Passed: `npm run test -- --run __tests__/pmSystemInstaller.plan.test.ts` (1 file, 15 tests).
+- Passed: `npm run typecheck`.
+
+## 2026-06-04 - Backup Restore Upgrade Planner Slice
+
+### Implemented
+
+- Added backup planner with Postgres export, optional storage export, manifest writing, and manifest verification.
+- Added restore planner requiring known backup source and exact destructive confirmation phrase.
+- Added upgrade planner requiring verified backup before image pull/migration, and blocking upgrade when doctor status is failed.
+- Expanded `__tests__/pmSystemInstaller.plan.test.ts` to 21 tests.
+- Updated F48 Development metadata to 55% progress.
+
+### Verification Log
+
+- Passed: `npm run test -- --run __tests__/pmSystemInstaller.plan.test.ts` (1 file, 21 tests).
+- Passed: `npm run typecheck`.
+
+## 2026-06-04 - PM System Installer Runbook
+
+### Implemented
+
+- Added `docs/engineering/pm-system-installer.md`.
+- Documented installer product boundary, deployment profiles, user roles, command set, secret boundaries, preflight checks, doctor status, and backup/restore/upgrade policy.
+- Updated documentation site manifests through `npm run docs:site:sync`.
+- Updated F48 Development metadata to 60% progress.
+
+### Verification Log
+
+- Passed: `npm run docs:check`.
+- Passed: `npm run docs:site:sync`.
+
+## 2026-06-04 - Focused Verification Pass 2
+
+### Verification Log
+
+- Passed: `npm run test -- --run __tests__/pmSystemInstaller.plan.test.ts` (1 file, 21 tests).
+- Passed: `npm run typecheck`.
+- Passed: `npm run docs:check`.
+- Not run: `npm run verify:baseline` because F48 is still in progress at 60%; baseline remains mandatory before completion/commit/PR.
+
+## 2026-06-04 - Self-hosted Stack Scaffold Slice
+
+### Implemented
+
+- Added self-hosted scaffold files:
+  - `infra/supabase/docker-compose.pm-system.yml`
+  - `infra/supabase/pm-system.env.example`
+  - `infra/supabase/migrations/0001_pm_core.sql`
+  - `infra/supabase/seed.sql`
+- Added scaffold inventory and secret-audit helper in `infra/supabase/pm-system-installer.ts`.
+- Added tests for scaffold inventory, no-real-secret guard, core PM tables, and RLS enablement.
+- Expanded `__tests__/pmSystemInstaller.plan.test.ts` to 24 tests.
+- Updated F48 Development metadata to 70% progress.
+
+### Verification Log
+
+- Passed: `npm run test -- --run __tests__/pmSystemInstaller.plan.test.ts` (1 file, 24 tests).
+- Passed: `npm run typecheck`.
+
+## 2026-06-04 - Dry-run CLI Response Slice
+
+### Implemented
+
+- Added `buildPmSystemCliResponse()` for dry-run-safe command responses.
+- Covered command response behavior for:
+  - install
+  - doctor
+  - backup
+  - restore
+  - upgrade
+  - start
+  - stop
+  - status
+  - logs
+- Added tests for dry-run install output, doctor missing-runtime blocking, unsafe backup, unsafe restore, and upgrade-without-backup messaging.
+- Expanded `__tests__/pmSystemInstaller.plan.test.ts` to 27 tests.
+- Updated F48 Development metadata to 78% progress.
+
+### Verification Log
+
+- Passed: `npm run test -- --run __tests__/pmSystemInstaller.plan.test.ts` (1 file, 27 tests).
+- Passed: `npm run typecheck`.
+
+## 2026-06-04 - Dry-run CLI Wrapper Slice
+
+### Implemented
+
+- Added `scripts/pm-system.mjs`.
+- Added `__tests__/pmSystemCli.test.ts`.
+- CLI wrapper currently supports dry-run planning only and refuses live host mutation without `--dry-run`.
+- `install --dry-run` prints the planned installer steps.
+- `restore --dry-run` and `upgrade --dry-run` remain blocked until explicit safety inputs are implemented.
+- Updated F48 Development metadata to 82% progress.
+
+### Verification Log
+
+- Passed: `npm run test -- --run __tests__/pmSystemInstaller.plan.test.ts __tests__/pmSystemCli.test.ts` (2 files, 30 tests).
+- Passed: `npm run typecheck`.
+- Passed: `node scripts/pm-system.mjs install --dry-run`.
+
+## 2026-06-04 - NPM Script Wiring
+
+### Implemented
+
+- Added package script: `npm run pm-system -- <command> --dry-run`.
+
+### Verification Log
+
+- Passed: `npm run pm-system -- install --dry-run`.
+- Passed: `npm run test -- --run __tests__/pmSystemInstaller.plan.test.ts __tests__/pmSystemCli.test.ts` (2 files, 30 tests).
+- Passed: `npm run typecheck`.
+- Passed: `npm run docs:check`.
+
+### Safety Note
+
+The scaffold is intentionally not a production-ready Supabase stack yet. It creates a reviewable file boundary for the next implementation slice without pulling images, starting containers, or writing real secrets.
+
+## 2026-06-04 - Scaffold Integrity Follow-up
+
+### Implemented
+
+- Added `infra/supabase/templates/kong.yml` placeholder because the compose scaffold mounts a Kong declarative config.
+- Added `create extension if not exists pgcrypto;` to the initial migration before `gen_random_uuid()` defaults.
+- Updated scaffold inventory and tests to include the Kong template and pgcrypto requirement.
+- Updated F48 Development metadata to 72% progress.
+
+### Verification Log
+
+- Passed: `npm run test -- --run __tests__/pmSystemInstaller.plan.test.ts` (1 file, 24 tests).
+- Passed: `npm run typecheck`.

@@ -1,0 +1,8 @@
+_format_version: "2.1"
+_transform: true
+
+# Placeholder Kong declarative config for F48.
+# Replace with the complete Supabase self-hosted routing contract before live use.
+services: []
+routes: []
+consumers: []

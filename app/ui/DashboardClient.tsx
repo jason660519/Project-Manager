@@ -32,7 +32,7 @@ interface DashboardClientProps {
 }
 
 const PHASE_TABS: Array<{ label: string; value: FeaturePhase }> = [
-  { label: 'Development', value: 'development' },
+  { label: 'Development Progress', value: 'development' },
   { label: 'E2E Testing', value: 'e2e_testing' },
   { label: 'Deployment', value: 'deployment' },
   { label: 'Operations', value: 'operations' },
@@ -252,7 +252,7 @@ export function DashboardClient({
                 <p className="mt-1 text-xs text-stone-400">
                   {filtered.length} feature{filtered.length !== 1 ? 's' : ''}
                   {' · '}
-                  {PHASE_TABS.find((tab) => tab.value === activePhase)?.label ?? 'Development'}
+                  {PHASE_TABS.find((tab) => tab.value === activePhase)?.label ?? 'Development Progress'}
                   {' · '}click row to inspect
                 </p>
               </div>

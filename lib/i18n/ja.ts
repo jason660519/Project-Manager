@@ -250,7 +250,7 @@ export const ja: Translations = {
     },
   },
   phases: {
-    development: '開発',
+    development: '開発進捗',
     e2eTesting: 'E2Eテスト',
     deployment: 'デプロイ',
     operations: '運用',

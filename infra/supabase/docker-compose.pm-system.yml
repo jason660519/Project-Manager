@@ -1,0 +1,42 @@
+# PM System self-hosted Supabase scaffold.
+# This file is a starting point for F48 and is not yet a production-ready stack.
+# Keep generated secrets in ignored local ops files, never in this template.
+
+name: pm-system
+
+services:
+  kong:
+    image: supabase/kong:latest
+    restart: unless-stopped
+    ports:
+      - "${PM_BACKEND_API_PORT:-8000}:8000"
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+    volumes:
+      - ./templates/kong.yml:/var/lib/kong/kong.yml:ro
+
+  postgres:
+    image: supabase/postgres:latest
+    restart: unless-stopped
+    ports:
+      - "${PM_BACKEND_POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_PASSWORD: "${PM_BACKEND_DATABASE_PASSWORD:?set in local ops env}"
+      POSTGRES_DB: postgres
+    volumes:
+      - pm-postgres-data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d/pm-migrations:ro
+
+  studio:
+    image: supabase/studio:latest
+    restart: unless-stopped
+    ports:
+      - "${PM_BACKEND_STUDIO_PORT:-54323}:3000"
+    environment:
+      SUPABASE_URL: "http://kong:8000"
+      SUPABASE_ANON_KEY: "${PM_BACKEND_SUPABASE_ANON_KEY:?set in local ops env}"
+      SUPABASE_SERVICE_KEY: "${PM_BACKEND_SUPABASE_SERVICE_ROLE_KEY:?set in local ops env}"
+
+volumes:
+  pm-postgres-data:

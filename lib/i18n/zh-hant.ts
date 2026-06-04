@@ -249,7 +249,7 @@ export const zhHant: Translations = {
     },
   },
   phases: {
-    development: '開發',
+    development: '開發進度',
     e2eTesting: 'E2E 測試',
     deployment: '部署',
     operations: '運維',

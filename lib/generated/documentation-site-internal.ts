@@ -4,19 +4,19 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-06-04T05:23:36.836Z",
+    "generatedAt": "2026-06-04T07:06:18.292Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
     "manifestAudience": "internal",
-    "totalDocuments": 100,
+    "totalDocuments": 101,
     "totalFolders": 14,
     "publicDocuments": 36,
-    "internalDocuments": 63,
+    "internalDocuments": 64,
     "restrictedDocuments": 1,
     "publishableDocuments": 12,
-    "reviewRequiredDocuments": 61,
-    "warningCount": 123
+    "reviewRequiredDocuments": 62,
+    "warningCount": 124
   },
   "folders": [
     {
@@ -26,7 +26,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "sourcePath": "docs",
       "label": "All Docs",
       "title": "Documentation",
-      "summary": "100 documentation files indexed from docs.",
+      "summary": "101 documentation files indexed from docs.",
       "parentSlug": null,
       "folderSlugs": [
         "architecture",
@@ -44,14 +44,14 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       ],
       "classificationCounts": {
         "public": 36,
-        "internal": 63,
+        "internal": 64,
         "restricted": 1
       },
       "publishableCount": 12,
-      "reviewRequiredCount": 61,
+      "reviewRequiredCount": 62,
       "visibilityCounts": {
         "public": 36,
-        "internal": 63,
+        "internal": 64,
         "restricted": 1
       },
       "warnings": [
@@ -231,6 +231,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "engineering/ollama-docker-usage",
         "engineering/openclaw-plugin",
         "engineering/plugin-guide",
+        "engineering/pm-system-installer",
         "engineering/readme",
         "engineering/runtime-bridge",
         "engineering/security-and-secrets",
@@ -245,14 +246,14 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       ],
       "classificationCounts": {
         "public": 0,
-        "internal": 22,
+        "internal": 23,
         "restricted": 0
       },
       "publishableCount": 0,
-      "reviewRequiredCount": 13,
+      "reviewRequiredCount": 14,
       "visibilityCounts": {
         "public": 0,
-        "internal": 22,
+        "internal": 23,
         "restricted": 0
       },
       "warnings": [
@@ -1690,6 +1691,39 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "updatedAt": "2026-05-22T02:26:41.000Z"
     },
     {
+      "id": "engineering/pm-system-installer",
+      "slug": "engineering/pm-system-installer",
+      "route": "/documentation/engineering/pm-system-installer",
+      "sourcePath": "docs/engineering/pm-system-installer.md",
+      "folderSlug": "engineering",
+      "folderPath": "docs/engineering",
+      "title": "PM System Installer Runbook",
+      "summary": "The PM System Installer provisions and operates a self-hosted Project Manager backend stack powered by Supabase. It supports a self-hosted-first, connector-based, cloud-compatible product...",
+      "content": "# PM System Installer Runbook\n\n> Status: Draft for F48  \n> Owner: Project Manager engineering  \n> Last updated: 2026-06-04\n\n## Purpose\n\nThe PM System Installer provisions and operates a self-hosted Project Manager backend stack powered by Supabase. It supports a self-hosted-first, connector-based, cloud-compatible product model.\n\nThe installer is for Workspace Owner/Admin setup and operations. General Users should connect to an existing workspace URL and should not install Docker or manage Supabase containers.\n\n## Product Boundary\n\n```text\nPM Desktop / PM Web\n  -> Backend Connector Profile\n      -> local self-hosted Supabase\n      -> LAN/VM self-hosted Supabase\n      -> Supabase Cloud endpoint later\n```\n\nProject Manager should have one active backend connector profile. The app should not know whether that profile points to local Docker, a VM, or Supabase Cloud beyond the profile mode.\n\n## Roles\n\n| Role | Responsibility |\n| --- | --- |\n| Workspace Owner | Installs backend, creates first admin, shares workspace URL. |\n| Admin/Ops | Runs status, doctor, backup, restore, upgrade, and logs. |\n| Developer | Connects PM Desktop, signs in, pairs local runner, dispatches guarded work. |\n| General User | Connects to workspace URL, signs in, views portal. No Docker requirement. |\n\n## Supported Deployment Profiles\n\n| Mode | Use |\n| --- | --- |\n| `local-self-hosted` | Single-owner/local team development or personal PM backend. |\n| `vm-self-hosted` | Team backend on a LAN server, Mac mini, NAS, or cloud VM. |\n| `supabase-cloud` | Future managed profile for teams that do not want to operate containers. |\n\n## Installer Commands\n\n| Command | Purpose |\n| --- | --- |\n| `install` | Generate config, pull images, start stack, run migrations, create owner, health check. |\n| `start` | Start existing backend stack. |\n| `stop` | Stop services without deleting volumes. |\n| `status` | Show service, port, profile, and schema status. |\n| `doctor` | Diagnose runtime, ports, Auth, Postgres, migrations, Storage, Realtime, connector. |\n| `backup` | Export Postgres and optionally Storage artifacts with manifest verification. |\n| `restore` | Restore from a known backup with explicit destructive confirmation. |\n| `upgrade` | Require verified backup, pull target images, run migrations, health check. |\n| `logs` | Collect support logs with secret redaction. |\n\n## Secret Boundary\n\nRenderer-safe profile may contain:\n\n- profile ID\n- display label\n- deployment mode\n- Supabase URL\n- Supabase anon key\n\nOps-only profile may contain:\n\n- service-role key\n- JWT secret\n- database password\n- compose project name\n- ports\n- schema version\n\nRules:\n\n- Never expose service-role key, JWT secret, or database password to the renderer.\n- Never commit generated secrets.\n- Redact secrets in doctor/logs/support output.\n\n## Preflight Requirements\n\nBefore install:\n\n1. Detect Docker-compatible runtime.\n2. If runtime is missing, return guided install state; do not silently install privileged system software.\n3. Check required ports.\n4. Detect existing stack and volumes.\n5. Require explicit owner approval before mutation.\n\n## Doctor Status\n\nDoctor status must not produce false success:\n\n| Status | Meaning |\n| --- | --- |\n| `healthy` | All checks pass. |\n| `degraded` | No blocking failures, but warnings require follow-up. |\n| `failed` | Blocking failure; do not start, upgrade, or dispatch until resolved. |\n\n## Backup Restore Upgrade Policy\n\n- Backup writes a manifest and verifies it.\n- Restore requires a known backup source and exact confirmation phrase.\n- Upgrade requires a verified backup before pulling images or running migrations.\n- Failed doctor checks block upgrade.\n\n## Current Implementation\n\nThe first implementation slice is side-effect-free:\n\n- `infra/supabase/pm-system-installer.ts`\n- `__tests__/pmSystemInstaller.plan.test.ts`\n\nIt models installer plans, backend profiles, doctor reports, backup/restore/upgrade plans, and maintenance policies. It does not call Docker, pull images, write secrets, or mutate host state.\n\n## Verification\n\nFocused verification:\n\n```bash\nnpm run test -- --run __tests__/pmSystemInstaller.plan.test.ts\nnpm run typecheck\nnpm run docs:check\n```\n\nFull completion gate:\n\n```bash\nnpm run verify:baseline\n```\n",
+      "contentHash": "bed26b968a208e22",
+      "readingMinutes": 3,
+      "classification": "internal",
+      "classificationSource": "policy",
+      "classificationConfidence": 0.95,
+      "classificationReason": "Engineering runbooks and implementation contracts are internal by default.",
+      "matchedPolicyRule": "CLS-INTERNAL-ENGINEERING",
+      "publish": false,
+      "reviewStatus": "ai-classified",
+      "needsReview": true,
+      "visibility": "internal",
+      "audience": [
+        "engineers",
+        "operators"
+      ],
+      "tags": [
+        "engineering"
+      ],
+      "warnings": [
+        "Mentions secrets, tokens, or credentials"
+      ],
+      "updatedAt": "2026-06-04T07:06:18.292Z"
+    },
+    {
       "id": "engineering/readme",
       "slug": "engineering/readme",
       "route": "/documentation/engineering/readme",
@@ -1860,7 +1894,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "warnings": [
         "Mentions local key storage"
       ],
-      "updatedAt": "2026-06-04T05:23:36.836Z"
+      "updatedAt": "2026-06-04T06:20:33.822Z"
     },
     {
       "id": "engineering/table-sheet-inventory",
@@ -2104,8 +2138,8 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "folderPath": "docs/guides/features",
       "title": "Agent Workflows",
       "summary": "Agent Workflows are reusable multi-agent business processes. They describe how Project Manager should split work into AI Engineer roles, run workers in dependency order, isolate memory, c...",
-      "content": "\n# Agent Workflows\n\nAgent Workflows are reusable multi-agent business processes. They describe how Project Manager should split work into AI Engineer roles, run workers in dependency order, isolate memory, collect artifacts, and summarize the result.\n\nThe first workflow templates are Software Development and Deep Research. Both use a DAG: a directed acyclic graph where nodes can run after their dependencies complete.\n\n## Core concepts\n\n| Concept | Meaning |\n|---|---|\n| Coordinator | The Project Manager control-plane service that schedules nodes, creates workers, tracks state, retries failures, and records artifacts. |\n| Workflow | A named process template such as Software Development or Deep Research. |\n| DAG | A dependency graph with no cycles. It defines which steps can run in parallel and which steps must wait. |\n| Node | One step in a workflow. A node declares role, dependencies, runtime, tools, memory policy, retry policy, and required output. |\n| AI Engineer | The role assigned to a node. It supplies prompt, provider, model, skills, scope, and capabilities. |\n| Worker | The runtime instance that runs one node for one AI Engineer. |\n| Runtime Adapter | The execution provider behind a worker, such as local/xmux now or CubeSandbox/E2B later. |\n| Tool Bundle | The tools, skills, memory sources, plugins, MCP servers, and capability candidates a worker may use. |\n| Artifact | A declared output from a node. Downstream nodes should consume artifacts, not hidden sibling transcripts. |\n| Checkpoint | Restorable state for retry or resume. |\n\n## Control-plane lifecycle\n\n```mermaid\nflowchart TD\n  request[\"User selects feature and workflow\"] --> proposal[\"Workflow proposal\"]\n  proposal --> coordinator[\"Coordinator\"]\n  coordinator --> validate[\"Validate DAG, tools, permissions\"]\n  validate --> run[\"Create WorkflowRun\"]\n  run --> ready[\"Find ready nodes\"]\n  ready --> worker[\"Create WorkerSpec\"]\n  worker --> runtime[\"Runtime Adapter\"]\n  runtime --> result[\"Logs, artifacts, checkpoint\"]\n  result --> complete{\"Node complete?\"}\n  complete -- yes --> ready\n  complete -- retryable failure --> retry[\"Retry with policy\"]\n  retry --> runtime\n  complete -- blocked --> blocked[\"WorkflowRun blocked\"]\n  ready --> summary[\"Final summary/report\"]\n```\n\n## Software Development workflow\n\nThe Software Development workflow is for feature implementation with parallel work and review gates.\n\n```mermaid\nflowchart LR\n  start((\"Start\")) --> planner[\"Planner\"]\n  planner --> implA[\"Implement A\"]\n  planner --> implB[\"Implement B\"]\n  planner --> reviewA[\"Code Review\"]\n  implA --> reviewA\n  implB --> reviewA\n  planner --> reviewB[\"Architecture Review\"]\n  implA --> reviewB\n  implB --> reviewB\n  reviewA --> tests[\"Unit / Integration Tests\"]\n  reviewB --> tests\n  reviewA --> e2e[\"E2E / Manual Gate\"]\n  reviewB --> e2e\n  tests --> summarizer[\"Summarizer\"]\n  e2e --> summarizer\n  summarizer --> done((\"Done\"))\n```\n\n| Stage | What happens | Required evidence |\n|---|---|---|\n| Planner | Reads the feature request and code context, then splits the work. | Implementation plan and verification matrix. |\n| Implementers | Make scoped code changes in parallel. | Diff summary and focused verification output. |\n| Reviewers | Review implementation and architecture boundaries. | Severity-ordered findings and open questions. |\n| Testers / Evaluators | Run unit, integration, E2E, or manual verification. | Commands, pass/fail results, and failure evidence. |\n| Summarizer | Reads declared artifacts and produces handoff. | Final summary, residual risk, and next steps. |\n\n## Deep Research workflow\n\nThe Deep Research workflow is for parallel research, synthesis, and report generation.\n\n```mermaid\nflowchart LR\n  start((\"Start\")) --> plan[\"Research Planner\"]\n  plan --> searchA[\"Search Topic A\"]\n  plan --> searchB[\"Search Topic B\"]\n  plan --> searchC[\"Search Topic C\"]\n  searchA --> writeA[\"Write Topic A\"]\n  searchB --> writeB[\"Write Topic B\"]\n  searchC --> writeC[\"Write Topic C\"]\n  writeA --> report[\"Research Report\"]\n  writeB --> report\n  writeC --> report\n  report --> done((\"Done\"))\n```\n\n| Stage | What happens | Required evidence |\n|---|---|---|\n| Research Planner | Defines topics, source criteria, and output shape. | Research brief and branch plan. |\n| Search Workers | Gather sources and notes for one topic each. | Source notes, citations, and uncertainty notes. |\n| Writer Workers | Draft topic sections from approved source notes. | Topic drafts with source references. |\n| Report Worker | Merges topic drafts into final report. | Final report, source summary, confidence notes. |\n\n## Dispatch flow\n\nWhen Dispatch supports workflows, the user path should be:\n\n1. Select a feature from Project Dashboard > Development.\n2. Choose a workflow template: Software Development, Deep Research, or a custom template.\n3. Confirm AI Engineer role assignments for each node group.\n4. Confirm provider/model and runtime preferences.\n5. Review tool bundle and memory scopes.\n6. Start in dry-run, guarded, or approved execution mode.\n7. Open AI Assistants Control Console > Workflow Runs to inspect the persisted run.\n8. Monitor node status, artifacts, logs, and checkpoints.\n\nThe Coordinator should block a workflow before runtime start if a required tool candidate, provider key, model, path permission, or memory policy is missing.\n\n## Memory and artifacts\n\nWorker sessions are isolated by default.\n\n```mermaid\nflowchart TD\n  workflow[\"WorkflowRun\"] --> nodeA[\"Node A / Agent 1\"]\n  workflow --> nodeB[\"Node B / Agent 2\"]\n  nodeA --> sessionA[\"Session A\"]\n  nodeB --> sessionB[\"Session B\"]\n  nodeA --> artifactA[\"Artifact A\"]\n  nodeB --> artifactB[\"Artifact B\"]\n  artifactA --> downstream[\"Downstream node\"]\n  artifactB --> downstream\n  sessionA -. \"private by default\" .- sessionB\n```\n\nRules:\n\n- Session keys include project, workflow, run, node, and agent identity.\n- Downstream nodes consume declared artifacts by default.\n- Sibling worker transcripts require explicit sharing policy.\n- Summarizers should report what artifacts they consumed.\n- Resume must use the exact checkpoint for the selected node and agent.\n\n## Runtime adapters\n\nF35 treats runtime providers as replaceable adapters. The workflow definition says what should run; the adapter decides how to run it.\n\n| Runtime | Intended use |\n|---|---|\n| local / xmux | Current local developer workflow and pane/session orchestration. |\n| CubeSandbox | Future isolated worker runtime with fast VM startup and pause/resume potential. |\n| E2B | Future hosted sandbox provider behind the same adapter contract. |\n| Hermes / OpenClaw | Future agent/service integrations when they expose compatible run/session semantics. |\n\nRuntime-specific fields should stay inside adapter configuration. User-authored workflow definitions should remain portable.\n\n## Current status\n\nImplemented now:\n\n- Built-in Software Development and Deep Research DAG definitions.\n- DAG validation for duplicate IDs, dangling edges, missing dependencies, and cycles.\n- WorkflowRun and WorkflowNodeRun state helpers for ready/queued/running/completed/blocked flow.\n- Dispatch and Batch Dispatch template pickers for multi-agent DAG workflows.\n- WorkflowRun sidecar persistence under `.project-manager/workflow-runs/*.json`.\n- AI Assistants Control Console > Workflow Runs sheet for browsing persisted sidecars, node status, session scope, runtime profile, and artifacts.\n- Per-worker session scope and path-safe store keys.\n- Tool bundle references without raw sensitive values.\n- F35 feature spec, TDD spec, user scenarios, and dev log.\n\nPlanned next:\n\n- Integrations Hub tool/capability resolver.\n- Runtime adapter interface and local/xmux worker runner.\n- Workflow Runs controls for retry, resume, cancellation, checkpoint restore, permissions, and audit events.\n\n## Related guides\n\n- [AI Assistants Control Console](ai-assistants-control-console.md)\n- [AI Engineers](engineers.md)\n- [AI Assistant](chat.md)\n- [Integrations Hub](integrations-hub.md)\n",
-      "contentHash": "52a2d0e4255954ce",
+      "content": "\n# Agent Workflows\n\nAgent Workflows are reusable multi-agent business processes. They describe how Project Manager should split work into AI Engineer roles, run workers in dependency order, isolate memory, collect artifacts, and summarize the result.\n\nThe first workflow templates are Software Development and Deep Research. Both use a DAG: a directed acyclic graph where nodes can run after their dependencies complete.\n\n## Core concepts\n\n| Concept | Meaning |\n|---|---|\n| Coordinator | The Project Manager control-plane service that schedules nodes, creates workers, tracks state, retries failures, and records artifacts. |\n| Workflow | A named process template such as Software Development or Deep Research. |\n| DAG | A dependency graph with no cycles. It defines which steps can run in parallel and which steps must wait. |\n| Node | One step in a workflow. A node declares role, dependencies, runtime, tools, memory policy, retry policy, and required output. |\n| AI Engineer | The role assigned to a node. It supplies prompt, provider, model, skills, scope, and capabilities. |\n| Worker | The runtime instance that runs one node for one AI Engineer. |\n| Runtime Adapter | The execution provider behind a worker, such as local/xmux now or CubeSandbox/E2B later. |\n| Tool Bundle | The tools, skills, memory sources, plugins, MCP servers, and capability candidates a worker may use. |\n| Artifact | A declared output from a node. Downstream nodes should consume artifacts, not hidden sibling transcripts. |\n| Checkpoint | Restorable state for retry or resume. |\n\n## Control-plane lifecycle\n\n```mermaid\nflowchart TD\n  request[\"User selects feature and workflow\"] --> proposal[\"Workflow proposal\"]\n  proposal --> coordinator[\"Coordinator\"]\n  coordinator --> validate[\"Validate DAG, tools, permissions\"]\n  validate --> run[\"Create WorkflowRun\"]\n  run --> ready[\"Find ready nodes\"]\n  ready --> worker[\"Create WorkerSpec\"]\n  worker --> runtime[\"Runtime Adapter\"]\n  runtime --> result[\"Logs, artifacts, checkpoint\"]\n  result --> complete{\"Node complete?\"}\n  complete -- yes --> ready\n  complete -- retryable failure --> retry[\"Retry with policy\"]\n  retry --> runtime\n  complete -- blocked --> blocked[\"WorkflowRun blocked\"]\n  ready --> summary[\"Final summary/report\"]\n```\n\n## Software Development workflow\n\nThe Software Development workflow is for feature implementation with parallel work and review gates.\n\n```mermaid\nflowchart LR\n  start((\"Start\")) --> planner[\"Planner\"]\n  planner --> implA[\"Implement A\"]\n  planner --> implB[\"Implement B\"]\n  planner --> reviewA[\"Code Review\"]\n  implA --> reviewA\n  implB --> reviewA\n  planner --> reviewB[\"Architecture Review\"]\n  implA --> reviewB\n  implB --> reviewB\n  reviewA --> tests[\"Unit / Integration Tests\"]\n  reviewB --> tests\n  reviewA --> e2e[\"E2E / Manual Gate\"]\n  reviewB --> e2e\n  tests --> summarizer[\"Summarizer\"]\n  e2e --> summarizer\n  summarizer --> done((\"Done\"))\n```\n\n| Stage | What happens | Required evidence |\n|---|---|---|\n| Planner | Reads the feature request and code context, then splits the work. | Implementation plan and verification matrix. |\n| Implementers | Make scoped code changes in parallel. | Diff summary and focused verification output. |\n| Reviewers | Review implementation and architecture boundaries. | Severity-ordered findings and open questions. |\n| Testers / Evaluators | Run unit, integration, E2E, or manual verification. | Commands, pass/fail results, and failure evidence. |\n| Summarizer | Reads declared artifacts and produces handoff. | Final summary, residual risk, and next steps. |\n\n## Deep Research workflow\n\nThe Deep Research workflow is for parallel research, synthesis, and report generation.\n\n```mermaid\nflowchart LR\n  start((\"Start\")) --> plan[\"Research Planner\"]\n  plan --> searchA[\"Search Topic A\"]\n  plan --> searchB[\"Search Topic B\"]\n  plan --> searchC[\"Search Topic C\"]\n  searchA --> writeA[\"Write Topic A\"]\n  searchB --> writeB[\"Write Topic B\"]\n  searchC --> writeC[\"Write Topic C\"]\n  writeA --> report[\"Research Report\"]\n  writeB --> report\n  writeC --> report\n  report --> done((\"Done\"))\n```\n\n| Stage | What happens | Required evidence |\n|---|---|---|\n| Research Planner | Defines topics, source criteria, and output shape. | Research brief and branch plan. |\n| Search Workers | Gather sources and notes for one topic each. | Source notes, citations, and uncertainty notes. |\n| Writer Workers | Draft topic sections from approved source notes. | Topic drafts with source references. |\n| Report Worker | Merges topic drafts into final report. | Final report, source summary, confidence notes. |\n\n## Dispatch flow\n\nWhen Dispatch supports workflows, the user path should be:\n\n1. Select a feature from Development Progress in the Project Progress Dashboard.\n2. Choose a workflow template: Software Development, Deep Research, or a custom template.\n3. Confirm AI Engineer role assignments for each node group.\n4. Confirm provider/model and runtime preferences.\n5. Review tool bundle and memory scopes.\n6. Start in dry-run, guarded, or approved execution mode.\n7. Open AI Assistants Control Console > Workflow Runs to inspect the persisted run.\n8. Monitor node status, artifacts, logs, and checkpoints.\n\nThe Coordinator should block a workflow before runtime start if a required tool candidate, provider key, model, path permission, or memory policy is missing.\n\n## Memory and artifacts\n\nWorker sessions are isolated by default.\n\n```mermaid\nflowchart TD\n  workflow[\"WorkflowRun\"] --> nodeA[\"Node A / Agent 1\"]\n  workflow --> nodeB[\"Node B / Agent 2\"]\n  nodeA --> sessionA[\"Session A\"]\n  nodeB --> sessionB[\"Session B\"]\n  nodeA --> artifactA[\"Artifact A\"]\n  nodeB --> artifactB[\"Artifact B\"]\n  artifactA --> downstream[\"Downstream node\"]\n  artifactB --> downstream\n  sessionA -. \"private by default\" .- sessionB\n```\n\nRules:\n\n- Session keys include project, workflow, run, node, and agent identity.\n- Downstream nodes consume declared artifacts by default.\n- Sibling worker transcripts require explicit sharing policy.\n- Summarizers should report what artifacts they consumed.\n- Resume must use the exact checkpoint for the selected node and agent.\n\n## Runtime adapters\n\nF35 treats runtime providers as replaceable adapters. The workflow definition says what should run; the adapter decides how to run it.\n\n| Runtime | Intended use |\n|---|---|\n| local / xmux | Current local developer workflow and pane/session orchestration. |\n| CubeSandbox | Future isolated worker runtime with fast VM startup and pause/resume potential. |\n| E2B | Future hosted sandbox provider behind the same adapter contract. |\n| Hermes / OpenClaw | Future agent/service integrations when they expose compatible run/session semantics. |\n\nRuntime-specific fields should stay inside adapter configuration. User-authored workflow definitions should remain portable.\n\n## Current status\n\nImplemented now:\n\n- Built-in Software Development and Deep Research DAG definitions.\n- DAG validation for duplicate IDs, dangling edges, missing dependencies, and cycles.\n- WorkflowRun and WorkflowNodeRun state helpers for ready/queued/running/completed/blocked flow.\n- Dispatch and Batch Dispatch template pickers for multi-agent DAG workflows.\n- WorkflowRun sidecar persistence under `.project-manager/workflow-runs/*.json`.\n- AI Assistants Control Console > Workflow Runs sheet for browsing persisted sidecars, node status, session scope, runtime profile, and artifacts.\n- Per-worker session scope and path-safe store keys.\n- Tool bundle references without raw sensitive values.\n- F35 feature spec, TDD spec, user scenarios, and dev log.\n\nPlanned next:\n\n- Integrations Hub tool/capability resolver.\n- Runtime adapter interface and local/xmux worker runner.\n- Workflow Runs controls for retry, resume, cancellation, checkpoint restore, permissions, and audit events.\n\n## Related guides\n\n- [AI Assistants Control Console](ai-assistants-control-console.md)\n- [AI Engineers](engineers.md)\n- [AI Assistant](chat.md)\n- [Integrations Hub](integrations-hub.md)\n",
+      "contentHash": "9969b4797a014d14",
       "readingMinutes": 6,
       "classification": "public",
       "classificationSource": "frontmatter",
@@ -2125,7 +2159,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "table"
       ],
       "warnings": [],
-      "updatedAt": "2026-05-28T03:09:20.000Z"
+      "updatedAt": "2026-06-04T07:06:18.272Z"
     },
     {
       "id": "guides/features/ai-assistants-control-console",
@@ -3986,6 +4020,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
     "engineering/ollama-docker-usage",
     "engineering/openclaw-plugin",
     "engineering/plugin-guide",
+    "engineering/pm-system-installer",
     "engineering/readme",
     "engineering/runtime-bridge",
     "engineering/security-and-secrets",

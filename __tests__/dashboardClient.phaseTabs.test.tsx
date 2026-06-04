@@ -76,11 +76,11 @@ function tab(label: string) {
 }
 
 describe('DashboardClient phase tabs: render and filtering', () => {
-  it('renders the four lifecycle tabs and defaults to Development', () => {
+  it('renders the four lifecycle tabs and defaults to Development Progress', () => {
     setUrl();
     renderDashboard();
 
-    expect(tab('Development')).toHaveAttribute('aria-selected', 'true');
+    expect(tab('Development Progress')).toHaveAttribute('aria-selected', 'true');
     expect(tab('E2E Testing')).toBeInTheDocument();
     expect(tab('Deployment')).toBeInTheDocument();
     expect(tab('Operations')).toBeInTheDocument();
@@ -146,7 +146,7 @@ describe('DashboardClient phase tabs: localStorage persistence', () => {
 
     renderDashboard();
 
-    expect(tab('Development')).toHaveAttribute('aria-selected', 'true');
+    expect(tab('Development Progress')).toHaveAttribute('aria-selected', 'true');
   });
 
   it('continues filtering when localStorage throws', async () => {
@@ -220,12 +220,12 @@ describe('DashboardClient phase tabs: URL sync', () => {
     expect(screen.getByText('E2E Testing Feature')).toBeInTheDocument();
   });
 
-  it('repairs an invalid URL phase to Development', async () => {
+  it('repairs an invalid URL phase to Development Progress', async () => {
     setUrl('?phase=bad_value');
 
     renderDashboard();
 
-    expect(tab('Development')).toHaveAttribute('aria-selected', 'true');
+    expect(tab('Development Progress')).toHaveAttribute('aria-selected', 'true');
     await waitFor(() => expect(window.location.search).toContain('phase=development'));
     expect(window.location.search).not.toContain('bad_value');
   });
@@ -236,7 +236,7 @@ describe('DashboardClient phase tabs: count badges', () => {
     setUrl();
     renderDashboard();
 
-    expect(screen.getByLabelText('2 Development features')).toHaveTextContent('2');
+    expect(screen.getByLabelText('2 Development Progress features')).toHaveTextContent('2');
     expect(screen.getByLabelText('1 E2E Testing features')).toHaveTextContent('1');
     expect(screen.getByLabelText('1 Deployment features')).toHaveTextContent('1');
     expect(screen.getByLabelText('1 Operations features')).toHaveTextContent('1');
@@ -262,11 +262,11 @@ describe('DashboardClient phase tabs: count badges', () => {
     expect(screen.getByLabelText('2 Operations features')).toHaveTextContent('2');
   });
 
-  it('counts missing phases under Development', () => {
+  it('counts missing phases under Development Progress', () => {
     setUrl();
     renderDashboard();
 
-    expect(screen.getByLabelText('2 Development features')).toHaveTextContent('2');
+    expect(screen.getByLabelText('2 Development Progress features')).toHaveTextContent('2');
   });
 });
 

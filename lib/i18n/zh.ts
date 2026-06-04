@@ -249,7 +249,7 @@ export const zh: Translations = {
     },
   },
   phases: {
-    development: '开发',
+    development: '开发进度',
     e2eTesting: 'E2E 测试',
     deployment: '部署',
     operations: '运维',

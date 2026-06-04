@@ -239,7 +239,7 @@ Summarize the local evidence, existing implementation shape, and constraints dis
 
 ## Functional Requirements
 
-- Register the work in Project Dashboard > Development.
+- Register the work in Development Progress on the Project Progress Dashboard.
 - Preserve existing app shell, navigation, and status visibility.
 - Keep fallback, loading, empty, error, and blocked states explicit where applicable.
 
@@ -252,7 +252,7 @@ Summarize the local evidence, existing implementation shape, and constraints dis
 
 ## Acceptance Criteria
 
-1. ${id} appears in Project Dashboard > Development with canonical artifact paths.
+1. ${id} appears in Development Progress on the Project Progress Dashboard with canonical artifact paths.
 2. Feature artifacts are complete enough for a future engineer to continue.
 3. Focused tests or explicit manual checks cover the core user paths.
 4. Verification commands and results are recorded in \`dev-log.md\`.
@@ -341,7 +341,7 @@ function templateDevLog({ id, title, now }) {
 
 ### Context
 
-Feature checkpoint created before implementation so Project Dashboard > Development, specs, tests, and dev logs stay aligned.
+Feature checkpoint created before implementation so Development Progress, specs, tests, and dev logs stay aligned on the Project Progress Dashboard.
 
 ### Planned Work
 

@@ -22,6 +22,7 @@
     "verify:dev-issues": "node scripts/check-next-dev-issues.mjs",
     "verify:restart-pm": "bash scripts/restart-project-manager-after-tests.sh npm run verify:baseline",
     "pm:restart": "bash start_project_manager.sh restart",
+    "pm-system": "node scripts/pm-system.mjs",
     "table:sheet:audit": "node scripts/audit-table-sheets.mjs",
     "verify:static-export": "node scripts/check-static-export-hygiene.mjs",
     "githooks:install": "bash scripts/install-githooks.sh",

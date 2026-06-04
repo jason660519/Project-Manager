@@ -109,7 +109,7 @@ flowchart LR
 
 When Dispatch supports workflows, the user path should be:
 
-1. Select a feature from Project Dashboard > Development.
+1. Select a feature from Development Progress in the Project Progress Dashboard.
 2. Choose a workflow template: Software Development, Deep Research, or a custom template.
 3. Confirm AI Engineer role assignments for each node group.
 4. Confirm provider/model and runtime preferences.

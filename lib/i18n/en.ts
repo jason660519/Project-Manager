@@ -249,7 +249,7 @@ export const en: Translations = {
     },
   },
   phases: {
-    development: 'Development',
+    development: 'Development Progress',
     e2eTesting: 'E2E Testing',
     deployment: 'Deployment',
     operations: 'Operations',
