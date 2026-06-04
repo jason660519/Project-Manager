@@ -461,10 +461,22 @@ function renderCompatibilityFile() {
   return `/* eslint-disable */\n// Compatibility export. Prefer documentation-site-internal or documentation-site-public explicitly.\nexport { DOCUMENTATION_SITE_INTERNAL_MANIFEST as DOCUMENTATION_SITE_MANIFEST } from './documentation-site-internal';\n`;
 }
 
+// `generatedAt` / `updatedAt` are derived from filesystem mtime, which git does
+// NOT preserve across clones — a fresh CI checkout regenerates different values
+// even when the docs are byte-identical. For `--check` we compare everything
+// EXCEPT these volatile timestamps, so the gate catches real content drift
+// (contentHash, classification, tags, body) without flagging mtime-only churn.
+const VOLATILE_TIMESTAMP_RE = /("(?:generatedAt|updatedAt)":\s*")[^"]*(")/g;
+
+function normalizeForCheck(content) {
+  return content.replace(VOLATILE_TIMESTAMP_RE, '$1<volatile>$2');
+}
+
 function writeOne(filePath, content) {
   const existing = existsSync(filePath) ? readFileSync(filePath, 'utf8') : null;
   if (checkOnly) {
-    return existing === content;
+    if (existing === null) return false;
+    return normalizeForCheck(existing) === normalizeForCheck(content);
   }
   mkdirSync(path.dirname(filePath), { recursive: true });
   writeFileSync(filePath, content);

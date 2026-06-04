@@ -36,6 +36,7 @@ maybe_standards_check() {
 run npm run typecheck
 maybe_standards_check
 run npm run docs:check
+run npm run docs:site:check
 run node scripts/audit-table-sheets.mjs --check
 run node scripts/check-static-export-hygiene.mjs
 run node scripts/check-native-dialogs.mjs

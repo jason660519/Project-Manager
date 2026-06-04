@@ -226,7 +226,7 @@ npm run githooks:install
 Hooks live under `.githooks/`:
 
 - `pre-commit` runs **`npm run verify:static-export`** when staged files include `.ts` / `.tsx`, plus table-governance static checks for table surfaces. Fast guard against client `fs` leaks, hydration footguns, and incomplete table baseline fixes.
-- `pre-push` runs **`npm run verify:quick`** for regular branch pushes, and escalates to **`npm run verify:baseline`** when pushing `main`. Set `PM_PRE_PUSH_BASELINE=1` to force the full baseline before any branch push.
+- `pre-push` runs **`npm run verify:quick`** for every push. It deliberately does **not** escalate to the full baseline for `main` — CI runs `verify:baseline` on every PR and push to `main` as the clean-clone source of truth, so duplicating it locally only adds latency and tempts the `PM_SKIP_PRE_PUSH_VERIFY=1` escape hatch. Set `PM_PRE_PUSH_BASELINE=1` to force the full baseline locally before a push when you want it.
 
 To bypass in an emergency (discouraged): `git commit --no-verify` or `PM_SKIP_PRE_PUSH_VERIFY=1 git push` — document why in the PR.
 
@@ -408,7 +408,7 @@ Workflow：`.github/workflows/verify-baseline.yml`
 
 每個 **pull request** 與 **push 到 `main`** 執行 `npm run verify:baseline`（typecheck、docs、hygiene、完整 tests、`cargo check`、static build）。CI 略過 Company `standards:check`（`VERIFY_SKIP_STANDARDS=1`），因 standards repo 路徑在本機；ship 前請在本機跑 `npm run standards:check`。
 
-### 7.2 Pre-commit hook（選用，建議）
+### 7.2 Local git hooks（選用，建議）
 
 每個 clone 安裝一次：
 
@@ -416,9 +416,12 @@ Workflow：`.github/workflows/verify-baseline.yml`
 npm run githooks:install
 ```
 
-Hook 位於 `.githooks/pre-commit`；當 staged 檔含 `.ts` / `.tsx` 時執行 **`npm run verify:static-export`**，快速擋 client `fs` leak 與 hydration 反模式。
+Hook 位於 `.githooks/`：
 
-緊急略過（不建議）：`git commit --no-verify` — 請在 PR 說明原因。
+- `pre-commit`：當 staged 檔含 `.ts` / `.tsx` 時執行 **`npm run verify:static-export`**，並對 table surfaces 跑 table-governance 靜態檢查。快速擋 client `fs` leak、hydration 反模式與未完成的 table baseline 修正。
+- `pre-push`：每次 push 都執行 **`npm run verify:quick`**。刻意**不**為 `main` 升級成 full baseline —— CI 已在每個 PR 與 push 到 `main` 跑 `verify:baseline` 當 clean-clone 唯一真相來源，本機重複只會增加延遲並誘使大家用 `PM_SKIP_PRE_PUSH_VERIFY=1` 跳過。需要時設 `PM_PRE_PUSH_BASELINE=1` 在 push 前強制跑一次 full baseline。
+
+緊急略過（不建議）：`git commit --no-verify` 或 `PM_SKIP_PRE_PUSH_VERIFY=1 git push` — 請在 PR 說明原因。
 
 ---
 

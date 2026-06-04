@@ -20,7 +20,10 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Cold cargo check of the full Tauri crate graph dominates wall-clock; the
+    # rust-cache step below keeps steady-state runs fast, and 30m leaves margin
+    # for the first cold run / cache-key changes so the cap never spuriously fails.
+    timeout-minutes: 30
     env:
       VERIFY_SKIP_STANDARDS: "1"
     steps:
@@ -40,6 +43,11 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
+
+      - name: Cache Rust build (cargo registry + src-tauri/target)
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
 
       - name: Install Tauri Linux dependencies (cargo check)
         run: |
