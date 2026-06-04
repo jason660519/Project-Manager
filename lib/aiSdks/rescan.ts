@@ -12,12 +12,14 @@ import { getProvider } from '../keys/registry';
 import { hasProviderKeyInStore } from '../keys/providerKeyStore';
 import { loadProviderMetadata, mergeCuratedAndDynamicModels } from '../keys/providerMetadata';
 import { revalidateStoredKey } from '../keys/validation';
+import { buildRescanFailure, type RescanFailure } from './rescanErrors';
+import { logAiSdksRescanFailure } from './rescanLog';
 
 export interface RescanSummary {
   scanned: number;
   skipped: number;
   newModels: number;
-  failed: Array<{ id: LlmProviderId; reason: string }>;
+  failed: RescanFailure[];
 }
 
 const STATIC_MODELS_BY_ID = new Map<LlmProviderId, readonly string[]>(
@@ -30,14 +32,34 @@ function knownModelsBefore(id: LlmProviderId): Set<string> {
   return new Set(mergeCuratedAndDynamicModels(STATIC_MODELS_BY_ID.get(id) ?? [], dynamic));
 }
 
-export async function rescanAiProviderModels(ids: readonly LlmProviderId[]): Promise<RescanSummary> {
+async function recordRescanFailure(
+  summary: RescanSummary,
+  id: LlmProviderId,
+  reason: string,
+  scope: 'provider' | 'all',
+): Promise<void> {
+  const failure = buildRescanFailure(id, reason);
+  summary.failed.push(failure);
+  await logAiSdksRescanFailure({
+    providerId: id,
+    category: failure.category,
+    reason: failure.reason,
+    scope,
+  });
+}
+
+export async function rescanAiProviderModels(
+  ids: readonly LlmProviderId[],
+  options: { scope?: 'provider' | 'all' } = {},
+): Promise<RescanSummary> {
+  const scope = options.scope ?? (ids.length > 1 ? 'all' : 'provider');
   const summary: RescanSummary = { scanned: 0, skipped: 0, newModels: 0, failed: [] };
 
   for (const id of ids) {
     try {
       const spec = getProvider(id);
       if (!spec) {
-        summary.failed.push({ id, reason: 'Unknown provider' });
+        await recordRescanFailure(summary, id, 'Unknown provider', scope);
         continue;
       }
 
@@ -52,10 +74,20 @@ export async function rescanAiProviderModels(ids: readonly LlmProviderId[]): Pro
         summary.scanned += 1;
         summary.newModels += result.models.filter((model) => !before.has(model.trim())).length;
       } else {
-        summary.failed.push({ id, reason: result.errorReason ?? 'Validation failed' });
+        await recordRescanFailure(
+          summary,
+          id,
+          result.errorReason ?? 'Validation failed',
+          scope,
+        );
       }
     } catch (err) {
-      summary.failed.push({ id, reason: err instanceof Error ? err.message : String(err) });
+      await recordRescanFailure(
+        summary,
+        id,
+        err instanceof Error ? err.message : String(err),
+        scope,
+      );
     }
   }
 

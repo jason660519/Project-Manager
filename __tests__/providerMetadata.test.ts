@@ -243,4 +243,27 @@ describe('validation failure classification', () => {
     expect(failure.category).toBe('endpoint');
     expect(failure.label).toBe('Provider endpoint returned 404');
   });
+
+  it('classifies quota and service-unavailable responses', () => {
+    expect(classifyValidationFailure('402 payment required').category).toBe('quota');
+    expect(classifyValidationFailure('503 service unavailable').category).toBe(
+      'service_unavailable',
+    );
+  });
+
+  it('classifies parse and permission failures', () => {
+    expect(classifyValidationFailure('Parse error: invalid JSON').category).toBe('parse');
+    expect(classifyValidationFailure('403 Permission denied').category).toBe('permission');
+  });
+
+  it('surfaces classified label in failed model list state', () => {
+    const state = getModelListState({
+      lastValidatedAt: '2026-05-30T12:00:00Z',
+      status: 'fail',
+      errorReason: '401 invalid_api_key',
+    });
+    expect(state.kind).toBe('failed');
+    expect(state.label).toBe('API key rejected');
+    expect(state.detail).toMatch(/invalid_api_key/);
+  });
 });

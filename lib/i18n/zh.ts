@@ -536,6 +536,10 @@ export const zh: Translations = {
     newSession: '新会话',
     exportChat: '导出',
     sendMessage: '发送',
+    routeFallbackTitle: '模型已切换 — 你选的 provider 未能回应',
+    routeFallbackAttemptFailed: '{provider} · {model} 失败：{reason}',
+    routeFallbackAttemptCooldown: '{provider} · {model} 跳过（冷却中）：{reason}',
+    routeFallbackResponded: '实际回答：{selected}',
   },
   dispatch: {
     title: '任务派遣',

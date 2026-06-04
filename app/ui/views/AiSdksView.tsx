@@ -25,6 +25,7 @@ import {
   subscribeProviderMetadataChanges,
   type ProviderMetadataMap,
 } from '../../../lib/keys/providerMetadata';
+import { formatRescanFailureNotice } from '../../../lib/aiSdks/rescanErrors';
 import { rescanAiProviderModels } from '../../../lib/aiSdks/rescan';
 import { useI18n } from '../../../lib/i18n';
 import {
@@ -221,20 +222,29 @@ export function AiSdksView({
     });
   }, []);
 
+  const providerLabelById = useMemo(
+    () => new Map(providers.map((provider) => [provider.id, provider.label])),
+    [providers],
+  );
+
   const formatRescanResult = useCallback(
-    (summary: Awaited<ReturnType<typeof rescanAiProviderModels>>) =>
-      copy.controls.rescanResult
+    (summary: Awaited<ReturnType<typeof rescanAiProviderModels>>) => {
+      const headline = copy.controls.rescanResult
         .replace('{scanned}', String(summary.scanned))
         .replace('{new}', String(summary.newModels))
         .replace('{skipped}', String(summary.skipped))
-        .replace('{failed}', String(summary.failed.length)),
-    [copy.controls.rescanResult],
+        .replace('{failed}', String(summary.failed.length));
+      if (summary.failed.length === 0) return headline;
+      const details = formatRescanFailureNotice(summary.failed, providerLabelById);
+      return `${headline}\n${details}`;
+    },
+    [copy.controls.rescanResult, providerLabelById],
   );
 
   const runRescan = useCallback(
-    async (ids: LlmProviderId[]) => {
+    async (ids: LlmProviderId[], scope: 'provider' | 'all') => {
       try {
-        const summary = await rescanAiProviderModels(ids);
+        const summary = await rescanAiProviderModels(ids, { scope });
         setMetaMap(loadAllProviderMetadata());
         setNotice(formatRescanResult(summary));
       } catch (err) {
@@ -248,7 +258,7 @@ export function AiSdksView({
     async (id: LlmProviderId) => {
       setRescanningIds((current) => new Set(current).add(id));
       try {
-        await runRescan([id]);
+        await runRescan([id], 'provider');
       } finally {
         setRescanningIds((current) => {
           const next = new Set(current);
@@ -264,7 +274,7 @@ export function AiSdksView({
     setRescanAllBusy(true);
     setRescanningIds(new Set(providers.map((provider) => provider.id)));
     try {
-      await runRescan(providers.map((provider) => provider.id));
+      await runRescan(providers.map((provider) => provider.id), 'all');
     } finally {
       setRescanningIds(new Set());
       setRescanAllBusy(false);
@@ -437,8 +447,14 @@ export function AiSdksView({
         </div>
       )}
       {notice && (
-        <div className="m-4 flex items-center justify-between gap-3 border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-          <span>{notice}</span>
+        <div
+          className={`m-4 flex items-center justify-between gap-3 px-3 py-2 text-xs ${
+            notice.includes('\n')
+              ? 'border border-rose-400/40 bg-rose-500/10 text-rose-100'
+              : 'border border-amber-400/40 bg-amber-500/10 text-amber-100'
+          }`}
+        >
+          <span className="whitespace-pre-wrap">{notice}</span>
           <button
             type="button"
             onClick={() => setNotice(null)}
@@ -460,7 +476,7 @@ export function AiSdksView({
             readOnly={readOnly}
             copy={copy}
             dynamicModels={dynamicModelsFor(p.id)}
-            modelListLabel={getModelListState(metaMap[p.id]).label}
+            modelListStatus={getModelListState(metaMap[p.id])}
             rescanBusy={rescanningIds.has(p.id)}
             onRescan={() => void handleRescanProvider(p.id)}
             onSetParam={setParam}

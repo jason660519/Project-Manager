@@ -2177,6 +2177,18 @@ export async function checkUpdate(): Promise<UpdateCheckResult> {
  * In the Next.js web preview (no Tauri runtime): falls back to
  * `window.open(url, '_blank')` with noopener/noreferrer.
  */
+/**
+ * Append one JSON line to `~/.project-manager/logs/{category}.jsonl` (rotating disk log).
+ * Used for operational diagnostics (e.g. AI SDKs rescan failures). No-op in browser dev
+ * except when callers handle fallback themselves.
+ */
+export async function appendPmOperationLog(category: string, line: string): Promise<void> {
+  if (!isTauri()) {
+    throw new Error('appendPmOperationLog requires Tauri runtime');
+  }
+  return invoke<void>('append_pm_operation_log', { category, line });
+}
+
 export async function openExternalUrl(url: string): Promise<void> {
   if (isTauri()) {
     const { open } = await import('@tauri-apps/plugin-shell');

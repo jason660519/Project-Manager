@@ -8,6 +8,11 @@ vi.mock('../lib/keys/validation', () => ({
   revalidateStoredKey: vi.fn(),
 }));
 
+vi.mock('../lib/aiSdks/rescanLog', () => ({
+  logAiSdksRescanFailure: vi.fn().mockResolvedValue(undefined),
+}));
+
+import { logAiSdksRescanFailure } from '../lib/aiSdks/rescanLog';
 import { rescanAiProviderModels } from '../lib/aiSdks/rescan';
 import { hasProviderKeyInStore } from '../lib/keys/providerKeyStore';
 import { revalidateStoredKey } from '../lib/keys/validation';
@@ -50,7 +55,15 @@ describe('rescanAiProviderModels', () => {
     const summary = await rescanAiProviderModels(['anthropic']);
 
     expect(summary.scanned).toBe(0);
-    expect(summary.failed).toEqual([{ id: 'anthropic', reason: '401 invalid_api_key' }]);
+    expect(summary.failed).toHaveLength(1);
+    expect(summary.failed[0]).toMatchObject({
+      id: 'anthropic',
+      reason: '401 invalid_api_key',
+      category: 'auth',
+    });
+    expect(logAiSdksRescanFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ providerId: 'anthropic', category: 'auth' }),
+    );
   });
 
   it('collects key store errors without throwing', async () => {
@@ -61,7 +74,7 @@ describe('rescanAiProviderModels', () => {
     expect(summary).toMatchObject({
       scanned: 0,
       skipped: 0,
-      failed: [{ id: 'anthropic', reason: 'keychain unavailable' }],
+      failed: [expect.objectContaining({ id: 'anthropic', category: 'keychain' })],
     });
     expect(mockRevalidate).not.toHaveBeenCalled();
   });

@@ -1342,6 +1342,74 @@ fn llm_router_state_path() -> Result<PathBuf, String> {
     Ok(PathBuf::from(home).join(".project-manager").join("llm-router-state.json"))
 }
 
+const PM_OP_LOG_MAX_DISK_BYTES: u64 = 2 * 1024 * 1024;
+const PM_OP_LOG_MAX_DISK_ROTATIONS: usize = 3;
+
+fn pm_logs_root() -> Result<PathBuf, String> {
+    let home = std::env::var("HOME").map_err(|_| "Cannot resolve HOME for operation logs".to_string())?;
+    Ok(PathBuf::from(home).join(".project-manager").join("logs"))
+}
+
+fn sanitize_pm_log_category(category: &str) -> Result<String, String> {
+    let safe: String = category
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .collect();
+    if safe.is_empty() {
+        return Err("Invalid log category".to_string());
+    }
+    Ok(safe)
+}
+
+async fn rotate_pm_log_if_needed(log_path: &std::path::Path) -> std::io::Result<()> {
+    let size = tokio::fs::metadata(log_path)
+        .await
+        .map(|m| m.len())
+        .unwrap_or(0);
+    if size < PM_OP_LOG_MAX_DISK_BYTES {
+        return Ok(());
+    }
+    for n in (1..PM_OP_LOG_MAX_DISK_ROTATIONS).rev() {
+        let from = rotation_path(log_path, n);
+        let to = rotation_path(log_path, n + 1);
+        if tokio::fs::metadata(&from).await.is_ok() {
+            let _ = tokio::fs::rename(&from, &to).await;
+        }
+    }
+    let p1 = rotation_path(log_path, 1);
+    let _ = tokio::fs::rename(log_path, &p1).await;
+    Ok(())
+}
+
+/// Append a single JSON line to `~/.project-manager/logs/{category}.jsonl`.
+#[tauri::command]
+async fn append_pm_operation_log(category: String, line: String) -> Result<(), String> {
+    let safe = sanitize_pm_log_category(&category)?;
+    let log_path = pm_logs_root()?.join(format!("{safe}.jsonl"));
+    rotate_pm_log_if_needed(&log_path)
+        .await
+        .map_err(|e| format!("Cannot rotate log {}: {e}", log_path.display()))?;
+    if let Some(parent) = log_path.parent() {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| format!("Cannot create log directory {}: {e}", parent.display()))?;
+    }
+    let mut file = tokio::fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(&log_path)
+        .await
+        .map_err(|e| format!("Cannot open log {}: {e}", log_path.display()))?;
+    use tokio::io::AsyncWriteExt;
+    file.write_all(line.as_bytes())
+        .await
+        .map_err(|e| format!("Cannot write log {}: {e}", log_path.display()))?;
+    file.write_all(b"\n")
+        .await
+        .map_err(|e| format!("Cannot write log {}: {e}", log_path.display()))?;
+    Ok(())
+}
+
 async fn read_llm_router_state() -> LlmRouterState {
     let path = match llm_router_state_path() {
         Ok(path) => path,
@@ -6082,6 +6150,7 @@ pub fn run() {
             list_directory_entries,
             read_file,
             write_file,
+            append_pm_operation_log,
             scan_env_files,
             project_manager_root,
             github_oauth_device_start,

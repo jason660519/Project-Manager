@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, Copy } from 'lucide-react';
+import { AlertTriangle, Check, Copy } from 'lucide-react';
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -17,6 +17,11 @@ import html from 'react-syntax-highlighter/dist/esm/languages/prism/markup';
 import yaml from 'react-syntax-highlighter/dist/esm/languages/prism/yaml';
 import markdown from 'react-syntax-highlighter/dist/esm/languages/prism/markdown';
 import type { ChatMessage as ChatMessageType } from '../../lib/chat/types';
+import {
+  buildRouteFallbackBannerContent,
+  formatProviderModel,
+} from '../../lib/chat/routeFallbackBanner';
+import { useI18n } from '../../lib/i18n';
 
 // Register common languages
 SyntaxHighlighter.registerLanguage('tsx', tsx);
@@ -55,6 +60,59 @@ function routeSummary(message: ChatMessageType): string | null {
   return parts.join(' · ');
 }
 
+function interpolate(template: string, values: Record<string, string>): string {
+  return Object.entries(values).reduce(
+    (text, [key, value]) => text.replaceAll(`{${key}}`, value),
+    template,
+  );
+}
+
+interface RouteFallbackBannerProps {
+  message: ChatMessageType;
+}
+
+function RouteFallbackBanner({ message }: RouteFallbackBannerProps) {
+  const { t } = useI18n();
+  const decision = message.routeDecision;
+  const content = decision ? buildRouteFallbackBannerContent(decision) : null;
+  if (!content) return null;
+
+  const selected = formatProviderModel(content.selectedProvider, content.selectedModel);
+
+  return (
+    <div
+      role="status"
+      aria-label={t.chat.routeFallbackTitle}
+      className="mb-2 rounded border border-amber-400/30 bg-amber-500/10 px-2 py-1.5 text-[10px] leading-snug text-amber-50/90"
+    >
+      <div className="mb-1 flex items-center gap-1.5 font-semibold text-amber-100">
+        <AlertTriangle size={12} className="shrink-0 text-amber-300/90" aria-hidden="true" />
+        <span>{t.chat.routeFallbackTitle}</span>
+      </div>
+      <ul className="space-y-0.5 pl-4">
+        {content.failedLines.map((line) => {
+          const template =
+            line.kind === 'skipped_cooldown'
+              ? t.chat.routeFallbackAttemptCooldown
+              : t.chat.routeFallbackAttemptFailed;
+          return (
+            <li key={`${line.kind}-${line.provider}-${line.model}`} className="list-disc text-amber-100/80">
+              {interpolate(template, {
+                provider: line.provider,
+                model: line.model,
+                reason: line.reason,
+              })}
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-1 border-t border-amber-400/15 pt-1 text-amber-100/85">
+        {interpolate(t.chat.routeFallbackResponded, { selected })}
+      </p>
+    </div>
+  );
+}
+
 interface ChatMessageProps {
   message: ChatMessageType;
 }
@@ -63,6 +121,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
   const route = !isUser ? routeSummary(message) : null;
+  const showFallbackBanner = !isUser && message.routeDecision?.degraded;
 
   const handleCopy = async () => {
     try {
@@ -125,6 +184,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
           </div>
         )}
       </div>
+
+      {showFallbackBanner && <RouteFallbackBanner message={message} />}
 
       {isUser ? (
         <p className="whitespace-pre-wrap break-words">{message.content}</p>

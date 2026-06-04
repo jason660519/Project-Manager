@@ -39,15 +39,22 @@ export interface ValidatedModelSupportSummary {
   uniqueModelCount: number;
 }
 
+export type ValidationFailureCategory =
+  | 'auth'
+  | 'unreachable'
+  | 'endpoint'
+  | 'rate_limit'
+  | 'quota'
+  | 'empty'
+  | 'permission'
+  | 'service_unavailable'
+  | 'invalid_request'
+  | 'parse'
+  | 'keychain'
+  | 'unknown';
+
 export interface ValidationFailureSummary {
-  category:
-    | 'auth'
-    | 'unreachable'
-    | 'endpoint'
-    | 'rate_limit'
-    | 'quota'
-    | 'empty'
-    | 'unknown';
+  category: ValidationFailureCategory;
   label: string;
   detail: string;
   hint: string;
@@ -57,7 +64,7 @@ export type ModelListState =
   | { kind: 'catalogue'; label: 'Catalogue'; detail: string }
   | { kind: 'refreshed'; label: string; detail: string }
   | { kind: 'stale'; label: string; detail: string }
-  | { kind: 'failed'; label: 'Failed'; detail: string };
+  | { kind: 'failed'; label: string; detail: string };
 
 /** Safe wrapper — returns `null` outside the browser or on parse failures. */
 function readMap(): ProviderMetadataMap {
@@ -218,10 +225,11 @@ export function getModelListState(
   const staleMs = options.staleMs ?? MODEL_LIST_STALE_MS;
 
   if (meta?.status === 'fail') {
+    const failure = classifyValidationFailure(meta.errorReason);
     return {
       kind: 'failed',
-      label: 'Failed',
-      detail: meta.errorReason ?? 'Last refresh failed',
+      label: failure.label,
+      detail: `${failure.detail} — ${failure.hint}`,
     };
   }
 
@@ -311,12 +319,114 @@ export function classifyValidationFailure(reason: string | null | undefined): Va
   const raw = reason?.trim() || 'Validation failed';
   const lower = raw.toLowerCase();
 
+  if (
+    lower.includes('unknown provider') ||
+    lower.includes('no validation contract')
+  ) {
+    return {
+      category: 'unknown',
+      label: 'Provider not supported for rescan',
+      detail: raw,
+      hint: 'This provider has no list-models validation path; check Keys configuration or update the app.',
+    };
+  }
+
   if (lower.includes('no key configured') || lower.includes('api key is empty')) {
     return {
       category: 'empty',
       label: 'No key configured',
       detail: raw,
-      hint: 'Import a key from .env or paste one in this provider sheet.',
+      hint: 'Import a key from .env or paste one on the Keys page for this provider, then rescan.',
+    };
+  }
+
+  if (
+    lower.includes('keychain') ||
+    lower.includes('keyring') ||
+    lower.includes('secret service') ||
+    lower.includes('osstatus')
+  ) {
+    return {
+      category: 'keychain',
+      label: 'Key storage unavailable',
+      detail: raw,
+      hint: 'Unlock the OS keychain, approve the access prompt, or restart the desktop app and retry.',
+    };
+  }
+
+  if (
+    lower.includes('parse error') ||
+    lower.includes('json parse') ||
+    lower.includes('malformed json') ||
+    lower.includes('unexpected token') ||
+    lower.includes('invalid json')
+  ) {
+    return {
+      category: 'parse',
+      label: 'Provider returned invalid data',
+      detail: raw,
+      hint: 'The provider API responded but the payload was not valid JSON; retry later or check provider status.',
+    };
+  }
+
+  if (
+    lower.includes('credit balance is too low') ||
+    lower.includes('insufficient credits') ||
+    lower.includes('payment required') ||
+    lower.includes('billing') ||
+    lower.includes('quota') ||
+    lower.includes('insufficient') ||
+    lower.includes('exceeded') ||
+    /\b402\b/.test(lower)
+  ) {
+    return {
+      category: 'quota',
+      label: 'Quota or billing blocked',
+      detail: raw,
+      hint: 'Add credits, fix billing, or raise project quota in the provider console, then rescan.',
+    };
+  }
+
+  if (
+    lower.includes('429') ||
+    lower.includes('rate limit') ||
+    lower.includes('too many requests')
+  ) {
+    return {
+      category: 'rate_limit',
+      label: 'Rate limited',
+      detail: raw,
+      hint: 'Wait a few minutes and rescan, or reduce parallel API usage on this provider.',
+    };
+  }
+
+  if (
+    lower.includes('suspended') ||
+    lower.includes('disabled') ||
+    lower.includes('unavailable') ||
+    lower.includes('overloaded') ||
+    lower.includes('service unavailable') ||
+    /\b503\b/.test(lower)
+  ) {
+    return {
+      category: 'service_unavailable',
+      label: 'Model service unavailable',
+      detail: raw,
+      hint: 'The provider may be down or your account is paused; check the provider status page and retry later.',
+    };
+  }
+
+  if (
+    lower.includes('forbidden') ||
+    lower.includes('permission denied') ||
+    lower.includes('access denied') ||
+    (lower.includes('403') && !lower.includes('invalid_api_key'))
+  ) {
+    return {
+      category: 'permission',
+      label: 'Insufficient API permissions',
+      detail: raw,
+      hint: 'Enable list-models (or equivalent) scope for this key in the provider console.',
     };
   }
 
@@ -325,8 +435,7 @@ export function classifyValidationFailure(reason: string | null | undefined): Va
     lower.includes('incorrect api key') ||
     lower.includes('invalid api key') ||
     lower.includes('unauthorized') ||
-    lower.includes('401') ||
-    lower.includes('403')
+    /\b401\b/.test(lower)
   ) {
     return {
       category: 'auth',
@@ -342,6 +451,8 @@ export function classifyValidationFailure(reason: string | null | undefined): Va
     lower.includes('failed to connect') ||
     lower.includes('econnrefused') ||
     lower.includes('enotfound') ||
+    lower.includes('dns') ||
+    lower.includes('connection reset') ||
     lower.includes('timed out') ||
     lower.includes('timeout')
   ) {
@@ -353,30 +464,25 @@ export function classifyValidationFailure(reason: string | null | undefined): Va
     };
   }
 
+  if (
+    lower.includes('invalid request') ||
+    lower.includes('bad request') ||
+    /\b400\b/.test(lower)
+  ) {
+    return {
+      category: 'invalid_request',
+      label: 'Invalid request to provider',
+      detail: raw,
+      hint: 'The validation request format may not match this provider; verify base URL and key type on Keys.',
+    };
+  }
+
   if (lower.includes('404') || lower.includes('not found')) {
     return {
       category: 'endpoint',
       label: 'Provider endpoint returned 404',
       detail: raw,
       hint: 'The validation endpoint or base URL may be wrong for this provider.',
-    };
-  }
-
-  if (lower.includes('429') || lower.includes('rate limit')) {
-    return {
-      category: 'rate_limit',
-      label: 'Rate limited',
-      detail: raw,
-      hint: 'Wait and retry, or check the provider quota and rate-limit policy.',
-    };
-  }
-
-  if (lower.includes('quota') || lower.includes('billing') || lower.includes('insufficient')) {
-    return {
-      category: 'quota',
-      label: 'Quota or billing blocked',
-      detail: raw,
-      hint: 'Check billing, credits, quota, and project-level API permissions in the provider console.',
     };
   }
 

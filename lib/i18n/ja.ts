@@ -537,6 +537,10 @@ export const ja: Translations = {
     newSession: '新規セッション',
     exportChat: 'エクスポート',
     sendMessage: '送信',
+    routeFallbackTitle: 'プロバイダーを切り替えました — 選択したモデルは応答しませんでした',
+    routeFallbackAttemptFailed: '{provider} · {model} 失敗: {reason}',
+    routeFallbackAttemptCooldown: '{provider} · {model} スキップ（クールダウン）: {reason}',
+    routeFallbackResponded: '実際の応答: {selected}',
   },
   dispatch: {
     title: 'タスクディスパッチ',

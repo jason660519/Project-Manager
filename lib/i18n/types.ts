@@ -534,6 +534,14 @@ export interface Translations {
     newSession: string;
     exportChat: string;
     sendMessage: string;
+    /** Degraded route banner title when the selected provider failed and PM fell back. */
+    routeFallbackTitle: string;
+    /** "{provider} · {model} failed: {reason}" */
+    routeFallbackAttemptFailed: string;
+    /** "{provider} · {model} skipped (cooldown): {reason}" */
+    routeFallbackAttemptCooldown: string;
+    /** "Answered with {selected}" — {selected} is already "provider · model". */
+    routeFallbackResponded: string;
   };
   dispatch: {
     title: string;

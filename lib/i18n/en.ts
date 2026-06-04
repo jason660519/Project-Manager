@@ -535,6 +535,10 @@ export const en: Translations = {
     newSession: 'New Session',
     exportChat: 'Export',
     sendMessage: 'Send',
+    routeFallbackTitle: 'Provider fallback — your selected model did not respond',
+    routeFallbackAttemptFailed: '{provider} · {model} failed: {reason}',
+    routeFallbackAttemptCooldown: '{provider} · {model} skipped (cooldown): {reason}',
+    routeFallbackResponded: 'Answered with {selected}',
   },
   dispatch: {
     title: 'Task Dispatch',

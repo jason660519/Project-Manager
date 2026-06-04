@@ -260,6 +260,7 @@ export function ChatPanel({ context, defaultExpanded = false, toggleOpen, docked
       assistantMessage.id = assistantId;
       assistantMessage.provider = result.provider ?? (chatSettings.provider !== 'auto' ? chatSettings.provider : undefined);
       assistantMessage.model = result.model ?? (chatSettings.provider !== 'auto' ? chatSettings.model : undefined);
+      assistantMessage.routeDecision = result.routeDecision;
       (assistantMessage as any).toolCalls = result.toolCalls || toolCalls;
       const finalMessages = [...nextMessages, assistantMessage];
       setMessages((prev) => {

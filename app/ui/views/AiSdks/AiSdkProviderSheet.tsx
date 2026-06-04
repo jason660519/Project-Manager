@@ -43,6 +43,7 @@ import {
 } from '@tanstack/react-table';
 
 import type { LlmProviderId } from '../../../../lib/keys/llmProviders';
+import type { ModelListState } from '../../../../lib/keys/providerMetadata';
 import {
   buildProviderModelCatalog,
   getParamSpecs,
@@ -85,7 +86,7 @@ interface AiSdkProviderSheetProps {
   readOnly: boolean;
   copy: AiSdksCopy;
   dynamicModels: readonly string[];
-  modelListLabel: string;
+  modelListStatus: ModelListState;
   rescanBusy: boolean;
   onRescan: () => void;
   onSetParam: (id: string, key: string, value: ParamValue) => void;
@@ -146,7 +147,7 @@ export function AiSdkProviderSheet({
   readOnly,
   copy,
   dynamicModels,
-  modelListLabel,
+  modelListStatus,
   rescanBusy,
   onRescan,
   onSetParam,
@@ -680,10 +681,16 @@ export function AiSdkProviderSheet({
           {/* Dataset actions — visually separated from view controls */}
           <div className="ml-auto flex flex-wrap items-center gap-2 border-l border-stone-200/12 pl-2">
             <span
-              className="text-[10px] uppercase tracking-[0.12em] text-stone-500"
-              title={copy.controls.rescanTitle}
+              className={`max-w-[min(28rem,50vw)] truncate text-[10px] uppercase tracking-[0.12em] ${
+                modelListStatus.kind === 'failed'
+                  ? 'text-rose-400'
+                  : modelListStatus.kind === 'stale'
+                    ? 'text-amber-300/90'
+                    : 'text-stone-500'
+              }`}
+              title={modelListStatus.detail}
             >
-              {modelListLabel}
+              {modelListStatus.label}
             </span>
             <button
               type="button"
