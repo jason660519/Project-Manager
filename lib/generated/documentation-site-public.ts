@@ -4,7 +4,7 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_PUBLIC_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-06-04T17:48:07.770Z",
+    "generatedAt": "2026-06-04T18:01:05.315Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",

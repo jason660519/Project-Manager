@@ -1,4 +1,4 @@
-# ADR-016: Schema v10 — Engineer Browser + External-File Access Policies
+# ADR-017: Schema v10 — Engineer Browser + External-File Access Policies
 
 > **Created Date**: 2026-06-05
 > **Created By**: Jason
@@ -46,8 +46,8 @@ into the agent CLI's own permission mechanism, or (future) by an OS sandbox.
 ## Decision
 
 1. Bump schema version from `9` to `10`. (Schema v9 — feature
-   `upstreamDependencies` — and ADR-014 / ADR-015 were already taken by other
-   work; this feature claims v10 / ADR-016.)
+   `upstreamDependencies` — and ADR-014 / ADR-015 / ADR-016 were already taken by other
+   work (ADR-016 is the Supabase control-plane ADR); this feature claims v10 / ADR-017.)
 2. Add two **optional** fields to `EngineerRole`:
    - `browserAccess?: BrowserAccessPolicy` — `{ enabled: boolean; allowedBrowserIds: string[] }`.
      Absent ⇒ disabled (no browser access).

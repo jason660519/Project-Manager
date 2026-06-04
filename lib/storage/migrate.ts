@@ -258,7 +258,7 @@ function migrate_8_to_9(cfg: RawConfig): RawConfig {
 }
 
 /**
- * v9 → v10 (ADR-016, Engineer Browser + External-File Access): adds optional
+ * v9 → v10 (ADR-017, Engineer Browser + External-File Access): adds optional
  * `browserAccess` and `externalFileAccess` policies to `EngineerRole`. Both are
  * optional and carry "no access" semantics when absent (browser disabled, no
  * external paths), so the migration is a pure version bump — no row rewriting.

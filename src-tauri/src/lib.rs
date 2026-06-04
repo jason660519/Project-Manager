@@ -695,7 +695,7 @@ async fn write_file(path: String, content: String) -> Result<(), String> {
         .map_err(|e| format!("Cannot write {path}: {e}"))
 }
 
-/// A browser detected as installed on the host (schema v10 / ADR-016).
+/// A browser detected as installed on the host (schema v10 / ADR-017).
 #[derive(Serialize, Clone)]
 struct InstalledBrowser {
     /// Stable id — platform bundle id on macOS (e.g. "com.google.Chrome").
@@ -709,7 +709,7 @@ struct InstalledBrowser {
 
 /// Detect installed web browsers on the host.
 ///
-/// macOS only for now (ADR-016): scans a fixed set of known browser bundles
+/// macOS only for now (ADR-017): scans a fixed set of known browser bundles
 /// under the standard Applications directories. Returns an empty vec — NOT an
 /// error — when none are found or on non-macOS platforms, so the UI can
 /// distinguish "none installed" from a genuine failure. Version is best-effort.

@@ -223,18 +223,18 @@
         },
         "browserAccess": {
           "$ref": "#/definitions/browserAccessPolicy",
-          "description": "Browser allowlist for PM-mediated search/launch (schema v10, ADR-016). Absent = disabled."
+          "description": "Browser allowlist for PM-mediated search/launch (schema v10, ADR-017). Absent = disabled."
         },
         "externalFileAccess": {
           "$ref": "#/definitions/externalFileAccessPolicy",
-          "description": "External (non-project) directory access policy (schema v10, ADR-016). Absent = no external access."
+          "description": "External (non-project) directory access policy (schema v10, ADR-017). Absent = no external access."
         }
       },
       "required": ["id", "name", "slug", "skills", "commands", "systemPrompt", "referenceFiles"]
     },
     "browserAccessPolicy": {
       "type": "object",
-      "description": "Which installed browsers an engineer may use (schema v10, ADR-016).",
+      "description": "Which installed browsers an engineer may use (schema v10, ADR-017).",
       "properties": {
         "enabled": { "type": "boolean", "description": "Master switch. Default false — no browser access." },
         "allowedBrowserIds": {
@@ -247,7 +247,7 @@
     },
     "externalFileAccessPolicy": {
       "type": "object",
-      "description": "External (non-project) directory access policy (schema v10, ADR-016).",
+      "description": "External (non-project) directory access policy (schema v10, ADR-017).",
       "properties": {
         "entries": {
           "type": "array",

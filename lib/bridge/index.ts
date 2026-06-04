@@ -982,7 +982,7 @@ export async function augmentArgsWithMcp(
   }
 }
 
-// ── Engineer browser + external-file access (schema v10, ADR-016) ────────────
+// ── Engineer browser + external-file access (schema v10, ADR-017) ────────────
 
 /**
  * Detect installed browsers on the host (macOS only for now). Returns `[]`
@@ -998,7 +998,7 @@ export async function listInstalledBrowsers(): Promise<InstalledBrowser[]> {
  * Thrown when a file-access policy COULD NOT be applied to a known, enforceable
  * command. The dispatch MUST abort on this — never fall back to unrestricted
  * args (that would run the agent unsandboxed while the UI claims otherwise).
- * See ADR-016 "Fail-Closed Enforcement".
+ * See ADR-017 "Fail-Closed Enforcement".
  */
 export class FileAccessPolicyApplyError extends Error {
   constructor(
@@ -1081,7 +1081,7 @@ export async function writeEngineerPolicyConfig(
  *   - Enforceable command, write fails→ THROW FileAccessPolicyApplyError → abort.
  *
  * Never silently returns unrestricted args for an enforceable command. See
- * ADR-016.
+ * ADR-017.
  */
 export async function augmentArgsWithFileAccessPolicy(
   command: string,

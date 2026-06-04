@@ -247,7 +247,7 @@ export interface WorkingScope {
   mode: 'soft' | 'strict';
 }
 
-// ── Engineer external access policies (schema v10, ADR-016) ──────────────────
+// ── Engineer external access policies (schema v10, ADR-017) ──────────────────
 
 /** A browser PM detected as installed on the host (returned by `listInstalledBrowsers`). */
 export interface InstalledBrowser {
@@ -400,9 +400,9 @@ export interface EngineerRole {
   defaultAgentId?: string;
   notes?: string;
   workingScope?: WorkingScope;
-  /** Browser allowlist for PM-mediated search/launch (schema v10, ADR-016). Absent = disabled. */
+  /** Browser allowlist for PM-mediated search/launch (schema v10, ADR-017). Absent = disabled. */
   browserAccess?: BrowserAccessPolicy;
-  /** External (non-project) directory access policy (schema v10, ADR-016). Absent = no external access. */
+  /** External (non-project) directory access policy (schema v10, ADR-017). Absent = no external access. */
   externalFileAccess?: ExternalFileAccessPolicy;
   /** Primary LLM model used when dispatching to this engineer. Stored on the role so dispatch modal stays simple. */
   primaryModel?: ModelFallbackEntry;

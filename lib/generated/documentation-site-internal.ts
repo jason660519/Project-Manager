@@ -4,7 +4,7 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-06-04T17:48:07.770Z",
+    "generatedAt": "2026-06-04T18:01:05.315Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
@@ -94,8 +94,8 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "architecture/adr-013-xmux-libghostty-terminal",
         "architecture/adr-014-spawn-token-event-correlation",
         "architecture/adr-015-mobile-voice-remote-control",
-        "architecture/adr-016-schema-v10-engineer-access-policies",
         "architecture/adr-016-supabase-cloud-control-plane-and-developer-runner",
+        "architecture/adr-017-schema-v10-engineer-access-policies",
         "architecture/architecture-overview",
         "architecture/readme"
       ],
@@ -1120,41 +1120,6 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "updatedAt": "2026-06-04T04:56:53.203Z"
     },
     {
-      "id": "architecture/adr-016-schema-v10-engineer-access-policies",
-      "slug": "architecture/adr-016-schema-v10-engineer-access-policies",
-      "route": "/documentation/architecture/adr-016-schema-v10-engineer-access-policies",
-      "sourcePath": "docs/architecture/ADR-016-schema-v10-engineer-access-policies.md",
-      "folderSlug": "architecture",
-      "folderPath": "docs/architecture",
-      "title": "ADR-016: Schema v10 — Engineer Browser + External-File Access Policies",
-      "summary": "`EngineerRole` already carries one access-control concept — `workingScope` (ADR-012 era) — but it is **advisory only**: `soft` injects the scope into the dispatch prompt, `strict` adds a...",
-      "content": "# ADR-016: Schema v10 — Engineer Browser + External-File Access Policies\n\n> **Created Date**: 2026-06-05\n> **Created By**: Jason\n> **Last Modified**: 2026-06-05\n> **Modified By**: Jason\n> **Status**: Accepted\n> **Decision Maker**: Jason\n> **Related**: [ADR-002 — Schema Versioning Strategy](./ADR-002-schema-versioning.md), [ADR-003 — Prompt Assembly Location](./ADR-003-prompt-assembly.md), [ADR-012 — Schema v8 Engineer Cron](./ADR-012-schema-v8-engineer-cron.md)\n\n---\n\n## Background\n\n`EngineerRole` already carries one access-control concept — `workingScope`\n(ADR-012 era) — but it is **advisory only**: `soft` injects the scope into the\ndispatch prompt, `strict` adds a red warning in the dispatch modal. Nothing is\nenforced at the filesystem or process layer.\n\nTwo new product requirements need richer, partly-enforced policy:\n\n1. **Browser Settings** — control which locally-installed browsers an engineer\n   may use for search/launch.\n2. **External-File Access Settings** — control read/write/deny on external\n   (non-project) directories: arbitrary local folders, and cloud-sync folders\n   such as Google Drive / OneDrive / iCloud.\n\n### The enforcement reality (why this ADR is careful about wording)\n\nInvestigation confirmed two hard facts that shape the design:\n\n- PM's `read_file` / `write_file` Rust commands have **no role context**, and\n  every caller is PM's own machinery (prompt assembly, skill loading, plugin\n  mirror) — **not** the engineer. Guarding them would break PM and still not\n  constrain the engineer.\n- The engineer's real file operations happen **inside the spawned CLI child\n  process** (`spawn_agent`) via that agent's own tools. PM cannot intercept\n  them in-process.\n\nTherefore there is no single in-process choke point for a dispatched agent.\nReal enforcement can only happen **at spawn time**, by translating the policy\ninto the agent CLI's own permission mechanism, or (future) by an OS sandbox.\n\n---\n\n## Decision\n\n1. Bump schema version from `9` to `10`. (Schema v9 — feature\n   `upstreamDependencies` — and ADR-014 / ADR-015 were already taken by other\n   work; this feature claims v10 / ADR-016.)\n2. Add two **optional** fields to `EngineerRole`:\n   - `browserAccess?: BrowserAccessPolicy` — `{ enabled: boolean; allowedBrowserIds: string[] }`.\n     Absent ⇒ disabled (no browser access).\n   - `externalFileAccess?: ExternalFileAccessPolicy` —\n     `{ entries: ExternalFileAccessEntry[]; requireConfirmForUnlisted: boolean }`.\n     Absent ⇒ no external access.\n3. Add supporting types: `InstalledBrowser`, `BrowserAccessPolicy`,\n   `ExternalFilePermission ('read'|'write'|'deny')`, `ExternalFileKind`,\n   `ExternalFileAccessEntry`, `ExternalFileAccessPolicy`.\n4. Add a `v9 -> v10` migration in `lib/storage/migrate.ts`. Both new fields are\n   optional with \"no access\" defaults, so the migration is a **pure version\n   bump** — no row rewriting. Idempotent.\n\nThis ADR ships **L2a enforcement**:\n\n- **Browser** — ENFORCED for browsers **PM launches itself** (xmux embedded\n  webview / `shell:allow-open`): the launch is gated by `browserAccess`. For an\n  agent-owned browser tool (e.g. a browser MCP) the policy is ADVISORY only.\n- **External files** — ENFORCED for adapters whose CLI exposes a native\n  permission mechanism PM knows how to translate to\n  (`augmentArgsWithFileAccessPolicy`, mirroring `augmentArgsWithMcp`). For every\n  other adapter the policy is ADVISORY (prompt-injected). The detail sheet\n  states which of the two applies for the selected adapter.\n\n---\n\n## Fail-Closed Enforcement (non-negotiable)\n\n`augmentArgsWithMcp` ends in `catch { return baseArgs; }` — correct for MCP,\nwhere a failed write just degrades a *feature*. **The permission path must NOT\ncopy that.** A failed write of a restrict/deny policy for a *known* command\nwould let the agent run **unrestricted** while the UI claims it is sandboxed —\na silent-failure / security-illusion defect (violates the Zero-Silent-Failures\niron rule).\n\nDecision: `augmentArgsWithFileAccessPolicy` is **fail-closed**. For a known\ncommand, if the policy file cannot be written it throws\n`FileAccessPolicyApplyError` and **aborts the dispatch** with a visible,\nlogged error. It never silently falls back to unrestricted args.\n\n---\n\n## Deferred (written down per process discipline)\n\n- **L2b OS-level sandbox** (macOS `sandbox-exec` / Seatbelt profile) — the only\n  way to get a *hard* guarantee against a child process. Out of scope here.\n- **Windows / Linux browser detection** — v10 ships macOS detection only;\n  `listInstalledBrowsers` returns `[]` elsewhere.\n- **Runtime authorization prompt** for `requireConfirmForUnlisted`. There is no\n  Rust→UI auth loop yet, so the field is **persisted but inert**, and the editor\n  renders the toggle **disabled** with an \"Available after runtime authorization\n  (L2b)\" note. It is stored now so enabling L2b later needs no schema bump.\n  Shipping it as an *active*-looking control that does nothing would itself be a\n  security-illusion defect, so it is explicitly neutered.\n\n---\n\n## Rationale\n\n- New fields are **optional siblings** of `workingScope`, matching the existing\n  role-as-policy-bag shape; absent = safe default (no access).\n- `deny` always wins over `read`/`write` so an explicit block can never be\n  widened by a broader entry.\n- Reusing the `augmentArgsWithMcp` structure (known-command keyed, temp config\n  file) keeps the enforcement translator consistent with the one injection\n  pattern PM already has — minimal new abstraction.\n- Prompt assembly (the advisory layer) stays in TypeScript — ADR-003 holds.\n- No Anthropic key movement — ADR-004 holds.\n\n---\n\n## Risks and Mitigation\n\n| Risk | Mitigation |\n| --- | --- |\n| Policy write fails → agent runs unrestricted but UI says restricted | **Fail-closed**: `augmentArgsWithFileAccessPolicy` throws + aborts dispatch + logs |\n| Engineer uses an adapter PM can't enforce, user assumes a wall | Per-adapter ENFORCED/ADVISORY badge in the detail sheet; advisory policy still injected into prompt |\n| `requireConfirmForUnlisted` implies a runtime prompt that doesn't exist | Toggle rendered disabled with explicit \"L2b\" note; field inert until the auth loop ships |\n| `allowedBrowserIds` references a browser later uninstalled | Stale id simply never matches a detected browser → browser unavailable (fail-closed for browser too) |\n| Existing v9 configs on disk mid-upgrade | `migrate_9_to_10` is idempotent and only bumps version |\n| `workingScope` vs `externalFileAccess` confusion | `workingScope` = project-internal modify scope; `externalFileAccess` = external (non-project) dirs. Documented in both type doc-comments |\n\n---\n\n## Consequences\n\n**Positive**\n- Engineers gain a real browser allowlist (enforced where PM launches) and a\n  structured external-file policy (enforced for supported adapters).\n- The honest ENFORCED/ADVISORY split prevents a false sense of security.\n\n**Negative**\n- The migration chain grows by another hop; per ADR-002 this is past the\n  threshold to consider migration consolidation.\n- Enforcement is only as strong as the spawned agent's own permission system\n  until L2b lands. This limitation is surfaced in the UI, not hidden.\n\n---\n\n## References\n\n- `lib/types/index.ts` (`BrowserAccessPolicy`, `ExternalFileAccessPolicy`, …)\n- `lib/storage/migrate.ts` (`migrate_9_to_10`)\n- `lib/bridge/index.ts` (`listInstalledBrowsers`, `augmentArgsWithFileAccessPolicy`)\n- `src-tauri/src/lib.rs` (`list_installed_browsers`, `write_engineer_policy_config`)\n- `app/ui/views/Engineers/` (table columns + detail-sheet sections)\n- ADR-002 (schema versioning), ADR-003 (prompt assembly in TS), ADR-012 (schema v8)\n",
-      "contentHash": "92ec9a53897cdbff",
-      "readingMinutes": 5,
-      "classification": "internal",
-      "classificationSource": "policy",
-      "classificationConfidence": 0.92,
-      "classificationReason": "Architecture decisions usually contain internal tradeoffs and implementation constraints.",
-      "matchedPolicyRule": "CLS-INTERNAL-ARCHITECTURE",
-      "publish": false,
-      "reviewStatus": "ai-classified",
-      "needsReview": true,
-      "visibility": "internal",
-      "audience": [
-        "engineers",
-        "technical-reviewers"
-      ],
-      "tags": [
-        "architecture",
-        "adr",
-        "table"
-      ],
-      "warnings": [
-        "Mentions execution or command policy"
-      ],
-      "updatedAt": "2026-06-04T17:48:07.770Z"
-    },
-    {
       "id": "architecture/adr-016-supabase-cloud-control-plane-and-developer-runner",
       "slug": "architecture/adr-016-supabase-cloud-control-plane-and-developer-runner",
       "route": "/documentation/architecture/adr-016-supabase-cloud-control-plane-and-developer-runner",
@@ -1189,6 +1154,41 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "Mentions execution or command policy"
       ],
       "updatedAt": "2026-06-04T04:56:53.203Z"
+    },
+    {
+      "id": "architecture/adr-017-schema-v10-engineer-access-policies",
+      "slug": "architecture/adr-017-schema-v10-engineer-access-policies",
+      "route": "/documentation/architecture/adr-017-schema-v10-engineer-access-policies",
+      "sourcePath": "docs/architecture/ADR-017-schema-v10-engineer-access-policies.md",
+      "folderSlug": "architecture",
+      "folderPath": "docs/architecture",
+      "title": "ADR-017: Schema v10 — Engineer Browser + External-File Access Policies",
+      "summary": "`EngineerRole` already carries one access-control concept — `workingScope` (ADR-012 era) — but it is **advisory only**: `soft` injects the scope into the dispatch prompt, `strict` adds a...",
+      "content": "# ADR-017: Schema v10 — Engineer Browser + External-File Access Policies\n\n> **Created Date**: 2026-06-05\n> **Created By**: Jason\n> **Last Modified**: 2026-06-05\n> **Modified By**: Jason\n> **Status**: Accepted\n> **Decision Maker**: Jason\n> **Related**: [ADR-002 — Schema Versioning Strategy](./ADR-002-schema-versioning.md), [ADR-003 — Prompt Assembly Location](./ADR-003-prompt-assembly.md), [ADR-012 — Schema v8 Engineer Cron](./ADR-012-schema-v8-engineer-cron.md)\n\n---\n\n## Background\n\n`EngineerRole` already carries one access-control concept — `workingScope`\n(ADR-012 era) — but it is **advisory only**: `soft` injects the scope into the\ndispatch prompt, `strict` adds a red warning in the dispatch modal. Nothing is\nenforced at the filesystem or process layer.\n\nTwo new product requirements need richer, partly-enforced policy:\n\n1. **Browser Settings** — control which locally-installed browsers an engineer\n   may use for search/launch.\n2. **External-File Access Settings** — control read/write/deny on external\n   (non-project) directories: arbitrary local folders, and cloud-sync folders\n   such as Google Drive / OneDrive / iCloud.\n\n### The enforcement reality (why this ADR is careful about wording)\n\nInvestigation confirmed two hard facts that shape the design:\n\n- PM's `read_file` / `write_file` Rust commands have **no role context**, and\n  every caller is PM's own machinery (prompt assembly, skill loading, plugin\n  mirror) — **not** the engineer. Guarding them would break PM and still not\n  constrain the engineer.\n- The engineer's real file operations happen **inside the spawned CLI child\n  process** (`spawn_agent`) via that agent's own tools. PM cannot intercept\n  them in-process.\n\nTherefore there is no single in-process choke point for a dispatched agent.\nReal enforcement can only happen **at spawn time**, by translating the policy\ninto the agent CLI's own permission mechanism, or (future) by an OS sandbox.\n\n---\n\n## Decision\n\n1. Bump schema version from `9` to `10`. (Schema v9 — feature\n   `upstreamDependencies` — and ADR-014 / ADR-015 / ADR-016 were already taken by other\n   work (ADR-016 is the Supabase control-plane ADR); this feature claims v10 / ADR-017.)\n2. Add two **optional** fields to `EngineerRole`:\n   - `browserAccess?: BrowserAccessPolicy` — `{ enabled: boolean; allowedBrowserIds: string[] }`.\n     Absent ⇒ disabled (no browser access).\n   - `externalFileAccess?: ExternalFileAccessPolicy` —\n     `{ entries: ExternalFileAccessEntry[]; requireConfirmForUnlisted: boolean }`.\n     Absent ⇒ no external access.\n3. Add supporting types: `InstalledBrowser`, `BrowserAccessPolicy`,\n   `ExternalFilePermission ('read'|'write'|'deny')`, `ExternalFileKind`,\n   `ExternalFileAccessEntry`, `ExternalFileAccessPolicy`.\n4. Add a `v9 -> v10` migration in `lib/storage/migrate.ts`. Both new fields are\n   optional with \"no access\" defaults, so the migration is a **pure version\n   bump** — no row rewriting. Idempotent.\n\nThis ADR ships **L2a enforcement**:\n\n- **Browser** — ENFORCED for browsers **PM launches itself** (xmux embedded\n  webview / `shell:allow-open`): the launch is gated by `browserAccess`. For an\n  agent-owned browser tool (e.g. a browser MCP) the policy is ADVISORY only.\n- **External files** — ENFORCED for adapters whose CLI exposes a native\n  permission mechanism PM knows how to translate to\n  (`augmentArgsWithFileAccessPolicy`, mirroring `augmentArgsWithMcp`). For every\n  other adapter the policy is ADVISORY (prompt-injected). The detail sheet\n  states which of the two applies for the selected adapter.\n\n---\n\n## Fail-Closed Enforcement (non-negotiable)\n\n`augmentArgsWithMcp` ends in `catch { return baseArgs; }` — correct for MCP,\nwhere a failed write just degrades a *feature*. **The permission path must NOT\ncopy that.** A failed write of a restrict/deny policy for a *known* command\nwould let the agent run **unrestricted** while the UI claims it is sandboxed —\na silent-failure / security-illusion defect (violates the Zero-Silent-Failures\niron rule).\n\nDecision: `augmentArgsWithFileAccessPolicy` is **fail-closed**. For a known\ncommand, if the policy file cannot be written it throws\n`FileAccessPolicyApplyError` and **aborts the dispatch** with a visible,\nlogged error. It never silently falls back to unrestricted args.\n\n---\n\n## Deferred (written down per process discipline)\n\n- **L2b OS-level sandbox** (macOS `sandbox-exec` / Seatbelt profile) — the only\n  way to get a *hard* guarantee against a child process. Out of scope here.\n- **Windows / Linux browser detection** — v10 ships macOS detection only;\n  `listInstalledBrowsers` returns `[]` elsewhere.\n- **Runtime authorization prompt** for `requireConfirmForUnlisted`. There is no\n  Rust→UI auth loop yet, so the field is **persisted but inert**, and the editor\n  renders the toggle **disabled** with an \"Available after runtime authorization\n  (L2b)\" note. It is stored now so enabling L2b later needs no schema bump.\n  Shipping it as an *active*-looking control that does nothing would itself be a\n  security-illusion defect, so it is explicitly neutered.\n\n---\n\n## Rationale\n\n- New fields are **optional siblings** of `workingScope`, matching the existing\n  role-as-policy-bag shape; absent = safe default (no access).\n- `deny` always wins over `read`/`write` so an explicit block can never be\n  widened by a broader entry.\n- Reusing the `augmentArgsWithMcp` structure (known-command keyed, temp config\n  file) keeps the enforcement translator consistent with the one injection\n  pattern PM already has — minimal new abstraction.\n- Prompt assembly (the advisory layer) stays in TypeScript — ADR-003 holds.\n- No Anthropic key movement — ADR-004 holds.\n\n---\n\n## Risks and Mitigation\n\n| Risk | Mitigation |\n| --- | --- |\n| Policy write fails → agent runs unrestricted but UI says restricted | **Fail-closed**: `augmentArgsWithFileAccessPolicy` throws + aborts dispatch + logs |\n| Engineer uses an adapter PM can't enforce, user assumes a wall | Per-adapter ENFORCED/ADVISORY badge in the detail sheet; advisory policy still injected into prompt |\n| `requireConfirmForUnlisted` implies a runtime prompt that doesn't exist | Toggle rendered disabled with explicit \"L2b\" note; field inert until the auth loop ships |\n| `allowedBrowserIds` references a browser later uninstalled | Stale id simply never matches a detected browser → browser unavailable (fail-closed for browser too) |\n| Existing v9 configs on disk mid-upgrade | `migrate_9_to_10` is idempotent and only bumps version |\n| `workingScope` vs `externalFileAccess` confusion | `workingScope` = project-internal modify scope; `externalFileAccess` = external (non-project) dirs. Documented in both type doc-comments |\n\n---\n\n## Consequences\n\n**Positive**\n- Engineers gain a real browser allowlist (enforced where PM launches) and a\n  structured external-file policy (enforced for supported adapters).\n- The honest ENFORCED/ADVISORY split prevents a false sense of security.\n\n**Negative**\n- The migration chain grows by another hop; per ADR-002 this is past the\n  threshold to consider migration consolidation.\n- Enforcement is only as strong as the spawned agent's own permission system\n  until L2b lands. This limitation is surfaced in the UI, not hidden.\n\n---\n\n## References\n\n- `lib/types/index.ts` (`BrowserAccessPolicy`, `ExternalFileAccessPolicy`, …)\n- `lib/storage/migrate.ts` (`migrate_9_to_10`)\n- `lib/bridge/index.ts` (`listInstalledBrowsers`, `augmentArgsWithFileAccessPolicy`)\n- `src-tauri/src/lib.rs` (`list_installed_browsers`, `write_engineer_policy_config`)\n- `app/ui/views/Engineers/` (table columns + detail-sheet sections)\n- ADR-002 (schema versioning), ADR-003 (prompt assembly in TS), ADR-012 (schema v8)\n",
+      "contentHash": "8e62a5745a9d0d25",
+      "readingMinutes": 5,
+      "classification": "internal",
+      "classificationSource": "policy",
+      "classificationConfidence": 0.92,
+      "classificationReason": "Architecture decisions usually contain internal tradeoffs and implementation constraints.",
+      "matchedPolicyRule": "CLS-INTERNAL-ARCHITECTURE",
+      "publish": false,
+      "reviewStatus": "ai-classified",
+      "needsReview": true,
+      "visibility": "internal",
+      "audience": [
+        "engineers",
+        "technical-reviewers"
+      ],
+      "tags": [
+        "architecture",
+        "adr",
+        "table"
+      ],
+      "warnings": [
+        "Mentions execution or command policy"
+      ],
+      "updatedAt": "2026-06-04T18:01:05.315Z"
     },
     {
       "id": "architecture/architecture-overview",
@@ -4041,8 +4041,8 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
     "architecture/adr-013-xmux-libghostty-terminal",
     "architecture/adr-014-spawn-token-event-correlation",
     "architecture/adr-015-mobile-voice-remote-control",
-    "architecture/adr-016-schema-v10-engineer-access-policies",
     "architecture/adr-016-supabase-cloud-control-plane-and-developer-runner",
+    "architecture/adr-017-schema-v10-engineer-access-policies",
     "architecture/architecture-overview",
     "architecture/readme",
     "archive/archived-20260512-05-adr-tauri",
