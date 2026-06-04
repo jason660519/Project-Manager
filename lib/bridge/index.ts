@@ -302,15 +302,31 @@ export async function listRegistry(): Promise<RegistryEntry[]> {
   return invoke<RegistryEntry[]>('list_registry');
 }
 
-/** Appends configPath to the registry if not already present. No-op in browser. */
+/** Appends configPath to the registry if not already present. */
 export async function addToRegistry(configPath: string): Promise<void> {
-  if (!isTauri()) return;
+  if (!isTauri()) {
+    const response = await fetch('/api/registry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ configPath }),
+    });
+    if (!response.ok) throw new Error(`Failed to add registry entry (${response.status})`);
+    return;
+  }
   return invoke<void>('add_to_registry', { configPath });
 }
 
-/** Removes configPath from the registry. No-op in browser. */
+/** Removes configPath from the registry. */
 export async function removeFromRegistry(configPath: string): Promise<void> {
-  if (!isTauri()) return;
+  if (!isTauri()) {
+    const response = await fetch('/api/registry', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ configPath }),
+    });
+    if (!response.ok) throw new Error(`Failed to remove registry entry (${response.status})`);
+    return;
+  }
   return invoke<void>('remove_from_registry', { configPath });
 }
 

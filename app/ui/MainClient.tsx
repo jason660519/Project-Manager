@@ -1145,8 +1145,9 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
 
   /**
    * Remove a project from PM's tracked list. Always removes the in-memory entry
-   * (which then persists via the saveProjects effect); when `deleteConfigFile`
-   * is true and we're on Tauri, also deletes the `.project-manager/config.json` on disk.
+   * (which then persists via the saveProjects effect) and the shared registry
+   * reference; when `deleteConfigFile` is true and we're on Tauri, also deletes
+   * the `.project-manager/config.json` on disk.
    * GitHub-sourced projects (configPath starts with https://) never touch disk.
    */
   const handleRemoveProject = useCallback(
@@ -1154,8 +1155,8 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
       const target = projects.find((p) => p.id === id);
       if (!target) return;
 
-      if (isTauri && !target.configPath.startsWith('https://')) {
-        if (deleteConfigFile) {
+      if (!target.configPath.startsWith('https://')) {
+        if (isTauri && deleteConfigFile) {
           try {
             const { deleteConfig } = await import('../../lib/bridge');
             await deleteConfig(target.configPath);

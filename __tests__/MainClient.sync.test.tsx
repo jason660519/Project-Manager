@@ -34,12 +34,16 @@ vi.mock('../app/ui/AppShell', () => ({
 vi.mock('../app/project-progress-dashboard/ProjectProgressClient', () => ({
   ProjectProgressClient: ({
     features,
+    projects,
     selectedDashboardProjectIds,
     onToggleDashboardProject,
+    onRemoveProject,
   }: {
     features: { id: string }[];
+    projects: Array<{ id: string; configPath: string }>;
     selectedDashboardProjectIds: string[];
     onToggleDashboardProject: (id: string, selected: boolean) => void;
+    onRemoveProject: (id: string, deleteConfigFile: boolean) => Promise<void> | void;
   }) => (
     <div data-testid="dashboard" data-feature-count={features.length}>
       <span data-testid="current-selection">{JSON.stringify(selectedDashboardProjectIds)}</span>
@@ -55,6 +59,15 @@ vi.mock('../app/project-progress-dashboard/ProjectProgressClient', () => ({
       >
         Remove project-manager
       </button>
+      <button
+        data-testid="remove-first-project"
+        onClick={() => {
+          const project = projects[0];
+          if (project) void onRemoveProject(project.id, false);
+        }}
+      >
+        Remove first project
+      </button>
     </div>
   ),
 }));
@@ -69,11 +82,15 @@ vi.mock('../app/ui/views/FeaturesView', () => ({
  */
 vi.mock('../app/ui/views/ProjectsView', () => ({
   ProjectsView: ({
+    projects,
     selectedDashboardProjectIds,
     onToggleDashboardProject,
+    onRemoveProject,
   }: {
+    projects: Array<{ id: string; configPath: string }>;
     selectedDashboardProjectIds: string[];
     onToggleDashboardProject: (id: string, selected: boolean) => void;
+    onRemoveProject: (id: string, deleteConfigFile: boolean) => Promise<void> | void;
   }) => (
     <div data-testid="projects">
       <span data-testid="current-selection">{JSON.stringify(selectedDashboardProjectIds)}</span>
@@ -88,6 +105,15 @@ vi.mock('../app/ui/views/ProjectsView', () => ({
         onClick={() => onToggleDashboardProject('project-manager', false)}
       >
         Remove project-manager
+      </button>
+      <button
+        data-testid="remove-first-project"
+        onClick={() => {
+          const project = projects[0];
+          if (project) void onRemoveProject(project.id, false);
+        }}
+      >
+        Remove first project
       </button>
     </div>
   ),
@@ -252,6 +278,57 @@ describe('empty project list', () => {
 });
 
 describe('web registry sync', () => {
+  it('removes a deleted browser-mode project from the shared registry so polling does not re-add it', async () => {
+    const user = userEvent.setup();
+    const configPath = '/Users/Project-Manager/.project-manager/config.json';
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const method = init?.method ?? 'GET';
+      if (method === 'DELETE') {
+        return { ok: true, json: async () => ({ ok: true }) } as Response;
+      }
+      return {
+        ok: true,
+        json: async () => [{ configPath }],
+      } as Response;
+    });
+
+    localStorage.setItem(KEY_PERSONAL_SEEDED, 'true');
+    localStorage.setItem(
+      KEY_SHARED_PROJECTS,
+      JSON.stringify([
+        {
+          id: 'project-manager',
+          configPath,
+          config: {
+            schemaVersion: 6,
+            project: {
+              name: 'Project Manager',
+              root: '/Users/Project-Manager',
+              defaultIDE: 'Cursor',
+            },
+            features: [],
+            adapters: { ides: [], agents: [] },
+          },
+        },
+      ]),
+    );
+
+    renderMainClient(<MainClient currentView="dashboard" />);
+    await screen.findByTestId('dashboard');
+
+    await user.click(screen.getByTestId('remove-first-project'));
+
+    await vi.waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith(
+        '/api/registry',
+        expect.objectContaining({
+          method: 'DELETE',
+          body: JSON.stringify({ configPath }),
+        }),
+      );
+    });
+  });
+
   it('merges newer disk features into an existing non-empty project snapshot', async () => {
     const oldFeatures = Array.from({ length: 20 }, (_, index) => ({
       id: `F${String(index + 1).padStart(2, '0')}`,
