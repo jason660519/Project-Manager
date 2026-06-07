@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
-import { ClipboardCheck, FileCheck2, Languages, TriangleAlert } from 'lucide-react';
+import { FileCheck2, Languages } from 'lucide-react';
 
-export type StandardsGateId = 'i18n' | 'standards' | 'docs' | 'color-drift';
+export type StandardsGateId = 'i18n' | 'docs';
 
 export type GateRunPhase = 'idle' | 'running' | 'pass' | 'fail' | 'skipped' | 'blocked';
 
@@ -36,9 +36,9 @@ export interface GateSpawnInvocation {
 
 const GATE_ICON_MAP: Record<StandardsGateDefinition['iconKey'], LucideIcon> = {
   languages: Languages,
-  clipboard: ClipboardCheck,
   fileCheck: FileCheck2,
-  triangle: TriangleAlert,
+  clipboard: FileCheck2,
+  triangle: FileCheck2,
 };
 
 export const STANDARDS_GATES_REGISTRY: readonly StandardsGateDefinition[] = [
@@ -57,20 +57,6 @@ export const STANDARDS_GATES_REGISTRY: readonly StandardsGateDefinition[] = [
     iconKey: 'languages',
   },
   {
-    id: 'standards',
-    label: 'Composite standards gate',
-    catalogStatus: 'Active',
-    statusTone: 'emerald',
-    npmScript: 'standards:check',
-    displayCommand: 'npm run standards:check',
-    scope: 'PM plus company baseline',
-    detail:
-      'Runs the PM-local i18n gate first, then delegates to the company standards checker for the shared baseline.',
-    tags: ['preflight', 'company script', 'blocking'],
-    blocking: true,
-    iconKey: 'clipboard',
-  },
-  {
     id: 'docs',
     label: 'Documentation governance',
     catalogStatus: 'Active',
@@ -83,20 +69,6 @@ export const STANDARDS_GATES_REGISTRY: readonly StandardsGateDefinition[] = [
     tags: ['docs layout', 'naming', 'public guide'],
     blocking: true,
     iconKey: 'fileCheck',
-  },
-  {
-    id: 'color-drift',
-    label: 'Color-token drift',
-    catalogStatus: 'P2 advisory',
-    statusTone: 'amber',
-    npmScript: null,
-    displayCommand: 'company-standards.sh check .',
-    scope: 'Company baseline advisory',
-    detail:
-      'Flags hardcoded color drift as a follow-up until the shared token package and migration plan are ready.',
-    tags: ['design tokens', 'non-blocking', 'follow-up'],
-    blocking: false,
-    iconKey: 'triangle',
   },
 ] as const;
 

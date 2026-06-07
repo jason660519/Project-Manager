@@ -6245,7 +6245,7 @@ pub fn run() {
     let mcp_registry: McpRegistry = Arc::new(Mutex::new(HashMap::new()));
     let telegram_registry: TelegramRegistry = Arc::new(Mutex::new(HashMap::new()));
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .manage(mcp_registry)
         .manage(telegram_registry)
         .manage(xmux_webview::XmuxWebviewState(std::sync::Mutex::new(
@@ -6253,8 +6253,15 @@ pub fn run() {
         )))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_pty::init())
-        .plugin(tauri_plugin_shell::init())
-        .setup(|app| {
+        .plugin(tauri_plugin_shell::init());
+
+    let builder = if cfg!(debug_assertions) {
+        builder.plugin(tauri_plugin_pilot::init())
+    } else {
+        builder
+    };
+
+    let builder = builder.setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
@@ -6367,7 +6374,9 @@ pub fn run() {
             xmux_webview::xmux_webview_clear_cookies,
             xmux_webview::xmux_webview_destroy,
             xmux_webview::xmux_webview_destroy_all,
-        ])
+        ]);
+
+    builder
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

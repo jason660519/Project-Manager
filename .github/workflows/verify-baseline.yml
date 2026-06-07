@@ -1,9 +1,6 @@
 # Full verification baseline — required on pull requests and pushes to main.
 # Mirrors `npm run verify:baseline` (see scripts/verify-baseline.sh).
 #
-# Company AI App Standards are skipped in CI (VERIFY_SKIP_STANDARDS=1) because
-# the standards repo is a local checkout path on developer machines.
-
 name: Verify Baseline
 
 on:
@@ -24,8 +21,6 @@ jobs:
     # rust-cache step below keeps steady-state runs fast, and 30m leaves margin
     # for the first cold run / cache-key changes so the cap never spuriously fails.
     timeout-minutes: 30
-    env:
-      VERIFY_SKIP_STANDARDS: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -61,3 +56,36 @@ jobs:
 
       - name: verify:baseline
         run: npm run verify:baseline
+
+  e2e-tauri-pilot-smoke:
+    name: E2E Tauri Pilot Smoke (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache Rust build (cargo registry + src-tauri/target)
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install tauri-pilot CLI
+        run: cargo install tauri-pilot-cli --version 0.7.1
+
+      - name: E2E (tauri-pilot smoke)
+        run: npm run e2e:pilot:smoke
