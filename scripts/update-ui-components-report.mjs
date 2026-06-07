@@ -13,9 +13,8 @@ const includeRoots = [
 ];
 const ignoreDirNames = new Set(['node_modules', '.next', 'out', 'dist', 'target', '.git']);
 
-function toFileUrl(absolutePath) {
-  const normalized = absolutePath.split(path.sep).join('/');
-  return `file://${normalized.startsWith('/') ? '' : '/'}${normalized}`;
+function toReportRelativePath(absolutePath) {
+  return path.relative(path.dirname(reportPath), absolutePath).split(path.sep).join('/');
 }
 
 function walkDir(dir, out) {
@@ -80,7 +79,7 @@ function categorize(filePath) {
 function formatSection(title, items) {
   const lines = [`### ${title}`, ''];
   for (const item of items) {
-    lines.push(`- [${item.name}](${toFileUrl(item.path)})`);
+    lines.push(`- [${item.name}](${toReportRelativePath(item.path)})`);
   }
   lines.push('');
   return lines.join('\n');

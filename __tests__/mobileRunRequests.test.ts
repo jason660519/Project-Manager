@@ -8,13 +8,13 @@ import {
 function projectFixture(agentCount = 1): ProjectEntry {
   return {
     id: 'project-manager',
-    configPath: '/Users/Project-Manager/.project-manager/config.json',
+    configPath: '/repo/Project-Manager/.project-manager/config.json',
     config: {
       schemaVersion: 8,
       id: 'project-manager',
       project: {
         name: 'Project Manager',
-        root: '/Users/Project-Manager',
+        root: '/repo/Project-Manager',
         defaultIDE: 'Cursor',
       },
       features: [
@@ -56,7 +56,7 @@ describe('mobile remote run request previews', () => {
       projectName: 'Project Manager',
       agentName: 'Codex',
       command: 'codex',
-      workingDir: '/Users/Project-Manager',
+      workingDir: '/repo/Project-Manager',
     });
   });
 

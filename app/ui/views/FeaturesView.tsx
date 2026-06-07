@@ -209,6 +209,7 @@ export function FeaturesView({
           features={selectedFeatures}
           adapters={adapters}
           projectRoot={projectRoot}
+          engineerRoles={engineerRoles}
           onClose={() => setBatchOpen(false)}
           onRunStart={onRunStart}
           onRunLog={onRunLog}

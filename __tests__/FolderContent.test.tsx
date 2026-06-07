@@ -26,7 +26,7 @@ describe('FolderContent', () => {
     listDirectoryEntriesMock.mockResolvedValueOnce([
       {
         name: 'src',
-        path: '/Users/Project-Manager/internal-resources/test-fixtures/client-alpha/src',
+        path: '/repo/Project-Manager/internal-resources/test-fixtures/client-alpha/src',
         isDir: true,
         isSymlink: false,
       },
@@ -35,13 +35,13 @@ describe('FolderContent', () => {
     render(
       <FolderContent
         itemId="folder-special"
-        rootPath="/Users/Project-Manager/internal-resources/test-fixtures/client-alpha"
+        rootPath="/repo/Project-Manager/internal-resources/test-fixtures/client-alpha"
       />,
     );
 
     await waitFor(() => {
       expect(listDirectoryEntriesMock).toHaveBeenCalledWith(
-        '/Users/Project-Manager/internal-resources/test-fixtures/client-alpha',
+        '/repo/Project-Manager/internal-resources/test-fixtures/client-alpha',
       );
     });
     expect(await screen.findByText('src')).toBeInTheDocument();

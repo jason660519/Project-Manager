@@ -13,17 +13,32 @@ import { ensureEngineerRoles } from './mergeEngineerRoles';
  * both layouts (new `<root>/.project-manager/config.json` and legacy
  * `<root>/.project-manager.json`) resolve to the same sample.
  */
-const BUNDLED_BY_PROJECT_ROOT: Record<string, ProjectManagerConfig> = {
-  '/Users/Project-Manager/internal-resources/projects/owner-property-management-ai-spa':
-    ensureEngineerRoles(sampleConfig1 as ProjectManagerConfig),
-  '/Users/Project-Manager':
-    ensureEngineerRoles(sampleConfig2 as ProjectManagerConfig),
-};
+const BUNDLED_OWNER_PROPERTY = ensureEngineerRoles(sampleConfig1 as ProjectManagerConfig);
+const BUNDLED_SELF = ensureEngineerRoles(sampleConfig2 as ProjectManagerConfig);
 
 function projectRootFromConfigPath(configPath: string): string {
   return configPath
     .replace(/\/\.project-manager\/config\.json$/, '')
     .replace(/\/\.project-manager\.json$/, '');
+}
+
+function looksLikeProjectManagerRepoRoot(root: string): boolean {
+  return (
+    /(^|[\\/])Project-Manager$/.test(root) ||
+    root.includes('/Project-Manager/') ||
+    root.includes('\\Project-Manager\\')
+  );
+}
+
+function resolveBundledSample(configPath: string): ProjectManagerConfig | null {
+  const root = projectRootFromConfigPath(configPath);
+  if (root.includes('owner-property-management-ai-spa')) {
+    return BUNDLED_OWNER_PROPERTY;
+  }
+  if (looksLikeProjectManagerRepoRoot(root)) {
+    return BUNDLED_SELF;
+  }
+  return null;
 }
 
 /** Fill an empty feature list from a bundled sample when the config path matches. */
@@ -32,7 +47,7 @@ export function enrichConfigFromBundledSample(
   configPath: string,
 ): ProjectManagerConfig {
   if (config.features.length > 0) return config;
-  const sample = BUNDLED_BY_PROJECT_ROOT[projectRootFromConfigPath(configPath)];
+  const sample = resolveBundledSample(configPath);
   if (!sample?.features?.length) return config;
   return {
     ...config,

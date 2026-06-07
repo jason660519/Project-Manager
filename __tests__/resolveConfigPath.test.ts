@@ -20,8 +20,8 @@ describe('resolveConfigPath', () => {
   });
 
   it('handles the real-world fixture path the user reported', () => {
-    expect(resolveConfigPath('/Users/Project-Manager/internal-resources/workspaces/realestate-management-apps')).toBe(
-      '/Users/Project-Manager/internal-resources/workspaces/realestate-management-apps/.project-manager/config.json',
+    expect(resolveConfigPath('/repo/project-manager/internal-resources/workspaces/realestate-management-apps')).toBe(
+      '/repo/project-manager/internal-resources/workspaces/realestate-management-apps/.project-manager/config.json',
     );
   });
 

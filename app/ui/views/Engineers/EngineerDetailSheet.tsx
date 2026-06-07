@@ -19,6 +19,8 @@ import {
   Camera,
   Eye,
   FolderLock,
+  Globe,
+  HardDrive,
   Loader2,
   Play,
   Plus,
@@ -29,7 +31,12 @@ import {
   X,
 } from 'lucide-react';
 
-import { callAnthropic, captureScreenshot } from '../../../../lib/bridge';
+import {
+  callAnthropic,
+  captureScreenshot,
+  listInstalledBrowsers,
+  supportsFileAccessEnforcement,
+} from '../../../../lib/bridge';
 import { sheetForKind } from '../../../../lib/capabilities/registry';
 import { listLlmProviders, type LlmProviderId } from '../../../../lib/keys/llmProviders';
 import { hasProviderKey, loadProviderKey } from '../../../../lib/keys/loadProviderKey';
@@ -43,8 +50,14 @@ import {
 import { listExposedSystemCliCommands } from '../../../../lib/storage/system-cli';
 import type {
   AnyAdapterConfig,
+  BrowserAccessPolicy,
   CapabilityKind,
   EngineerRole,
+  ExternalFileAccessEntry,
+  ExternalFileAccessPolicy,
+  ExternalFileKind,
+  ExternalFilePermission,
+  InstalledBrowser,
   ModelFallbackEntry,
   RoleCapability,
   WorkingScope,
@@ -74,6 +87,15 @@ interface FormState {
   scopeInput: string;
   capabilities: RoleCapability[];
   commands: string[];
+  // Browser access (schema v10, ADR-017)
+  browserAccessEnabled: boolean;
+  allowedBrowserIds: string[];
+  // External-file access (schema v10, ADR-017)
+  externalEntries: ExternalFileAccessEntry[];
+  externalPathInput: string;
+  externalKindInput: ExternalFileKind;
+  externalPermissionInput: ExternalFilePermission;
+  requireConfirmForUnlisted: boolean;
 }
 
 function roleToForm(role: EngineerRole): FormState {
@@ -97,6 +119,13 @@ function roleToForm(role: EngineerRole): FormState {
     scopeInput: '',
     capabilities: role.capabilities ?? [],
     commands: role.commands ?? [],
+    browserAccessEnabled: role.browserAccess?.enabled ?? false,
+    allowedBrowserIds: role.browserAccess?.allowedBrowserIds ?? [],
+    externalEntries: role.externalFileAccess?.entries ?? [],
+    externalPathInput: '',
+    externalKindInput: 'local-dir',
+    externalPermissionInput: 'read',
+    requireConfirmForUnlisted: role.externalFileAccess?.requireConfirmForUnlisted ?? false,
   };
 }
 
@@ -104,6 +133,19 @@ function formToRole(id: string, form: FormState, existing: EngineerRole): Engine
   const workingScope: WorkingScope | undefined =
     form.scopePaths.length > 0
       ? { allowedPaths: form.scopePaths, mode: form.scopeMode }
+      : undefined;
+  // ADR-017: persist browser + external-file policies. Absent (no access) when
+  // nothing is configured, matching the "optional sibling of workingScope" shape.
+  const browserAccess: BrowserAccessPolicy | undefined =
+    form.browserAccessEnabled || form.allowedBrowserIds.length > 0
+      ? { enabled: form.browserAccessEnabled, allowedBrowserIds: form.allowedBrowserIds }
+      : undefined;
+  const externalFileAccess: ExternalFileAccessPolicy | undefined =
+    form.externalEntries.length > 0 || form.requireConfirmForUnlisted
+      ? {
+          entries: form.externalEntries,
+          requireConfirmForUnlisted: form.requireConfirmForUnlisted,
+        }
       : undefined;
   return {
     id,
@@ -122,6 +164,8 @@ function formToRole(id: string, form: FormState, existing: EngineerRole): Engine
     defaultAgentId: form.defaultAgentId || undefined,
     notes: form.notes || undefined,
     workingScope,
+    browserAccess,
+    externalFileAccess,
     primaryModel: form.primaryProviderId
       ? {
           providerId: form.primaryProviderId,
@@ -214,6 +258,21 @@ function EngineerDetailBody({ role, agents, onSave, onDelete }: EngineerDetailBo
   });
   const [exposedCommands, setExposedCommands] = useState<string[]>([]);
   const [attachScreenshot, setAttachScreenshot] = useState(false);
+  const [installedBrowsers, setInstalledBrowsers] = useState<InstalledBrowser[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void listInstalledBrowsers()
+      .then((browsers) => {
+        if (!cancelled) setInstalledBrowsers(browsers);
+      })
+      .catch((err) => {
+        console.warn('[EngineerDetailSheet] listInstalledBrowsers failed', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -234,6 +293,44 @@ function EngineerDetailBody({ role, agents, onSave, onDelete }: EngineerDetailBo
         commands: has ? prev.commands.filter((c) => c !== cmd) : [...prev.commands, cmd],
       };
     });
+    setDirty(true);
+  };
+
+  const toggleBrowserAllowed = (id: string) => {
+    setForm((prev) => {
+      const has = prev.allowedBrowserIds.includes(id);
+      return {
+        ...prev,
+        allowedBrowserIds: has
+          ? prev.allowedBrowserIds.filter((x) => x !== id)
+          : [...prev.allowedBrowserIds, id],
+      };
+    });
+    setDirty(true);
+  };
+
+  const addExternalEntry = () => {
+    const path = form.externalPathInput.trim().replace(/,+$/, '');
+    if (!path || form.externalEntries.some((e) => e.path === path)) {
+      setForm((prev) => ({ ...prev, externalPathInput: '' }));
+      return;
+    }
+    setForm((prev) => ({
+      ...prev,
+      externalEntries: [
+        ...prev.externalEntries,
+        { path, kind: prev.externalKindInput, permission: prev.externalPermissionInput },
+      ],
+      externalPathInput: '',
+    }));
+    setDirty(true);
+  };
+
+  const removeExternalEntry = (path: string) => {
+    setForm((prev) => ({
+      ...prev,
+      externalEntries: prev.externalEntries.filter((e) => e.path !== path),
+    }));
     setDirty(true);
   };
 
@@ -1094,6 +1191,279 @@ function EngineerDetailBody({ role, agents, onSave, onDelete }: EngineerDetailBo
           </div>
         );
       })()}
+
+      {/* Browser Access (schema v10, ADR-017) */}
+      <div
+        id="engineer-section-browser"
+        className="scroll-mt-3 space-y-3 border border-stone-200/15 bg-[rgb(var(--pm-card-3))]/40 p-3"
+      >
+        <div className="flex items-center gap-2">
+          <Globe size={13} className="text-stone-400" />
+          <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">
+            Browser Access
+          </span>
+          <span className="ml-auto text-[10px] text-stone-600">
+            Allow-list browsers PM may launch for this engineer
+          </span>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setForm((prev) => ({ ...prev, browserAccessEnabled: !prev.browserAccessEnabled }));
+              setDirty(true);
+            }}
+            aria-pressed={form.browserAccessEnabled}
+            className={[
+              'border px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors',
+              form.browserAccessEnabled
+                ? 'border-emerald-300/35 bg-emerald-950/50 text-emerald-200/85'
+                : 'border-stone-200/15 text-stone-500 hover:border-stone-200/30 hover:text-stone-300',
+            ].join(' ')}
+          >
+            {form.browserAccessEnabled ? 'Enabled' : 'Disabled'}
+          </button>
+          <span className="text-[10px] text-stone-600">
+            {form.browserAccessEnabled
+              ? 'Engineer may use the allow-listed browsers below.'
+              : 'No browser access — PM-mediated launches stay blocked (fail-closed).'}
+          </span>
+        </div>
+
+        {form.browserAccessEnabled ? (
+          installedBrowsers.length === 0 ? (
+            <p className="text-[10px] text-stone-500">
+              No installed browsers detected (host detection runs in the desktop app, macOS
+              only for now). With an empty allow-list, PM-mediated browsing stays blocked
+              (fail-closed).
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {installedBrowsers.map((browser) => {
+                const checked = form.allowedBrowserIds.includes(browser.id);
+                return (
+                  <button
+                    key={browser.id}
+                    type="button"
+                    onClick={() => toggleBrowserAllowed(browser.id)}
+                    aria-pressed={checked}
+                    title={browser.path}
+                    className={[
+                      'inline-flex items-center gap-1 border px-2 py-0.5 text-[10px] transition-colors',
+                      checked
+                        ? 'border-emerald-300/35 bg-emerald-950/40 text-emerald-200/85'
+                        : 'border-stone-200/15 text-stone-500 hover:border-stone-200/30 hover:text-stone-300',
+                    ].join(' ')}
+                  >
+                    {checked && <span aria-hidden>✓</span>}
+                    {browser.name}
+                  </button>
+                );
+              })}
+            </div>
+          )
+        ) : null}
+
+        {(() => {
+          const staleIds = form.allowedBrowserIds.filter(
+            (id) => !installedBrowsers.some((b) => b.id === id),
+          );
+          if (staleIds.length === 0 || installedBrowsers.length === 0) return null;
+          return (
+            <div className="space-y-1.5 border-t border-amber-300/15 pt-2">
+              <span className="text-[10px] uppercase tracking-[0.12em] text-amber-300/70">
+                Allow-listed but not detected
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {staleIds.map((id) => (
+                  <span
+                    key={id}
+                    className="inline-flex items-center gap-1 border border-amber-300/35 bg-amber-950/30 px-2 py-0.5 font-mono text-[10px] text-amber-200/80"
+                  >
+                    {id}
+                    <button
+                      type="button"
+                      onClick={() => toggleBrowserAllowed(id)}
+                      className="ml-0.5 text-amber-300/60 hover:text-red-400"
+                      aria-label={`Remove ${id}`}
+                    >
+                      <X size={9} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <p className="text-[10px] text-stone-600">
+                A stale id never matches a detected browser, so it stays unavailable
+                (fail-closed for browser too).
+              </p>
+            </div>
+          );
+        })()}
+      </div>
+
+      {/* External-File Access (schema v10, ADR-017) */}
+      <div
+        id="engineer-section-external-files"
+        className="scroll-mt-3 space-y-3 border border-stone-200/15 bg-[rgb(var(--pm-card-3))]/40 p-3"
+      >
+        <div className="flex items-center gap-2">
+          <HardDrive size={13} className="text-stone-400" />
+          <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">
+            External-File Access
+          </span>
+          <span className="ml-auto text-[10px] text-stone-600">
+            Non-project directories (incl. cloud-sync folders)
+          </span>
+        </div>
+
+        {/* Per-adapter ENFORCED / ADVISORY badge */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] uppercase tracking-[0.12em] text-stone-500">
+            Enforcement
+          </span>
+          {agents.filter((a) => Boolean(a.command)).length === 0 ? (
+            <span className="text-[10px] text-stone-600">
+              No agent adapters configured — policy is prompt-injected (advisory) only.
+            </span>
+          ) : (
+            agents
+              .filter((a) => Boolean(a.command))
+              .map((a) => {
+                const enforced = supportsFileAccessEnforcement(a.command as string);
+                return (
+                  <span
+                    key={a.id}
+                    title={
+                      enforced
+                        ? `PM translates the policy into ${a.name}'s native permissions.`
+                        : `${a.name} has no native permission mechanism PM can translate to — policy is prompt-injected (advisory) only.`
+                    }
+                    className={[
+                      'inline-flex items-center gap-1 border px-2 py-0.5 font-mono text-[10px]',
+                      enforced
+                        ? 'border-emerald-300/30 bg-emerald-950/35 text-emerald-200/85'
+                        : 'border-amber-300/30 bg-amber-950/30 text-amber-200/80',
+                    ].join(' ')}
+                  >
+                    {a.name} · {enforced ? 'ENFORCED' : 'ADVISORY'}
+                  </span>
+                );
+              })
+          )}
+        </div>
+
+        {/* Entry editor */}
+        <div className="flex flex-wrap gap-2">
+          <input
+            value={form.externalPathInput}
+            onChange={(e) => setForm((prev) => ({ ...prev, externalPathInput: e.target.value }))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addExternalEntry();
+              }
+            }}
+            placeholder="/Users/you/Library/CloudStorage/GoogleDrive-…  (Enter to add)"
+            className={`${inputCls} min-w-[180px] flex-1 font-mono text-xs`}
+          />
+          <select
+            value={form.externalKindInput}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, externalKindInput: e.target.value as ExternalFileKind }))
+            }
+            className={`${inputCls} w-auto text-xs`}
+            aria-label="External path kind"
+          >
+            <option value="local-dir">Local dir</option>
+            <option value="gdrive">Google Drive</option>
+            <option value="onedrive">OneDrive</option>
+            <option value="icloud">iCloud</option>
+            <option value="other">Other</option>
+          </select>
+          <select
+            value={form.externalPermissionInput}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                externalPermissionInput: e.target.value as ExternalFilePermission,
+              }))
+            }
+            className={`${inputCls} w-auto text-xs`}
+            aria-label="External path permission"
+          >
+            <option value="read">read</option>
+            <option value="write">write</option>
+            <option value="deny">deny</option>
+          </select>
+          <button
+            type="button"
+            onClick={addExternalEntry}
+            className="border border-stone-200/18 px-3 py-2 text-xs text-stone-400 hover:border-emerald-300/30 hover:text-emerald-200"
+          >
+            Add
+          </button>
+        </div>
+
+        {form.externalEntries.length > 0 && (
+          <div className="space-y-1.5">
+            {form.externalEntries.map((entry) => {
+              const tone =
+                entry.permission === 'deny'
+                  ? 'border-red-300/30 bg-red-950/30 text-red-200/85'
+                  : entry.permission === 'write'
+                    ? 'border-emerald-300/25 bg-emerald-950/35 text-emerald-200/80'
+                    : 'border-sky-300/25 bg-sky-950/30 text-sky-200/80';
+              return (
+                <div
+                  key={entry.path}
+                  className="flex items-center gap-2 border border-stone-200/12 bg-[rgb(var(--pm-input))]/40 px-2 py-1"
+                >
+                  <span
+                    className={`shrink-0 border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] ${tone}`}
+                  >
+                    {entry.permission}
+                  </span>
+                  <span className="shrink-0 font-mono text-[9px] uppercase tracking-[0.1em] text-stone-500">
+                    {entry.kind}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-stone-300" title={entry.path}>
+                    {entry.path}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeExternalEntry(entry.path)}
+                    className="shrink-0 text-stone-500 hover:text-red-400"
+                    aria-label={`Remove ${entry.path}`}
+                  >
+                    <X size={10} />
+                  </button>
+                </div>
+              );
+            })}
+            <p className="text-[10px] text-stone-600">
+              <span className="font-mono text-red-300/80">deny</span> always wins over a broader{' '}
+              <span className="font-mono">read</span> / <span className="font-mono">write</span>{' '}
+              entry. Distinct from Working Scope, which governs project-internal paths.
+            </p>
+          </div>
+        )}
+
+        {/* L2b-deferred runtime authorization toggle (rendered disabled per ADR-017) */}
+        <label className="flex cursor-not-allowed items-center gap-2 border-t border-stone-200/12 pt-2 opacity-60">
+          <input
+            type="checkbox"
+            disabled
+            checked={form.requireConfirmForUnlisted}
+            readOnly
+            className="h-3 w-3 accent-emerald-400"
+          />
+          <span className="text-[11px] text-stone-400">Require confirmation for unlisted paths</span>
+          <span className="ml-auto text-[10px] text-amber-300/70">
+            Available after runtime authorization (L2b)
+          </span>
+        </label>
+      </div>
 
       {/* Notes */}
       <FormField label="Notes">

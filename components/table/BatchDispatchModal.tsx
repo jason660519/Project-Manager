@@ -3,12 +3,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import {
+  augmentArgsWithFileAccessPolicy,
   augmentArgsWithMcp,
   killProcess,
   mcpInjectionFlag,
   onAgentExit,
   onAgentStdout,
   spawnAgent,
+  supportsFileAccessEnforcement,
 } from '../../lib/bridge';
 import {
   DEFAULT_AGENT_WORKFLOWS,
@@ -22,7 +24,7 @@ import {
 } from '../../lib/agent-workflows';
 import { collectEnabledMcpServers } from '../../lib/storage/plugins';
 import { useI18n } from '../../lib/i18n';
-import { AgentAdapterConfig, AnyAdapterConfig, Feature } from '../../lib/types';
+import { AgentAdapterConfig, AnyAdapterConfig, EngineerRole, Feature } from '../../lib/types';
 
 // ── Batch prompt templates ────────────────────────────────────────────────────
 
@@ -88,6 +90,8 @@ interface BatchDispatchModalProps {
   features: Feature[];
   adapters: AnyAdapterConfig[];
   projectRoot: string;
+  /** Engineer roles available on this project; used for the batch-wide access policy (ADR-017). */
+  engineerRoles?: EngineerRole[];
   onClose: () => void;
   onRunStart?: (
     pid: number,
@@ -110,6 +114,7 @@ export function BatchDispatchModal({
   features,
   adapters,
   projectRoot,
+  engineerRoles = [],
   onClose,
   onRunStart,
   onRunLog,
@@ -123,6 +128,7 @@ export function BatchDispatchModal({
   const noAgentAdapters = !emptyState && agentAdapters.length === 0;
 
   const [selectedAdapterId, setSelectedAdapterId] = useState(agentAdapters[0]?.id ?? '');
+  const [selectedRoleId, setSelectedRoleId] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState(0);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState('');
   const [selectedDagWorkflowId, setSelectedDagWorkflowId] = useState('');
@@ -143,6 +149,12 @@ export function BatchDispatchModal({
   }, []);
 
   const adapter = agentAdapters.find((a) => a.id === selectedAdapterId);
+  const selectedRole = selectedRoleId ? engineerRoles.find((r) => r.id === selectedRoleId) ?? null : null;
+  // ADR-017: the whole batch reuses one adapter + template, so it also reuses one
+  // engineer access policy. Surface whether that policy is ENFORCED (PM can
+  // translate it to the adapter's native permissions) or ADVISORY for this adapter.
+  const fileAccessEnforced = adapter ? supportsFileAccessEnforcement(adapter.command) : false;
+  const hasExternalFilePolicy = (selectedRole?.externalFileAccess?.entries.length ?? 0) > 0;
   const selectedWorkflow = selectedWorkflowId ? getAgentWorkflowById(selectedWorkflowId) ?? null : null;
   const dagWorkflows = listAgentWorkflowDags();
   const selectedDagWorkflow = selectedDagWorkflowId ? getAgentWorkflowDagById(selectedDagWorkflowId) ?? null : null;
@@ -271,7 +283,15 @@ export function BatchDispatchModal({
         const { feature } = item;
         try {
           const baseArgs = await buildArgs(feature);
-          const args = await augmentArgsWithMcp(adapter.command, baseArgs, mcpServers);
+          const mcpArgs = await augmentArgsWithMcp(adapter.command, baseArgs, mcpServers);
+          // ADR-017: apply the batch-wide engineer's external-file policy, fail-closed.
+          // A throw here lands in the per-item catch below, so that item aborts
+          // visibly instead of spawning unrestricted.
+          const args = await augmentArgsWithFileAccessPolicy(
+            adapter.command,
+            mcpArgs,
+            selectedRole?.externalFileAccess,
+          );
           onFeatureUpdate?.(feature.id, { status: 'in_progress' });
           const { pid, spawnToken } = await spawnAgent({ command: adapter.command, args, workingDir: projectRoot });
           tokenToFeatureId.set(spawnToken, feature.id);
@@ -391,6 +411,45 @@ export function BatchDispatchModal({
                       </option>
                     ))}
                   </select>
+                </div>
+              )}
+
+              {/* Engineer role (batch-wide access policy — ADR-017) */}
+              {engineerRoles.length > 0 && (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-stone-200">
+                    Engineer Role
+                  </label>
+                  <select
+                    value={selectedRoleId}
+                    onChange={(e) => setSelectedRoleId(e.target.value)}
+                    className="w-full border border-stone-200/20 bg-[rgb(var(--pm-input))] px-3 py-2 text-sm text-stone-100 outline-none"
+                  >
+                    <option value="">— 不套用工程師存取政策 —</option>
+                    {engineerRoles.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedRole && hasExternalFilePolicy && (
+                    <p
+                      className={`mt-1.5 border px-3 py-2 text-[11px] ${
+                        fileAccessEnforced
+                          ? 'border-emerald-300/25 bg-emerald-950/25 text-emerald-100/85'
+                          : 'border-amber-300/25 bg-amber-950/25 text-amber-100/85'
+                      }`}
+                    >
+                      <span className="font-mono uppercase tracking-[0.12em]">
+                        {fileAccessEnforced ? 'ENFORCED' : 'ADVISORY'}
+                      </span>
+                      <span className="ml-2">
+                        {fileAccessEnforced
+                          ? `${selectedRole.name} 的外部檔案政策會套用到此批次的每個派遣（fail-closed）。`
+                          : `此 adapter 無法強制外部檔案政策，僅以提示注入（advisory）。`}
+                      </span>
+                    </p>
+                  )}
                 </div>
               )}
 

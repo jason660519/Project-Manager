@@ -19,10 +19,12 @@ import {
   MoreHorizontal,
   Plus,
   RotateCcw,
+  ShieldAlert,
   TerminalSquare,
 } from 'lucide-react';
 import { deriveBrowserLabel } from '../terminal/blockLayout';
 import { openExternalUrl } from '../../lib/bridge';
+import { useBrowserAccessGate } from './BrowserAccessGate';
 import {
   formatXmuxSelectedElementSnippet,
   isXmuxSelectedElementPayload,
@@ -276,6 +278,12 @@ export function BrowserContent({
   const selectSessionRef = useRef(0);
   const selectCapturedSinceStartRef = useRef(false);
 
+  // ADR-017: when an engineer owner governs this surface and their browserAccess
+  // policy denies, the pane is blocked — no BrowserSlot is rendered, so neither a
+  // native webview nor an iframe is ever created (no unrestricted fallback).
+  const accessGate = useBrowserAccessGate();
+  const browserBlocked = accessGate.governed && !accessGate.allowed;
+
   useEffect(() => {
     setDraftUrl(url);
   }, [itemId, url]);
@@ -366,7 +374,18 @@ export function BrowserContent({
     return () => window.removeEventListener('pm:xmux-selected-element', handleSelectedElement);
   }, []);
 
+  const blockedStatus = (): void => {
+    setStatus({
+      tone: 'error',
+      message: `Browser blocked by ${accessGate.ownerLabel ?? 'engineer'} access policy — no browser is allow-listed for this engineer.`,
+    });
+  };
+
   const navigate = () => {
+    if (browserBlocked) {
+      blockedStatus();
+      return;
+    }
     const next = normalizeUrl(draftUrl);
     if (!next) return;
     setDraftUrl(next);
@@ -374,6 +393,10 @@ export function BrowserContent({
   };
 
   const openExternally = () => {
+    if (browserBlocked) {
+      blockedStatus();
+      return;
+    }
     const target = normalizeUrl(draftUrl) ?? url;
     void openExternalUrl(target).catch(() => {
       if (typeof window !== 'undefined') {
@@ -815,7 +838,7 @@ export function BrowserContent({
           onClear={() => setSelectedDragContext(null)}
         />
       ) : null}
-      {showBlockedHint ? (
+      {showBlockedHint && !browserBlocked ? (
         <div className="relative z-[100] flex shrink-0 items-center gap-2 border-b border-amber-900/40 bg-amber-950/40 px-2 py-1 text-[11px] text-amber-200">
           <Info size={12} className="shrink-0" />
           <span className="min-w-0 flex-1">
@@ -858,12 +881,35 @@ export function BrowserContent({
       ) : null}
       <div className="flex min-h-0 flex-1">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <BrowserSlot
-            key={embedRetryKey}
-            itemId={itemId}
-            url={url}
-            isActive={isActive}
-          />
+          {browserBlocked ? (
+            <div
+              data-browser-blocked
+              className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-editor-bg p-6 text-center"
+            >
+              <ShieldAlert size={28} className="text-red-300/80" />
+              <div className="space-y-1">
+                <p className="text-[13px] font-semibold text-red-100">
+                  Browser access blocked
+                </p>
+                <p className="max-w-sm text-[11px] leading-5 text-stone-400">
+                  This pane is governed by{' '}
+                  <span className="text-stone-200">{accessGate.ownerLabel ?? 'an engineer'}</span>
+                  &rsquo;s browser-access policy, which allow-lists no browser
+                  (disabled or empty). No page is loaded — neither a native webview
+                  nor a preview. Enable browser access and allow-list a browser for
+                  this engineer in the Engineers detail sheet, or assign a different
+                  owner.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <BrowserSlot
+              key={embedRetryKey}
+              itemId={itemId}
+              url={url}
+              isActive={isActive}
+            />
+          )}
         </div>
         {browserConsoleOpen || cssInspectorOpen ? (
           <BrowserSidePanel>

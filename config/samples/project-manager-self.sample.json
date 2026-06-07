@@ -6,7 +6,7 @@
   "updatedBy": "codex",
   "project": {
     "name": "Project Manager",
-    "root": "/Users/Project-Manager",
+    "root": ".",
     "defaultIDE": "Cursor"
   },
   "features": [

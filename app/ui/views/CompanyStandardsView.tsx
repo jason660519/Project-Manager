@@ -37,17 +37,7 @@ export type { GateRunAllProgress, GateRunPhase };
 import { useI18n } from '../../../lib/i18n';
 import type { ProjectEntry } from '../../../lib/types';
 
-const PROJECT_ROOT = '/Users/Project-Manager';
 const STANDARDS_ROOT = '/Users/Company-AI-App-Standards';
-const CONTRACT_DOC =
-  `${PROJECT_ROOT}/docs/integrations/company-standards-plugin-contract.md`;
-const COMPANY_UI_DOC = `${STANDARDS_ROOT}/docs/ui-design-system.md`;
-const COMPANY_MULTI_APP_DOC = `${STANDARDS_ROOT}/docs/multi-app-integration.md`;
-const BASELINE_DOC = `${STANDARDS_ROOT}/docs/patterns/table-governance.md`;
-const PROFILE_DOC = `${STANDARDS_ROOT}/docs/patterns/project-manager-table-profile.md`;
-const PM_DESIGN_DOC = `${PROJECT_ROOT}/DESIGN.md`;
-const PM_SHARED_STYLE_DOC =
-  `${PROJECT_ROOT}/docs/design/shared-ai-desktop-style.md`;
 
 type Tone = 'emerald' | 'cyan' | 'amber' | 'blue' | 'stone';
 
@@ -260,45 +250,30 @@ const RESOURCES: ResourceLink[] = [
   {
     label: 'Company UI Baseline',
     detail: 'Current shared design rules and token table.',
-    path: COMPANY_UI_DOC,
+    path: `${STANDARDS_ROOT}/docs/ui-design-system.md`,
     icon: FileText,
   },
   {
     label: 'Multi-App Integration',
     detail: 'Plugin contracts, runtime isolation, and cross-app reliability rules.',
-    path: COMPANY_MULTI_APP_DOC,
+    path: `${STANDARDS_ROOT}/docs/multi-app-integration.md`,
     icon: FileText,
   },
-  {
-    label: 'PM Plugin Contract',
-    detail: 'How Project Manager consumes standards profiles and checks.',
-    path: CONTRACT_DOC,
-    icon: FileText,
-  },
+  { label: 'PM Plugin Contract', detail: 'How Project Manager consumes standards profiles and checks.', path: '', icon: FileText },
   {
     label: 'Table Governance',
     detail: 'Company table baseline for dense operational data.',
-    path: BASELINE_DOC,
+    path: `${STANDARDS_ROOT}/docs/patterns/table-governance.md`,
     icon: FileText,
   },
   {
     label: 'PM Table Profile',
     detail: 'Project Manager-specific table behavior and implementation references.',
-    path: PROFILE_DOC,
+    path: `${STANDARDS_ROOT}/docs/patterns/project-manager-table-profile.md`,
     icon: FileText,
   },
-  {
-    label: 'PM Design Guide',
-    detail: 'Repo-local product personality, shell, layout, and UX rules.',
-    path: PM_DESIGN_DOC,
-    icon: FileText,
-  },
-  {
-    label: 'Shared AI Desktop Style',
-    detail: 'Current family-level visual language that should move upstream over time.',
-    path: PM_SHARED_STYLE_DOC,
-    icon: FileText,
-  },
+  { label: 'PM Design Guide', detail: 'Repo-local product personality, shell, layout, and UX rules.', path: '', icon: FileText },
+  { label: 'Shared AI Desktop Style', detail: 'Current family-level visual language that should move upstream over time.', path: '', icon: FileText },
 ];
 
 function stageLabel(stage: PackageLane['stage']) {
@@ -351,6 +326,7 @@ export function CompanyStandardsView({
   const g = t.companyStandards.gates;
   const [copyHint, setCopyHint] = useState<string | null>(null);
   const copyHintTimerRef = useRef<number | null>(null);
+  const [projectRoot, setProjectRoot] = useState('');
 
   useEffect(
     () => () => {
@@ -359,7 +335,39 @@ export function CompanyStandardsView({
     [],
   );
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { getProjectManagerRoot } = await import('../../../lib/bridge');
+        const root = await getProjectManagerRoot();
+        if (!cancelled) setProjectRoot(root);
+      } catch {
+        if (!cancelled) setProjectRoot('');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const resources = useMemo(() => {
+    const root = projectRoot.replace(/\/+$/, '');
+    const pmPaths: Record<string, string> = {
+      'PM Plugin Contract': root
+        ? `${root}/docs/integrations/company-standards-plugin-contract.md`
+        : '',
+      'PM Design Guide': root ? `${root}/DESIGN.md` : '',
+      'Shared AI Desktop Style': root ? `${root}/docs/design/shared-ai-desktop-style.md` : '',
+    };
+    return RESOURCES.map((resource) => ({
+      ...resource,
+      path: pmPaths[resource.label] ?? resource.path,
+    })).filter((resource) => Boolean(resource.path));
+  }, [projectRoot]);
+
   const handleOpen = (path: string) => {
+    if (!path) return;
     void openPath(path).catch(() => {});
   };
 
@@ -559,7 +567,7 @@ export function CompanyStandardsView({
             detail="These are the current source files behind the hub. Raw paths are secondary; the hub should expose the decision layer first."
           />
           <div className="grid gap-2 p-4 md:grid-cols-2">
-            {RESOURCES.map((resource) => (
+            {resources.map((resource) => (
               <ResourceButton
                 key={resource.path}
                 resource={resource}

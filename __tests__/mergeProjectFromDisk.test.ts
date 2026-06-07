@@ -16,7 +16,7 @@ const localFeature: Feature = {
 const localConfig: ProjectManagerConfig = {
   schemaVersion: 4,
   id: 'test-project-id',
-  project: { name: 'Project Manager', root: '/Users/Project-Manager', defaultIDE: 'Cursor' },
+  project: { name: 'Project Manager', root: '/repo/Project-Manager', defaultIDE: 'Cursor' },
   features: [localFeature],
   adapters: { ides: [], agents: [] },
 };
@@ -35,7 +35,7 @@ describe('enrichConfigFromBundledSample', () => {
     };
     const enriched = enrichConfigFromBundledSample(
       empty,
-      '/Users/Project-Manager/.project-manager.json',
+      '/repo/Project-Manager/.project-manager.json',
     );
     expect(enriched.features.length).toBeGreaterThan(0);
   });
@@ -57,7 +57,7 @@ describe('mergeProjectConfigFromDisk', () => {
     const merged = mergeProjectConfigFromDisk(
       { ...localConfig, features: [] },
       disk,
-      '/Users/Project-Manager/.project-manager.json',
+      '/repo/Project-Manager/.project-manager.json',
     );
     expect(merged.features.length).toBeGreaterThan(0);
   });

@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { clsx } from 'clsx';
 import {
+  augmentArgsWithFileAccessPolicy,
   augmentArgsWithMcp,
   killProcess,
   onAgentExit,
@@ -398,7 +399,16 @@ export function TaskDispatchModal({
         throw new Error(result.message ?? `Unable to build command for ${adapter.name}`);
       }
       const { command, args: baseArgs } = result;
-      const args = await augmentArgsWithMcp(command, baseArgs, collectEnabledMcpServers(projectRoot));
+      const mcpArgs = await augmentArgsWithMcp(command, baseArgs, collectEnabledMcpServers(projectRoot));
+      // ADR-017: translate the engineer's external-file policy into the adapter's
+      // native permissions. Fail-closed — a throw here aborts the dispatch (caught
+      // below) so a known command never spawns unrestricted while the UI implies a wall.
+      const dispatchRoleConfig = engineerRoles.find((r) => r.id === config.selectedRoleId);
+      const args = await augmentArgsWithFileAccessPolicy(
+        command,
+        mcpArgs,
+        dispatchRoleConfig?.externalFileAccess,
+      );
 
       // Listeners are registered before the spawn resolves, so the token isn't
       // known yet. Rust starts the stdout/exit emit tasks BEFORE returning the
@@ -551,7 +561,14 @@ export function TaskDispatchModal({
         projectRoot,
       });
       if (!result.success || !result.command || !result.args) throw new Error(result.message ?? 'Unable to build command');
-      const args = await augmentArgsWithMcp(result.command, result.args, collectEnabledMcpServers(projectRoot));
+      const mcpArgs = await augmentArgsWithMcp(result.command, result.args, collectEnabledMcpServers(projectRoot));
+      // ADR-017: fail-closed external-file policy — throws abort the terminal open (caught below).
+      const terminalRole = engineerRoles.find((r) => r.id === config.selectedRoleId);
+      const args = await augmentArgsWithFileAccessPolicy(
+        result.command,
+        mcpArgs,
+        terminalRole?.externalFileAccess,
+      );
       const flatArgs = args.map((a) => a.replace(/\r?\n/g, ' '));
       await spawnTerminal({ command: result.command, args: flatArgs, cwd: projectRoot });
       const assignmentPatch = buildAssignmentPatch(activeRole, config, dagSelection);

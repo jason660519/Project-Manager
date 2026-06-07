@@ -38,21 +38,33 @@ export default function PluginGuidePanel({ isOpen, onClose }: PluginGuidePanelPr
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  const guidePath = '/Users/Project-Manager/docs/engineering/plugin-guide.md';
+  const [guidePath, setGuidePath] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
+    let cancelled = false;
     setLoading(true);
     setContent(null);
     setError(null);
-    readFile(guidePath)
-      .then(setContent)
-      .catch((e: unknown) => {
+    void (async () => {
+      try {
+        const { getProjectManagerRoot } = await import('../lib/bridge');
+        const root = (await getProjectManagerRoot()).replace(/\/+$/, '');
+        const resolved = root ? `${root}/docs/engineering/plugin-guide.md` : '';
+        if (!cancelled) setGuidePath(resolved);
+        if (!resolved) throw new Error('Missing Project Manager root');
+        const next = await readFile(resolved);
+        if (!cancelled) setContent(next);
+      } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
-        setError(`Failed to read plugin-guide.md: ${msg}`);
-      })
-      .finally(() => setLoading(false));
+        if (!cancelled) setError(`Failed to read plugin-guide.md: ${msg}`);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen]);
 
   // Keyboard close on Esc
@@ -64,6 +76,7 @@ export default function PluginGuidePanel({ isOpen, onClose }: PluginGuidePanelPr
   }, [isOpen, onClose]);
 
   const openInEditor = async () => {
+    if (!guidePath) return;
     try {
       await openPath(guidePath);
     } catch { /* no-op in web */ }

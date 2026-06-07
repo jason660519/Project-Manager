@@ -8,8 +8,13 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
-import { Bell, Bot, Folder, MessageSquareText } from 'lucide-react';
+import { Bell, Bot, Folder, MessageSquareText, ShieldCheck } from 'lucide-react';
 import { ChatPanel } from '../../../components/chat/ChatPanel';
+import { isBrowserLaunchAllowed } from '../../../lib/bridge';
+import {
+  BrowserAccessGateProvider,
+  type BrowserAccessGateValue,
+} from '../../../components/browser/BrowserAccessGate';
 import {
   BottomSheetTabs,
   type SheetTabItem,
@@ -40,7 +45,7 @@ import {
   loadPersistedXmuxLayout,
   savePersistedXmuxLayout,
 } from '../../../lib/xmux/layoutPersistence';
-import type { ProjectEntry } from '../../../lib/types';
+import type { EngineerRole, ProjectEntry } from '../../../lib/types';
 import type { ChatContext } from '../../../lib/chat/types';
 import { waitForTauriRuntime } from '../../../lib/runtime/tauri-ready';
 
@@ -70,53 +75,63 @@ interface XmuxViewProps {
 
 type DragCursor = 'col-resize' | 'row-resize' | null;
 
-const fallbackWorkspaces: WorkspaceRow[] = [
-  {
-    id: 'project-manager',
-    name: 'Project Management',
-    branch: 'dispatch-wip-20260525*',
-    cwd: '/Users/Project-Manager',
-    notification: 'xmux review requested',
-    homepageUrl: DEFAULT_HOMEPAGE,
-  },
-  {
-    id: 'realestate-management-apps',
-    name: 'Realestate_Management_Apps',
-    branch: 'main*',
-    cwd: '/Users/Project-Manager/internal-resources/workspaces/realestate-management-apps',
-    notification: 'Codex waiting for input',
-    homepageUrl: DEFAULT_HOMEPAGE,
-  },
-  {
-    id: 'comfy-ui',
-    name: 'ComfyUI',
-    branch: 'main*',
-    cwd: '/Users/Project-Manager/internal-resources/workspaces/real-estate-management',
-    homepageUrl: DEFAULT_HOMEPAGE,
-  },
-  {
-    id: 'saydo',
-    name: 'SayDo',
-    branch: 'main*',
-    cwd: '/Users/Project-Manager/internal-resources/workspaces/saydo',
-    homepageUrl: DEFAULT_HOMEPAGE,
-  },
-  {
-    id: 'company-ai-app-standards',
-    name: 'Company-AI-App-Standards',
-    branch: 'main*',
-    cwd: '/Users/Company-AI-App-Standards',
-    homepageUrl: DEFAULT_HOMEPAGE,
-  },
-];
+function buildFallbackWorkspaces(pmRoot: string, standardsRoot: string): WorkspaceRow[] {
+  const root = pmRoot.replace(/\/+$/, '');
+  const standards = standardsRoot.replace(/\/+$/, '');
+  const rows: WorkspaceRow[] = [
+    {
+      id: 'project-manager',
+      name: 'Project Management',
+      branch: 'local*',
+      cwd: root,
+      notification: 'xmux review requested',
+      homepageUrl: DEFAULT_HOMEPAGE,
+    },
+    {
+      id: 'realestate-management-apps',
+      name: 'Realestate_Management_Apps',
+      branch: 'main*',
+      cwd: root ? `${root}/internal-resources/workspaces/realestate-management-apps` : '',
+      notification: 'Codex waiting for input',
+      homepageUrl: DEFAULT_HOMEPAGE,
+    },
+    {
+      id: 'real-estate-management',
+      name: 'Real Estate Management',
+      branch: 'main*',
+      cwd: root ? `${root}/internal-resources/workspaces/real-estate-management` : '',
+      homepageUrl: DEFAULT_HOMEPAGE,
+    },
+    {
+      id: 'saydo',
+      name: 'SayDo',
+      branch: 'main*',
+      cwd: root ? `${root}/internal-resources/workspaces/saydo` : '',
+      homepageUrl: DEFAULT_HOMEPAGE,
+    },
+  ];
+
+  if (standards) {
+    rows.push({
+      id: 'company-ai-app-standards',
+      name: 'Company-AI-App-Standards',
+      branch: 'main*',
+      cwd: standards,
+      homepageUrl: DEFAULT_HOMEPAGE,
+    });
+  }
+
+  return rows;
+}
 
 function deriveWorkspaceRows(
   projects: ProjectEntry[] | undefined,
   selectedDashboardProjectIds: string[] | undefined,
   selectedProjectId: string | undefined,
+  fallback: WorkspaceRow[],
 ): WorkspaceRow[] {
   if (!projects || projects.length === 0) {
-    return fallbackWorkspaces;
+    return fallback;
   }
 
   const byId = new Map(projects.map((project) => [project.id, project]));
@@ -277,11 +292,19 @@ function WorkspaceHeader({
   notificationOpen,
   hasPendingAlerts,
   onToggleNotifications,
+  ownerRoles,
+  activeOwnerId,
+  onSelectOwner,
+  browserGate,
 }: {
   workspace: WorkspaceRow | undefined;
   notificationOpen: boolean;
   hasPendingAlerts: boolean;
   onToggleNotifications: () => void;
+  ownerRoles: EngineerRole[];
+  activeOwnerId: string;
+  onSelectOwner: (roleId: string) => void;
+  browserGate: BrowserAccessGateValue;
 }) {
   return (
     <header className="flex min-h-11 min-w-0 items-center gap-3 border-b border-stone-800 bg-editor-bar px-3">
@@ -298,6 +321,37 @@ function WorkspaceHeader({
           ) : null}
         </div>
       </div>
+      {ownerRoles.length > 0 ? (
+        <label
+          className="flex shrink-0 items-center gap-1.5 text-[10px] text-stone-500"
+          title="Engineer whose browser-access policy (ADR-017) governs this workspace's browser panes. Unassigned = you browse freely."
+        >
+          <ShieldCheck
+            size={12}
+            className={
+              browserGate.governed
+                ? browserGate.allowed
+                  ? 'text-emerald-300'
+                  : 'text-red-300'
+                : 'text-stone-500'
+            }
+          />
+          <span className="uppercase tracking-[0.12em]">Browser owner</span>
+          <select
+            value={activeOwnerId}
+            onChange={(event) => onSelectOwner(event.target.value)}
+            className="border border-stone-700 bg-editor-addr px-1.5 py-0.5 text-[11px] text-stone-200 outline-none focus:border-sky-400/50"
+            aria-label="Browser access owner"
+          >
+            <option value="">Unassigned (you)</option>
+            {ownerRoles.map((role) => (
+              <option key={role.id} value={role.id}>
+                {role.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
       <button
         type="button"
         onClick={onToggleNotifications}
@@ -374,24 +428,50 @@ function InteropConsole({
   onSelectWorkspace,
   onCloseWorkspace,
   onReopenWorkspaces,
+  projects,
 }: {
   workspaces: WorkspaceRow[];
   activeWorkspaceId: string;
   onSelectWorkspace: (workspaceId: string) => void;
   onCloseWorkspace: (workspaceId: string) => void;
   onReopenWorkspaces: () => void;
+  projects?: ProjectEntry[];
 }) {
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(true);
   const [assistantWidth, setAssistantWidth] = useState(340);
   const [dragCursor, setDragCursor] = useState<DragCursor>(null);
   const [layouts, setLayouts] = useState<Record<string, LayoutNode>>({});
+  // ADR-017: per-workspace engineer "browser owner". Empty = ungoverned (you).
+  const [browserOwnerByWorkspace, setBrowserOwnerByWorkspace] = useState<Record<string, string>>({});
   const pendingLayoutsRef = useRef<Record<string, LayoutNode>>({});
   const nativeResizeSuspendedRef = useRef(false);
 
   const activeWorkspace =
     workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? workspaces[0];
   const hasPendingAlerts = workspaces.some((workspace) => Boolean(workspace.notification));
+
+  // Engineer roles for the active workspace's project (if any) drive the
+  // browser-access owner selector + the fail-closed gate passed to the panes.
+  const ownerRoles = useMemo(() => {
+    const project = projects?.find((entry) => entry.id === activeWorkspaceId);
+    return project?.config.engineerRoles ?? [];
+  }, [projects, activeWorkspaceId]);
+  const activeOwnerId = browserOwnerByWorkspace[activeWorkspaceId] ?? '';
+  const activeOwner = ownerRoles.find((role) => role.id === activeOwnerId);
+  const browserGate: BrowserAccessGateValue = activeOwner
+    ? {
+        governed: true,
+        allowed: isBrowserLaunchAllowed(activeOwner.browserAccess),
+        ownerLabel: activeOwner.name,
+      }
+    : { governed: false, allowed: true };
+  const selectBrowserOwner = useCallback(
+    (roleId: string) => {
+      setBrowserOwnerByWorkspace((prev) => ({ ...prev, [activeWorkspaceId]: roleId }));
+    },
+    [activeWorkspaceId],
+  );
   const workspacesById = useMemo(
     () => new Map(workspaces.map((workspace) => [workspace.id, workspace])),
     [workspaces],
@@ -614,6 +694,7 @@ function InteropConsole({
   }, []);
 
   return (
+    <BrowserAccessGateProvider value={browserGate}>
     <section
       ref={rootRef}
       className="flex h-full min-h-0 w-full flex-col overflow-hidden border border-stone-700/80 bg-editor-panel shadow-2xl"
@@ -636,6 +717,10 @@ function InteropConsole({
             notificationOpen={notificationOpen}
             hasPendingAlerts={hasPendingAlerts}
             onToggleNotifications={() => setNotificationOpen((value) => !value)}
+            ownerRoles={ownerRoles}
+            activeOwnerId={activeOwnerId}
+            onSelectOwner={selectBrowserOwner}
+            browserGate={browserGate}
           />
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {activeWorkspace && activeLayout ? (
@@ -694,6 +779,7 @@ function InteropConsole({
         />
       ) : null}
     </section>
+    </BrowserAccessGateProvider>
   );
 }
 
@@ -702,14 +788,36 @@ export function XmuxView({
   selectedDashboardProjectIds,
   selectedProjectId,
 }: XmuxViewProps = {}) {
+  const [fallbackWorkspaces, setFallbackWorkspaces] = useState<WorkspaceRow[]>(() =>
+    buildFallbackWorkspaces('', ''),
+  );
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { getProjectManagerRoot } = await import('../../../lib/bridge');
+        const root = await getProjectManagerRoot();
+        const standards = root
+          ? `${root.replace(/\/+$/, '')}/internal-resources/company-ai-app-standards`
+          : '';
+        if (!cancelled) setFallbackWorkspaces(buildFallbackWorkspaces(root, standards));
+      } catch {
+        if (!cancelled) setFallbackWorkspaces(buildFallbackWorkspaces('', ''));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const dashboardScopedIds = useMemo(() => {
     if (!projects || projects.length === 0) return [];
     const validIds = new Set(projects.map((project) => project.id));
     return (selectedDashboardProjectIds ?? []).filter((id) => validIds.has(id));
   }, [projects, selectedDashboardProjectIds]);
   const workspaces = useMemo(
-    () => deriveWorkspaceRows(projects, dashboardScopedIds, selectedProjectId),
-    [projects, dashboardScopedIds, selectedProjectId],
+    () => deriveWorkspaceRows(projects, dashboardScopedIds, selectedProjectId, fallbackWorkspaces),
+    [projects, dashboardScopedIds, fallbackWorkspaces, selectedProjectId],
   );
   const [closedWorkspaceIds, setClosedWorkspaceIds] = useState<Set<string>>(() => new Set());
   const visibleWorkspaces = useMemo(
@@ -766,6 +874,7 @@ export function XmuxView({
           onSelectWorkspace={setActiveWorkspaceId}
           onCloseWorkspace={closeWorkspace}
           onReopenWorkspaces={() => setClosedWorkspaceIds(new Set())}
+          projects={projects}
         />
       )}
     </section>

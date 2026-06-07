@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const PROJECT_ROOT = '/Users/Project-Manager';
+const PROJECT_ROOT = '/repo/Project-Manager';
 
 function mockJsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

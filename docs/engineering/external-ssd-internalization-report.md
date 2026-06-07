@@ -42,10 +42,10 @@ or generated material into this repository.
 
 ## Replacement Policy
 
-- Project Manager's own root now uses `/Users/Project-Manager`.
+- Project Manager's own root now uses `<project-manager-root>`.
 - Bundled Owner Property sample roots now use
-  `/Users/Project-Manager/internal-resources/projects/owner-property-management-ai-spa`.
-- Fallback xmux workspaces now use `/Users/Project-Manager/internal-resources/workspaces/*`.
+  `<project-manager-root>/internal-resources/projects/owner-property-management-ai-spa`.
+- Fallback xmux workspaces now use `<project-manager-root>/internal-resources/workspaces/*`.
 - Historical references were rewritten to describe external SSD absolute paths
   generically rather than preserving the old literal path.
 
@@ -66,4 +66,3 @@ npm run docs:site:check
 npm run typecheck
 npm run verify:baseline
 ```
-

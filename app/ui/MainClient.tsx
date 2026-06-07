@@ -17,6 +17,7 @@ import {
   resolveDashboardProjectIds,
   resolveInitialProjectId,
 } from '../../lib/storage';
+import { resolveProjectRoot } from '../../lib/storage/dashboardLayout';
 import { getProjectSetupStatus } from '../../lib/projectSetup';
 import {
   ActiveRun,
@@ -174,14 +175,26 @@ async function collectDashboardArtifactSnapshot(
 const SEED_PROJECTS: ProjectEntry[] = [
   {
     id: 'owner-property',
-    config: ensureEngineerRoles(sampleConfig1 as ProjectManagerConfig),
+    config: ensureEngineerRoles({
+      ...(sampleConfig1 as ProjectManagerConfig),
+      project: {
+        ...(sampleConfig1 as ProjectManagerConfig).project,
+        root: './internal-resources/projects/owner-property-management-ai-spa',
+      },
+    } as ProjectManagerConfig),
     configPath:
-      '/Users/Project-Manager/internal-resources/projects/owner-property-management-ai-spa/.project-manager/config.json',
+      './internal-resources/projects/owner-property-management-ai-spa/.project-manager/config.json',
   },
   {
     id: 'project-manager',
-    config: ensureEngineerRoles(sampleConfig2 as ProjectManagerConfig),
-    configPath: '/Users/Project-Manager/.project-manager/config.json',
+    config: ensureEngineerRoles({
+      ...(sampleConfig2 as ProjectManagerConfig),
+      project: {
+        ...(sampleConfig2 as ProjectManagerConfig).project,
+        root: '.',
+      },
+    } as ProjectManagerConfig),
+    configPath: './.project-manager/config.json',
   },
 ];
 
@@ -266,6 +279,69 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const resolved = detectedProjectManagerRoot.trim().replace(/\/+$/, '');
+    if (!resolved) return;
+    setProjects((current) => {
+      let changed = false;
+      const next = current.map((project) => {
+        const rewriteAbsolute = (value: string) =>
+          value.replace(/^\/Users\/Project-Manager/, resolved);
+        const rewriteRelative = (value: string) => {
+          if (value === '.') return resolved;
+          if (value.startsWith('./')) return `${resolved}/${value.slice(2)}`;
+          return value;
+        };
+
+        if (project.id === 'project-manager') {
+          const updated: ProjectEntry = {
+            ...project,
+            configPath: `${resolved}/.project-manager/config.json`,
+            config: {
+              ...project.config,
+              project: { ...project.config.project, root: resolved },
+            },
+          };
+          changed ||= JSON.stringify(updated) !== JSON.stringify(project);
+          return updated;
+        }
+
+        if (project.id === 'owner-property') {
+          const ownerRoot = `${resolved}/internal-resources/projects/owner-property-management-ai-spa`;
+          const updated: ProjectEntry = {
+            ...project,
+            configPath: `${ownerRoot}/.project-manager/config.json`,
+            config: {
+              ...project.config,
+              project: { ...project.config.project, root: ownerRoot },
+            },
+          };
+          changed ||= JSON.stringify(updated) !== JSON.stringify(project);
+          return updated;
+        }
+
+        const nextConfigPath = rewriteRelative(rewriteAbsolute(project.configPath ?? ''));
+        const nextRoot = rewriteRelative(rewriteAbsolute(project.config.project.root ?? ''));
+        if (nextConfigPath === project.configPath && nextRoot === project.config.project.root) {
+          return project;
+        }
+        changed = true;
+        return {
+          ...project,
+          configPath: nextConfigPath,
+          config: {
+            ...project.config,
+            project: { ...project.config.project, root: nextRoot },
+          },
+        };
+      });
+
+      if (!changed) return current;
+      void getProjectsRepository().saveProjects(next);
+      return next;
+    });
+  }, [detectedProjectManagerRoot]);
 
   // Load persisted state from localStorage on mount.  The repository wraps a
   // synchronous localStorage in Promises (for future SQLite/cloud backends),
@@ -357,10 +433,22 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
   }, []);
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId) ?? projects[0];
+  const projectManagerProject =
+    projects.find((p) => p.id === 'project-manager') ??
+    SEED_PROJECTS.find((p) => p.id === 'project-manager');
+  const isAbsoluteLikePath = (value: string) =>
+    value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value);
+  const derivedRootFromConfigPath =
+    projectManagerProject?.configPath && isAbsoluteLikePath(projectManagerProject.configPath)
+      ? resolveProjectRoot(projectManagerProject.configPath)
+      : '';
   const projectManagerRoot =
     detectedProjectManagerRoot ||
-    projects.find((p) => p.id === 'project-manager')?.config.project.root ||
-    SEED_PROJECTS.find((p) => p.id === 'project-manager')?.config.project.root;
+    derivedRootFromConfigPath ||
+    (projectManagerProject?.config.project.root &&
+    isAbsoluteLikePath(projectManagerProject.config.project.root)
+      ? projectManagerProject.config.project.root
+      : '');
   const adapters = selectedProject ? listAdapters(selectedProject.config) : [];
   const selectedDashboardProjects = projects.filter((p) => selectedDashboardProjectIds.includes(p.id));
   const effectiveDashboardProjects =

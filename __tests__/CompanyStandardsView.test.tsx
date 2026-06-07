@@ -12,10 +12,10 @@ const baseProps = {
   dashboardScopeProjects: [
     {
       id: 'project-manager',
-      configPath: '/Users/Project-Manager/.project-manager/config.json',
+      configPath: '/repo/Project-Manager/.project-manager/config.json',
       config: {
         schemaVersion: 6,
-        project: { name: 'Project Manager', root: '/Users/Project-Manager' },
+        project: { name: 'Project Manager', root: '/repo/Project-Manager' },
         features: [],
       } as unknown as import('../lib/types').ProjectEntry['config'],
     },

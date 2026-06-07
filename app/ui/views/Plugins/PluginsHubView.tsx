@@ -179,6 +179,7 @@ export interface PluginsHubViewProps {
 
 export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: PluginsHubViewProps) {
   const pmRoot = resolveProjectManagerRepoRoot(pmRepoRoot);
+  const pluginGuidePath = pmRoot ? `${pmRoot.replace(/\/+$/, '')}/docs/engineering/plugin-guide.md` : '';
   const { t } = useI18n();
   const router = useRouter();
   const confirmAction = useInAppConfirm();
@@ -1950,9 +1951,9 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
                 <button
                   type="button"
                   onClick={() =>
-                    void openPath('/Users/Project-Manager/docs/engineering/plugin-guide.md').catch(
-                      () => {},
-                    )
+                    pluginGuidePath
+                      ? void openPath(pluginGuidePath).catch(() => {})
+                      : undefined
                   }
                   className="flex shrink-0 items-center gap-2 border border-emerald-500/20 bg-emerald-950/25 px-3 py-1.5 text-xs text-emerald-400"
                 >

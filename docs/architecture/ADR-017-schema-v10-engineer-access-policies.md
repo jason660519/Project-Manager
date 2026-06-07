@@ -61,47 +61,56 @@ into the agent CLI's own permission mechanism, or (future) by an OS sandbox.
    optional with "no access" defaults, so the migration is a **pure version
    bump** — no row rewriting. Idempotent.
 
-### Delivery status — FOUNDATION ONLY (enforcement deferred)
+### Delivery status — ENFORCEMENT WIRED (L2a)
 
-> ⚠️ This commit lands the **data/contract foundation only**: the schema v10
-> fields, the supporting types, the `v9 → v10` migration, the bridge helper
-> `augmentArgsWithFileAccessPolicy`, and the Rust commands
-> (`list_installed_browsers`, the policy-config writer). **No enforcement is
-> wired yet, and no detail-sheet UI ships in this commit.** Until the wiring
-> below lands, `browserAccess` and `externalFileAccess` are **persisted but
-> inert** — they impose no restriction at runtime. Nothing in PM claims, in UI
-> or behaviour, that a role is sandboxed; treating these fields as active
-> enforcement would itself be the security-illusion defect this ADR warns
-> against, so they are explicitly documented as not-yet-enforced.
+> ✅ The foundation (schema v10 fields, supporting types, `v9 → v10` migration,
+> the bridge helper `augmentArgsWithFileAccessPolicy`, and the Rust commands
+> `list_installed_browsers` / policy-config writer) landed first; the **L2a
+> enforcement and detail-sheet UI are now wired** on top of it. `browserAccess`
+> and `externalFileAccess` are no longer inert — they impose real restrictions at
+> the boundaries described below. Only the explicitly-deferred items
+> (`requireConfirmForUnlisted` runtime prompt, the L2b OS sandbox, and
+> Windows/Linux browser detection) remain inert, and each stays visibly neutered
+> in the UI so it cannot read as active enforcement.
 
-The **target L2a enforcement** (a follow-up, not this commit) is:
+The **L2a enforcement** now in place:
 
-- **Browser** — to be ENFORCED for browsers **PM launches itself** (xmux
-  embedded webview / `shell:allow-open`) by gating the launch on `browserAccess`.
-  For an agent-owned browser tool (e.g. a browser MCP) the policy is ADVISORY
-  only. *Not yet wired: `browserAccess` is read by no launch path today.*
-- **External files** — to be ENFORCED for adapters whose CLI exposes a native
-  permission mechanism PM can translate to, by calling
-  `augmentArgsWithFileAccessPolicy` from the dispatch path (mirroring
-  `augmentArgsWithMcp`). For every other adapter the policy is ADVISORY
-  (prompt-injected). *Not yet wired: `augmentArgsWithFileAccessPolicy` is
-  defined but called by no dispatch path today.*
+- **Browser** — ENFORCED for browsers **PM launches itself** (the xmux embedded
+  webview / `shell:allow-open` "open externally"). The xmux workspace carries an
+  engineer **"browser owner"** selector (`WorkspaceHeader`); when an engineer
+  owns the surface, `isBrowserLaunchAllowed(owner.browserAccess)` gates every
+  pane via the `BrowserAccessGate` React context. A denied pane renders blocked
+  and never creates a native webview **or** an iframe — so there is no
+  "fall back to unrestricted" path. With **no** owner assigned the surface is
+  ungoverned (the human user browses freely, the pre-ADR-017 default). For an
+  agent-owned browser tool (e.g. a browser MCP) the policy stays ADVISORY only.
+- **External files** — ENFORCED for adapters whose CLI exposes a native
+  permission mechanism PM can translate to (`supportsFileAccessEnforcement`), by
+  calling `augmentArgsWithFileAccessPolicy` from the dispatch path
+  (`TaskDispatchModal` agent-spawn + open-in-terminal, and `BatchDispatchModal`
+  with its batch-wide engineer-role selector) right after `augmentArgsWithMcp`.
+  For every other adapter the policy is ADVISORY (prompt-injected) and the
+  detail sheet shows a per-adapter ENFORCED/ADVISORY badge.
 
-Follow-up work (tracked, out of scope for this foundation commit):
-1. Call `augmentArgsWithFileAccessPolicy` in `TaskDispatchModal` /
-   `BatchDispatchModal` next to the existing `augmentArgsWithMcp` calls.
-2. Gate PM-mediated browser/`open_path` launches on `browserAccess`.
-3. Add the engineer detail-sheet sections + the per-adapter ENFORCED/ADVISORY
-   badge described below.
+Delivered wiring (was follow-up; now landed):
+1. ✅ `augmentArgsWithFileAccessPolicy` is called in `TaskDispatchModal` /
+   `BatchDispatchModal` next to the existing `augmentArgsWithMcp` calls,
+   fail-closed (a `FileAccessPolicyApplyError` aborts the dispatch visibly).
+2. ✅ PM-mediated browser / `open_path` / xmux-webview launches are gated on
+   `browserAccess` via the engineer browser-owner selector + `BrowserAccessGate`.
+3. ✅ The engineer detail-sheet Browser Access + External-File Access sections
+   ship, including the per-adapter ENFORCED/ADVISORY badge and the disabled
+   `requireConfirmForUnlisted` toggle with the "Available after runtime
+   authorization (L2b)" note.
 
 ---
 
 ## Fail-Closed Enforcement (non-negotiable)
 
-> Describes the **intended design** of `augmentArgsWithFileAccessPolicy`, which
-> is built fail-closed. It is **not yet exercised** because no dispatch path
-> calls it yet (see Delivery status above); this contract governs the follow-up
-> wiring.
+> Describes the design of `augmentArgsWithFileAccessPolicy`, which is built
+> fail-closed and is **now exercised** by the dispatch paths (see Delivery
+> status above): `TaskDispatchModal` (agent spawn + open-in-terminal) and
+> `BatchDispatchModal`.
 
 `augmentArgsWithMcp` ends in `catch { return baseArgs; }` — correct for MCP,
 where a failed write just degrades a *feature*. **The permission path must NOT
@@ -171,12 +180,11 @@ logged error. It never silently falls back to unrestricted args.
 **Negative**
 - The migration chain grows by another hop; per ADR-002 this is past the
   threshold to consider migration consolidation.
-- **The policies are inert until the follow-up wiring lands** — a role that
-  sets `browserAccess` / `externalFileAccess` today gets no runtime restriction.
-  This is documented (Delivery status) rather than hidden, but consumers must
-  not treat v10 presence as active enforcement.
-- Once wired, enforcement is only as strong as the spawned agent's own
-  permission system until the L2b OS sandbox lands.
+- Enforcement is only as strong as the spawned agent's own permission system
+  until the L2b OS sandbox lands — a cooperative agent CLI honours the injected
+  permission config; a hostile one is only truly contained by L2b.
+- Browser enforcement covers PM-mediated launches only (xmux owner-gated). An
+  agent-owned browser tool inside a spawned CLI remains advisory.
 
 ---
 
@@ -184,7 +192,14 @@ logged error. It never silently falls back to unrestricted args.
 
 - `lib/types/index.ts` (`BrowserAccessPolicy`, `ExternalFileAccessPolicy`, …)
 - `lib/storage/migrate.ts` (`migrate_9_to_10`)
-- `lib/bridge/index.ts` (`listInstalledBrowsers`, `augmentArgsWithFileAccessPolicy`)
+- `lib/bridge/index.ts` (`listInstalledBrowsers`, `augmentArgsWithFileAccessPolicy`,
+  `isBrowserLaunchAllowed`, `supportsFileAccessEnforcement`)
+- `components/table/TaskDispatchModal.tsx`, `components/table/BatchDispatchModal.tsx`
+  (external-file policy wired into dispatch, fail-closed)
+- `components/browser/BrowserAccessGate.tsx` + `app/ui/views/XmuxView.tsx`
+  (engineer browser-owner gating of the xmux pane)
+- `app/ui/views/Engineers/EngineerDetailSheet.tsx` (Browser + External-File sections,
+  ENFORCED/ADVISORY badge, disabled L2b toggle)
 - `src-tauri/src/lib.rs` (`list_installed_browsers`, `write_engineer_policy_config`)
-- `app/ui/views/Engineers/` (table columns + detail-sheet sections)
+- `__tests__/bridge.access-policy.test.ts`, `__tests__/migrate.v9-to-v10.test.ts`
 - ADR-002 (schema versioning), ADR-003 (prompt assembly in TS), ADR-012 (schema v8)

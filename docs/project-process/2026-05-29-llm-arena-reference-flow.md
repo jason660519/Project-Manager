@@ -1,7 +1,7 @@
 # LLM Arena Reference Flow Breakdown
 
 > Date: 2026-05-29
-> Reference: `/Users/Project-Manager/internal-resources/projects/owner-property-management-ai-spa/apps/superadmin`
+> Reference: `<project-manager-root>/internal-resources/projects/owner-property-management-ai-spa/apps/superadmin`
 > Page: `http://localhost:3001/superadmin/settings/api_key_and_model_setting#evaluations-global`
 
 ## Business Flow
@@ -86,4 +86,3 @@ Project Manager is currently local-first in this Keys surface. The adapted LLM A
 | `EvaluationsGlobalPanel.tsx` | `app/ui/views/Keys/LlmArenaSheet.tsx` + detail sheet |
 | `adapter-runs/route.ts` | `useArenaChat` timeout/error/result normalization |
 | `adapter_evaluation_runs` summary/export | local history + Markdown export |
-

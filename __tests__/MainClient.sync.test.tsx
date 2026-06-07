@@ -280,7 +280,7 @@ describe('empty project list', () => {
 describe('web registry sync', () => {
   it('removes a deleted browser-mode project from the shared registry so polling does not re-add it', async () => {
     const user = userEvent.setup();
-    const configPath = '/Users/Project-Manager/.project-manager/config.json';
+    const configPath = '/repo/Project-Manager/.project-manager/config.json';
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const method = init?.method ?? 'GET';
       if (method === 'DELETE') {
@@ -303,7 +303,7 @@ describe('web registry sync', () => {
             schemaVersion: 6,
             project: {
               name: 'Project Manager',
-              root: '/Users/Project-Manager',
+              root: '/repo/Project-Manager',
               defaultIDE: 'Cursor',
             },
             features: [],
@@ -347,12 +347,12 @@ describe('web registry sync', () => {
         category: 'Development',
       })),
     ];
-    const configPath = '/Users/Project-Manager/.project-manager/config.json';
+    const configPath = '/repo/Project-Manager/.project-manager/config.json';
     const baseConfig = {
       schemaVersion: 6,
       project: {
         name: 'Project Manager',
-        root: '/Users/Project-Manager',
+        root: '/repo/Project-Manager',
         defaultIDE: 'Cursor',
         githubUrl: 'https://github.com/jason660519/Project-Manager',
       },

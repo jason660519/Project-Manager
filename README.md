@@ -6,7 +6,7 @@ Project Manager is a cross-project development progress management and task disp
 
 ## Project Paths
 
-- **Codebase Root**: `/Users/Project-Manager`
+- **Codebase Root**: `<your-local-project-manager-path>`
 - **App Router**: `app/`
 - **Core Types**: `lib/types/`
 - **Adapters**: `lib/adapters/`
@@ -45,7 +45,7 @@ Project Manager supports two execution modes sharing the same codebase, with sli
 `start_project_manager.sh` is a one-click wrapper that automatically detects and installs dependencies (Node, Rust, npm packages) on its first run and starts the app:
 
 ```bash
-cd /Users/Project-Manager
+cd <your-local-project-manager-path>
 ./start_project_manager.sh           # Auto-detects and launches Tauri desktop app
 ./start_project_manager.sh all       # Starts PM + Hermes + OpenClaw, and opens browser tabs
 ./start_project_manager.sh web       # Only starts Next.js web server (no Tauri)
@@ -84,7 +84,7 @@ Development startup defaults to `PM_DEV_PLAINTEXT_SECRETS=1` to use `~/.project-
 ### Browser Mode (Recommended for Dev / E2E Testing)
 
 ```bash
-cd /Users/Project-Manager
+cd <your-local-project-manager-path>
 npm install
 cp .env.example .env          # Enter ANTHROPIC_API_KEY
 npm run dev

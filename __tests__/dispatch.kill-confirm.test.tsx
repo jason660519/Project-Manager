@@ -12,6 +12,9 @@ let agentExitHandler: ((event: { pid: number; spawnToken: number; code: number }
 
 vi.mock('../lib/bridge', () => ({
   augmentArgsWithMcp: vi.fn().mockResolvedValue([]),
+  augmentArgsWithFileAccessPolicy: vi
+    .fn()
+    .mockImplementation((_command, args) => Promise.resolve(args)),
   killProcess: killProcessMock,
   mcpInjectionFlag: vi.fn().mockReturnValue(null),
   onAgentExit: vi.fn().mockImplementation(async (handler) => {
@@ -94,7 +97,7 @@ describe('TaskDispatchModal [kill confirmation]', () => {
   const baseProps = {
     feature: MOCK_FEATURE,
     adapters: AGENT_ADAPTERS,
-    projectRoot: '/Users/Project-Manager',
+    projectRoot: '/repo/Project-Manager',
     defaultIDE: 'Cursor' as const,
     onClose: vi.fn(),
     onExecuted: vi.fn(),

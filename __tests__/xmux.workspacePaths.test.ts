@@ -23,12 +23,12 @@ function project(root: string, configPath: string): ProjectEntry {
 describe('xmux workspace path derivation', () => {
   it('uses a normal local project root for folder tabs', () => {
     const result = deriveProjectWorkspacePath(
-      project('/Users/Project-Manager', '/unused/.project-manager/config.json'),
+      project('/repo/project-manager', '/unused/.project-manager/config.json'),
     );
 
     expect(result).toMatchObject({
       ok: true,
-      cwd: '/Users/Project-Manager',
+      cwd: '/repo/project-manager',
       source: 'project.root',
     });
   });
@@ -36,26 +36,26 @@ describe('xmux workspace path derivation', () => {
   it('normalizes a root accidentally stored as the canonical config path', () => {
     const result = deriveProjectWorkspacePath(
       project(
-        '/Users/Project-Manager/.project-manager/config.json',
+        '/repo/project-manager/.project-manager/config.json',
         '/unused/.project-manager/config.json',
       ),
     );
 
     expect(result).toMatchObject({
       ok: true,
-      cwd: '/Users/Project-Manager',
+      cwd: '/repo/project-manager',
       source: 'project.root',
     });
   });
 
   it('falls back to configPath when project.root is empty or relative', () => {
     const result = deriveProjectWorkspacePath(
-      project('Project-Manager', '/Users/Project-Manager/.project-manager/config.json'),
+      project('Project-Manager', '/repo/project-manager/.project-manager/config.json'),
     );
 
     expect(result).toMatchObject({
       ok: true,
-      cwd: '/Users/Project-Manager',
+      cwd: '/repo/project-manager',
       source: 'configPath',
     });
     expect(result.ok && result.warning).toContain('project.root');
@@ -63,12 +63,12 @@ describe('xmux workspace path derivation', () => {
 
   it('keeps spaces and non-ASCII path segments intact', () => {
     const result = deriveProjectWorkspacePath(
-      project('/Users/Project-Manager/internal-resources/test-fixtures/client-alpha', '/unused/.project-manager/config.json'),
+      project('/repo/project-manager/internal-resources/test-fixtures/client-alpha', '/unused/.project-manager/config.json'),
     );
 
     expect(result).toMatchObject({
       ok: true,
-      cwd: '/Users/Project-Manager/internal-resources/test-fixtures/client-alpha',
+      cwd: '/repo/project-manager/internal-resources/test-fixtures/client-alpha',
     });
   });
 

@@ -90,7 +90,7 @@ describe('TaskDispatchModal [render]', () => {
   const baseProps = {
     feature: MOCK_FEATURE,
     adapters: MOCK_ADAPTERS,
-    projectRoot: '/Users/Project-Manager',
+    projectRoot: '/repo/Project-Manager',
     defaultIDE: 'Cursor' as const,
     onClose: vi.fn(),
     onExecuted: vi.fn(),

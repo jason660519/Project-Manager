@@ -54,5 +54,5 @@ The reference implementation evaluates image-to-image models as a row-based benc
 
 ## Notes
 
-- The reference page itself redirects to login in the browser, so the implementation was decomposed from the local source checkout behind that route: `/Users/Project-Manager/internal-resources/projects/owner-property-management-ai-spa`.
+- The reference page itself redirects to login in the browser, so the implementation was decomposed from the local source checkout behind that route: `<project-manager-root>/internal-resources/projects/owner-property-management-ai-spa`.
 - Project Manager now contains client-side provider adapters for Gemini image output, OpenAI image edits, and Qwen multimodal generation, matching the reference request/response normalization.

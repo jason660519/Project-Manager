@@ -172,7 +172,7 @@ npm run test:restart-pm
 npm run verify:restart-pm
 ```
 
-These commands run the selected test gate first. Only after a zero exit code do they call `/Users/Project-Manager/start_project_manager.sh restart`, which:
+These commands run the selected test gate first. Only after a zero exit code do they call `./start_project_manager.sh restart`, which:
 
 - closes old Project Manager browser tabs on port `43187` in Chrome, Edge, Brave, and Safari on macOS
 - stops stale Project Manager Tauri, launcher, and Next.js dev-server processes
@@ -377,7 +377,7 @@ npm run test:restart-pm
 npm run verify:restart-pm
 ```
 
-這兩個命令會先執行指定測試關卡。只有 exit code 為 0 時，才會呼叫 `/Users/Project-Manager/start_project_manager.sh restart`，其流程會：
+這兩個命令會先執行指定測試關卡。只有 exit code 為 0 時，才會呼叫 `./start_project_manager.sh restart`，其流程會：
 
 - 關閉 macOS Chrome、Edge、Brave、Safari 中 port `43187` 的舊 Project Manager browser tabs
 - 停止殘留的 Project Manager Tauri、launcher、Next.js dev-server processes

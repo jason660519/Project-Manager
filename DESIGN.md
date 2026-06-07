@@ -8,7 +8,7 @@ Last updated: 2026-05-14
 
 Before changing Project Manager UI, read these files in order:
 
-1. `/Users/Project-Manager/internal-resources/company-ai-app-standards/docs/ui-design-system.md` - company baseline design system.
+1. `internal-resources/company-ai-app-standards/docs/ui-design-system.md` - company baseline design system.
 2. `DESIGN.md` - this repo-specific implementation guide.
 3. `docs/design/shared-ai-desktop-style.md` - shared visual language for Project Manager/SayDo family apps.
 4. `README.md` - app purpose and current operating modes.

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-LAUNCHER="/Users/Project-Manager/start_project_manager.sh"
+LAUNCHER="$ROOT/start_project_manager.sh"
 LOG_DIR="$ROOT/.project-manager/dev-logs"
 LOG_FILE="$LOG_DIR/restart-after-tests.log"
 

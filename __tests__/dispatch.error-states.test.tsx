@@ -98,7 +98,7 @@ describe('TaskDispatchModal [error states]', () => {
   const baseProps = {
     feature: MOCK_FEATURE,
     adapters: AGENT_ADAPTERS,
-    projectRoot: '/Users/Project-Manager',
+    projectRoot: '/repo/Project-Manager',
     defaultIDE: 'Cursor' as const,
     onClose: vi.fn(),
     onExecuted: vi.fn(),

@@ -100,7 +100,7 @@ describe('AIAssistantsConsoleClient', () => {
     render(
       <AIAssistantsConsoleClient
         activeSheet="overview"
-        projectRoot="/Users/Project-Manager"
+        projectRoot="/repo/Project-Manager"
       />,
     );
 

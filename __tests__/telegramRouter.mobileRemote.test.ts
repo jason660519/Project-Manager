@@ -32,13 +32,13 @@ const catalog: ChannelCatalog = {
 function projectFixture(): ProjectEntry {
   return {
     id: 'project-manager',
-    configPath: '/Users/Project-Manager/.project-manager/config.json',
+    configPath: '/repo/Project-Manager/.project-manager/config.json',
     config: {
       schemaVersion: 8,
       id: 'project-manager',
       project: {
         name: 'Project Manager',
-        root: '/Users/Project-Manager',
+        root: '/repo/Project-Manager',
         defaultIDE: 'Cursor',
       },
       features: [

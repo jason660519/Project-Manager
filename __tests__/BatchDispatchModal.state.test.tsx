@@ -11,6 +11,10 @@ let stdoutHandler: ((event: { pid: number; spawnToken: number; line: string }) =
 
 vi.mock('../lib/bridge', () => ({
   augmentArgsWithMcp: augmentArgsWithMcpMock,
+  augmentArgsWithFileAccessPolicy: vi
+    .fn()
+    .mockImplementation((_command, args) => Promise.resolve(args)),
+  supportsFileAccessEnforcement: vi.fn().mockReturnValue(false),
   killProcess: vi.fn().mockResolvedValue(undefined),
   mcpInjectionFlag: vi.fn().mockReturnValue(null),
   onAgentExit: vi.fn().mockImplementation(async (handler) => {

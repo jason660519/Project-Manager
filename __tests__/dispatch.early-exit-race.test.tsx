@@ -15,6 +15,9 @@ const spawnAgentMock = vi.fn();
 
 vi.mock('../lib/bridge', () => ({
   augmentArgsWithMcp: vi.fn().mockImplementation((_command, args) => Promise.resolve(args)),
+  augmentArgsWithFileAccessPolicy: vi
+    .fn()
+    .mockImplementation((_command, args) => Promise.resolve(args)),
   killProcess: vi.fn().mockResolvedValue(undefined),
   mcpInjectionFlag: vi.fn().mockReturnValue(null),
   onAgentExit: vi.fn().mockImplementation(async (handler) => {

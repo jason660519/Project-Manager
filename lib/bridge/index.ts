@@ -10,6 +10,7 @@ import { defaultDiscoveryPlan } from '../integrations/discovery/presets';
 import type { DiscoveryPlan } from '../integrations/discovery/types';
 import { migrateConfig } from '../storage';
 import type {
+  BrowserAccessPolicy,
   ExternalFileAccessPolicy,
   InstalledBrowser,
   ProjectManagerConfig,
@@ -992,6 +993,34 @@ export async function augmentArgsWithMcp(
 export async function listInstalledBrowsers(): Promise<InstalledBrowser[]> {
   if (!isTauri()) return [];
   return invoke<InstalledBrowser[]>('list_installed_browsers');
+}
+
+/**
+ * Fail-closed gate for a PM-mediated browser launch governed by an engineer's
+ * `browserAccess` policy (ADR-017, L2a). Returns whether the launch is permitted:
+ *
+ *   - No policy (`undefined`)            → BLOCKED. A governed launch with no
+ *                                          configured policy must not fall open.
+ *   - `enabled === false`                → BLOCKED (master switch off).
+ *   - `allowedBrowserIds` empty          → BLOCKED (nothing is allow-listed).
+ *   - `browserId` given but not allowed  → BLOCKED (specific browser not listed).
+ *   - otherwise                          → allowed.
+ *
+ * Callers that are NOT governed by any engineer (e.g. the human user's own xmux
+ * browser pane with no engineer owner assigned) must simply not consult this
+ * gate — "ungoverned" is distinct from "policy present but denying". See the
+ * `BrowserAccessGate` context wired into the xmux browser pane.
+ */
+export function isBrowserLaunchAllowed(
+  policy: BrowserAccessPolicy | undefined,
+  browserId?: string,
+): boolean {
+  if (!policy || !policy.enabled) return false;
+  if (policy.allowedBrowserIds.length === 0) return false;
+  if (browserId !== undefined && !policy.allowedBrowserIds.includes(browserId)) {
+    return false;
+  }
+  return true;
 }
 
 /**
