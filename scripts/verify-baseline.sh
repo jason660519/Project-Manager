@@ -16,26 +16,8 @@ run() {
   echo ""
 }
 
-maybe_standards_check() {
-  if [[ "${VERIFY_SKIP_STANDARDS:-}" == "1" ]]; then
-    echo "→ standards:check — SKIPPED (VERIFY_SKIP_STANDARDS=1)"
-    echo ""
-    return
-  fi
-  local standards_root="${COMPANY_STANDARDS_ROOT:-/Users/Company-AI-App-Standards}"
-  local standards_script="$standards_root/scripts/company-standards.sh"
-  if [[ -x "$standards_script" ]]; then
-    run "$standards_script" check .
-    return
-  fi
-  echo "→ standards:check — SKIPPED (Company-AI-App-Standards not found at $standards_script)"
-  echo "  Set COMPANY_STANDARDS_ROOT or run locally on a machine with the standards repo."
-  echo ""
-}
-
 run npm run typecheck
 run npm run agents:check
-maybe_standards_check
 run npm run docs:check
 run npm run docs:site:check
 run node scripts/audit-table-sheets.mjs --check

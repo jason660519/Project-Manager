@@ -79,13 +79,11 @@ Full pipeline + data flow: [`docs/architecture/architecture-overview.md`](./docs
 - **Bilingual docs** → top-level `docs/*.md` are English block first, then Chinese;
   run `npm run docs:check` after edits.
 - **File naming** → follow [`docs/file-naming-standards.md`](./docs/file-naming-standards.md).
-- **External docs library** (`Company-AI-App-Standards`) → optional; enforced via
-  `standards:check`. Set `COMPANY_STANDARDS_ROOT` env var or skip with `VERIFY_SKIP_STANDARDS=1`.
 
 ## 6. Verification Gate (mandatory before "done")
 
 ```bash
-npm run verify:baseline   # typecheck + standards + docs + hygiene + test + cargo + build
+npm run verify:baseline   # typecheck + docs + hygiene + test + cargo + build
 ```
 
 For UI / routing / `'use client'` / i18n / localStorage changes also do manual browser

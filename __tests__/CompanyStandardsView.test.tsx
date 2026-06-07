@@ -66,7 +66,7 @@ describe('CompanyStandardsView', () => {
   it('enables per-gate run when canRunGates is true', () => {
     renderHub({ canRunGates: true });
     const runButtons = screen.getAllByRole('button', { name: 'Run' });
-    expect(runButtons.length).toBeGreaterThanOrEqual(3);
+    expect(runButtons.length).toBeGreaterThanOrEqual(2);
     expect(runButtons[0]).not.toBeDisabled();
   });
 

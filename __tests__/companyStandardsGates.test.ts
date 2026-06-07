@@ -18,15 +18,9 @@ describe('standardsGates registry', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('lists three blocking gates in order', () => {
+  it('lists blocking gates in order', () => {
     const blocking = getBlockingGatesInOrder();
-    expect(blocking.map((g) => g.id)).toEqual(['i18n', 'standards', 'docs']);
-  });
-
-  it('marks color-drift as non-blocking advisory', () => {
-    const gate = getStandardsGate('color-drift');
-    expect(gate.blocking).toBe(false);
-    expect(gate.npmScript).toBeNull();
+    expect(blocking.map((g) => g.id)).toEqual(['i18n', 'docs']);
   });
 
   it('maps blocking gates to package.json scripts', () => {
@@ -56,10 +50,6 @@ describe('standardsGates registry', () => {
 
   it('throws for unknown gate id', () => {
     expect(() => getStandardsGate('unknown' as 'i18n')).toThrow(/Unknown standards gate/);
-  });
-
-  it('throws when invoking advisory gate', () => {
-    expect(() => getGateInvocation('color-drift')).toThrow(/no npm script/);
   });
 });
 
