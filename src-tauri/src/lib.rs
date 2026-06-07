@@ -1710,7 +1710,11 @@ async fn call_stored_chat_provider(
     let api_key = resolve_stored_chat_provider_key(&provider, &spec)?;
     let model = model.unwrap_or_else(|| spec.default_model.to_string());
     let sys = system_prompt.unwrap_or_else(|| "You are the Project Manager AI assistant.".to_string());
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(120))
+        .build()
+        .map_err(|e| format!("Request client init failed: {e}"))?;
     let images = image_attachment_data(&attachments);
 
     match spec.api_kind {

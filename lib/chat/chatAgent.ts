@@ -788,7 +788,7 @@ async function callChatApi(
   chatPayload.systemPrompt = systemPrompt;
 
   if (isTauriRuntime()) {
-    const nativeResult = await callLlmRouted({
+    const nativeResult = await awaitAbortable(callLlmRouted({
       modelAlias: 'pm-code',
       taskClass: 'chat',
       provider: providerConfig.provider,
@@ -797,7 +797,7 @@ async function callChatApi(
       messages,
       systemPrompt,
       attachments: multimodalAttachments,
-    });
+    }), abortSignal);
     if (onStream && nativeResult.content) onStream(nativeResult.content);
     return {
       content: nativeResult.content,
@@ -829,8 +829,10 @@ async function callChatApi(
     const decoder = new TextDecoder();
     let result = '';
     let buffer = '';
+    let streamDone = false;
 
-    while (true) {
+    try {
+      while (!streamDone) {
       if (abortSignal?.aborted) throw new DOMException('Chat request aborted', 'AbortError');
       const { done, value } = await reader.read();
       if (done) break;
@@ -848,7 +850,10 @@ async function callChatApi(
 
         try {
           const json = JSON.parse(trimmed.slice(dataPrefix.length));
-          if (json.done) break;
+          if (json.done) {
+            streamDone = true;
+            break;
+          }
           if (json.text) {
             result += json.text;
             onStream(json.text);
@@ -861,6 +866,11 @@ async function callChatApi(
             throw parseErr;
           }
         }
+      }
+      }
+    } finally {
+      if (streamDone) {
+        await reader.cancel().catch(() => undefined);
       }
     }
 
@@ -890,6 +900,16 @@ async function callChatApi(
 
 function createChatAbortError(): DOMException {
   return new DOMException('Chat request aborted', 'AbortError');
+}
+
+function awaitAbortable<T>(promise: Promise<T>, abortSignal?: AbortSignal): Promise<T> {
+  if (!abortSignal) return promise;
+  if (abortSignal.aborted) return Promise.reject(createChatAbortError());
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(createChatAbortError());
+    abortSignal.addEventListener('abort', onAbort, { once: true });
+    promise.then(resolve, reject).finally(() => abortSignal.removeEventListener('abort', onAbort));
+  });
 }
 
 // Correlate agent events by spawnToken (unique, monotonic), not the reusable
@@ -1076,7 +1096,7 @@ async function callAgentApi(
   if (providerConfig.model) payload.model = providerConfig.model;
 
   if (isTauriRuntime()) {
-    const nativeResult = await callLlmRouted({
+    const nativeResult = await awaitAbortable(callLlmRouted({
       modelAlias: 'pm-reasoning',
       taskClass: 'agent-chat',
       provider: providerConfig.provider,
@@ -1085,7 +1105,7 @@ async function callAgentApi(
       messages,
       systemPrompt,
       attachments: multimodalAttachments,
-    });
+    }), abortSignal);
     callbacks.onText?.(nativeResult.content);
     return {
       content: nativeResult.content,
@@ -1117,8 +1137,10 @@ async function callAgentApi(
   let provider: string | undefined;
   let model: string | undefined;
   const toolCalls: AgentStreamResult['toolCalls'] = [];
+  let streamDone = false;
 
-  while (true) {
+  try {
+    while (!streamDone) {
     if (abortSignal?.aborted) throw new DOMException('Chat request aborted', 'AbortError');
     const { done, value } = await reader.read();
     if (done) break;
@@ -1168,9 +1190,15 @@ async function callAgentApi(
             contentAccum = `❌ ${json.error}`;
             break;
           case 'done':
+            streamDone = true;
             break;
         }
       } catch { /* skip malformed */ }
+    }
+  }
+  } finally {
+    if (streamDone) {
+      await reader.cancel().catch(() => undefined);
     }
   }
 
