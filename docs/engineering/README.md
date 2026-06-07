@@ -1,7 +1,7 @@
 # Project Manager Engineering Documentation
 
 > Status: Active  
-> Last updated: 2026-05-23  
+> Last updated: 2026-06-07  
 > Audience: AI engineers and maintainers
 
 ---
@@ -26,6 +26,7 @@ This folder contains operational engineering documentation for Project Manager. 
 10. [openclaw-plugin.md](./openclaw-plugin.md)
 11. [verification-runbook.md](./verification-runbook.md)
 12. [ai-sdks-store.md](./ai-sdks-store.md)
+13. [multi-ai-config.md](./multi-ai-config.md)
 
 ## 3. Ownership Map
 
@@ -42,6 +43,7 @@ This folder contains operational engineering documentation for Project Manager. 
 | Project-scoped OpenClaw install, gateway, update, rollback, and plugin toggle | `scripts/install-openclaw.sh`, `scripts/openclaw.sh`, `scripts/update-openclaw.sh`, `scripts/rollback-openclaw.sh`, `.project-manager/vendor/openclaw/`, `lib/storage/plugins.ts` | [openclaw-plugin.md](./openclaw-plugin.md) |
 | Pre-handoff checks and release verification | `package.json`, `scripts/*`, `src-tauri/Cargo.toml` | [verification-runbook.md](./verification-runbook.md) |
 | AI SDK parameter config store, normalization, validation | `lib/aiSdks/*`, `app/ui/views/AiSdksView.tsx`, `app/ui/views/AiSdks/*`, `.project-manager/ai-sdks.json` | [ai-sdks-store.md](./ai-sdks-store.md) |
+| Multi-AI agent instruction files (SSOT + thin shells), Tier-1/2/3 model, drift check | `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.cursor/rules/*.mdc`, `.claude/local.md`, `scripts/check-agents-drift.mjs` | [multi-ai-config.md](./multi-ai-config.md) |
 
 ## 4. Documentation Rule
 
@@ -69,6 +71,7 @@ Update the relevant document whenever an implementation change changes a command
 10. [openclaw-plugin.md](./openclaw-plugin.md)
 11. [verification-runbook.md](./verification-runbook.md)
 12. [ai-sdks-store.md](./ai-sdks-store.md)
+13. [multi-ai-config.md](./multi-ai-config.md)
 
 ## 3. 責任對照
 
@@ -85,6 +88,7 @@ Update the relevant document whenever an implementation change changes a command
 | Project-scoped OpenClaw 安裝、gateway、更新、回滾與 plugin toggle | `scripts/install-openclaw.sh`, `scripts/openclaw.sh`, `scripts/update-openclaw.sh`, `scripts/rollback-openclaw.sh`, `.project-manager/vendor/openclaw/`, `lib/storage/plugins.ts` | [openclaw-plugin.md](./openclaw-plugin.md) |
 | 交付前檢查與 release verification | `package.json`, `scripts/*`, `src-tauri/Cargo.toml` | [verification-runbook.md](./verification-runbook.md) |
 | AI SDK 參數設定儲存、正規化與驗證 | `lib/aiSdks/*`, `app/ui/views/AiSdksView.tsx`, `app/ui/views/AiSdks/*`, `.project-manager/ai-sdks.json` | [ai-sdks-store.md](./ai-sdks-store.md) |
+| 多家 AI agent 指令檔（SSOT + 薄殼）、Tier-1/2/3 模型、drift check | `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.cursor/rules/*.mdc`, `.claude/local.md`, `scripts/check-agents-drift.mjs` | [multi-ai-config.md](./multi-ai-config.md) |
 
 ## 4. 文件維護規則
 

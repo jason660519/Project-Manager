@@ -1,56 +1,124 @@
-# AGENTS.md
+# AGENTS.md — Single Source of Truth
 
-This project follows Company AI App Standards v0.2.
+> This file is the **canonical instruction set for every AI agent** working in this
+> repo — Claude Code, Codex / OpenAI, Gemini, Cursor, Cline, Aider, anyone else.
+>
+> Brand-specific shells reference this file:
+> - **Claude Code** → [`CLAUDE.md`](./CLAUDE.md) (+ `~/.claude/CLAUDE.md` global, `./.claude/local.md` personal)
+> - **Gemini** → [`GEMINI.md`](./GEMINI.md)
+> - **Cursor** → [`.cursor/rules/_agents-pointer.mdc`](./.cursor/rules/_agents-pointer.mdc)
+>
+> If a brand shell contradicts this file, **this file wins**. To intentionally
+> deviate, open an ADR under [`docs/architecture/`](./docs/architecture/).
+>
+> Full Tier-1/2/3 model and drift policy: [`docs/engineering/multi-ai-config.md`](./docs/engineering/multi-ai-config.md).
 
-## Required Reading
+---
 
-Before implementation:
+## 1. Project
 
-1. `/Users/Company-AI-App-Standards/docs/ai-engineer-workflow.md`
-2. `/Users/Company-AI-App-Standards/docs/ui-design-system.md`
-3. `/Users/Company-AI-App-Standards/docs/patterns/table-governance.md`
-4. `/Users/Company-AI-App-Standards/docs/file-naming-standards.md`
-5. `./docs/file-naming-standards.md`
-6. `./docs/engineering/table-standards.md`
-7. `./DESIGN.md`
-8. `./docs/design/shared-ai-desktop-style.md`
-9. `./README.md`
-10. `./CLAUDE.md`
-11. `./docs/architecture/architecture-overview.md` + `./docs/architecture/README.md`
+Cross-project engineering dashboard: ingests specs (Folder / GitHub) → AI-normalizes →
+canonical JSON → dashboard → dispatches to local IDEs / agents via a Tauri desktop shell.
 
-## Project Overrides
+Full pipeline + data flow: [`docs/architecture/architecture-overview.md`](./docs/architecture/architecture-overview.md).
 
-PM-specific rules live in: `./DESIGN.md`, `./CLAUDE.md`, `./docs/file-naming-standards.md`, `./docs/design/shared-ai-desktop-style.md`, `./docs/architecture/`, and the `table-and-sheet-layout` + `verify-before-complete` skills (under both `./.claude/skills/` and `./.agents/skills/`).
+## 2. Stack
 
-## Internal Resource Paths
+- **Shell**: Tauri v2 (Rust) + Next.js 16 `output: 'export'`, React 19, TypeScript, Tailwind, TanStack Table v8
+- **Bridge**: Rust commands in `src-tauri/src/lib.rs`; typed TS wrapper in `lib/bridge/index.ts`
+- **AI**: Anthropic API via Rust `call_anthropic` (reqwest); release builds store keys in OS Keychain
+- **Canonical state**: `.project-manager/config.json` (`schemaVersion: 6`)
+- **Dev**: Next on port **43187**; debug API key convention `~/.project-manager/dev-secrets.json` (never commit)
 
-No removable-volume absolute paths. Externalized resources are internalized under `./internal-resources/`; read `./docs/engineering/external-ssd-internalization-report.md` before adding, moving, or reintroducing project/sample resource paths.
+## 3. Directory Map
 
-## Completion gate (mandatory)
+| Path | Purpose |
+|---|---|
+| `app/ui/` | Shell + view components (`MainClient`, `Sidebar`, `views/*`) |
+| `app/api/` | Dev-only API routes — NOT in static export |
+| `lib/bridge/index.ts` | Sole `invoke()` entry point — wrap every Tauri command here |
+| `lib/adapters/` | IDE / Agent runtime adapters + registry |
+| `lib/types/` | Canonical domain types |
+| `src-tauri/src/lib.rs` | All Tauri commands (FS, process, AI, keyring) |
+| `schema/project-manager.schema.json` | Canonical project schema |
+| `docs/architecture/ADR-*.md` | Closed architecture decisions |
+| `docs/engineering/` | Bridge, storage, ingestion, secrets ops docs — read `README.md` first |
+| `.project-manager/features/<ID>/` | Per-feature docs (README, feature-spec, tdd-spec, debug-retro, test-scenarios, dev-log, notes) |
+| `internal-resources/` | PM-owned snapshots / placeholders (no removable-volume paths) |
 
-Before claiming **done**, marking a feature **100%**, or offering **commit/PR**: run `npm run verify:baseline` and follow `./.claude/skills/verify-before-complete/SKILL.md`. UI changes also require manual browser smoke in Chrome/Safari/Tauri (not the Cursor embedded browser alone) — `./docs/engineering/verification-runbook.md` §6. **Ship blocker:** Next.js dev **Issues** count must be **0** on changed routes; Tauri events use `safeUnlisten` / `subscribeAgentProcessEvents` per `docs/engineering/runtime-bridge.md` §4.
+## 4. Iron Rules (violations = bug)
 
-If Project Manager must deviate from company standards, create an ADR under `docs/architecture/`.
+1. **Zero silent failures.** Bare `catch (e) {}` or `.unwrap()` on user-facing paths is a defect.
+2. **Bridge discipline.** Every Tauri command needs a typed wrapper in `lib/bridge/index.ts`
+   AND a capability entry in `src-tauri/capabilities/default.json`. Never `invoke()` from a component.
+3. **ADR adherence.** Surface contradictions with closed ADRs loudly:
+   - **ADR-002** — bump `schemaVersion` on any breaking config change
+   - **ADR-003** — prompt assembly lives in TypeScript; Rust just executes
+   - **ADR-004** — Anthropic key never reaches the renderer; proxy through `call_anthropic`
+4. **Verification baseline.** Run **`npm run verify:baseline`** (single gate) before claiming
+   done or shipping. Partial runs do not count.
+5. **No false completion.** Never mark a feature 100%, say "verification passed", or offer
+   commit / PR without green `verify:baseline` and (for UI) manual browser smoke in
+   Chrome / Safari / Tauri (not Cursor embedded browser alone).
+6. **Zero dev overlay errors.** After UI work, the Next.js **Issues** badge (bottom-left)
+   must be **0** on changed routes — no uncaught runtime errors (incl. Tauri `listen` /
+   `unregisterListener` races). Use `safeUnlisten` + async `cancelled` guards per
+   [`docs/engineering/runtime-bridge.md`](./docs/engineering/runtime-bridge.md) §4.
+7. **Static export discipline.** `app/api/` only runs under `next dev`; anything shipped
+   belongs in Rust. Node `fs` is forbidden in client-reachable graphs.
+8. **No removable-volume paths.** Externalized resources live under `internal-resources/`;
+   update [`docs/engineering/external-ssd-internalization-report.md`](./docs/engineering/external-ssd-internalization-report.md)
+   before adding / moving them.
 
-## Documentation Standards
+## 5. Key Conventions (soft rules)
+
+- **UI change** → read [`DESIGN.md`](./DESIGN.md) + [`docs/design/shared-ai-desktop-style.md`](./docs/design/shared-ai-desktop-style.md) first.
+- **Table / sheet / tab view** → any `app/ui/views/` page with a table or tabs MUST use
+  `WorkstationFrame` + `BottomSheetTabs`, tab strip at panel **bottom** (Excel-style).
+  Details: [`docs/engineering/table-standards.md`](./docs/engineering/table-standards.md).
+- **Bilingual docs** → top-level `docs/*.md` are English block first, then Chinese;
+  run `npm run docs:check` after edits.
+- **File naming** → follow [`docs/file-naming-standards.md`](./docs/file-naming-standards.md).
+- **External docs library** (`Company-AI-App-Standards`) → optional; enforced via
+  `standards:check`. Set `COMPANY_STANDARDS_ROOT` env var or skip with `VERIFY_SKIP_STANDARDS=1`.
+
+## 6. Verification Gate (mandatory before "done")
 
 ```bash
-npm run standards:check
-npm run docs:check
+npm run verify:baseline   # typecheck + standards + docs + hygiene + test + cargo + build
 ```
 
-## OpenAI/Codex Workflow Commands
+For UI / routing / `'use client'` / i18n / localStorage changes also do manual browser
+smoke per [`docs/engineering/verification-runbook.md`](./docs/engineering/verification-runbook.md) §6.
 
-Claude `.claude/commands/*.md` are not auto-exposed as Codex slash commands. Durable Codex workflows live under `docs/project-process/commands/`. When the user invokes one (or its aliases), follow that command doc:
+Read the [`verify-before-complete`](./.agents/skills/verify-before-complete/SKILL.md) skill before
+claiming done, marking a feature 100%, or offering commit / PR.
 
-| Command / triggers | Doc (`docs/project-process/commands/`) | Action |
-|---|---|---|
-| `/daily-report`, `每日工作日誌` | `daily-report.md` | Write date-prefixed progress report under `docs/project-process/` |
-| `/debug-retro`, `沉澱本次debug經驗` | `debug-retro.md` | Update feature `debug-retro.md`, `test-scenarios.md`, dashboard metadata |
-| `/feature-kickoff`, `新增今天工作ID`, `先登記Development sheet` | `feature-kickoff.md` | `npm run feature:kickoff -- …` → Development sheet entry + `.project-manager/features/<ID>/` artifacts **before** code |
-| `/feature-resume Fxx`, `接續 Fxx` | `feature-resume.md` | `npm run feature:resume -- --id Fxx …` → append dev-log continuation + update metadata **before** code |
-| verify completion / `可以 commit 了嗎` | `verify-before-complete.md` | `npm run verify:baseline` + UI browser smoke before claiming done / commit / PR |
+## 7. Common Commands
 
-## Context7
+```bash
+npm run dev               # Next.js only on :43187
+npm run tauri:dev         # Full desktop app
+npm run typecheck         # next typegen + tsc --noEmit
+npm run verify:baseline   # Single completion gate (see §6)
+npm run build             # Static export to out/
+npm run docs:check        # Bilingual doc governance
+npm run agents:check      # AI-config drift check (see multi-ai-config.md)
+cargo check --manifest-path src-tauri/Cargo.toml
+```
 
-Use Context7 MCP for current docs on any library / framework / SDK / API / CLI tool / cloud service. Start with `resolve-library-id` (unless given an exact `/org/project` ID), then `query-docs` with the full question. Do not use it for refactoring, writing scripts from scratch, business-logic debugging, code review, or general programming concepts.
+## 8. Pointers (read before changing)
+
+- ADRs: [`docs/architecture/`](./docs/architecture/) — read before changing closed decisions.
+- Engineering docs: [`docs/engineering/README.md`](./docs/engineering/README.md) — read before changing
+  bridge, storage / schema, ingestion, or secrets.
+- File naming: [`docs/file-naming-standards.md`](./docs/file-naming-standards.md).
+- UI design: [`DESIGN.md`](./DESIGN.md) + [`docs/design/shared-ai-desktop-style.md`](./docs/design/shared-ai-desktop-style.md).
+- Architecture overview: [`docs/architecture/architecture-overview.md`](./docs/architecture/architecture-overview.md).
+
+## 9. Tooling — Library / Framework Docs
+
+Use **Context7 MCP** (`resolve-library-id` → `query-docs`) for current docs on any
+library / framework / SDK / API / CLI tool / cloud service, rather than pre-trained
+knowledge. Do not use it for refactoring, writing scripts from scratch, business-logic
+debugging, code review, or general programming concepts.

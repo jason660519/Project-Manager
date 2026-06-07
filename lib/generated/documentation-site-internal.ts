@@ -4,15 +4,15 @@ import type { DocumentationSiteManifest } from '../documentation/types';
 
 export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
   "sync": {
-    "generatedAt": "2026-06-05T06:59:55.809Z",
+    "generatedAt": "2026-06-07T13:15:04.538Z",
     "generatorVersion": "2.0.0",
     "mode": "heuristic",
     "sourceRoot": "docs",
     "manifestAudience": "internal",
-    "totalDocuments": 102,
+    "totalDocuments": 103,
     "totalFolders": 14,
     "publicDocuments": 36,
-    "internalDocuments": 65,
+    "internalDocuments": 66,
     "restrictedDocuments": 1,
     "publishableDocuments": 12,
     "reviewRequiredDocuments": 63,
@@ -26,7 +26,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "sourcePath": "docs",
       "label": "All Docs",
       "title": "Documentation",
-      "summary": "102 documentation files indexed from docs.",
+      "summary": "103 documentation files indexed from docs.",
       "parentSlug": null,
       "folderSlugs": [
         "architecture",
@@ -44,14 +44,14 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       ],
       "classificationCounts": {
         "public": 36,
-        "internal": 65,
+        "internal": 66,
         "restricted": 1
       },
       "publishableCount": 12,
       "reviewRequiredCount": 63,
       "visibilityCounts": {
         "public": 36,
-        "internal": 65,
+        "internal": 66,
         "restricted": 1
       },
       "warnings": [
@@ -229,6 +229,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "engineering/ingestion-pipeline",
         "engineering/legacy-surface-guard",
         "engineering/llm-vlm-arena-evaluation-spec-v1",
+        "engineering/multi-ai-config",
         "engineering/ollama-docker-usage",
         "engineering/openclaw-plugin",
         "engineering/plugin-guide",
@@ -247,14 +248,14 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       ],
       "classificationCounts": {
         "public": 0,
-        "internal": 23,
+        "internal": 24,
         "restricted": 0
       },
       "publishableCount": 0,
       "reviewRequiredCount": 14,
       "visibilityCounts": {
         "public": 0,
-        "internal": 23,
+        "internal": 24,
         "restricted": 0
       },
       "warnings": [
@@ -1188,7 +1189,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "warnings": [
         "Mentions execution or command policy"
       ],
-      "updatedAt": "2026-06-04T18:40:12.519Z"
+      "updatedAt": "2026-06-05T14:49:55.158Z"
     },
     {
       "id": "architecture/architecture-overview",
@@ -1494,7 +1495,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "table"
       ],
       "warnings": [],
-      "updatedAt": "2026-06-05T06:58:00.922Z"
+      "updatedAt": "2026-06-06T14:13:56.996Z"
     },
     {
       "id": "engineering/hermes-agent-plugin",
@@ -1526,7 +1527,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "table"
       ],
       "warnings": [],
-      "updatedAt": "2026-06-05T06:58:37.490Z"
+      "updatedAt": "2026-06-06T14:13:57.008Z"
     },
     {
       "id": "engineering/ingestion-pipeline",
@@ -1625,6 +1626,38 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "Mentions secrets, tokens, or credentials"
       ],
       "updatedAt": "2026-05-22T02:26:41.000Z"
+    },
+    {
+      "id": "engineering/multi-ai-config",
+      "slug": "engineering/multi-ai-config",
+      "route": "/documentation/engineering/multi-ai-config",
+      "sourcePath": "docs/engineering/multi-ai-config.md",
+      "folderSlug": "engineering",
+      "folderPath": "docs/engineering",
+      "title": "Multi-AI Configuration",
+      "summary": "This repo is worked on by multiple AI agents — Claude Code, Codex / OpenAI, Gemini, Cursor, and any future addition. Each brand reads a different instruction file by convention. Maintaini...",
+      "content": "# Multi-AI Configuration\n\n> Status: Active\n> Last updated: 2026-06-07\n> Audience: Anyone adding / editing AI-agent instruction files in this repo\n> Enforced by: `npm run agents:check` (wired into `npm run verify:baseline`)\n\n---\n\n## English Version\n\n## 1. Why this document exists\n\nThis repo is worked on by multiple AI agents — Claude Code, Codex / OpenAI, Gemini,\nCursor, and any future addition. Each brand reads a different instruction file by\nconvention. Maintaining the same facts in four places guarantees drift.\n\nThis document defines the **Single-Source-of-Truth + Thin Shell** model used here.\n\n## 2. The Tier-1 / Tier-2 / Tier-3 model\n\nThree layers, each with a clear scope. Lower-tier rules cannot override higher-tier\nIron Rules.\n\n| Tier | File | Scope | In git? | Edit frequency |\n|---|---|---|---|---|\n| **1 — Global** | `~/.claude/CLAUDE.md` | Every project the user works on | No | Quarterly |\n| **2 — Project** | `AGENTS.md` (SSOT) + `CLAUDE.md` / `GEMINI.md` / `.cursor/rules/*.mdc` (shells) | This repo | Yes | Weekly |\n| **3 — Local** | `.claude/local.md` | This repo, this user, this machine | No (gitignored) | Daily |\n\nConflict resolution: **Tier 2 is ground truth.** Tier 1 and Tier 3 may supplement\ngaps but cannot override Iron Rules in `AGENTS.md`.\n\n## 3. Single Source of Truth: `AGENTS.md`\n\n`AGENTS.md` holds **every fact that is true for every AI agent in this repo**:\n\n- Stack and directory map\n- ADR-locked decisions\n- Iron Rules\n- Verification gate (`npm run verify:baseline`)\n- Common commands\n- Pointers into `docs/architecture/` and `docs/engineering/`\n\n`AGENTS.md` does **not** hold:\n\n- Brand-specific mechanisms (Claude skills, Cursor `alwaysApply`, Gemini Context7 prompts)\n- Personal preferences (those belong in Tier 1)\n- Machine-specific paths (those belong in Tier 3)\n\n## 4. Thin shells\n\nEvery brand-specific file is a **thin shell** — it points at `AGENTS.md` and adds\nonly what is unique to that brand:\n\n| Shell | Brand-specific content |\n|---|---|\n| [`CLAUDE.md`](../../CLAUDE.md) | Claude skills routing, `/loop`, `/code-review ultra`, Tier-3 pointer |\n| [`GEMINI.md`](../../GEMINI.md) | Context7 mandate, Gemini Workspace boundaries |\n| [`.cursor/rules/_agents-pointer.mdc`](../../.cursor/rules/_agents-pointer.mdc) | Cursor `alwaysApply` pointer |\n| [`.cursor/rules/verify-before-complete.mdc`](../../.cursor/rules/verify-before-complete.mdc) | Cursor embedded-browser caveat |\n\nShells must:\n\n1. **Reference `AGENTS.md` by name** — `npm run agents:check` greps for this.\n2. **Not redefine SSOT headings** (`## Stack`, `## Iron Rules`, `## Directory Map`,\n   `## Common Commands`) — those are SSOT-only.\n\n## 5. Tier-3 personal layer\n\n`.claude/local.md` (gitignored) holds anything that is true only on **this user's\nmachine, this project**:\n\n- Per-user paths (dev-secrets location, alternate scripts)\n- Personal workflow preferences\n- In-progress conventions not yet agreed with the team\n- TODOs that are just for me\n\nClaude Code loads it automatically. Codex / Gemini / Cursor do not — that is by\ndesign (Tier 3 is one user's notes, not team policy).\n\nIf something in Tier 3 turns out to be useful for the whole team, promote it to\n`AGENTS.md` via a normal PR.\n\n## 6. Adding a new AI agent\n\nWhen onboarding a new brand (Cline, Aider, Windsurf, etc.):\n\n1. Find the file the new brand reads (usually a project-root `.md` or `.<brand>/`).\n2. Create a thin shell containing exactly:\n   - A one-line reference to `AGENTS.md`\n   - Brand-specific extras only\n3. Add the shell to `SHELLS` in [`scripts/check-agents-drift.mjs`](../../scripts/check-agents-drift.mjs).\n4. Run `npm run agents:check` — must pass.\n5. Document the addition in this file's table (§4).\n\n## 7. Drift check\n\n`npm run agents:check` (also part of `npm run verify:baseline`) verifies:\n\n- `AGENTS.md` exists and contains the canonical headings (`## 2. Stack`,\n  `## 4. Iron Rules`, `## 6. Verification Gate`).\n- Each shell references `AGENTS.md` by name.\n- No shell redefines an SSOT-only heading.\n\nFailure mode: any drift fails `verify:baseline`, blocking commit / PR.\n\n## 8. Skill directories\n\nSkills live in [`.agents/skills/`](../../.agents/skills/) as the canonical copy.\n[`.claude/skills/`](../../.claude/skills/) contains:\n\n- **Symlinks** back to `.agents/skills/` for skills shared with other agents.\n- **Real directories** for Claude-only skills (`check-pr`, `pr-review-loop`).\n\nDo not add the same skill in both directories as separate files — it will diverge.\n\n---\n\n## 中文版本\n\n## 1. 為什麼需要這份文件\n\n此 repo 由多個 AI agent 一起協作 —— Claude Code、Codex / OpenAI、Gemini、Cursor，\n未來可能還會加入更多。每家慣例讀的指令檔不同；如果把同一份事實寫到四個檔案，\ndrift 是遲早的事。\n\n本文件定義此 repo 採用的 **Single Source of Truth + Thin Shell** 模型。\n\n## 2. Tier-1 / Tier-2 / Tier-3 三層模型\n\n三層各有清楚邊界。下層不可推翻上層的 Iron Rules。\n\n| 層級 | 檔案 | 作用域 | 進 git？ | 改動頻率 |\n|---|---|---|---|---|\n| **1 — 全域** | `~/.claude/CLAUDE.md` | 使用者所有專案 | 否 | 季度 |\n| **2 — 專案** | `AGENTS.md`（SSOT）+ `CLAUDE.md` / `GEMINI.md` / `.cursor/rules/*.mdc`（薄殼） | 本 repo | 是 | 週 |\n| **3 — 個人** | `.claude/local.md` | 本 repo、本使用者、本機 | 否（gitignored） | 日 |\n\n衝突解析：**Tier 2 是 ground truth**。Tier 1 與 Tier 3 可以補 Tier 2 沒涵蓋到的，\n但不能推翻 `AGENTS.md` 裡的 Iron Rules。\n\n## 3. Single Source of Truth：`AGENTS.md`\n\n`AGENTS.md` 收錄 **對 repo 內所有 AI agent 都成立的事實**：\n\n- Stack 與目錄結構\n- ADR-locked 決策\n- Iron Rules\n- 完工 gate（`npm run verify:baseline`）\n- 常用命令\n- 指向 `docs/architecture/` 與 `docs/engineering/` 的指針\n\n`AGENTS.md` 不收錄：\n\n- 品牌特有機制（Claude skills、Cursor `alwaysApply`、Gemini Context7 提示）\n- 個人偏好（屬於 Tier 1）\n- 本機路徑（屬於 Tier 3）\n\n## 4. 薄殼\n\n每個品牌設定檔都是 **薄殼**：指向 `AGENTS.md`、只放該品牌獨有的內容。\n\n| 薄殼 | 品牌特有內容 |\n|---|---|\n| [`CLAUDE.md`](../../CLAUDE.md) | Claude skills routing、`/loop`、`/code-review ultra`、Tier-3 指針 |\n| [`GEMINI.md`](../../GEMINI.md) | Context7 強制、Gemini Workspace 邊界 |\n| [`.cursor/rules/_agents-pointer.mdc`](../../.cursor/rules/_agents-pointer.mdc) | Cursor `alwaysApply` 指針 |\n| [`.cursor/rules/verify-before-complete.mdc`](../../.cursor/rules/verify-before-complete.mdc) | Cursor 內建 browser 注意事項 |\n\n薄殼必須：\n\n1. **以名稱引用 `AGENTS.md`** —— `npm run agents:check` 會 grep 此字串。\n2. **不重複定義 SSOT 章節**（`## Stack`、`## Iron Rules`、`## Directory Map`、\n   `## Common Commands`）—— 那些只能存在於 SSOT。\n\n## 5. Tier-3 個人層\n\n`.claude/local.md`（gitignored）只放 **此使用者、此專案、此機器** 成立的內容：\n\n- 個人路徑（dev-secrets 位置、自己寫的腳本）\n- 個人 workflow 偏好\n- 還沒跟團隊取得共識的 convention 草案\n- 只對自己有用的 TODO\n\nClaude Code 會自動讀取此檔。Codex / Gemini / Cursor 不會 —— 這是設計，不是 bug\n（Tier 3 是個人筆記，不是團隊政策）。\n\n如果某項 Tier 3 內容對全團隊都有價值，就透過正常 PR 把它搬到 `AGENTS.md`。\n\n## 6. 新增 AI agent 的流程\n\n要接入新品牌（Cline、Aider、Windsurf 等）：\n\n1. 找出該品牌慣例讀的檔案（通常在 repo 根目錄或 `.<brand>/`）。\n2. 建立薄殼，內容只包含：\n   - 一行引用 `AGENTS.md`\n   - 該品牌獨有的補充\n3. 將該薄殼加進 [`scripts/check-agents-drift.mjs`](../../scripts/check-agents-drift.mjs) 的 `SHELLS` 陣列。\n4. 跑 `npm run agents:check` —— 必須通過。\n5. 在本文件 §4 的表格中登記新薄殼。\n\n## 7. Drift check\n\n`npm run agents:check`（也是 `npm run verify:baseline` 的一環）會驗證：\n\n- `AGENTS.md` 存在，且含有 canonical 章節（`## 2. Stack`、`## 4. Iron Rules`、\n  `## 6. Verification Gate`）。\n- 每個薄殼都引用了 `AGENTS.md`。\n- 沒有薄殼重新定義 SSOT 專屬章節。\n\n任何 drift 都會讓 `verify:baseline` 失敗，阻擋 commit / PR。\n\n## 8. Skills 目錄\n\nSkills canonical 副本在 [`.agents/skills/`](../../.agents/skills/)。\n[`.claude/skills/`](../../.claude/skills/) 包含：\n\n- **Symlinks** 指回 `.agents/skills/`（與其他 agent 共用的 skill）\n- **實體目錄** 給 Claude-only skills（`check-pr`、`pr-review-loop`）\n\n不要把同一個 skill 在兩邊各放一份實體檔 —— 一定會 diverge。\n",
+      "contentHash": "9d6467602f662cfb",
+      "readingMinutes": 5,
+      "classification": "internal",
+      "classificationSource": "policy",
+      "classificationConfidence": 0.95,
+      "classificationReason": "Engineering runbooks and implementation contracts are internal by default.",
+      "matchedPolicyRule": "CLS-INTERNAL-ENGINEERING",
+      "publish": false,
+      "reviewStatus": "ai-classified",
+      "needsReview": false,
+      "visibility": "internal",
+      "audience": [
+        "engineers",
+        "operators"
+      ],
+      "tags": [
+        "engineering",
+        "table"
+      ],
+      "warnings": [],
+      "updatedAt": "2026-06-07T13:14:33.580Z"
     },
     {
       "id": "engineering/ollama-docker-usage",
@@ -1769,8 +1802,8 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "folderPath": "docs/engineering",
       "title": "Project Manager Engineering Documentation",
       "summary": "This folder contains operational engineering documentation for Project Manager. Product documents explain what the app should do; these documents explain how the current implementation is...",
-      "content": "# Project Manager Engineering Documentation\n\n> Status: Active  \n> Last updated: 2026-05-23  \n> Audience: AI engineers and maintainers\n\n---\n\n## English Version\n\n## 1. Purpose\n\nThis folder contains operational engineering documentation for Project Manager. Product documents explain what the app should do; these documents explain how the current implementation is wired and what must be kept stable when changing it.\n\n## 2. Read Order\n\n1. [../file-naming-standards.md](../file-naming-standards.md)\n2. [runtime-bridge.md](./runtime-bridge.md)\n3. [storage-and-schema.md](./storage-and-schema.md)\n4. [ingestion-pipeline.md](./ingestion-pipeline.md)\n5. [security-and-secrets.md](./security-and-secrets.md)\n6. [table-standards.md](./table-standards.md)\n7. [document-classification-standard.md](./document-classification-standard.md)\n8. [documentation-site-sync.md](./documentation-site-sync.md)\n9. [hermes-agent-plugin.md](./hermes-agent-plugin.md)\n10. [openclaw-plugin.md](./openclaw-plugin.md)\n11. [verification-runbook.md](./verification-runbook.md)\n12. [ai-sdks-store.md](./ai-sdks-store.md)\n\n## 3. Ownership Map\n\n| Topic | Primary Files | Document |\n| --- | --- | --- |\n| Tauri commands, browser fallbacks, event contracts | `src-tauri/src/lib.rs`, `lib/bridge/index.ts`, `app/api/*` | [runtime-bridge.md](./runtime-bridge.md) |\n| Project list, selected project, schema migration | `lib/storage/*`, `schema/project-manager.schema.json`, `config/samples/*` | [storage-and-schema.md](./storage-and-schema.md) |\n| Markdown import and AI-assisted spec import | `lib/ingestion/*`, `app/ui/views/IngestionView.tsx` | [ingestion-pipeline.md](./ingestion-pipeline.md) |\n| API keys, provider keys, GitHub token, API call boundary | `lib/storage/plugins.ts`, `lib/bridge/index.ts`, `src-tauri/src/lib.rs`, `app/api/anthropic/route.ts` | [security-and-secrets.md](./security-and-secrets.md) |\n| Table interaction, label contracts, sorting behavior, dashboard document-link cells, workstation viewport rules | `app/project-progress-dashboard/_components/PhaseTable.tsx`, `app/project-progress-dashboard/_lib/columns.tsx`, `app/project-progress-dashboard/_lib/pathLinks.tsx`, `app/ui/views/Plugins/PluginsHubView.tsx`, `app/ui/views/Plugins/_shared/IntegrationsTable.tsx`, `components/table/TableCore.tsx` | [table-standards.md](./table-standards.md) |\n| Document classification, public/internal/restricted gates, and public publish policy | `scripts/sync-documentation-site.mjs`, `docs/**/*.md` frontmatter | [document-classification-standard.md](./document-classification-standard.md) |\n| Static documentation website sync, generated routes, and publication classification metadata | `scripts/sync-documentation-site.mjs`, `lib/generated/documentation-site-internal.ts`, `lib/generated/documentation-site-public.ts`, `app/documentation/[[...slug]]/page.tsx`, `app/ui/views/DocumentationView.tsx` | [documentation-site-sync.md](./documentation-site-sync.md) |\n| Project-scoped Hermes Agent install and plugin toggle | `scripts/install-hermes-agent.sh`, `scripts/hermes-agent.sh`, `.project-manager/vendor/hermes-agent/`, `lib/storage/plugins.ts` | [hermes-agent-plugin.md](./hermes-agent-plugin.md) |\n| Project-scoped OpenClaw install, gateway, update, rollback, and plugin toggle | `scripts/install-openclaw.sh`, `scripts/openclaw.sh`, `scripts/update-openclaw.sh`, `scripts/rollback-openclaw.sh`, `.project-manager/vendor/openclaw/`, `lib/storage/plugins.ts` | [openclaw-plugin.md](./openclaw-plugin.md) |\n| Pre-handoff checks and release verification | `package.json`, `scripts/*`, `src-tauri/Cargo.toml` | [verification-runbook.md](./verification-runbook.md) |\n| AI SDK parameter config store, normalization, validation | `lib/aiSdks/*`, `app/ui/views/AiSdksView.tsx`, `app/ui/views/AiSdks/*`, `.project-manager/ai-sdks.json` | [ai-sdks-store.md](./ai-sdks-store.md) |\n\n## 4. Documentation Rule\n\nUpdate the relevant document whenever an implementation change changes a command signature, persisted shape, storage key, parser behavior, secret boundary, or verification requirement.\n\n---\n\n## 中文版本\n\n## 1. 目的\n\n此目錄保存 Project Manager 的工程技術文件。產品文件說明 app 應該做什麼；本目錄說明目前實作如何接線，以及修改時哪些 contract 不能破壞。\n\n## 2. 建議閱讀順序\n\n1. [../file-naming-standards.md](../file-naming-standards.md)\n2. [runtime-bridge.md](./runtime-bridge.md)\n3. [storage-and-schema.md](./storage-and-schema.md)\n4. [ingestion-pipeline.md](./ingestion-pipeline.md)\n5. [security-and-secrets.md](./security-and-secrets.md)\n6. [table-standards.md](./table-standards.md)\n7. [document-classification-standard.md](./document-classification-standard.md)\n8. [documentation-site-sync.md](./documentation-site-sync.md)\n9. [hermes-agent-plugin.md](./hermes-agent-plugin.md)\n10. [openclaw-plugin.md](./openclaw-plugin.md)\n11. [verification-runbook.md](./verification-runbook.md)\n12. [ai-sdks-store.md](./ai-sdks-store.md)\n\n## 3. 責任對照\n\n| 主題 | 主要檔案 | 文件 |\n| --- | --- | --- |\n| Tauri commands、browser fallbacks、event contracts | `src-tauri/src/lib.rs`, `lib/bridge/index.ts`, `app/api/*` | [runtime-bridge.md](./runtime-bridge.md) |\n| Project list、selected project、schema migration | `lib/storage/*`, `schema/project-manager.schema.json`, `config/samples/*` | [storage-and-schema.md](./storage-and-schema.md) |\n| Markdown import 與 AI-assisted spec import | `lib/ingestion/*`, `app/ui/views/IngestionView.tsx` | [ingestion-pipeline.md](./ingestion-pipeline.md) |\n| API keys、provider keys、GitHub token、API call boundary | `lib/storage/plugins.ts`, `lib/bridge/index.ts`, `src-tauri/src/lib.rs`, `app/api/anthropic/route.ts` | [security-and-secrets.md](./security-and-secrets.md) |\n| Table 互動、label contracts、排序行為、dashboard 文件連結欄位與 workstation 視窗版面規則 | `app/project-progress-dashboard/_components/PhaseTable.tsx`, `app/project-progress-dashboard/_lib/columns.tsx`, `app/project-progress-dashboard/_lib/pathLinks.tsx`, `app/ui/views/Plugins/PluginsHubView.tsx`, `app/ui/views/Plugins/_shared/IntegrationsTable.tsx`, `components/table/TableCore.tsx` | [table-standards.md](./table-standards.md) |\n| 文件分類、public/internal/restricted gates 與 public publish policy | `scripts/sync-documentation-site.mjs`, `docs/**/*.md` frontmatter | [document-classification-standard.md](./document-classification-standard.md) |\n| 靜態 Documentation website sync、generated routes 與 publication classification metadata | `scripts/sync-documentation-site.mjs`, `lib/generated/documentation-site-internal.ts`, `lib/generated/documentation-site-public.ts`, `app/documentation/[[...slug]]/page.tsx`, `app/ui/views/DocumentationView.tsx` | [documentation-site-sync.md](./documentation-site-sync.md) |\n| Project-scoped Hermes Agent 安裝與 plugin toggle | `scripts/install-hermes-agent.sh`, `scripts/hermes-agent.sh`, `.project-manager/vendor/hermes-agent/`, `lib/storage/plugins.ts` | [hermes-agent-plugin.md](./hermes-agent-plugin.md) |\n| Project-scoped OpenClaw 安裝、gateway、更新、回滾與 plugin toggle | `scripts/install-openclaw.sh`, `scripts/openclaw.sh`, `scripts/update-openclaw.sh`, `scripts/rollback-openclaw.sh`, `.project-manager/vendor/openclaw/`, `lib/storage/plugins.ts` | [openclaw-plugin.md](./openclaw-plugin.md) |\n| 交付前檢查與 release verification | `package.json`, `scripts/*`, `src-tauri/Cargo.toml` | [verification-runbook.md](./verification-runbook.md) |\n| AI SDK 參數設定儲存、正規化與驗證 | `lib/aiSdks/*`, `app/ui/views/AiSdksView.tsx`, `app/ui/views/AiSdks/*`, `.project-manager/ai-sdks.json` | [ai-sdks-store.md](./ai-sdks-store.md) |\n\n## 4. 文件維護規則\n\n只要實作變更 command signature、persisted shape、storage key、parser behavior、secret boundary 或 verification requirement，就要更新對應文件。\n",
-      "contentHash": "cba8965667095cbb",
+      "content": "# Project Manager Engineering Documentation\n\n> Status: Active  \n> Last updated: 2026-06-07  \n> Audience: AI engineers and maintainers\n\n---\n\n## English Version\n\n## 1. Purpose\n\nThis folder contains operational engineering documentation for Project Manager. Product documents explain what the app should do; these documents explain how the current implementation is wired and what must be kept stable when changing it.\n\n## 2. Read Order\n\n1. [../file-naming-standards.md](../file-naming-standards.md)\n2. [runtime-bridge.md](./runtime-bridge.md)\n3. [storage-and-schema.md](./storage-and-schema.md)\n4. [ingestion-pipeline.md](./ingestion-pipeline.md)\n5. [security-and-secrets.md](./security-and-secrets.md)\n6. [table-standards.md](./table-standards.md)\n7. [document-classification-standard.md](./document-classification-standard.md)\n8. [documentation-site-sync.md](./documentation-site-sync.md)\n9. [hermes-agent-plugin.md](./hermes-agent-plugin.md)\n10. [openclaw-plugin.md](./openclaw-plugin.md)\n11. [verification-runbook.md](./verification-runbook.md)\n12. [ai-sdks-store.md](./ai-sdks-store.md)\n13. [multi-ai-config.md](./multi-ai-config.md)\n\n## 3. Ownership Map\n\n| Topic | Primary Files | Document |\n| --- | --- | --- |\n| Tauri commands, browser fallbacks, event contracts | `src-tauri/src/lib.rs`, `lib/bridge/index.ts`, `app/api/*` | [runtime-bridge.md](./runtime-bridge.md) |\n| Project list, selected project, schema migration | `lib/storage/*`, `schema/project-manager.schema.json`, `config/samples/*` | [storage-and-schema.md](./storage-and-schema.md) |\n| Markdown import and AI-assisted spec import | `lib/ingestion/*`, `app/ui/views/IngestionView.tsx` | [ingestion-pipeline.md](./ingestion-pipeline.md) |\n| API keys, provider keys, GitHub token, API call boundary | `lib/storage/plugins.ts`, `lib/bridge/index.ts`, `src-tauri/src/lib.rs`, `app/api/anthropic/route.ts` | [security-and-secrets.md](./security-and-secrets.md) |\n| Table interaction, label contracts, sorting behavior, dashboard document-link cells, workstation viewport rules | `app/project-progress-dashboard/_components/PhaseTable.tsx`, `app/project-progress-dashboard/_lib/columns.tsx`, `app/project-progress-dashboard/_lib/pathLinks.tsx`, `app/ui/views/Plugins/PluginsHubView.tsx`, `app/ui/views/Plugins/_shared/IntegrationsTable.tsx`, `components/table/TableCore.tsx` | [table-standards.md](./table-standards.md) |\n| Document classification, public/internal/restricted gates, and public publish policy | `scripts/sync-documentation-site.mjs`, `docs/**/*.md` frontmatter | [document-classification-standard.md](./document-classification-standard.md) |\n| Static documentation website sync, generated routes, and publication classification metadata | `scripts/sync-documentation-site.mjs`, `lib/generated/documentation-site-internal.ts`, `lib/generated/documentation-site-public.ts`, `app/documentation/[[...slug]]/page.tsx`, `app/ui/views/DocumentationView.tsx` | [documentation-site-sync.md](./documentation-site-sync.md) |\n| Project-scoped Hermes Agent install and plugin toggle | `scripts/install-hermes-agent.sh`, `scripts/hermes-agent.sh`, `.project-manager/vendor/hermes-agent/`, `lib/storage/plugins.ts` | [hermes-agent-plugin.md](./hermes-agent-plugin.md) |\n| Project-scoped OpenClaw install, gateway, update, rollback, and plugin toggle | `scripts/install-openclaw.sh`, `scripts/openclaw.sh`, `scripts/update-openclaw.sh`, `scripts/rollback-openclaw.sh`, `.project-manager/vendor/openclaw/`, `lib/storage/plugins.ts` | [openclaw-plugin.md](./openclaw-plugin.md) |\n| Pre-handoff checks and release verification | `package.json`, `scripts/*`, `src-tauri/Cargo.toml` | [verification-runbook.md](./verification-runbook.md) |\n| AI SDK parameter config store, normalization, validation | `lib/aiSdks/*`, `app/ui/views/AiSdksView.tsx`, `app/ui/views/AiSdks/*`, `.project-manager/ai-sdks.json` | [ai-sdks-store.md](./ai-sdks-store.md) |\n| Multi-AI agent instruction files (SSOT + thin shells), Tier-1/2/3 model, drift check | `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.cursor/rules/*.mdc`, `.claude/local.md`, `scripts/check-agents-drift.mjs` | [multi-ai-config.md](./multi-ai-config.md) |\n\n## 4. Documentation Rule\n\nUpdate the relevant document whenever an implementation change changes a command signature, persisted shape, storage key, parser behavior, secret boundary, or verification requirement.\n\n---\n\n## 中文版本\n\n## 1. 目的\n\n此目錄保存 Project Manager 的工程技術文件。產品文件說明 app 應該做什麼；本目錄說明目前實作如何接線，以及修改時哪些 contract 不能破壞。\n\n## 2. 建議閱讀順序\n\n1. [../file-naming-standards.md](../file-naming-standards.md)\n2. [runtime-bridge.md](./runtime-bridge.md)\n3. [storage-and-schema.md](./storage-and-schema.md)\n4. [ingestion-pipeline.md](./ingestion-pipeline.md)\n5. [security-and-secrets.md](./security-and-secrets.md)\n6. [table-standards.md](./table-standards.md)\n7. [document-classification-standard.md](./document-classification-standard.md)\n8. [documentation-site-sync.md](./documentation-site-sync.md)\n9. [hermes-agent-plugin.md](./hermes-agent-plugin.md)\n10. [openclaw-plugin.md](./openclaw-plugin.md)\n11. [verification-runbook.md](./verification-runbook.md)\n12. [ai-sdks-store.md](./ai-sdks-store.md)\n13. [multi-ai-config.md](./multi-ai-config.md)\n\n## 3. 責任對照\n\n| 主題 | 主要檔案 | 文件 |\n| --- | --- | --- |\n| Tauri commands、browser fallbacks、event contracts | `src-tauri/src/lib.rs`, `lib/bridge/index.ts`, `app/api/*` | [runtime-bridge.md](./runtime-bridge.md) |\n| Project list、selected project、schema migration | `lib/storage/*`, `schema/project-manager.schema.json`, `config/samples/*` | [storage-and-schema.md](./storage-and-schema.md) |\n| Markdown import 與 AI-assisted spec import | `lib/ingestion/*`, `app/ui/views/IngestionView.tsx` | [ingestion-pipeline.md](./ingestion-pipeline.md) |\n| API keys、provider keys、GitHub token、API call boundary | `lib/storage/plugins.ts`, `lib/bridge/index.ts`, `src-tauri/src/lib.rs`, `app/api/anthropic/route.ts` | [security-and-secrets.md](./security-and-secrets.md) |\n| Table 互動、label contracts、排序行為、dashboard 文件連結欄位與 workstation 視窗版面規則 | `app/project-progress-dashboard/_components/PhaseTable.tsx`, `app/project-progress-dashboard/_lib/columns.tsx`, `app/project-progress-dashboard/_lib/pathLinks.tsx`, `app/ui/views/Plugins/PluginsHubView.tsx`, `app/ui/views/Plugins/_shared/IntegrationsTable.tsx`, `components/table/TableCore.tsx` | [table-standards.md](./table-standards.md) |\n| 文件分類、public/internal/restricted gates 與 public publish policy | `scripts/sync-documentation-site.mjs`, `docs/**/*.md` frontmatter | [document-classification-standard.md](./document-classification-standard.md) |\n| 靜態 Documentation website sync、generated routes 與 publication classification metadata | `scripts/sync-documentation-site.mjs`, `lib/generated/documentation-site-internal.ts`, `lib/generated/documentation-site-public.ts`, `app/documentation/[[...slug]]/page.tsx`, `app/ui/views/DocumentationView.tsx` | [documentation-site-sync.md](./documentation-site-sync.md) |\n| Project-scoped Hermes Agent 安裝與 plugin toggle | `scripts/install-hermes-agent.sh`, `scripts/hermes-agent.sh`, `.project-manager/vendor/hermes-agent/`, `lib/storage/plugins.ts` | [hermes-agent-plugin.md](./hermes-agent-plugin.md) |\n| Project-scoped OpenClaw 安裝、gateway、更新、回滾與 plugin toggle | `scripts/install-openclaw.sh`, `scripts/openclaw.sh`, `scripts/update-openclaw.sh`, `scripts/rollback-openclaw.sh`, `.project-manager/vendor/openclaw/`, `lib/storage/plugins.ts` | [openclaw-plugin.md](./openclaw-plugin.md) |\n| 交付前檢查與 release verification | `package.json`, `scripts/*`, `src-tauri/Cargo.toml` | [verification-runbook.md](./verification-runbook.md) |\n| AI SDK 參數設定儲存、正規化與驗證 | `lib/aiSdks/*`, `app/ui/views/AiSdksView.tsx`, `app/ui/views/AiSdks/*`, `.project-manager/ai-sdks.json` | [ai-sdks-store.md](./ai-sdks-store.md) |\n| 多家 AI agent 指令檔（SSOT + 薄殼）、Tier-1/2/3 模型、drift check | `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.cursor/rules/*.mdc`, `.claude/local.md`, `scripts/check-agents-drift.mjs` | [multi-ai-config.md](./multi-ai-config.md) |\n\n## 4. 文件維護規則\n\n只要實作變更 command signature、persisted shape、storage key、parser behavior、secret boundary 或 verification requirement，就要更新對應文件。\n",
+      "contentHash": "8accb134e3e271b5",
       "readingMinutes": 3,
       "classification": "internal",
       "classificationSource": "policy",
@@ -1792,7 +1825,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "warnings": [
         "Mentions secrets, tokens, or credentials"
       ],
-      "updatedAt": "2026-06-01T02:28:53.090Z"
+      "updatedAt": "2026-06-07T13:15:04.538Z"
     },
     {
       "id": "engineering/runtime-bridge",
@@ -2063,7 +2096,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "table"
       ],
       "warnings": [],
-      "updatedAt": "2026-06-05T06:59:55.809Z"
+      "updatedAt": "2026-06-06T14:13:57.075Z"
     },
     {
       "id": "engineering/update-project-progress-dashboard-guide",
@@ -2131,7 +2164,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
       "warnings": [
         "Mentions secrets, tokens, or credentials"
       ],
-      "updatedAt": "2026-06-05T06:56:33.419Z"
+      "updatedAt": "2026-06-06T14:13:57.091Z"
     },
     {
       "id": "file-naming-standards",
@@ -2343,7 +2376,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "Mentions execution or command policy",
         "Mentions roadmap, pricing, investor, or strategy material"
       ],
-      "updatedAt": "2026-06-05T06:58:29.687Z"
+      "updatedAt": "2026-06-06T14:13:57.107Z"
     },
     {
       "id": "guides/features/cron-jobs",
@@ -3749,7 +3782,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "Mentions local service ports",
         "Mentions execution or command policy"
       ],
-      "updatedAt": "2026-06-05T06:58:09.473Z"
+      "updatedAt": "2026-06-06T14:13:57.147Z"
     },
     {
       "id": "project-process/2026-05-29-vlm-arena-image-persistence-report",
@@ -3816,7 +3849,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
         "Mentions secrets, tokens, or credentials",
         "Mentions local service ports"
       ],
-      "updatedAt": "2026-06-05T06:58:20.673Z"
+      "updatedAt": "2026-06-06T14:13:57.160Z"
     },
     {
       "id": "project-process/commands/daily-report",
@@ -4056,6 +4089,7 @@ export const DOCUMENTATION_SITE_INTERNAL_MANIFEST = {
     "engineering/ingestion-pipeline",
     "engineering/legacy-surface-guard",
     "engineering/llm-vlm-arena-evaluation-spec-v1",
+    "engineering/multi-ai-config",
     "engineering/ollama-docker-usage",
     "engineering/openclaw-plugin",
     "engineering/plugin-guide",

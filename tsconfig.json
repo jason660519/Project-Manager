@@ -38,6 +38,7 @@
     "app/plugins/hermes-agent",
     "vendor/openclaw",
     "vendor/hermes-agent",
+    "hermes-agent",
     ".next/types/validator.ts",
     ".next/dev/types/validator.ts",
     ".project-manager"

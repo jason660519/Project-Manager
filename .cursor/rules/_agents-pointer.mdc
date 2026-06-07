@@ -1,0 +1,18 @@
+---
+description: Pointer to the single source of truth for all AI agents — AGENTS.md.
+alwaysApply: true
+---
+
+# AI agent rules pointer (Project Manager)
+
+**Shared facts for every AI agent in this repo live in [`AGENTS.md`](../../AGENTS.md).**
+Read it before any non-trivial change. It defines:
+
+- Stack, directory map, ADR-locked decisions
+- Iron Rules (zero silent failures, bridge discipline, schemaVersion, key boundary, static export)
+- The single completion gate: `npm run verify:baseline`
+
+Cursor-specific extras live in sibling `.mdc` rules in this directory.
+
+If a Cursor rule appears to contradict `AGENTS.md`, `AGENTS.md` wins — open an ADR
+under `docs/architecture/` if intentional deviation is needed.

@@ -34,6 +34,7 @@ maybe_standards_check() {
 }
 
 run npm run typecheck
+run npm run agents:check
 maybe_standards_check
 run npm run docs:check
 run npm run docs:site:check

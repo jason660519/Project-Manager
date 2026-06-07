@@ -12,6 +12,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "i18n:check": "node scripts/check-ui-i18n.mjs",
     "guard:legacy-surfaces": "node scripts/check-legacy-surfaces.mjs",
+    "agents:check": "node scripts/check-agents-drift.mjs",
     "branch:check": "node scripts/check-branch-hygiene.mjs",
     "feature:kickoff": "node scripts/create-feature-checkpoint.mjs",
     "feature:resume": "node scripts/resume-feature-checkpoint.mjs",
