@@ -57,6 +57,8 @@
     "test:restart-pm": "bash scripts/restart-project-manager-after-tests.sh npm test",
     "test:watch": "vitest",
     "e2e:tauri:f34-select": "node scripts/run-f34-tauri-select-e2e.mjs",
+    "e2e:pilot:smoke": "node scripts/run-tauri-pilot-e2e.mjs --suite smoke",
+    "e2e:pilot": "node scripts/run-tauri-pilot-e2e.mjs",
     "eval:run:wrapper": "node eval/runners/run-wrapper-batch.mjs --help",
     "eval:run:wrapper-example": "node eval/runners/run-wrapper-batch-example.mjs --dataset eval/datasets/llm-sample-tasks.v1.json --output eval/runs/run-rows.jsonl --model demo-model --provider demo-provider --trials 3",
     "eval:run:raw-api": "node eval/runners/run-raw-api-batch.mjs --help",
