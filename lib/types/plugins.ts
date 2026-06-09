@@ -33,7 +33,7 @@ export interface EditorPlugin extends BasePlugin {
   command: string;
 }
 
-export type McpTransport = 'stdio' | 'http';
+export type McpTransport = 'stdio' | 'sse' | 'shttp';
 
 export interface McpPlugin extends BasePlugin {
   kind: 'mcp';

@@ -489,6 +489,7 @@ export interface Translations {
     colCompany: string;
     colScope: string;
     colMethod: string;
+    colServerType: string;
     colScanMethod: string;
     colPath: string;
     colPort: string;
@@ -502,6 +503,32 @@ export interface Translations {
     colTestAvailabilityHint: string;
     selectAll: string;
     deselectAll: string;
+    systemInstalledApps: {
+      installedTitle: string;
+      installedSubtitle: string;
+      recommendedTitle: string;
+      recommendedSubtitle: string;
+      scanButton: string;
+      scanningButton: string;
+      scanning: string;
+      scanSuccess: string;
+      scanFailed: string;
+      scanFailedHint: string;
+      permissionTitle: string;
+      permissionBody: string;
+      permissionStep1: string;
+      permissionStep2: string;
+      permissionStep3: string;
+      partialWarnings: string;
+      scannedPaths: string;
+      noAppsFound: string;
+      noSearchResults: string;
+      noDescription: string;
+      colAppName: string;
+      colCategory: string;
+      colPrimaryFunction: string;
+      colWebsite: string;
+    };
   };
   features: {
     filterAll: string;

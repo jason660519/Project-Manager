@@ -678,6 +678,8 @@ print_app_success() {
   success "$name opened successfully"
   echo "  Port: $port"
   echo "  URL:  $url"
+  # Print a raw URL line to maximize terminal click-to-open compatibility.
+  echo "  Open: $url"
   if [[ -n "$log_file" ]]; then
     echo "  Log:  $log_file"
   fi
@@ -1343,7 +1345,8 @@ cmd_all() {
 
   header "Launch Summary"
   success "Project-scoped apps are ready (PM + optional sidecars + reachable aux pages)"
-  echo "  Project Manager Desktop: started (Next.js dev port $DEV_PORT)"
+  echo "  Project Manager Desktop: started"
+  echo "  Project Manager URL:      http://localhost:${DEV_PORT}/project-progress-dashboard"
   echo "  Hermes Agent Dashboard:  http://127.0.0.1:${HERMES_PORT} (when running + configured)"
   echo "  OpenClaw Dashboard:      http://127.0.0.1:${OPENCLAW_PORT}/ (when running + configured)"
   echo "  Launcher profile:        ${PM_LAUNCHER_PROFILE} (aux pages from config/samples/launcher.*.json)"
@@ -1368,7 +1371,8 @@ cmd_core() {
 
   header "Launch Summary"
   success "Core apps are ready (PM + optional sidecars)"
-  echo "  Project Manager Desktop: started (Next.js dev port $DEV_PORT)"
+  echo "  Project Manager Desktop: started"
+  echo "  Project Manager URL:      http://localhost:${DEV_PORT}/project-progress-dashboard"
   echo "  Project Manager Web App: http://localhost:${DEV_PORT}/"
   echo "  Hermes Agent Dashboard:  http://127.0.0.1:${HERMES_PORT} (when autostart enabled + installed)"
   echo "  OpenClaw Dashboard:      http://127.0.0.1:${OPENCLAW_PORT}/ (when autostart enabled + installed)"

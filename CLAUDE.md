@@ -26,6 +26,21 @@ Skill sources of truth live in [`./.agents/skills/`](./.agents/skills/);
 `.claude/skills/` are symlinks back to those (Claude-only skills like
 `check-pr` and `pr-review-loop` stay in `.claude/skills/`).
 
+## gstack (global skills)
+
+[gstack](https://github.com/garrytan/gstack) is installed globally at
+`~/.claude/skills/gstack/` (v1.57.x). Its 30+ generic skills (`/browse`, `/qa`,
+`/office-hours`, `/review`, `/design-shotgun`, …) and `bin/` CLIs are available in
+every project. Update with `/gstack-upgrade`.
+
+- **Web browsing / QA / dogfooding → use `/browse`** (gstack's headless browser).
+  Prefer it over chrome / playwright MCP tools for smoke tests and site checks.
+- **Same-name skills resolve to the project version.** `investigate`, `ship`,
+  `context-save`, `context-restore` exist both here (`.agents/skills/`, PM-tailored:
+  `verify:baseline`, schema bumps, Tauri IPC, repo-native handoff) and in gstack
+  (generic). The project copies in `.claude/skills/` take precedence — keep using
+  them; do not delete the project versions.
+
 ## Claude-Code-specific surfaces
 
 - **Slash commands** under [`.claude/commands/`](./.claude/commands/) (not auto-shared with

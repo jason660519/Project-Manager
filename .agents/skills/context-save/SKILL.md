@@ -1,25 +1,31 @@
 ---
 name: context-save
-description: Capture the current working state of a Project Manager session into a markdown checkpoint under `.context/sessions/` so a future session (this AI, or another) can resume without losing context. Saves git state + decisions made + remaining work + gotchas. Different from `/handoff` (which writes a self-contained prompt for a brand-new AI). Use when the user says "save context / save my place / checkpoint this / stop here for now / pause this work". HARD GATE - this skill writes ONE file under `.context/sessions/`; it never modifies source code.
+description: Capture the current working state into a repo-native engineering handoff — appends `.project-manager/features/<ID>/dev-log.md` and writes a lightweight checkpoint under `.context/sessions/`. Requires an active feature ID (Fxx). Does not write feature-spec, tdd-spec, or test-scenarios (those are read on restore). Use when the user says "save context / save my place / checkpoint this / stop here for now / pause this work". HARD GATE - this skill only writes markdown under `.context/sessions/` and appends dev-log; it never modifies source code.
 ---
 
-# context-save — checkpoint the working state
+# context-save — repo-native engineering checkpoint
 
-> Adapted from `gstack/context-save`. State lives **inside the project** at `.context/sessions/` (not `~/.gstack/`), so checkpoints travel with the repo and survive machine moves.
+> Adapted from `gstack/context-save`. **Gate 0 wedge:** one daily habit — append **dev-log only**; restore reads spec / tdd / test-scenarios.
 
-**HARD GATE:** This skill writes a single markdown file under `.context/sessions/`. It never edits source code. Refuse if asked to do both.
+**HARD GATE:** This skill writes (1) one checkpoint under `.context/sessions/` and (2) one **append** to `.project-manager/features/<ID>/dev-log.md`. It never edits source code. Refuse if asked to do both in the same turn.
 
 **Relation to existing tools:**
-- `/handoff` (command) → writes a *self-contained* prompt for a brand-new AI session that has no memory. Use at end-of-day or before context switches.
-- `context-save` (this skill) → writes a *checkpoint* of the current working state. Smaller, lighter, designed to pair with `context-restore`. Use mid-session before standing up to lunch, before switching branches, before risky experiments.
+- `/handoff` (command) → self-contained prompt for a brand-new AI session with no memory.
+- `context-save` (this skill) → checkpoint + dev-log append; pairs with `context-restore`.
+- SessionFS / `continues` → cross-agent **session** resume; out of scope until Gate 0 passes.
+
+**Artifact contract (locked):**
+- **Write:** `dev-log.md` only (append-only, one dated section per save).
+- **Do not write:** `feature-spec.md`, `tdd-spec.md`, `test-scenarios.md`, `config.json`, `progress.json`.
 
 ---
 
 ## Detect mode
 
 Parse user input:
-- `/context-save` or `/context-save <title>` → **Save** (this skill's main path)
-- `/context-save list` → **List existing checkpoints** (read-only listing)
+- `/context-save` or `/context-save <title>` → **Save** (main path)
+- `/context-save F46` or `/context-save F46 <title>` → **Save** with explicit feature ID
+- `/context-save list` → **List checkpoints** (read-only)
 
 If the user says "restore" / "resume", point them to `context-restore`.
 
@@ -27,7 +33,60 @@ If the user says "restore" / "resume", point them to `context-restore`.
 
 ## Save flow
 
-### Step 1: Gather state (one bash block)
+### Step 0: Resolve `featureId` (required)
+
+Extract from the user message (`F` + digits, case-insensitive → uppercase, e.g. `f46` → `F46`).
+
+If missing, infer from conversation (active feature being worked on). If still unknown, **STOP** and ask:
+
+> Which feature ID is active? (e.g. `F46`) — required for repo-native handoff. Run `npm run feature:kickoff` if the feature folder does not exist yet.
+
+**Allowlist:** `^F[0-9]{2,}$` only. Reject anything else.
+
+**Chore / no feature:** not supported in this wedge. Gate 0 assumes every save ties to a feature artifact tree.
+
+### Step 0b: Resolve feature paths
+
+Read `.project-manager/config.json`. Find `features[]` entry where `id === featureId`.
+
+If missing: **STOP** — list up to 5 nearest IDs from `features[].id` and ask the user to correct.
+
+Collect paths (defaults if `paths` partial):
+
+| Key | Default |
+|-----|---------|
+| `featureFolder` | `.project-manager/features/<ID>/` |
+| `spec` | `.project-manager/features/<ID>/feature-spec.md` |
+| `tdd` | `.project-manager/features/<ID>/tdd-spec.md` |
+| `testScenarios` | `.project-manager/features/<ID>/test-scenarios.md` |
+| `dev-log` | `.project-manager/features/<ID>/dev-log.md` |
+
+Verify `dev-log` parent directory exists. If not, **STOP** — suggest `npm run feature:kickoff`.
+
+Optional bash sanity check:
+
+```bash
+FEATURE_ID="F46"  # uppercase from Step 0
+node -e "
+const fs=require('fs');
+const id=process.env.FEATURE_ID;
+const c=JSON.parse(fs.readFileSync('.project-manager/config.json','utf8'));
+const f=(c.features||[]).find(x=>x.id===id);
+if(!f){console.error('FEATURE_NOT_FOUND:',id);process.exit(1);}
+const p=f.paths||{};
+const folder=p.featureFolder||'.project-manager/features/'+id+'/';
+console.log('featureFolder='+folder);
+console.log('spec='+(p.spec||folder+'feature-spec.md'));
+console.log('tdd='+(p.tdd||folder+'tdd-spec.md'));
+console.log('testScenarios='+(p.testScenarios||folder+'test-scenarios.md'));
+console.log('devLog='+folder+'dev-log.md');
+console.log('featureName='+f.name);
+" 
+```
+
+Pass `FEATURE_ID` in the environment when running the block.
+
+### Step 1: Gather git state (one bash block)
 
 ```bash
 echo "=== BRANCH ==="
@@ -51,17 +110,15 @@ git log origin/main..HEAD --oneline 2>/dev/null || true
 
 ### Step 2: Synthesize the summary (no extra tool calls)
 
-Using the gathered state + this conversation's history, draft the following sections:
+Using git output + conversation history, draft:
 
-1. **Goal** — the high-level objective of this work (1–2 sentences).
-2. **Decisions made** — architectural choices, trade-offs taken, approaches ruled out and why.
-3. **Remaining work** — concrete next steps, in priority order, each with file paths. If a feature is in progress, write any notes to `.project-manager/features/<ID>/dev-log.md` rather than inline in `config.json`.
-4. **Gotchas / open questions** — things tried that didn't work, blocked items, items waiting on external info, ADR collisions noted.
-5. **Verification baseline at checkpoint time** — last known state of `typecheck` / `cargo check` / `jest` / `cargo test`. Mark `UNKNOWN` if not run this session.
+1. **Goal** — 1–2 sentences for this checkpoint slice.
+2. **Decisions made** — architectural choices, trade-offs, ruled-out approaches.
+3. **Remaining work** — ordered next steps with file paths.
+4. **Gotchas / open questions** — failures, blockers, ADR collisions.
+5. **Verification baseline** — only commands **actually run** this session. Use `PASS` / `FAIL` / `UNKNOWN`. Never claim `PASS` without a command name. Prefer `npm run verify:baseline` when a full gate was run.
 
-### Step 3: Compute the file path (in bash, NEVER in the LLM layer)
-
-Title sanitization is an allowlist — only `a–z 0–9 - .` survive. Critical: if you let user-supplied titles into shell-built paths without sanitizing, you've created a shell-injection vector.
+### Step 3: Compute checkpoint path (bash only — never rebuild in the LLM)
 
 ```bash
 mkdir -p .context/sessions
@@ -75,7 +132,6 @@ TITLE_SLUG=$(printf '%s' "$RAW" \
 TITLE_SLUG="${TITLE_SLUG:-untitled}"
 FILE=".context/sessions/${TIMESTAMP}-${TITLE_SLUG}.md"
 
-# Collision-safe (same-second double-save with same title)
 if [ -e "$FILE" ]; then
   SUFFIX=$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom 2>/dev/null | head -c 4 || printf '%04x' "$$")
   FILE=".context/sessions/${TIMESTAMP}-${TITLE_SLUG}-${SUFFIX}.md"
@@ -83,21 +139,28 @@ fi
 echo "FILE=$FILE"
 ```
 
-When invoking the above, pass the user's raw title as `TITLE_RAW="…"`. If the user didn't provide one, infer a 3–6 word slug from the conversation (e.g. `bridge-error-surfacing`, `ingestion-md-parser`, `projects-view-empty-state`).
+Pass user title as `TITLE_RAW="…"`. If omitted, infer a 3–6 word slug from the conversation.
 
 ### Step 4: Write the checkpoint
 
-Use the exact `$FILE` path printed by Step 3. Do NOT rebuild it in the LLM — that defeats the sanitizer.
+Use the exact `$FILE` from Step 3.
 
 ```markdown
 ---
 title: <human-readable title>
+featureId: <Fxx>
+feature_name: <from config.json>
 branch: <branch>
 saved_at: <ISO-8601 with timezone>
-files_touched_unstaged: <comma-separated list or "none">
-files_touched_staged: <comma-separated list or "none">
+files_touched_unstaged: <comma-separated or "none">
+files_touched_staged: <comma-separated or "none">
 last_commit: <short sha + subject>
-schemaVersion: 1
+schemaVersion: 2
+artifact_paths:
+  spec: <relative path>
+  tdd: <relative path>
+  test_scenarios: <relative path>
+  dev_log: <relative path>
 ---
 
 # <title>
@@ -107,39 +170,64 @@ schemaVersion: 1
 
 ## Decisions made
 - <decision> — <why>
-- ...
 
 ## Remaining work
-1. <next step> — <file paths>
-2. ...
+1. <step> — <paths>
 
 ## Gotchas / open questions
 - <item>
-- ...
 
 ## Verification baseline
 - typecheck: PASS / FAIL / UNKNOWN
 - cargo check: PASS / FAIL / UNKNOWN
-- jest: PASS / FAIL / UNKNOWN (Ncases)
-- cargo test: PASS / FAIL / UNKNOWN (Ncases)
+- npm run verify:baseline: PASS / FAIL / UNKNOWN
+- other: <command>: PASS / FAIL / UNKNOWN
 
 ## Pointers
 - ADRs touched: <none / list>
-- Skills used this session: <plan-review / pre-landing-review / investigate / ...>
-- Linked TODO items in TODOS.md: <none / list>
+- Skills used: <none / list>
 ```
 
-### Step 5: Confirm to the user
+### Step 5: Append dev-log (required — do before Step 6 confirm)
 
-Output:
+Append **one new section** to `dev-log` (never overwrite prior sections). If the file is missing, create it with `# <featureId> Dev Log` header first.
+
+```markdown
+
+## <YYYY-MM-DD> — <title> (context-save)
+
+### Goal
+<same as checkpoint Goal>
+
+### Decisions
+- <bullet list>
+
+### Remaining work
+1. <ordered list with paths>
+
+### Verification
+- <command>: PASS / FAIL / UNKNOWN
+- (list every command named in checkpoint; UNKNOWN if not run)
+
+### Checkpoint
+- File: `<relative path to .context/sessions/...>`
+- Branch: `<branch>`
+- Saved at: `<ISO-8601>`
+```
+
+If dev-log append fails (permissions, path): **report the error and do not claim success**. Do not write the checkpoint without dev-log unless the user explicitly aborts the save after seeing the error.
+
+### Step 6: Confirm to the user
 
 ```
 CHECKPOINT SAVED
 ════════════════════════════════════════
+Feature: Fxx — <feature name>
+Dev log: .project-manager/features/Fxx/dev-log.md (appended)
 File:    .context/sessions/<timestamp>-<slug>.md
 Title:   <title>
 Branch:  <branch>
-Resume:  /context-restore       (loads the most recent)
+Resume:  /context-restore
          /context-restore <slug-fragment>
 ════════════════════════════════════════
 ```
@@ -156,17 +244,17 @@ else
 fi
 ```
 
-If `NO_CHECKPOINTS`: tell the user `"No checkpoints yet. Run /context-save first."`
+If `NO_CHECKPOINTS`: `"No checkpoints yet. Run /context-save Fxx first."`
 
-Otherwise read frontmatter from each (Title + Branch + saved_at) and present as a numbered list, newest first.
+Otherwise read frontmatter (`title`, `featureId`, `branch`, `saved_at`) and present newest first.
 
 ---
 
 ## .gitignore reminder
 
-The first time `.context/sessions/` is created in a repo, suggest to the user:
+First time `.context/sessions/` is created, suggest:
 
-> `.context/sessions/` lives inside the repo so checkpoints travel with it. If you want checkpoints private to your machine, add `.context/sessions/` to `.gitignore`. If you want them shared (multi-machine handoff), commit them.
+> Checkpoints live in-repo. Add `.context/sessions/` to `.gitignore` for machine-private use, or commit them for multi-machine handoff. **Dev-log append should usually be committed** — it is the engineering record.
 
 Do not modify `.gitignore` without asking.
 
@@ -174,8 +262,9 @@ Do not modify `.gitignore` without asking.
 
 ## Guardrails
 
-- **Single file written**, under `.context/sessions/<timestamp>-<slug>.md`. Nothing else.
-- **No source code edits**, ever. If the user asks "save context AND fix X", do `context-save` only, then tell them you'll handle X in a separate turn.
-- **Sanitize titles in bash**, not in the LLM. Filenames are append-only — never overwrite.
-- If the bash sanitizer collapses the title to empty, fall back to `untitled` — don't error.
-- If conversation context is thin (early in a session), still save — just write `Goal: TBD` and let `context-restore` prompt the user to fill it in.
+- **Two markdown writes per save:** checkpoint file + dev-log append. Nothing else.
+- **No source code edits.** If the user asks "save AND fix X", save only; fix X next turn.
+- **Sanitize titles in bash**, not in the LLM. Checkpoints are append-only — never overwrite.
+- **Verification honesty:** `UNKNOWN` beats a false `PASS` (AGENTS.md Iron Rule #5).
+- Thin conversation context: still save with `Goal: TBD`; dev-log must note uncertainty.
+- **Do not update** feature-spec, tdd-spec, or test-scenarios on save — restore reads them.

@@ -313,6 +313,14 @@ export function updatePlugin(
   };
 }
 
+export function setPluginEnabled(
+  catalog: PluginCatalog,
+  id: string,
+  enabled: boolean,
+): PluginCatalog {
+  return updatePlugin(catalog, id, (p) => (p.enabled === enabled ? p : { ...p, enabled }));
+}
+
 export function togglePluginEnabled(catalog: PluginCatalog, id: string): PluginCatalog {
   return updatePlugin(catalog, id, (p) => ({ ...p, enabled: !p.enabled }));
 }

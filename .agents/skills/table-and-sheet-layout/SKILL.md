@@ -638,6 +638,22 @@ Run this checklist before implementation. It decides which parts of the baseline
 
 ### 7. Cell interaction
 
+#### Enabled checkbox columns (`col-check` / `col-active`)
+
+The first-column **Enabled** control must use **set semantics**, not toggle semantics:
+
+- `onChange` passes the **target** boolean (`e.target.checked`). Handlers must persist that value (`{ ...row, enabled: next }`), never `!row.enabled`.
+- Header "select all" calls the same handler once per visible row with a shared target. Skip rows that already match (`row.enabled === next`) so batch updates stay idempotent.
+- When multiple rows update in one click, accumulate against a ref or functional updater so each row sees the previous mutation (Integrations Hub uses `catalogRef` / `channelCatalogRef`).
+- Disable the checkbox (and exclude from header state) when the row cannot be enabled — e.g. marketplace-not-installed rows on plugin sheets. Integrations Hub: `canToggleRowEnabled` on `IntegrationsTable`.
+- Call `e.stopPropagation()` on checkbox `onChange` and `onClick` when the row opens a detail panel.
+- Reference implementations: `IntegrationsTable` + `PluginsHubView.handleIntegrationRowEnabled`, `KeysProviderTable` `ActiveCell`, `CodingAgentCandidateTable` `col-active`.
+
+Anti-patterns (bugs):
+
+- `togglePluginEnabled(catalog, id)` inside `onToggleEnabled(row, enabled)` — ignores `enabled` and breaks header batch + mixed states.
+- Stale closure over `catalog` inside a `forEach` header handler — only the last row persists.
+
 - [ ] Interactive cells call `e.stopPropagation()` when rows have click behavior.
 - [ ] Buttons, links, selects, checkboxes, menus, and resize handles have visible focus states.
 - [ ] Secondary external links are icon-only with accessible labels/tooltips when embedded under the row identity.
@@ -673,6 +689,7 @@ Run this checklist before implementation. It decides which parts of the baseline
 - [ ] `Add Row`, `Import`, and `Export` are present only when the page owns editable/importable/exportable data with clear user value
 - [ ] Generic table toolbars do not contain credential clearing, filesystem, bridge, network, or other destructive controls
 - [ ] Numeric columns store `number | null`, units in header
+- [ ] Enabled columns use set semantics; header batch + non-toggleable rows handled (see §7 Enabled checkbox columns)
 - [ ] Action buttons call `e.stopPropagation()`
 - [ ] Cells > 30 lines extracted to `*Cell.tsx`
 - [ ] Table scroll container does not mix with `overflow-hidden`

@@ -1,24 +1,23 @@
 ---
 name: context-restore
-description: Resume a Project Manager session from a checkpoint saved by `context-save`. Reads `.context/sessions/*.md`, presents the most recent (or a named one), shows goal + decisions + remaining work + gotchas + verification baseline, and offers to continue. HARD GATE - this skill only reads checkpoints and presents them; it never edits source code. Use when the user says "resume / restore / continue from where I left off / pick up the last checkpoint / where was I".
+description: Resume from a context-save checkpoint and assemble a repo-native engineering briefing — reads `.context/sessions/*.md` plus feature README, feature-spec, tdd-spec, test-scenarios (read-only), and the latest dev-log section. Flags stale artifacts and verification gaps. HARD GATE - briefing only; never edits source code or starts implementation in the same turn. Use when the user says "resume / restore / continue from where I left off / pick up the last checkpoint / where was I".
 ---
 
-# context-restore — resume from a saved checkpoint
+# context-restore — engineering handoff briefing
 
-> Adapted from `gstack/context-restore`. Loads from `.context/sessions/` inside the repo (not `~/.gstack/`).
+> **Gate 0 wedge:** restore delivers **reviewable engineering context**, not just chat summary. Save writes dev-log only; restore **reads** spec / tdd / test-scenarios.
 
-**HARD GATE:** This skill reads checkpoint markdown files and presents them. It does not edit source code, run tests, or start implementing the remaining work in the same turn. Once the user confirms they want to continue, the *next* turn does the work — this turn is the briefing.
+**HARD GATE:** Read-only briefing. No source edits, no tests, no implementation in this turn. User confirms → **next turn** implements.
 
-**Default behaviour:** load the **most recent** checkpoint, **regardless of current branch**. The branch is recorded in frontmatter; cross-branch resume is intentional (e.g. you saved on `feat/x` and are now resuming on `feat/y` to harvest a decision).
+**Default:** load the **most recent** checkpoint (any branch). Cross-branch resume is intentional.
 
 ---
 
 ## Detect mode
 
-Parse user input:
-- `/context-restore` → load the most recent checkpoint (any branch)
-- `/context-restore <fragment-or-number>` → load a specific checkpoint by title-slug fragment or numbered position from the list view
-- `/context-restore list` → tell the user `"Use /context-save list — listing lives on the save side."` and stop.
+- `/context-restore` → most recent checkpoint
+- `/context-restore <fragment-or-number>` → specific checkpoint (slug fragment or 1-indexed list position)
+- `/context-restore list` → `"Use /context-save list — listing lives on the save side."` and stop.
 
 ---
 
@@ -39,96 +38,181 @@ else
 fi
 ```
 
-Notes on the choice of `find | sort -r` over `ls -1t`:
-- Canonical order is the filename's `YYYYMMDD-HHMMSS` prefix — stable across copies / rsync. Filesystem mtime drifts.
-- On macOS, `ls -1t` falls back to listing the cwd on empty input. `find | sort -r` returns nothing cleanly.
+Use `find | sort -r` (filename `YYYYMMDD-HHMMSS` prefix), not `ls -1t`.
 
 ### Step 2: Select the file
 
-- **No argument** → load the first line of the sorted output (= most recent).
-- **Argument is a number `N`** → load the N-th line (1-indexed).
-- **Argument is a string** → match the first file whose path contains that substring (case-insensitive). If multiple match, present a disambiguation list via AskUserQuestion (A / B / C / D options for the top 4 matches).
+- No argument → first line (newest).
+- Number `N` → N-th line (1-indexed).
+- String → first path match (case-insensitive). Multiple matches → disambiguate (top 4).
 
-If the file can't be read: report the error path and stop.
+Unreadable file → report path and stop.
 
-### Step 3: Present the briefing
+### Step 3: Load checkpoint + feature artifacts
 
-Read the chosen file (Read tool, full file). Then output:
+Read the checkpoint (full file). Parse frontmatter:
+
+- `featureId` (required for schemaVersion ≥ 2; if missing on old checkpoints, infer from `Pointers` / conversation or ask)
+- `saved_at`, `branch`, `artifact_paths` (or resolve from `config.json` like context-save Step 0b)
+
+**Read-only artifact load** (summarize — do not dump entire files into the briefing):
+
+| Artifact | Read goal |
+|----------|-----------|
+| `README.md` in feature folder | Status, scope, non-goals (first ~30 lines) |
+| `feature-spec.md` | Current intent / acceptance themes (short summary) |
+| `tdd-spec.md` | Manual verification table + next tests to run |
+| `test-scenarios.md` | Top unresolved user paths (short summary) |
+| `dev-log.md` | **Last section only** — primary source for verify state at save time |
+
+If an artifact path is missing on disk, note `⚠ missing: <path>` — do not silently skip.
+
+### Step 3b: Stale artifact detection
+
+Compare each artifact file mtime against checkpoint time (`saved_at` ISO, or filename prefix `YYYYMMDD-HHMMSS` as fallback).
+
+```bash
+CHECKPOINT_FILE="<path from Step 2>"
+# Epoch from filename (UTC-local wall clock — good enough for stale hints):
+CP_DATE=$(basename "$CHECKPOINT_FILE" | cut -d- -f1)
+CP_TIME=$(basename "$CHECKPOINT_FILE" | cut -d- -f2 | cut -d. -f1)
+CP_EPOCH=$(date -j -f "%Y%m%d-%H%M%S" "${CP_DATE}${CP_TIME}" "+%s" 2>/dev/null \
+  || date -d "${CP_DATE:0:4}-${CP_DATE:4:2}-${CP_DATE:6:2} ${CP_TIME:0:2}:${CP_TIME:2:2}:${CP_TIME:4:2}" "+%s" 2>/dev/null \
+  || echo 0)
+
+check_stale() {
+  local label="$1" path="$2"
+  [ -z "$path" ] || [ ! -f "$path" ] && return
+  local art_epoch
+  art_epoch=$(stat -f %m "$path" 2>/dev/null || stat -c %Y "$path" 2>/dev/null || echo 0)
+  if [ "$art_epoch" -gt "$CP_EPOCH" ] && [ "$CP_EPOCH" -gt 0 ]; then
+    echo "STALE|$label|$path"
+  fi
+}
+
+# Set SPEC TDD SCENARIOS from checkpoint frontmatter or Step 0b resolution
+check_stale "feature-spec" "$SPEC"
+check_stale "tdd-spec" "$TDD"
+check_stale "test-scenarios" "$SCENARIOS"
+```
+
+For each `STALE|…` line, include in briefing:
+
+> ⚠ `<artifact>` last modified **after** this checkpoint — may contain cases or scope not reflected in dev-log. Re-read before implementing.
+
+This is intentional: honest lag beats fake checkbox sync on save.
+
+### Step 3c: Verification consistency check
+
+- Compare checkpoint **Verification baseline** with dev-log **last section → Verification**.
+- If checkpoint says `PASS` but dev-log says `UNKNOWN` (or vice versa), flag:
+
+> ⚠ Verification mismatch between checkpoint and dev-log last section — treat as **UNKNOWN** until re-run.
+
+- If all verification fields are `UNKNOWN` and saved >24h ago, add stale baseline advisory (Step 5).
+
+### Step 4: Present the briefing
 
 ```
 RESUMING CONTEXT
 ════════════════════════════════════════
-Title:       <from frontmatter>
-Branch:      <from frontmatter>
-Saved:       <saved_at, formatted local-time>
-Current:     <current branch from `git rev-parse --abbrev-ref HEAD`>
-Status:      <on the same branch / DIFFERENT branch — see note below>
+Title:       <from checkpoint>
+Feature:     Fxx — <feature_name>
+Branch:      <saved branch>
+Saved:       <saved_at>
+Current:     <git branch>
+Status:      <same branch / DIFFERENT branch>
 ════════════════════════════════════════
 
 ## Goal
-<from file>
+<from checkpoint>
 
 ## Decisions made
-<from file>
+<from checkpoint>
 
 ## Remaining work
-<from file>
+<from checkpoint>
 
 ## Gotchas / open questions
-<from file>
+<from checkpoint>
 
-## Verification baseline at checkpoint time
-<from file>
+## Verification at save time
+<from checkpoint + dev-log last section; note mismatches>
+
+## Engineering artifacts (read-only summary)
+### README
+<2–4 bullets>
+
+### Feature spec
+<2–4 bullets>
+
+### TDD spec — next manual checks
+<bullets from Manual Verification / Required Verification sections>
+
+### Test scenarios
+<2–4 bullets — focus on not-yet-covered paths>
+
+### Dev-log (latest section)
+<summary of last ## dated section>
+
+## Stale / warnings
+<stale artifact lines, branch mismatch, verify mismatch, missing files>
+
+## Artifact paths
+- spec: …
+- tdd: …
+- test-scenarios: …
+- dev-log: …
 ```
 
-**Branch mismatch handling:** if `current branch != saved branch`, append:
+**Branch mismatch:** if `current != saved branch`:
 
-> ⚠ This checkpoint was saved on `<saved-branch>`. You are currently on `<current-branch>`. If the remaining work belongs to `<saved-branch>`, switch with `git checkout <saved-branch>` before continuing.
+> ⚠ Saved on `<saved>`, now on `<current>`. `git checkout <saved>` before continuing if work belongs on the saved branch. No auto-checkout.
 
-Do **not** auto-checkout — branch switches mid-session can lose uncommitted work.
+### Step 5: Offer next steps
 
-### Step 4: Offer next steps via AskUserQuestion
+Single AskUserQuestion (or prose equivalent):
 
-Always batch into a single question:
+- A) **Continue** — next turn starts first remaining-work item
+- B) **Show full checkpoint** — raw `.context/sessions/…` file
+- C) **Pick a different item** — user points at a remaining-work line
+- D) **Briefing only** — exit
 
-- A) **Continue** — start on the first remaining-work item (the next turn will do the work)
-- B) **Show full file** — print the raw `.md`
-- C) **Pick a different item** — let the user point at a specific remaining-work line
-- D) **Just needed the briefing, thanks** — exit cleanly
+On A or C: draft a one-paragraph **starting point** (files to open, test to run, failure mode to repro). **Do not code this turn.**
 
-On A or C, draft a one-paragraph "starting point" — file paths to open, the failure mode to reproduce, the next test to write — but **do not start coding in this turn**. Hand it back so the user can confirm before the next turn implements.
+**Stale baseline advisory** (Step 3c): if checkpoint verification is all `UNKNOWN` or saved >24h ago or branch has new commits since `saved_at`:
 
-### Step 5: Re-verify the baseline (optional, advisory)
+> ℹ Baseline may be stale. Consider `npm run verify:baseline` before resuming. Not run automatically.
 
-If the checkpoint's verification baseline says PASS but it was saved >24 hours ago OR the branch has new commits since `saved_at`, append:
+### Step 6: Schema migration note
 
-> ℹ The baseline in this checkpoint is stale. Worth running `npm run typecheck && cargo check --manifest-path src-tauri/Cargo.toml` once before resuming the work.
-
-Don't run it automatically — that's a "next turn" decision for the user.
+`schemaVersion: 1` checkpoints lack `featureId`. On restore:
+- Try to infer feature from title/slug or ask once.
+- Skip artifact load if no ID; still present checkpoint body.
+- Suggest re-saving with `/context-save Fxx` to upgrade handoff quality.
 
 ---
 
 ## If no checkpoints exist
 
-If Step 1 prints `NO_CHECKPOINTS`:
-
 ```
 No checkpoints found in .context/sessions/.
 
-To create one: pause your work and run `/context-save` (optionally with a short title).
-That writes a markdown checkpoint here that `/context-restore` will find next time.
+Create one: /context-save Fxx [optional title]
+That appends dev-log and writes a checkpoint for the next restore.
 
-Adjacent tools:
-- `/handoff` — generate a full self-contained prompt for a brand-new AI session
-- `.context/sessions/` — where checkpoints live (per-repo, can be gitignored or committed)
+Adjacent:
+- /handoff — full prompt for a brand-new AI session
+- dev-log — .project-manager/features/<ID>/dev-log.md
 ```
 
 ---
 
 ## Guardrails
 
-- **Never modify code** in this skill's turn. Briefing only.
-- **Never auto-checkout** another branch.
-- **Always search across all branches** — the branch is recorded in frontmatter, not enforced. Cross-branch resume is the whole point.
-- If a checkpoint references files that no longer exist (renamed / deleted), note it in the briefing — don't silently drop them.
-- If the frontmatter is malformed, present what you can parse and flag the rest as `<unreadable>` rather than crashing.
+- **Never modify code or artifacts** in this turn. Read-only.
+- **Never auto-checkout** branches.
+- **Never write** spec / tdd / test-scenarios / dev-log on restore.
+- Summarize artifacts — full file dump only if user picks "Show full checkpoint" or asks.
+- Missing / renamed files → explicit warning, not silent drop.
+- Malformed frontmatter → present parseable fields; flag rest as `<unreadable>`.

@@ -120,3 +120,7 @@ Use **Context7 MCP** (`resolve-library-id` → `query-docs`) for current docs on
 library / framework / SDK / API / CLI tool / cloud service, rather than pre-trained
 knowledge. Do not use it for refactoring, writing scripts from scratch, business-logic
 debugging, code review, or general programming concepts.
+
+For **web browsing / QA / dogfooding**, prefer gstack's `/browse` (headless browser)
+over chrome / playwright MCP tools where the agent supports it. gstack is installed
+globally at `~/.claude/skills/gstack/`.

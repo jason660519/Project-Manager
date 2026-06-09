@@ -69,6 +69,7 @@ import {
   savePluginCatalog,
   selectProviders,
   setProviderApiKey,
+  setPluginEnabled,
   togglePluginEnabled,
   togglePluginAutostart,
 } from '../../../../lib/storage/plugins';
@@ -118,6 +119,8 @@ import {
   telegramStopPoll,
   onTelegramStatus,
   spawnTerminal,
+  scanMacosApplications,
+  type ScanMacosApplicationsResult,
 } from '../../../../lib/bridge';
 import { checkCommandExists } from '../../../../lib/adapters/availability';
 import { getSkillsDir } from '../../../../lib/storage/settings';
@@ -132,14 +135,14 @@ import {
 import { useInAppAlert, useInAppConfirm } from '../../../../components/ui/InAppDialog';
 import {
   IntegrationsTable,
-  DEFAULT_VISIBILITY,
-  type ColumnVisibility,
   type IntegrationRowTestResult,
 } from './_shared/IntegrationsTable';
 import { IntegrationsDetailSheet } from './_shared/IntegrationsDetailSheet';
 import { McpLogsViewer } from './_shared/McpLogsViewer';
 import { ConnectSheet } from './ConnectSheet';
 import { CapabilitySheetView } from './CapabilitySheetView';
+import { buildSystemInstalledAppsRows } from '../../../../lib/integrations/mappers/system-installed-apps';
+import { deriveSystemAppsScanPhase, SystemAppsScanBanner } from './SystemInstalledAppsSheet';
 import { ScanReportPanel } from './_shared/ScanReportPanel';
 import { DiscoverPlanDialog } from './_shared/DiscoverPlanDialog';
 import { DiscoveryResultPanel } from './_shared/DiscoveryResultPanel';
@@ -166,7 +169,6 @@ function newMappingId(): string {
   return typeof crypto !== 'undefined' ? crypto.randomUUID() : Math.random().toString(36).slice(2);
 }
 
-type PluginsFilter = 'all' | 'installed' | 'marketplace';
 type PluginsRowDensity = 'compact' | 'comfortable';
 
 export interface PluginsHubViewProps {
@@ -185,14 +187,13 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
   const confirmAction = useInAppConfirm();
   const botTokenAlert = useInAppAlert();
   const activeSheet: IntegrationSheet = normalizeIntegrationSheet(initialSheet ?? SYSTEM_INSTALLED_APPS_SHEET);
-  const [pluginsFilter, setPluginsFilter] = useState<PluginsFilter>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
-  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(DEFAULT_VISIBILITY);
   const [selectedRow, setSelectedRow] = useState<IntegrationRow | null>(null);
   const [manualVersion, setManualVersion] = useState(0);
 
   const [catalog, setCatalog] = useState<PluginCatalog>(EMPTY_CATALOG);
+  const catalogRef = useRef<PluginCatalog>(EMPTY_CATALOG);
   const [channelCatalog, setChannelCatalog] = useState<ChannelCatalog>({ channels: [], commandMappings: [] });
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
   const [mcpStatuses, setMcpStatuses] = useState<Map<string, McpRunStatus>>(new Map());
@@ -236,6 +237,10 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
   const [scanReport, setScanReport] = useState<ScanReport | null>(null);
   const [scanRunning, setScanRunning] = useState(false);
   const [scanActionKind, setScanActionKind] = useState<'scan' | 'test'>('scan');
+  const [macosAppsSnapshot, setMacosAppsSnapshot] = useState<ScanMacosApplicationsResult | null>(null);
+  const [macosAppsScanning, setMacosAppsScanning] = useState(false);
+  const [macosAppsScanError, setMacosAppsScanError] = useState<string | null>(null);
+  const [macosAppsLastScannedAt, setMacosAppsLastScannedAt] = useState<number | null>(null);
   const refreshManual = () => setManualVersion((v) => v + 1);
 
   // Reset per-sheet state when the URL sheet changes — dynamic-segment
@@ -251,6 +256,39 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
       router.replace(`/integrations-hub/${SYSTEM_INSTALLED_APPS_SHEET}`);
     }
   }, [initialSheet, router]);
+
+  const runMacosApplicationsScan = useCallback(async (): Promise<ScanMacosApplicationsResult> => {
+    setMacosAppsScanning(true);
+    setMacosAppsScanError(null);
+    try {
+      const result = await scanMacosApplications();
+      setMacosAppsSnapshot(result);
+      setMacosAppsLastScannedAt(Date.now());
+      if (result.warnings.some((w) => w.toLowerCase().includes('permission denied')) && result.apps.length === 0) {
+        setMacosAppsScanError(result.warnings.find((w) => w.toLowerCase().includes('permission denied')) ?? null);
+      } else if (result.apps.length === 0 && result.warnings.length > 0) {
+        setMacosAppsScanError(result.warnings.join(' '));
+      }
+      return result;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setMacosAppsScanError(message);
+      throw err;
+    } finally {
+      setMacosAppsScanning(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeSheet !== SYSTEM_INSTALLED_APPS_SHEET) return;
+    void runMacosApplicationsScan().catch(() => {});
+  }, [activeSheet, runMacosApplicationsScan]);
+
+  const macosAppsScanPhase = deriveSystemAppsScanPhase({
+    scanning: macosAppsScanning,
+    snapshot: macosAppsSnapshot,
+    errorMessage: macosAppsScanError,
+  });
 
   useEffect(() => {
     const c = loadPluginCatalog();
@@ -480,6 +518,10 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
   }, []);
 
   useEffect(() => {
+    catalogRef.current = catalog;
+  }, [catalog]);
+
+  useEffect(() => {
     channelCatalogRef.current = channelCatalog;
   }, [channelCatalog]);
 
@@ -507,6 +549,7 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
   }, []);
 
   const updateCatalog = (next: PluginCatalog) => {
+    catalogRef.current = next;
     setCatalog(next);
     savePluginCatalog(next, { repoRoot: pmRoot });
     refreshManual();
@@ -536,13 +579,13 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
         resolvedInstallPaths[mp.id],
       ),
     );
-    let rows: IntegrationRow[] = [];
-    if (pluginsFilter === 'installed') rows = installed;
-    else if (pluginsFilter === 'marketplace') rows = marketplace.filter((r) => r.status === 'not_installed');
-    else rows = [...installed, ...marketplace.filter((r) => !installedIds.has(r.sourceId))];
+    const rows: IntegrationRow[] = [
+      ...installed,
+      ...marketplace.filter((r) => !installedIds.has(r.sourceId)),
+    ];
     return mergeAllManual(rows);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catalog, apiKeys, systemCommandStatus, mcpStatuses, pluginsFilter, installedIds, manualVersion, resolvedInstallPaths]);
+  }, [catalog, apiKeys, systemCommandStatus, mcpStatuses, installedIds, manualVersion, resolvedInstallPaths]);
 
   const pluginSheetRows = useMemo(
     () => allPluginRows.filter((r) => r.sheet === 'plugins'),
@@ -568,6 +611,26 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
     pluginSheetRows,
     CODING_TOOL_IDS,
   ]);
+
+  const pluginMapperCtx = useMemo(
+    () => ({
+      apiKeys,
+      systemCommandStatus,
+      mcpStatuses,
+      resolvedInstallPaths,
+    }),
+    [apiKeys, systemCommandStatus, mcpStatuses, resolvedInstallPaths],
+  );
+
+  const systemInstalledAppsRows = useMemo(
+    () =>
+      buildSystemInstalledAppsRows(
+        pluginSheetRows,
+        pluginMapperCtx,
+        macosAppsSnapshot?.apps ?? [],
+      ),
+    [pluginSheetRows, pluginMapperCtx, macosAppsSnapshot?.apps],
+  );
 
   const channelRows = useMemo(() => {
     const rows = channelCatalog.channels.map((ch) =>
@@ -641,36 +704,39 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
           ctx.paths[mp.id],
         ),
       );
-      let rows: IntegrationRow[];
-      if (pluginsFilter === 'installed') rows = installed;
-      else if (pluginsFilter === 'marketplace')
-        rows = marketplace.filter((r) => r.status === 'not_installed');
-      else rows = [...installed, ...marketplace.filter((r) => !installedIds.has(r.sourceId))];
+      const rows: IntegrationRow[] = [
+        ...installed,
+        ...marketplace.filter((r) => !installedIds.has(r.sourceId)),
+      ];
       return mergeAllManual(rows);
     },
-    [apiKeys, catalog, installedIds, pluginsFilter],
+    [apiKeys, catalog, installedIds],
   );
 
   const rescanSystemInstalledApps = useCallback(
     async (sharedCtx?: SharedPluginCtx): Promise<ScanOutcome> => {
       const startedAt = Date.now();
-      const prev = pluginRows;
+      const prev = systemInstalledAppsRows;
       try {
         const ctx = sharedCtx ?? (await runPluginSystemScan());
         if (!sharedCtx) {
           setSystemCommandStatus(ctx.status);
           setResolvedInstallPaths(ctx.paths);
         }
-        const allRows = buildPluginRowsFromCtx(ctx, mcpStatuses);
-        const next = allRows
-          .filter((r) => r.sheet === 'plugins')
-          .filter((r) => !CODING_TOOL_IDS.has(r.sourceId));
+        const macResult = await runMacosApplicationsScan();
+        const mapperCtx = {
+          systemCommandStatus: ctx.status,
+          resolvedInstallPaths: ctx.paths,
+        };
+        const pluginRowsSnapshot = buildPluginRowsFromCtx(ctx, mcpStatuses).filter((r) => r.sheet === 'plugins');
+        const next = buildSystemInstalledAppsRows(pluginRowsSnapshot, mapperCtx, macResult.apps);
         return {
           sheetId: SYSTEM_INSTALLED_APPS_SHEET,
           label: 'System Installed Apps',
           count: next.length,
           ...diffRows(prev, next),
           durationMs: Date.now() - startedAt,
+          ...(macResult.warnings.length > 0 ? { skipped: macResult.warnings.join('; ') } : {}),
         };
       } catch (e) {
         return {
@@ -685,7 +751,13 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
         };
       }
     },
-    [pluginRows, runPluginSystemScan, buildPluginRowsFromCtx, mcpStatuses, CODING_TOOL_IDS],
+    [
+      systemInstalledAppsRows,
+      runMacosApplicationsScan,
+      runPluginSystemScan,
+      buildPluginRowsFromCtx,
+      mcpStatuses,
+    ],
   );
 
   const rescanCodingTools = useCallback(
@@ -952,7 +1024,7 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
   const activeRows = useMemo(() => {
     let rows =
       activeSheet === SYSTEM_INSTALLED_APPS_SHEET
-        ? pluginRows
+        ? systemInstalledAppsRows
         : activeSheet === 'coding-tools'
           ? codingToolRows
           : activeSheet === 'mcp'
@@ -974,7 +1046,7 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
     return rows;
   }, [
     activeSheet,
-    pluginRows,
+    systemInstalledAppsRows,
     codingToolRows,
     mcpRows,
     skillsRowsMerged,
@@ -1390,7 +1462,11 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
   };
 
   const sheetTabs: ReadonlyArray<SheetTabItem<IntegrationSheet>> = [
-    { key: SYSTEM_INSTALLED_APPS_SHEET, label: t.integrations.sheetPlugins, badge: pluginRows.length },
+    {
+      key: SYSTEM_INSTALLED_APPS_SHEET,
+      label: t.integrations.sheetPlugins,
+      badge: systemInstalledAppsRows.length,
+    },
     { key: 'coding-tools', label: 'Coding Tools', badge: codingToolRows.length },
     { key: 'mcp', label: t.integrations.sheetMcp, badge: mcpRows.length },
     { key: 'skills', label: t.integrations.sheetSkills, badge: skillsRowsMerged.length },
@@ -1426,6 +1502,67 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
 
   const isPluginSystemSheet =
     activeSheet === SYSTEM_INSTALLED_APPS_SHEET || activeSheet === 'coding-tools' || activeSheet === 'mcp';
+
+  const canToggleRowEnabled = useCallback(
+    (row: IntegrationRow) => {
+      if (isPluginSystemSheet) return row.sourceKind === 'plugin-installed';
+      if (activeSheet === 'channels') return row.sourceKind === 'channel';
+      if (activeSheet === 'commands') {
+        return row.sourceKind === 'command-mapping' || row.sourceKind === 'system-cli';
+      }
+      return false;
+    },
+    [activeSheet, isPluginSystemSheet],
+  );
+
+  const handleIntegrationRowEnabled = useCallback(
+    (row: IntegrationRow, enabled: boolean) => {
+      if (row.enabled === enabled) return;
+
+      if (isPluginSystemSheet) {
+        if (row.sourceKind !== 'plugin-installed') return;
+        const next = setPluginEnabled(catalogRef.current, row.sourceId, enabled);
+        catalogRef.current = next;
+        updateCatalog(next);
+        return;
+      }
+
+      if (activeSheet === 'channels') {
+        if (row.sourceKind !== 'channel') return;
+        const current = channelCatalogRef.current;
+        const next: ChannelCatalog = {
+          ...current,
+          channels: current.channels.map((c) =>
+            c.id === row.sourceId ? { ...c, enabled } : c,
+          ),
+        };
+        channelCatalogRef.current = next;
+        updateChannels(next);
+        return;
+      }
+
+      if (activeSheet === 'commands') {
+        if (row.sourceKind === 'command-mapping') {
+          const current = channelCatalogRef.current;
+          const next: ChannelCatalog = {
+            ...current,
+            commandMappings: current.commandMappings.map((m) =>
+              m.id === row.sourceId ? { ...m, enabled } : m,
+            ),
+          };
+          channelCatalogRef.current = next;
+          updateChannels(next);
+        } else if (row.sourceKind === 'system-cli') {
+          setSystemCliExposed(row.sourceId, enabled);
+          setSystemCliExposure((prev) => ({ ...prev, [row.sourceId]: enabled }));
+        } else {
+          return;
+        }
+        void loadCommands();
+      }
+    },
+    [activeSheet, isPluginSystemSheet, updateCatalog, updateChannels, loadCommands],
+  );
 
   const showIntegrationRowTest =
     isPluginSystemSheet || activeSheet === 'connected-instances';
@@ -1577,7 +1714,7 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
       createIntegrationSheetActionRegistry<SharedPluginCtx>({
         system_installed_apps: {
           scan: rescanSystemInstalledApps,
-          test: (rows: IntegrationRow[]) => testPluginRowsForSheet('system_installed_apps', rows),
+          test: (rows) => testPluginRowsForSheet('system_installed_apps', rows),
           testMode: 'selected-rows',
         },
         'coding-tools': {
@@ -1702,22 +1839,28 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
   const activeSheetCanTest = Boolean(activeSheetAction) && (!activeSheetRequiresSelection || activeSheetTestRows.length > 0);
 
   const activeSheetLoading =
-    activeSheet === 'skills'
-      ? skillsLoading
-      : activeSheet === 'memory'
-        ? memoryLoading
-        : activeSheet === 'commands'
-          ? commandsLoading
-          : false;
+    activeSheet === SYSTEM_INSTALLED_APPS_SHEET
+      ? macosAppsScanning && !macosAppsSnapshot
+      : activeSheet === 'skills'
+        ? skillsLoading
+        : activeSheet === 'memory'
+          ? memoryLoading
+          : activeSheet === 'commands'
+            ? commandsLoading
+            : false;
 
   const activeSheetError =
-    activeSheet === 'skills'
-      ? skillsError
-      : activeSheet === 'memory'
-        ? memoryError
-        : activeSheet === 'commands'
-          ? commandsError
-          : null;
+    activeSheet === SYSTEM_INSTALLED_APPS_SHEET
+      ? macosAppsScanPhase === 'error' || macosAppsScanPhase === 'permission'
+        ? macosAppsScanError
+        : null
+      : activeSheet === 'skills'
+        ? skillsError
+        : activeSheet === 'memory'
+          ? memoryError
+          : activeSheet === 'commands'
+            ? commandsError
+            : null;
 
   const RESCANABLE_SHEETS = new Set<IntegrationSheet>(INTEGRATION_INVENTORY_SHEETS);
 
@@ -1733,12 +1876,23 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
         <button
           type="button"
           onClick={() => void runSheetRescan(activeSheet)}
-          disabled={scanRunning || connectedInstanceScanRunning}
-          title="Rescan this sheet"
+          disabled={scanRunning || connectedInstanceScanRunning || macosAppsScanning}
+          title={
+            activeSheet === SYSTEM_INSTALLED_APPS_SHEET
+              ? 'Rescan macOS Applications folders and PATH probes'
+              : 'Rescan this sheet'
+          }
           className="flex items-center gap-1 border border-stone-200/20 px-2 py-2 text-xs text-stone-300 hover:border-emerald-300/30 disabled:opacity-50"
         >
-          <RotateCw size={12} className={scanRunning || connectedInstanceScanRunning ? 'animate-spin' : ''} />
-          Rescan
+          <RotateCw
+            size={12}
+            className={
+              scanRunning || connectedInstanceScanRunning || macosAppsScanning ? 'animate-spin' : ''
+            }
+          />
+          {activeSheet === SYSTEM_INSTALLED_APPS_SHEET
+            ? t.integrations.systemInstalledApps.scanButton
+            : 'Rescan'}
         </button>
       )}
       <select
@@ -1752,17 +1906,6 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
           </option>
         ))}
       </select>
-      {isPluginSystemSheet && (
-        <select
-          value={pluginsFilter}
-          onChange={(e) => setPluginsFilter(e.target.value as PluginsFilter)}
-          className="border border-stone-200/18 bg-[rgb(var(--pm-panel))] px-2 py-2 text-xs text-stone-200"
-        >
-          <option value="all">{t.integrations.filterAllPlugins}</option>
-          <option value="installed">{t.plugins.installed}</option>
-          <option value="marketplace">{t.plugins.marketplace}</option>
-        </select>
-      )}
       {activeSheet === 'skills' && (
         <Link href="/settings" className="text-xs text-emerald-300/80 hover:text-emerald-200">
           {t.plugins.settings}
@@ -1863,25 +2006,7 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
           </button>
         </div>
       )}
-      <label className="flex items-center gap-1 text-[10px] text-stone-500">
-        <input
-          type="checkbox"
-          checked={columnVisibility.installPath}
-          onChange={(e) =>
-            setColumnVisibility((v) => ({ ...v, installPath: e.target.checked }))
-          }
-        />
-        Path
-      </label>
-      <label className="flex items-center gap-1 text-[10px] text-stone-500">
-        <input
-          type="checkbox"
-          checked={columnVisibility.notes}
-          onChange={(e) => setColumnVisibility((v) => ({ ...v, notes: e.target.checked }))}
-        />
-        Notes
-      </label>
-      <div className="ml-2 flex items-center gap-1 border-l border-stone-200/15 pl-2">
+      <div className="flex items-center gap-1 border-l border-stone-200/15 pl-2">
         <Snowflake size={12} className="text-cyan-300" />
         <label className="text-[10px] text-stone-400">Freeze cols</label>
         <input
@@ -1912,11 +2037,26 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
         header={
           <div>
             <div className="flex items-center justify-between gap-3">
-              <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">
-                {t.integrations.title}
-              </h1>
+              <div className="flex min-w-0 items-center gap-2">
+                <h1 className="text-lg font-semibold uppercase tracking-[0.18em] text-stone-50">
+                  {t.integrations.title}
+                </h1>
+                <button
+                  type="button"
+                  onClick={() =>
+                    pluginGuidePath
+                      ? void openPath(pluginGuidePath).catch(() => {})
+                      : undefined
+                  }
+                  className="flex shrink-0 items-center gap-2 border border-emerald-500/20 bg-emerald-950/25 px-3 py-1.5 text-xs text-emerald-400"
+                >
+                  <FileText size={13} />
+                  {t.integrations.hubGuide}
+                  <ExternalLink size={11} />
+                </button>
+              </div>
               <div className="flex items-center gap-2">
-                {activeSheetAction && (
+                {activeSheetAction && activeSheet !== SYSTEM_INSTALLED_APPS_SHEET && (
                   <button
                     type="button"
                     onClick={() => void runSheetTest()}
@@ -1947,19 +2087,6 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
                 >
                   <RefreshCw size={13} className={scanRunning ? 'animate-spin' : ''} />
                   {scanRunning && scanActionKind === 'scan' ? 'Scanning...' : 'Scan All'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    pluginGuidePath
-                      ? void openPath(pluginGuidePath).catch(() => {})
-                      : undefined
-                  }
-                  className="flex shrink-0 items-center gap-2 border border-emerald-500/20 bg-emerald-950/25 px-3 py-1.5 text-xs text-emerald-400"
-                >
-                  <FileText size={13} />
-                  {t.integrations.hubGuide}
-                  <ExternalLink size={11} />
                 </button>
               </div>
             </div>
@@ -2014,6 +2141,15 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
               </div>
             )}
 
+            {activeSheet === SYSTEM_INSTALLED_APPS_SHEET && macosAppsScanPhase !== 'idle' && (
+              <SystemAppsScanBanner
+                phase={macosAppsScanPhase}
+                snapshot={macosAppsSnapshot}
+                errorMessage={macosAppsScanError}
+                lastScannedAt={macosAppsLastScannedAt}
+                appCount={macosAppsSnapshot?.apps.length ?? 0}
+              />
+            )}
             <div className="min-h-0 flex-1">
               <IntegrationsTable
                 rows={activeRows}
@@ -2023,13 +2159,16 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
                 onToggleCheck={handleToggleCheck}
                 onToggleCheckAll={handleToggleCheckAll}
                 globalFilter={search}
-                columnVisibility={columnVisibility}
                 isLoading={activeSheetLoading}
                 errorMessage={activeSheetError}
                 frozenDataColCount={frozenDataColCount}
                 rowDensity={rowDensity}
                 methodColumnHeader={
-                  activeSheet === 'connected-instances' ? t.integrations.colScanMethod : undefined
+                  activeSheet === 'connected-instances'
+                    ? t.integrations.colScanMethod
+                    : activeSheet === 'mcp'
+                      ? t.integrations.colServerType
+                      : undefined
                 }
                 compactStatusCell={activeSheet === 'connected-instances'}
                 onTestRow={
@@ -2041,41 +2180,15 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
                 testingKeys={
                   showIntegrationRowTest ? pluginTestingKeys : undefined
                 }
+                canToggleRowEnabled={
+                  isPluginSystemSheet || activeSheet === 'channels' || activeSheet === 'commands'
+                    ? canToggleRowEnabled
+                    : undefined
+                }
                 onToggleEnabled={
-                  isPluginSystemSheet
-                    ? (row, _enabled) => {
-                        if (row.sourceKind === 'plugin-installed') {
-                          updateCatalog(togglePluginEnabled(catalog, row.sourceId));
-                        }
-                      }
-                    : activeSheet === 'channels'
-                      ? (row, enabled) => {
-                          if (row.sourceKind !== 'channel') return;
-                          updateChannels({
-                            ...channelCatalog,
-                            channels: channelCatalog.channels.map((c) =>
-                              c.id === row.sourceId ? { ...c, enabled } : c,
-                            ),
-                          });
-                        }
-                      : activeSheet === 'commands'
-                        ? (row, enabled) => {
-                            if (row.sourceKind === 'command-mapping') {
-                              updateChannels({
-                                ...channelCatalog,
-                                commandMappings: channelCatalog.commandMappings.map((m) =>
-                                  m.id === row.sourceId ? { ...m, enabled } : m,
-                                ),
-                              });
-                            } else if (row.sourceKind === 'system-cli') {
-                              setSystemCliExposed(row.sourceId, enabled);
-                              setSystemCliExposure((prev) => ({ ...prev, [row.sourceId]: enabled }));
-                            } else {
-                              return;
-                            }
-                            void loadCommands();
-                          }
-                        : undefined
+                  isPluginSystemSheet || activeSheet === 'channels' || activeSheet === 'commands'
+                    ? handleIntegrationRowEnabled
+                    : undefined
                 }
               />
             </div>

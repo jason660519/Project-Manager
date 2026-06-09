@@ -83,6 +83,10 @@ const METHOD_STYLES: Record<string, { label: string; className: string }> = {
   nmap: { label: 'nmap', className: 'border-amber-400/25 bg-amber-500/10 text-amber-200' },
   manual: { label: 'Manual', className: 'border-stone-400/25 bg-stone-500/10 text-stone-200' },
   mdns: { label: 'mDNS', className: 'border-teal-400/25 bg-teal-500/10 text-teal-200' },
+  stdio: { label: 'STDIO', className: 'border-violet-400/25 bg-violet-500/10 text-violet-200' },
+  sse: { label: 'SSE', className: 'border-sky-400/25 bg-sky-500/10 text-sky-200' },
+  shttp: { label: 'SHTTP', className: 'border-emerald-400/25 bg-emerald-500/10 text-emerald-200' },
+  http: { label: 'SSE', className: 'border-sky-400/25 bg-sky-500/10 text-sky-200' },
 };
 
 function MethodBadge({ method }: { method?: string }) {
@@ -102,6 +106,8 @@ interface IntegrationsTableProps {
   selectedRowKey: string | null;
   onRowClick: (row: IntegrationRow) => void;
   onToggleEnabled?: (row: IntegrationRow, enabled: boolean) => void;
+  /** When set, only matching rows show an interactive Enabled checkbox (header uses the same filter). */
+  canToggleRowEnabled?: (row: IntegrationRow) => boolean;
   /** Row selection checkboxes (multi-select for batch operations). */
   checkedKeys?: ReadonlySet<string>;
   onToggleCheck?: (rowKey: string, checked: boolean) => void;
@@ -141,6 +147,7 @@ export function IntegrationsTable({
   selectedRowKey,
   onRowClick,
   onToggleEnabled,
+  canToggleRowEnabled,
   checkedKeys,
   onToggleCheck,
   onToggleCheckAll,
@@ -170,17 +177,22 @@ export function IntegrationsTable({
                 const visibleRows = table.getRowModel().rows.map((r) => r.original);
                 const visibleKeys = visibleRows.map((r) => r.rowKey);
                 const selectionOnly = Boolean(onToggleCheck && !onToggleEnabled);
+                const enabledRows = canToggleRowEnabled
+                  ? visibleRows.filter((r) => canToggleRowEnabled(r))
+                  : visibleRows;
                 const allChecked = selectionOnly
                   ? visibleKeys.length > 0 && visibleKeys.every((k) => checkedKeys?.has(k))
-                  : visibleRows.length > 0 && visibleRows.every((r) => r.enabled);
+                  : enabledRows.length > 0 && enabledRows.every((r) => r.enabled);
                 const someChecked = selectionOnly
                   ? !allChecked && visibleKeys.some((k) => checkedKeys?.has(k))
-                  : !allChecked && visibleRows.some((r) => r.enabled);
+                  : !allChecked && enabledRows.some((r) => r.enabled);
+                const headerDisabled = !selectionOnly && enabledRows.length === 0;
                 return (
                   <div className="inline-flex items-center gap-1.5">
                     <input
                       type="checkbox"
                       checked={allChecked}
+                      disabled={headerDisabled}
                       ref={(el) => { if (el) el.indeterminate = someChecked; }}
                       onChange={(e) => {
                         e.stopPropagation();
@@ -189,13 +201,14 @@ export function IntegrationsTable({
                           onToggleCheckAll?.(next, visibleKeys);
                           return;
                         }
-                        visibleRows.forEach((row) => {
+                        enabledRows.forEach((row) => {
+                          if (row.enabled === next) return;
                           onToggleEnabled?.(row, next);
                           onToggleCheck?.(row.rowKey, next);
                         });
                       }}
                       onClick={(e) => e.stopPropagation()}
-                      className="h-3.5 w-3.5 shrink-0 accent-emerald-400"
+                      className="h-3.5 w-3.5 shrink-0 accent-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
                       title={allChecked ? t.integrations.deselectAll : t.integrations.selectAll}
                     />
                     <span className="whitespace-nowrap normal-case tracking-normal text-stone-400">
@@ -206,6 +219,7 @@ export function IntegrationsTable({
               },
               cell: ({ row }) => {
                 const selectionOnly = Boolean(onToggleCheck && !onToggleEnabled);
+                const rowToggleable = !canToggleRowEnabled || canToggleRowEnabled(row.original);
                 const checked = selectionOnly
                   ? (checkedKeys?.has(row.original.rowKey) ?? false)
                   : row.original.enabled;
@@ -213,6 +227,7 @@ export function IntegrationsTable({
                   <input
                     type="checkbox"
                     checked={checked}
+                    disabled={!selectionOnly && !rowToggleable}
                     onChange={(e) => {
                       e.stopPropagation();
                       const next = e.target.checked;
@@ -220,11 +235,12 @@ export function IntegrationsTable({
                         onToggleCheck?.(row.original.rowKey, next);
                         return;
                       }
+                      if (!rowToggleable || row.original.enabled === next) return;
                       onToggleEnabled?.(row.original, next);
                       onToggleCheck?.(row.original.rowKey, next);
                     }}
                     onClick={(e) => e.stopPropagation()}
-                    className="h-3.5 w-3.5 accent-emerald-400"
+                    className="h-3.5 w-3.5 accent-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
                     title={t.integrations.colEnabled}
                   />
                 );
@@ -465,6 +481,7 @@ export function IntegrationsTable({
       onToggleCheckAll,
       checkedKeys,
       onToggleEnabled,
+      canToggleRowEnabled,
       onTestRow,
       testResults,
       testingKeys,

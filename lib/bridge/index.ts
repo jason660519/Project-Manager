@@ -995,6 +995,53 @@ export async function listInstalledBrowsers(): Promise<InstalledBrowser[]> {
   return invoke<InstalledBrowser[]>('list_installed_browsers');
 }
 
+export interface InstalledMacApp {
+  id: string;
+  name: string;
+  path: string;
+  description: string | null;
+}
+
+export interface ScanMacosApplicationsResult {
+  apps: InstalledMacApp[];
+  scannedPaths: string[];
+  warnings: string[];
+}
+
+/**
+ * Scan macOS `/Applications`, `/System/Applications`, and `~/Applications`
+ * for installed `.app` bundles. In browser dev mode (macOS only), falls back
+ * to the dev-only `/api/integrations/scan-applications` route.
+ */
+export async function scanMacosApplications(): Promise<ScanMacosApplicationsResult> {
+  if (isTauri()) {
+    const raw = await invoke<{
+      apps: InstalledMacApp[];
+      scannedPaths: string[];
+      warnings: string[];
+    }>('scan_macos_applications');
+    return {
+      apps: raw.apps.map((app) => ({
+        ...app,
+        description: app.description ?? null,
+      })),
+      scannedPaths: raw.scannedPaths,
+      warnings: raw.warnings,
+    };
+  }
+
+  if (typeof window === 'undefined') {
+    throw new Error('scanMacosApplications requires a browser or Tauri runtime');
+  }
+
+  const res = await fetch('/api/integrations/scan-applications');
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? `Scan failed (${res.status})`);
+  }
+  return res.json() as Promise<ScanMacosApplicationsResult>;
+}
+
 /**
  * Fail-closed gate for a PM-mediated browser launch governed by an engineer's
  * `browserAccess` policy (ADR-017, L2a). Returns whether the launch is permitted:

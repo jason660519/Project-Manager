@@ -769,11 +769,17 @@ fn detect_macos_browsers() -> Vec<InstalledBrowser> {
 /// Best-effort read of `CFBundleShortVersionString` from an app bundle's Info.plist.
 #[cfg(target_os = "macos")]
 fn read_bundle_version(app_path: &Path) -> Option<String> {
+    read_bundle_plist_string(app_path, "CFBundleShortVersionString")
+}
+
+/// Best-effort read of a string field from an app bundle's Info.plist.
+#[cfg(target_os = "macos")]
+fn read_bundle_plist_string(app_path: &Path, key: &str) -> Option<String> {
     let info = app_path.join("Contents/Info");
     let out = std::process::Command::new("defaults")
         .arg("read")
         .arg(&info)
-        .arg("CFBundleShortVersionString")
+        .arg(key)
         .output()
         .ok()?;
     if !out.status.success() {
@@ -785,6 +791,152 @@ fn read_bundle_version(app_path: &Path) -> Option<String> {
     } else {
         Some(v)
     }
+}
+
+/// macOS application discovered under an Applications folder (Integrations Hub).
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct InstalledMacApp {
+    /// Stable bundle id when readable from Info.plist; otherwise the bundle path.
+    id: String,
+    name: String,
+    path: String,
+    description: Option<String>,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ScanMacosApplicationsResult {
+    apps: Vec<InstalledMacApp>,
+    scanned_paths: Vec<String>,
+    warnings: Vec<String>,
+}
+
+/// Scan standard macOS Applications folders for `.app` bundles.
+///
+/// Returns structured warnings (permission denied, missing path) instead of
+/// failing the whole scan when one root is unreadable.
+#[tauri::command]
+async fn scan_macos_applications() -> Result<ScanMacosApplicationsResult, String> {
+    #[cfg(target_os = "macos")]
+    {
+        Ok(scan_macos_applications_sync())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err("scan_macos_applications is only supported on macOS".to_string())
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn macos_application_roots() -> Vec<PathBuf> {
+    let mut roots = vec![
+        PathBuf::from("/Applications"),
+        PathBuf::from("/System/Applications"),
+    ];
+    if let Some(home) = std::env::var_os("HOME") {
+        roots.push(PathBuf::from(home).join("Applications"));
+    }
+    roots
+}
+
+#[cfg(target_os = "macos")]
+fn scan_macos_applications_sync() -> ScanMacosApplicationsResult {
+    let mut scanned_paths: Vec<String> = Vec::new();
+    let mut warnings: Vec<String> = Vec::new();
+    let mut by_path: std::collections::BTreeMap<String, InstalledMacApp> =
+        std::collections::BTreeMap::new();
+
+    for root in macos_application_roots() {
+        let root_display = root.to_string_lossy().into_owned();
+        if !root.exists() {
+            warnings.push(format!("Path not found: {root_display}"));
+            continue;
+        }
+        scanned_paths.push(root_display.clone());
+        scan_macos_applications_dir(&root, &mut by_path, &mut warnings);
+    }
+
+    let mut apps: Vec<InstalledMacApp> = by_path.into_values().collect();
+    apps.sort_by(|a, b| a.name.to_ascii_lowercase().cmp(&b.name.to_ascii_lowercase()));
+    ScanMacosApplicationsResult {
+        apps,
+        scanned_paths,
+        warnings,
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn scan_macos_applications_dir(
+    dir: &Path,
+    apps: &mut std::collections::BTreeMap<String, InstalledMacApp>,
+    warnings: &mut Vec<String>,
+) {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(v) => v,
+        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
+            warnings.push(format!(
+                "Permission denied reading {}. Grant Full Disk Access to Project Manager in System Settings → Privacy & Security.",
+                dir.display()
+            ));
+            return;
+        }
+        Err(e) => {
+            warnings.push(format!("Cannot read {}: {e}", dir.display()));
+            return;
+        }
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let file_type = match entry.file_type() {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        if file_type.is_dir() {
+            if path.extension().and_then(|e| e.to_str()) == Some("app") {
+                if let Some(app) = installed_mac_app_from_bundle(&path) {
+                    apps.entry(app.path.clone()).or_insert(app);
+                }
+            }
+            continue;
+        }
+        if file_type.is_symlink() {
+            if path.extension().and_then(|e| e.to_str()) == Some("app") {
+                if let Ok(meta) = std::fs::metadata(&path) {
+                    if meta.is_dir() {
+                        if let Some(app) = installed_mac_app_from_bundle(&path) {
+                            apps.entry(app.path.clone()).or_insert(app);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn installed_mac_app_from_bundle(app_path: &Path) -> Option<InstalledMacApp> {
+    let path_string = app_path.to_string_lossy().into_owned();
+    let bundle_id = read_bundle_plist_string(app_path, "CFBundleIdentifier");
+    let display_name = read_bundle_plist_string(app_path, "CFBundleDisplayName");
+    let bundle_name = read_bundle_plist_string(app_path, "CFBundleName");
+    let file_stem = app_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_string());
+    let name = display_name
+        .or(bundle_name)
+        .or(file_stem)
+        .unwrap_or_else(|| "Unknown App".to_string());
+    let description = read_bundle_plist_string(app_path, "CFBundleGetInfoString")
+        .or_else(|| read_bundle_plist_string(app_path, "NSHumanReadableCopyright"));
+    Some(InstalledMacApp {
+        id: bundle_id.unwrap_or_else(|| path_string.clone()),
+        name,
+        path: path_string,
+        description,
+    })
 }
 
 #[derive(Serialize, Clone)]
@@ -5529,6 +5681,19 @@ mod browser_tests {
         assert!(list_installed_browsers().await.is_ok());
     }
 
+    #[tokio::test]
+    async fn scan_macos_applications_never_errors_on_macos() {
+        #[cfg(target_os = "macos")]
+        {
+            let result = scan_macos_applications().await.expect("scan should succeed");
+            assert!(!result.scanned_paths.is_empty());
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            assert!(scan_macos_applications().await.is_err());
+        }
+    }
+
     #[cfg(target_os = "macos")]
     #[test]
     fn read_bundle_version_missing_path_is_none() {
@@ -6318,6 +6483,7 @@ pub fn run() {
             read_file,
             write_file,
             list_installed_browsers,
+            scan_macos_applications,
             append_pm_operation_log,
             scan_env_files,
             project_manager_root,

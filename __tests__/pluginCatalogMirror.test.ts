@@ -10,6 +10,7 @@ import {
 } from '../lib/storage/plugin-catalog-mirror';
 import {
   loadPluginCatalog,
+  setPluginEnabled,
   togglePluginAutostart,
   togglePluginEnabled,
 } from '../lib/storage/plugins';
@@ -80,6 +81,21 @@ describe('plugin catalog mirror', () => {
   it('leaves plugins unchanged when toggling autostart for unknown id', () => {
     const catalog: PluginCatalog = { schemaVersion: 2, plugins: [] };
     expect(togglePluginAutostart(catalog, 'missing').plugins).toEqual([]);
+  });
+
+  it('setPluginEnabled sets the target flag without inverting', () => {
+    let catalog = loadPluginCatalog();
+    const before = catalog.plugins.find((p) => p.id === 'openclaw')?.enabled;
+    catalog = setPluginEnabled(catalog, 'openclaw', true);
+    expect(catalog.plugins.find((p) => p.id === 'openclaw')?.enabled).toBe(true);
+    catalog = setPluginEnabled(catalog, 'openclaw', true);
+    expect(catalog.plugins.find((p) => p.id === 'openclaw')?.enabled).toBe(true);
+    catalog = setPluginEnabled(catalog, 'openclaw', false);
+    expect(catalog.plugins.find((p) => p.id === 'openclaw')?.enabled).toBe(false);
+    if (before === true) {
+      catalog = setPluginEnabled(catalog, 'openclaw', true);
+      expect(catalog.plugins.find((p) => p.id === 'openclaw')?.enabled).toBe(true);
+    }
   });
 
   it('uses relative commands for built-in sidecar CLIs', () => {

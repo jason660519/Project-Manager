@@ -4,11 +4,26 @@ import type {
   CliPlugin,
   EditorPlugin,
   McpPlugin,
+  McpTransport,
   PluginCatalog,
   ProviderPlugin,
 } from '../../types/plugins';
+import { MARKETPLACE } from '../marketplace-catalog';
 import { registryFor } from '../registry';
 import type { IntegrationRow, IntegrationScope, IntegrationStatus } from '../types';
+
+const MCP_SERVER_TYPES = new Set<McpTransport>(['stdio', 'sse', 'shttp']);
+
+/** Normalizes MCP transport for the Integrations Hub "Server Type" column. */
+export function mcpServerTypeForRow(pluginId: string, transport?: string): McpTransport {
+  if (transport && MCP_SERVER_TYPES.has(transport as McpTransport)) {
+    return transport as McpTransport;
+  }
+  if (transport === 'http') return 'sse';
+  const fromMarketplace = MARKETPLACE.find((entry) => entry.id === pluginId)?.defaultMcp?.transport;
+  if (fromMarketplace && MCP_SERVER_TYPES.has(fromMarketplace)) return fromMarketplace;
+  return 'stdio';
+}
 
 export interface ResolvedPluginPath {
   /** Absolute path of the executable as found on PATH (null if missing). */
@@ -181,7 +196,10 @@ function mapPlugin(plugin: AnyPlugin, ctx: PluginMapperContext): IntegrationRow 
     port: portFor(plugin, reg),
     installPath:
       reg.installPathHint ?? installPathFor(plugin, ctx.resolvedInstallPaths?.[plugin.id]),
-    installMethod: reg.installMethod ?? '',
+    installMethod:
+      plugin.kind === 'mcp'
+        ? mcpServerTypeForRow(plugin.id, plugin.transport)
+        : reg.installMethod ?? '',
     status,
     statusLabel,
     lastUpdated: plugin.installedAt?.slice(0, 10) ?? '',
@@ -235,7 +253,8 @@ export function mapMarketplaceRow(
     scope: (reg.scope ?? '') as IntegrationScope,
     port: reg.port ?? '',
     installPath: reg.installPathHint ?? detectedPath,
-    installMethod: reg.installMethod ?? '',
+    installMethod:
+      entry.kind === 'mcp' ? mcpServerTypeForRow(entry.id) : reg.installMethod ?? '',
     status: entry.installed ? 'installed' : 'not_installed',
     statusLabel: entry.installed ? 'Installed' : 'Available',
     lastUpdated: '',
