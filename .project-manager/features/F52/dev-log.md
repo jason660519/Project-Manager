@@ -107,3 +107,36 @@
   - Existing Turbopack warnings remain in `app/api/integrations/scan-applications/route.ts`
     broad `/Applications` tracing and `next.config.mjs` NFT trace; baseline still
     completed with `== verify:baseline: PASS ==`.
+
+## 2026-06-15 - Chat Workflow Command Slice
+
+- Added `/workflow <featureId>` as a local chat command that returns a Project
+  Workflow Loop Decision Package.
+- Kept the command review-first: it creates an in-memory run for review and does
+  not spawn actors, execute commands, or write sidecar files.
+- Imported the engine directly instead of the `project-workflows` index so chat
+  does not pull the run-store bridge boundary into this command path.
+
+## Verification - Chat Workflow Command Slice
+
+- PASS: `npm run test -- __tests__/chat.agent.test.ts`
+  - 21 tests.
+- PASS: `npm run typecheck`
+- PASS: `npm run docs:check`
+- PASS: `npm run test -- __tests__/projectWorkflowEngine.test.ts __tests__/chat.agent.test.ts __tests__/agentWorkflowDag.test.ts __tests__/projectDispatchAssistant.test.ts`
+  - 4 files / 63 tests.
+- PASS: `npm run verify:baseline`
+  - typecheck PASS
+  - agents:check PASS
+  - docs:check PASS
+  - docs:site:check PASS
+  - table sheet audit PASS
+  - static export hygiene PASS
+  - native dialog guard PASS
+  - UI i18n PASS
+  - vitest PASS: 173 files / 1171 tests
+  - cargo check PASS
+  - build PASS
+  - Existing Turbopack warnings remain in `app/api/integrations/scan-applications/route.ts`
+    broad `/Applications` tracing and `next.config.mjs` NFT trace; baseline still
+    completed with `== verify:baseline: PASS ==`.

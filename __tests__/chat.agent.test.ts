@@ -147,6 +147,18 @@ describe('sendChatMessage', () => {
     expect(spawnAgent).not.toHaveBeenCalled();
   });
 
+  it('returns a Project Workflow Loop decision package for /workflow <id>', async () => {
+    const result = await sendChatMessage({ content: '/workflow F14', history: [], context });
+
+    expect(result.content).toContain('Project Workflow Loop Decision Package');
+    expect(result.content).toContain('Template: Software Engineering Loop');
+    expect(result.content).toContain('F14');
+    expect(result.content).toContain('Sidebar Chatbot');
+    expect(result.content).toContain('Persistent memory: handoff artifacts and evidence ledger');
+    expect(result.content).toContain('No actor or command is executed by this package.');
+    expect(spawnAgent).not.toHaveBeenCalled();
+  });
+
   it('returns error for non-existent feature', async () => {
     const result = await sendChatMessage({ content: '/feature F99', history: [], context });
     expect(result.content).toContain('找不到功能');

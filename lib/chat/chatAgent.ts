@@ -19,6 +19,11 @@ import {
   createProjectDispatchPlanForFeature,
   renderProjectDispatchDecisionPackage,
 } from '../dispatch/projectDispatchAssistant';
+import {
+  createProjectWorkflowRun,
+  getProjectWorkflowTemplateById,
+  renderProjectWorkflowDecisionPackage,
+} from '../project-workflows/projectWorkflowEngine';
 import { loadAIAssistantsConsoleState } from '../ai-assistants/repository';
 import type { PermissionState, TerminalOperationalBoundaries } from '../ai-assistants/types';
 import { createDefaultTerminalBoundaries } from '../ai-assistants/terminalBoundaries';
@@ -366,6 +371,7 @@ const HELP_TEXT = `**🦞 Project Manager 小龍蝦助手**
 | \`/memory\` | 查看已儲存記憶 |
 | \`/go <view>\` | 導航至頁面 |
 | \`/dispatch <id>\` | 準備 Dispatch 提示 |
+| \`/workflow <id>\` | 準備 Workflow Loop 決策包 |
 
 **自然語言：**
 - 「搜尋 &lt;關鍵字&gt;」— 搜尋專案檔案
@@ -522,6 +528,27 @@ function buildDispatchResponse(context: ChatContext, featureId: string): string 
   return renderProjectDispatchDecisionPackage(plan);
 }
 
+function buildWorkflowResponse(context: ChatContext, featureId: string): string {
+  const feature = findFeature(context, featureId);
+  if (!feature) {
+    return `找不到功能 **${featureId}**。請用 \`/status\` 查看所有功能。`;
+  }
+  const template = getProjectWorkflowTemplateById('software-engineering-loop');
+  if (!template) {
+    return '找不到 Software Engineering Loop workflow template。';
+  }
+  const run = createProjectWorkflowRun(template, {
+    projectId: context.selectedProject?.id ?? context.selectedProject?.config.project.name ?? 'project-manager',
+    workItemId: feature.id,
+    createdBy: 'Chat command',
+  });
+  return [
+    `## Workflow Loop: ${feature.id} ${feature.name}`,
+    '',
+    renderProjectWorkflowDecisionPackage(template, run),
+  ].join('\n');
+}
+
 function naturalLanguageRoute(content: string): string | undefined {
   const text = normalize(content);
   const match = text.match(/\b(?:open|go to|show|navigate to)\s+([a-z-]+)\b/);
@@ -625,6 +652,15 @@ function localCommand(request: SendChatMessageRequest): SendChatMessageResult | 
     saveMemory('lastInteraction', content, request.context);
     return {
       content: buildDispatchResponse(request.context, content.slice('/dispatch '.length)),
+      handledLocally: true,
+    };
+  }
+
+  // /workflow <id>
+  if (lowered.startsWith('/workflow ')) {
+    saveMemory('lastInteraction', content, request.context);
+    return {
+      content: buildWorkflowResponse(request.context, content.slice('/workflow '.length)),
       handledLocally: true,
     };
   }

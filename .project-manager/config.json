@@ -1917,7 +1917,9 @@
           "lib/project-workflows/projectWorkflowEngine.ts",
           "lib/project-workflows/projectWorkflowRunStore.ts",
           "lib/project-workflows/index.ts",
+          "lib/chat/chatAgent.ts",
           "__tests__/projectWorkflowEngine.test.ts",
+          "__tests__/chat.agent.test.ts",
           ".project-manager/features/F52/README.md",
           ".project-manager/features/F52/feature-spec.md",
           ".project-manager/features/F52/tdd-spec.md",
@@ -1927,7 +1929,7 @@
         "kickoffAt": "2026-06-15T05:20:00.000Z"
       },
       "name": "Project Workflow Loop Engine",
-      "notes": "Core cross-discipline PM workflow loop engine model, software and construction quality templates, review-first run state, structured handoffs, evidence ledger, workflow events, persistent run store, scorecard blocking, stop policy, and human approval gates added. Software Engineering Loop is the first template, not the product boundary.",
+      "notes": "Core cross-discipline PM workflow loop engine model, software and construction quality templates, review-first run state, structured handoffs, evidence ledger, workflow events, persistent run store, chat /workflow decision package, scorecard blocking, stop policy, and human approval gates added. Software Engineering Loop is the first template, not the product boundary.",
       "paths": {
         "developmentLogSummaryFolder": ".project-manager/features/F52/",
         "featureFolder": ".project-manager/features/F52/",
@@ -1939,10 +1941,10 @@
       },
       "phase": "development",
       "points": 8,
-      "progress": 60,
+      "progress": 75,
       "readmePath": ".project-manager/features/F52/README.md",
       "status": "in_progress",
-      "updatedAt": "2026-06-15T06:45:00.000Z",
+      "updatedAt": "2026-06-15T07:05:00.000Z",
       "updatedBy": "Codex"
     }
   ],
