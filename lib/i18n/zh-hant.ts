@@ -752,6 +752,7 @@ export const zhHant: Translations = {
     vlm: {
       inputTitle: '測試輸入',
       uploadImage: '上傳測試圖片',
+      browserModeNotice: '影像評測僅支援在桌面 App（Tauri）中執行；瀏覽器模式僅供檢視。',
       removeUploadedImage: '移除上傳圖片',
       tableTitle: 'VLM Arena 評測表',
       clearResults: '清除結果',
@@ -832,6 +833,10 @@ export const zhHant: Translations = {
     },
     coding: {
       tableTitle: '程式代理候選',
+      suggestionsTitle: '來自 LLM Arena 的建議',
+      suggestionAccept: '接受',
+      suggestionDismiss: '忽略',
+      staleWarning: '以下候選的 provider 金鑰已失效：',
       addCandidate: '新增候選',
       emptyNoRows: '尚無程式候選模型 — 新增一個開始。',
       notePlaceholder: '為何選此模型做程式…',

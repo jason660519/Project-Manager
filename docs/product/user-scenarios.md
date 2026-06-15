@@ -1,12 +1,12 @@
 ---
 classification: internal
 publish: false
-classificationReason: Internal engineering scenarios reference Tauri/Rust integration details not suitable for external readers.
+classificationReason: Internal cross-discipline scenarios reference Tauri/Rust integration details not suitable for external readers.
 ---
 
 # Project Manager User Scenarios
 
-> This document describes realistic workflows for engineers using Project Manager.
+> This document describes realistic workflows for PMs, discipline specialists, and software-heavy early adopters using Project Manager.
 > Each scenario maps to a core product capability and required Tauri/Rust integration.
 
 ---
@@ -15,12 +15,12 @@ classificationReason: Internal engineering scenarios reference Tauri/Rust integr
 
 ## Persona
 
-**Primary user: Alex (Solo Developer / Small-Team Tech Lead)**
+**Primary user: Alex (AI-native operator / Small-team delivery lead)**
 
 - Manages 3 to 8 active projects in parallel.
-- Uses Cursor or VS Code with Claude Code.
-- Runs AI-agent-based workflows daily.
-- Pain point: tasks and specs are spread across Notion, GitHub Issues, Slack, and terminal.
+- Uses a mix of folders, GitHub, spreadsheets, domain docs, review queues, and, for software projects, Cursor or VS Code with Claude Code.
+- Runs AI-assisted planning or agent-based workflows daily.
+- Pain point: tasks, specs, approvals, and execution evidence are spread across Notion, GitHub Issues, Slack, spreadsheets, shared folders, and terminal.
 
 ## Scenario 1: Morning Triage (Multi-Source View)
 
@@ -46,14 +46,14 @@ Tauri dependencies: `fs::read`, `fs::watch`, `reqwest`.
 
 ## Scenario 1.5: Add Project by GitHub URL
 
-Trigger: Alex wants to onboard an existing repository quickly.
+Trigger: Alex wants to onboard an existing repository or project folder quickly.
 
 Flow:
 
 1. Click "Add Project".
-2. Paste repository URL (for example: `https://github.com/user/my-app`).
+2. Paste repository URL (for example: `https://github.com/user/my-app`) or choose a local project folder.
 3. Project Manager analyzes and caches:
-   - PR status (open/merged/blocked).
+   - PR status (open/merged/blocked), if a GitHub repo is present.
    - Commit frequency.
    - Milestone/project progress.
    - Issue labels.
@@ -151,14 +151,14 @@ Tauri dependencies: `fs::write`, clipboard API.
 
 ## Scenario 6: Global Hotkey Overlay
 
-Trigger: Alex is inside IDE and wants instant task dispatch.
+Trigger: Alex is inside an IDE, spreadsheet, document review, or planning discussion and wants instant task dispatch.
 
 Flow:
 
 1. Press global shortcut.
 2. Show mini overlay.
 3. Select project and feature, then dispatch.
-4. Return focus to IDE.
+4. Return focus to the previous work surface.
 
 OS interactions:
 
@@ -189,12 +189,12 @@ Tauri dependencies: `tauri-plugin-global-shortcut`, window focus API.
 
 ## Persona
 
-**主要使用者：Alex（獨立開發者 / 小型團隊 Tech Lead）**
+**主要使用者：Alex（AI-native operator / 小型團隊交付 Lead）**
 
 - 同時管理 3 到 8 個進行中專案。
-- 日常使用 Cursor 或 VS Code + Claude Code。
-- 每天都會執行 AI Agent 任務。
-- 核心痛點是任務、規格與執行資訊分散在多個工具。
+- 混用 folders、GitHub、spreadsheets、domain docs、review queues；軟體專案中也會使用 Cursor 或 VS Code + Claude Code。
+- 每天都會執行 AI-assisted planning 或 AI Agent 任務。
+- 核心痛點是任務、規格、審核與執行證據分散在多個工具。
 
 ## 情境 1：早晨任務盤點（多源聚合）
 
@@ -215,15 +215,15 @@ OS 互動：
 
 依賴：`fs::read`、`fs::watch`、`reqwest`。
 
-## 情境 1.5：貼上 GitHub Repo URL 建立專案
+## 情境 1.5：貼上 GitHub Repo URL 或選取 Project Folder 建立專案
 
-觸發點：Alex 想快速導入既有 repo。
+觸發點：Alex 想快速導入既有 repo 或 project folder。
 
 流程：
 
 1. 點擊「新增專案」。
-2. 貼上 repo URL。
-3. 系統分析 PR 狀態、commit 頻率、milestone 進度、issue 標籤。
+2. 貼上 repo URL 或選取本機 project folder。
+3. 系統分析 PR 狀態、commit 頻率、milestone 進度、issue 標籤；若是非 GitHub folder，則先掃描可用規格、文件與工作輸入。
 4. 對應結果自動映射成 Feature 卡片。
 
 智慧提醒：
@@ -318,14 +318,14 @@ OS 互動：
 
 ## 情境 6：全域快捷鍵喚起
 
-觸發點：Alex 在 IDE 中需要瞬間派遣任務。
+觸發點：Alex 在 IDE、試算表、文件審閱或規劃討論中需要瞬間派遣任務。
 
 流程：
 
 1. 按下全域快捷鍵。
 2. 顯示 mini overlay。
 3. 選專案與 Feature 後派遣。
-4. 自動把焦點切回 IDE。
+4. 自動把焦點切回原本的 work surface。
 
 OS 互動：
 

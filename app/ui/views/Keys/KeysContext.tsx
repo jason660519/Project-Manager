@@ -33,6 +33,7 @@ import {
   sanitizeLlmArenaNumber,
   type LlmArenaScoringProfile,
 } from './LlmArenaEvaluation';
+import { commitKeysSlice, readKeysSlice } from '../../../../lib/keys/store';
 
 // Re-export slug helpers + KeysTab so existing imports from this module keep
 // working. The constants themselves live in a server-safe module so
@@ -62,6 +63,8 @@ interface VlmArenaState extends ArenaState {
   imageDetail: 'auto' | 'low' | 'high';
 }
 
+// Sheet-payload shape inside the keys-store v2 envelope (`sheets` slice).
+// `version` here versions THIS payload, independently of the envelope version.
 interface PersistedKeysState {
   version: 1;
   activeTab: KeysTab;
@@ -127,8 +130,6 @@ const defaultCodingState: CodingCandidateState = {
 };
 
 const MAX_CODING_CANDIDATES = 20;
-
-const KEYS_STATE_STORAGE_KEY = 'projectManager:keys-state:v1';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -206,16 +207,29 @@ function sanitizeCodingState(value: unknown, fallback: CodingCandidateState): Co
       const provider = typeof item.provider === 'string' ? (item.provider as LlmProviderId) : null;
       const model = typeof item.model === 'string' ? item.model : null;
       if (!provider || !model) return null;
-      return {
+      const row: CodingCandidateRow = {
         provider,
         model,
         note: typeof item.note === 'string' ? item.note : '',
         enabled: typeof item.enabled === 'boolean' ? item.enabled : true,
       };
+      if (item.origin === 'manual' || item.origin === 'accepted') row.origin = item.origin;
+      if (typeof item.sourceRunId === 'string') row.sourceRunId = item.sourceRunId;
+      if (typeof item.scoreSnapshot === 'number' && Number.isFinite(item.scoreSnapshot)) {
+        row.scoreSnapshot = item.scoreSnapshot;
+      }
+      return row;
     })
     .filter((item): item is CodingCandidateRow => item !== null)
     .slice(0, MAX_CODING_CANDIDATES);
-  return { rows };
+  const dismissedSuggestions = isRecord(value.dismissedSuggestions)
+    ? Object.fromEntries(
+        Object.entries(value.dismissedSuggestions).filter(
+          (entry): entry is [string, string] => typeof entry[1] === 'string',
+        ),
+      )
+    : undefined;
+  return dismissedSuggestions ? { rows, dismissedSuggestions } : { rows };
 }
 
 function normalizeDefaultLlmUserPrompt(userPrompt: string): string {
@@ -224,27 +238,21 @@ function normalizeDefaultLlmUserPrompt(userPrompt: string): string {
 
 function loadPersistedKeysState(): PersistedKeysState | null {
   if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.localStorage.getItem(KEYS_STATE_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed: unknown = JSON.parse(raw);
-    if (!isRecord(parsed)) return null;
-    if (parsed.version !== 1) return null;
-    const activeTab = typeof parsed.activeTab === 'string' ? (parsed.activeTab as KeysTab) : 'api_key_validation';
-    const llmState = sanitizeArenaState(parsed.llmState, defaultLlmState);
-    return {
-      version: 1,
-      activeTab,
-      llmState: {
-        ...llmState,
-        userPrompt: normalizeDefaultLlmUserPrompt(llmState.userPrompt),
-      },
-      vlmState: sanitizeVlmState(parsed.vlmState, defaultVlmState),
-      codingState: sanitizeCodingState(parsed.codingState, defaultCodingState),
-    };
-  } catch {
-    return null;
-  }
+  const parsed = readKeysSlice('sheets');
+  if (!isRecord(parsed)) return null;
+  if (parsed.version !== 1) return null;
+  const activeTab = typeof parsed.activeTab === 'string' ? (parsed.activeTab as KeysTab) : 'api_key_validation';
+  const llmState = sanitizeArenaState(parsed.llmState, defaultLlmState);
+  return {
+    version: 1,
+    activeTab,
+    llmState: {
+      ...llmState,
+      userPrompt: normalizeDefaultLlmUserPrompt(llmState.userPrompt),
+    },
+    vlmState: sanitizeVlmState(parsed.vlmState, defaultVlmState),
+    codingState: sanitizeCodingState(parsed.codingState, defaultCodingState),
+  };
 }
 
 const KeysContext = createContext<KeysContextType | null>(null);
@@ -295,18 +303,15 @@ export function KeysProvider({
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    try {
-      const payload: PersistedKeysState = {
-        version: 1,
-        activeTab,
-        llmState,
-        vlmState,
-        codingState,
-      };
-      window.localStorage.setItem(KEYS_STATE_STORAGE_KEY, JSON.stringify(payload));
-    } catch {
-      // Ignore persistence failures (quota/private mode) without breaking UI.
-    }
+    const payload: PersistedKeysState = {
+      version: 1,
+      activeTab,
+      llmState,
+      vlmState,
+      codingState,
+    };
+    // commitKeysSlice absorbs quota/private-mode failures without breaking UI.
+    commitKeysSlice('sheets', payload);
   }, [activeTab, llmState, vlmState, codingState]);
 
   const validatedLlmProviders = useMemo(() => {

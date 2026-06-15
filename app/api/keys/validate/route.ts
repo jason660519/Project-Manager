@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { outboundGet, outboundPost } from '../../../../lib/server/outboundHttp.server';
 
 type ProviderApiKind = 'anthropic' | 'openai-compatible' | 'gemini' | 'github';
 
@@ -16,20 +17,19 @@ function validationResult(ok: boolean, models: string[] = [], errorReason?: stri
   return { ok, models, errorReason: errorReason ?? null };
 }
 
-async function readError(prefix: string, res: Response): Promise<string> {
-  const text = await res.text().catch(() => '');
-  return `${prefix} ${res.status}: ${truncateError(text)}`;
+async function readError(prefix: string, res: { status: number; body: string }): Promise<string> {
+  return `${prefix} ${res.status}: ${truncateError(res.body)}`;
 }
 
 async function validateAnthropic(apiKey: string): Promise<string[]> {
-  const res = await fetch('https://api.anthropic.com/v1/models', {
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
+  const res = await outboundGet('https://api.anthropic.com/v1/models', {
+    'x-api-key': apiKey,
+    'anthropic-version': '2023-06-01',
   });
-  if (!res.ok) throw new Error(await readError('Anthropic', res));
-  const raw = (await res.json()) as { data?: Array<{ id?: unknown }> };
+  if (res.status < 200 || res.status >= 300) {
+    throw new Error(`${await readError('Anthropic', res)}`);
+  }
+  const raw = JSON.parse(res.body) as { data?: Array<{ id?: unknown }> };
   return raw.data?.flatMap((model) => (typeof model.id === 'string' ? [model.id] : [])) ?? [];
 }
 
@@ -50,19 +50,19 @@ async function validateOpenAiCompatible(
     return validatePerplexity(apiKey);
   }
 
-  const res = await fetch(`${normalizedBaseUrl}/models`, {
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-    },
+  const res = await outboundGet(`${normalizedBaseUrl}/models`, {
+    authorization: `Bearer ${apiKey}`,
   });
-  if (!res.ok && allowMoonshotAlternate && isMoonshotBaseUrl(normalizedBaseUrl)) {
+  if ((res.status < 200 || res.status >= 300) && allowMoonshotAlternate && isMoonshotBaseUrl(normalizedBaseUrl)) {
     const alternateBaseUrl = getAlternateMoonshotBaseUrl(normalizedBaseUrl);
     if (alternateBaseUrl) {
       return validateOpenAiCompatible(alternateBaseUrl, apiKey, false);
     }
   }
-  if (!res.ok) throw new Error(await readError('Provider', res));
-  const raw = (await res.json()) as { data?: Array<{ id?: unknown }> };
+  if (res.status < 200 || res.status >= 300) {
+    throw new Error(await readError('Provider', res));
+  }
+  const raw = JSON.parse(res.body) as { data?: Array<{ id?: unknown }> };
   return raw.data?.flatMap((model) => (typeof model.id === 'string' ? [model.id] : [])) ?? [];
 }
 
@@ -74,19 +74,21 @@ async function validatePerplexity(apiKey: string): Promise<string[]> {
     'sonar-reasoning',
     'sonar-reasoning-pro',
   ];
-  const res = await fetch('https://api.perplexity.ai/v1/sonar', {
-    method: 'POST',
-    headers: {
+  const res = await outboundPost(
+    'https://api.perplexity.ai/v1/sonar',
+    {
       authorization: `Bearer ${apiKey}`,
       'content-type': 'application/json',
     },
-    body: JSON.stringify({
+    JSON.stringify({
       model: 'sonar',
       max_tokens: 16,
       messages: [{ role: 'user', content: 'ping' }],
     }),
-  });
-  if (!res.ok) throw new Error(await readError('Perplexity', res));
+  );
+  if (res.status < 200 || res.status >= 300) {
+    throw new Error(await readError('Perplexity', res));
+  }
   return models;
 }
 
@@ -101,13 +103,13 @@ function getAlternateMoonshotBaseUrl(baseUrl: string): string | null {
 }
 
 async function validateGemini(apiKey: string): Promise<string[]> {
-  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models', {
-    headers: {
-      'x-goog-api-key': apiKey,
-    },
+  const res = await outboundGet('https://generativelanguage.googleapis.com/v1beta/models', {
+    'x-goog-api-key': apiKey,
   });
-  if (!res.ok) throw new Error(await readError('Gemini', res));
-  const raw = (await res.json()) as { models?: Array<{ name?: unknown }> };
+  if (res.status < 200 || res.status >= 300) {
+    throw new Error(await readError('Gemini', res));
+  }
+  const raw = JSON.parse(res.body) as { models?: Array<{ name?: unknown }> };
   return (
     raw.models?.flatMap((model) => {
       if (typeof model.name !== 'string') return [];
@@ -117,14 +119,14 @@ async function validateGemini(apiKey: string): Promise<string[]> {
 }
 
 async function validateGithub(apiKey: string): Promise<string[]> {
-  const res = await fetch('https://api.github.com/user', {
-    headers: {
-      authorization: `token ${apiKey}`,
-      accept: 'application/vnd.github+json',
-      'user-agent': 'project-manager',
-    },
+  const res = await outboundGet('https://api.github.com/user', {
+    authorization: `token ${apiKey}`,
+    accept: 'application/vnd.github+json',
+    'user-agent': 'project-manager',
   });
-  if (!res.ok) throw new Error(await readError('GitHub', res));
+  if (res.status < 200 || res.status >= 300) {
+    throw new Error(await readError('GitHub', res));
+  }
   return [];
 }
 

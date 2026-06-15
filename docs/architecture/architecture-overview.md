@@ -33,10 +33,10 @@ Purpose: normalize inconsistent upstream specification formats.
 
 ### 2.2 Runtime Adapters
 
-Purpose: convert UI interactions into executable developer actions.
+Purpose: convert UI interactions into executable work actions for software and non-software project domains.
 
-- IDE adapter launches local editor actions.
-- Agent adapter builds prompts and triggers CLI tools.
+- IDE adapter launches local editor actions for software workflows.
+- Agent adapter builds prompts and triggers CLI tools or future domain-specific execution surfaces.
 
 ### 2.3 Local Bridge
 
@@ -128,10 +128,10 @@ Detailed operating notes live under `docs/engineering/`:
 
 ### 2.2 Runtime Adapters（執行適配器）
 
-目的：將 UI 操作轉換成可執行的開發行為。
+目的：將 UI 操作轉換成軟體與非軟體專案領域都可執行的 work actions。
 
-- IDE Adapter 負責啟動本地編輯器動作。
-- Agent Adapter 負責組 Prompt 並觸發 CLI。
+- IDE Adapter 負責啟動軟體工作流中的本地編輯器動作。
+- Agent Adapter 負責組 Prompt 並觸發 CLI 或未來 domain-specific execution surfaces。
 
 ### 2.3 Local Bridge（本地橋接層）
 

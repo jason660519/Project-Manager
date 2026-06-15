@@ -1862,11 +1862,12 @@ export async function validateProviderKey(opts: {
     }
     return body as ValidateProviderKeyResult;
   }
-  return invoke<ValidateProviderKeyResult>('validate_provider_key', {
+  const result = await invoke<ValidateProviderKeyResult>('validate_provider_key', {
     apiKind: opts.apiKind,
     baseUrl: opts.baseUrl ?? null,
     apiKey: opts.apiKey,
   });
+  return result;
 }
 
 /**

@@ -2,9 +2,21 @@ import React, { useLayoutEffect } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
 import { KeysProvider, useKeysContext } from '../app/ui/views/Keys/KeysContext';
+import {
+  KEYS_STORE_STORAGE_KEY,
+  LEGACY_KEY_BY_SLICE,
+  commitKeysSlice,
+  resetKeysStoreForTests,
+} from '../lib/keys/store';
 import type { LlmProviderId } from '../lib/keys/llmProviders';
 
-const STORAGE_KEY = 'projectManager:keys-state:v1';
+const LEGACY_STORAGE_KEY = LEGACY_KEY_BY_SLICE.sheets!;
+
+function readPersistedSheets(): any {
+  const raw = window.localStorage.getItem(KEYS_STORE_STORAGE_KEY);
+  if (!raw) return null;
+  return JSON.parse(raw).slices?.sheets ?? null;
+}
 const NEW_DEFAULT_LLM_PROMPT = '你是哪一家公司的哪一個模型？';
 const LEGACY_DEFAULT_LLM_PROMPT = 'Explain how a neural network works in simple terms.';
 
@@ -41,7 +53,7 @@ function LlmPromptProbe({ onPrompt }: { onPrompt: (prompt: string) => void }) {
 
 describe('KeysContext persistence', () => {
   beforeEach(() => {
-    window.localStorage.removeItem(STORAGE_KEY);
+    resetKeysStoreForTests();
   });
 
   it('restores all selected LLM models after remount', async () => {
@@ -51,10 +63,9 @@ describe('KeysContext persistence', () => {
       </KeysProvider>,
     );
     await waitFor(() => {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      expect(raw).toBeTruthy();
-      const parsed = JSON.parse(raw!);
-      expect(parsed.llmState.selectedModels).toHaveLength(10);
+      const sheets = readPersistedSheets();
+      expect(sheets).toBeTruthy();
+      expect(sheets.llmState.selectedModels).toHaveLength(10);
     });
     first.unmount();
 
@@ -84,8 +95,9 @@ describe('KeysContext persistence', () => {
   });
 
   it('migrates the old default LLM arena test prompt without overwriting custom prompts', async () => {
+    // Seed the LEGACY v1 island — covers the store-v2 migration path end to end.
     window.localStorage.setItem(
-      STORAGE_KEY,
+      LEGACY_STORAGE_KEY,
       JSON.stringify({
         version: 1,
         activeTab: 'llm_arena',
@@ -119,27 +131,26 @@ describe('KeysContext persistence', () => {
     migrated.unmount();
 
     const customPrompt = 'Keep this custom LLM arena test prompt.';
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        version: 1,
-        activeTab: 'llm_arena',
-        llmState: {
-          systemPrompt: 'You are a helpful AI assistant. Respond clearly and concisely.',
-          userPrompt: customPrompt,
-          selectedModels: [],
-          temperature: 0.7,
-        },
-        vlmState: {
-          systemPrompt: 'You are a helpful AI vision assistant. Describe what you see accurately.',
-          userPrompt: 'What is happening in this image?',
-          selectedModels: [],
-          temperature: 0.4,
-          imageDataUrl: null,
-          imageDetail: 'auto',
-        },
-      }),
-    );
+    // The envelope already exists now, so seed through the live store instead
+    // of the (ignored) legacy key.
+    commitKeysSlice('sheets', {
+      version: 1,
+      activeTab: 'llm_arena',
+      llmState: {
+        systemPrompt: 'You are a helpful AI assistant. Respond clearly and concisely.',
+        userPrompt: customPrompt,
+        selectedModels: [],
+        temperature: 0.7,
+      },
+      vlmState: {
+        systemPrompt: 'You are a helpful AI vision assistant. Describe what you see accurately.',
+        userPrompt: 'What is happening in this image?',
+        selectedModels: [],
+        temperature: 0.4,
+        imageDataUrl: null,
+        imageDetail: 'auto',
+      },
+    });
 
     let restoredCustomPrompt = '';
     render(

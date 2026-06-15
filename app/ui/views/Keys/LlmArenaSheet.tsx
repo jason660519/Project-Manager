@@ -7,9 +7,15 @@ import { hasProviderKey } from '../../../../lib/keys/loadProviderKey';
 import { useI18n } from '../../../../lib/i18n';
 import { LlmArenaMatrixTable } from './LlmArenaMatrixTable';
 import { LlmArenaDetailSheet } from './LlmArenaDetailSheet';
-import { formatResultSummary, type EvaluationLevel, type RunHistoryEntry } from './LlmArenaTypes';
+import {
+  formatResultSummary,
+  sanitizeLlmArenaHistory,
+  type EvaluationLevel,
+  type RunHistoryEntry,
+} from './LlmArenaTypes';
 import { buildLlmArenaResultRow } from './LlmArenaEvaluation';
 import type { ArenaModelSpec } from './useArenaChat';
+import { commitKeysSlice, readKeysSlice } from '../../../../lib/keys/store';
 
 function preferredModelForProvider(provider: {
   availableModels: readonly string[];
@@ -56,13 +62,30 @@ export function LlmArenaSheet() {
   const { t } = useI18n();
   const copy = t.keysArena.llm;
   const { llmState, setLlmState, validatedLlmProviders } = useKeysContext();
-  const { runComparison, results, clearResults } = useArenaChat('pm.arena.llm.results');
+  const { runComparison, results, clearResults } = useArenaChat('llmArenaResults');
   const allProviders = validatedLlmProviders;
   const seenResultTimestampRef = useRef<Record<string, number>>({});
   const [evaluationByIndex, setEvaluationByIndex] = useState<Record<number, EvaluationLevel>>({});
   const [noteByIndex, setNoteByIndex] = useState<Record<number, string>>({});
   const [promptOverrideByIndex, setPromptOverrideByIndex] = useState<Record<number, string>>({});
-  const [historyByResultKey, setHistoryByResultKey] = useState<Record<string, RunHistoryEntry[]>>({});
+  const [historyByResultKey, setHistoryByResultKey] = useState<Record<string, RunHistoryEntry[]>>(() =>
+    typeof window === 'undefined' ? {} : sanitizeLlmArenaHistory(readKeysSlice('llmArenaHistory')),
+  );
+  // Persisted results are re-walked on mount; without seeding the seen-marks
+  // from restored history, every reload would append duplicate history rows.
+  const historySeededRef = useRef(false);
+  if (!historySeededRef.current) {
+    historySeededRef.current = true;
+    for (const [key, entries] of Object.entries(historyByResultKey)) {
+      const newest = entries[0]?.timestamp ?? 0;
+      if (newest) seenResultTimestampRef.current[key] = newest;
+    }
+  }
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    commitKeysSlice('llmArenaHistory', historyByResultKey);
+  }, [historyByResultKey]);
   const [selectedDetailIndex, setSelectedDetailIndex] = useState<number | null>(null);
   const [runningIndexes, setRunningIndexes] = useState<Set<number>>(new Set());
   const autoAddSignatureRef = useRef<string>('');
@@ -293,7 +316,30 @@ export function LlmArenaSheet() {
 
   const runSelectedRows = async () => {
     if (!llmState.userPrompt.trim()) return;
-    await Promise.allSettled(llmState.selectedModels.map((_, index) => runSingleRow(index)));
+    const models = llmState.selectedModels.map((spec, index) => ({
+      provider: spec.provider,
+      model: spec.model,
+      userPromptOverride: promptOverrideByIndex[index],
+    }));
+    if (models.length === 0) return;
+    // One batch per trial round: the runner caps parallelism across the whole
+    // batch (per-row fan-out used to bypass maxParallelRuns entirely), and
+    // sequential rounds keep per-model history capturing every trial.
+    setRunningIndexes(new Set(models.map((_, index) => index)));
+    try {
+      for (let trial = 0; trial < llmState.sampleCount; trial += 1) {
+        await runComparison({
+          models,
+          systemPrompt: llmState.systemPrompt,
+          userPrompt: llmState.userPrompt,
+          temperature: llmState.temperature,
+          maxTokens: llmState.maxTokens,
+          timeoutMs: llmState.timeoutMs,
+        });
+      }
+    } finally {
+      setRunningIndexes(new Set());
+    }
   };
 
   const handleClearAll = () => {

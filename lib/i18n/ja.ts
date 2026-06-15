@@ -753,6 +753,7 @@ export const ja: Translations = {
     vlm: {
       inputTitle: 'Test Input',
       uploadImage: 'Upload Test Image',
+      browserModeNotice: '画像評価はデスクトップアプリ（Tauri）でのみ実行できます。ブラウザモードでは閲覧のみ可能です。',
       removeUploadedImage: 'Remove uploaded image',
       tableTitle: 'VLM Arena Evaluation Table',
       clearResults: 'Clear Results',
@@ -833,6 +834,10 @@ export const ja: Translations = {
     },
     coding: {
       tableTitle: 'コーディングエージェント候補',
+      suggestionsTitle: 'LLM Arena からの提案',
+      suggestionAccept: '承認',
+      suggestionDismiss: '却下',
+      staleWarning: '次の候補のプロバイダーキーが無効になっています：',
       addCandidate: '候補を追加',
       emptyNoRows: 'コーディング候補はまだありません — 追加して開始してください。',
       notePlaceholder: 'このモデルをコーディングに選ぶ理由…',

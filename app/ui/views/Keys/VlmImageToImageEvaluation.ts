@@ -2,6 +2,7 @@
 
 import type { LlmProviderId } from '../../../../lib/keys/llmProviders';
 import { loadProviderKey } from '../../../../lib/keys/loadProviderKey';
+import { commitKeysSlice, readKeysSlice } from '../../../../lib/keys/store';
 import type { ProviderLike, RunHistoryEntry } from './VlmArenaTypes';
 
 export type VlmImageToImageStyle = 'modern' | 'nordic' | 'japanese' | 'luxury' | 'rental' | 'minimal';
@@ -76,11 +77,18 @@ export const VLM_IMAGE_TO_IMAGE_OUTPUT_OPTIONS: Array<{
   { id: 'both', label: '2D + 3D 同時評估', prompt: '同時產出兩張圖：(1) 2D 彩繪平面圖，正俯視 90 度垂直俯視視角；(2) 3D 立體彩繪圖，45 度斜角俯瞰視角（isometric / 從右前上方俯瞰），需展現家具立面、牆面厚度與空間深度立體感。若模型只能回一張圖，優先產出 3D 立體彩繪圖（45 度斜角），並用文字說明 2D 平面配置。' },
 ];
 
-export const VLM_IMAGE_TO_IMAGE_CAPABLE_MODELS: Array<{
+export interface VlmCuratedModel {
   provider: LlmProviderId;
   model: string;
   label: string;
-}> = [
+}
+
+/**
+ * Built-in seed for the curated image-to-image model list. The effective list
+ * lives in the keys store (`vlmCuratedModels` slice) so new models can be
+ * added without a code change; this constant is only the default.
+ */
+export const VLM_IMAGE_TO_IMAGE_CAPABLE_MODELS: VlmCuratedModel[] = [
   { provider: 'gemini', model: 'gemini-3.1-flash-image-preview', label: 'Nano Banana 2 (3.1 Flash Image)' },
   { provider: 'gemini', model: 'gemini-3-pro-image-preview', label: 'Banana Pro (3 Pro Image)' },
   { provider: 'gemini', model: 'gemini-2.5-flash-image', label: 'Banana (2.5 Flash Image)' },
@@ -91,7 +99,6 @@ export const VLM_IMAGE_TO_IMAGE_CAPABLE_MODELS: Array<{
 ];
 
 const IMAGE_MIME_PATTERN = /^data:(image\/(?:jpeg|png|webp|gif));base64,(.+)$/i;
-const VLM_IMAGE_TO_IMAGE_STORAGE_KEY = 'projectManager:keys-vlm-image-to-image:v1';
 const MAX_HISTORY_PER_MODEL = 10;
 
 let currentState: VlmImageToImageState | null = null;
@@ -114,35 +121,70 @@ export function isImageToImageCapableModel(provider: string, model: string): boo
   return false;
 }
 
-export function imageToImageModelDisplayName(provider: string, model: string): string {
-  return VLM_IMAGE_TO_IMAGE_CAPABLE_MODELS.find((item) => item.provider === provider && item.model === model)?.label ?? model;
+function sanitizeCuratedModels(value: unknown): VlmCuratedModel[] | null {
+  if (!Array.isArray(value)) return null;
+  const models = value
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const source = item as Partial<VlmCuratedModel>;
+      if (typeof source.provider !== 'string' || typeof source.model !== 'string' || !source.model.trim()) return null;
+      return {
+        provider: source.provider as LlmProviderId,
+        model: source.model,
+        label: typeof source.label === 'string' && source.label.trim() ? source.label : source.model,
+      };
+    })
+    .filter((item): item is VlmCuratedModel => item !== null);
+  return models.length > 0 ? models : null;
 }
 
-export function imageToImageProvidersFrom(providers: readonly ProviderLike[]): ProviderLike[] {
-  const activeProviderIds = new Set(providers.map((provider) => provider.id));
-  const providerIds = unique([
-    ...providers.map((provider) => provider.id),
-    ...VLM_IMAGE_TO_IMAGE_CAPABLE_MODELS
-      .filter((item) => item.provider === 'gemini' || activeProviderIds.has(item.provider))
-      .map((item) => item.provider),
-  ]);
+/** Effective curated list: store override when present, built-in seed otherwise. */
+export function loadVlmCuratedModels(): VlmCuratedModel[] {
+  if (!canUseLocalStorage()) return VLM_IMAGE_TO_IMAGE_CAPABLE_MODELS;
+  return sanitizeCuratedModels(readKeysSlice('vlmCuratedModels')) ?? VLM_IMAGE_TO_IMAGE_CAPABLE_MODELS;
+}
 
-  return providerIds
-    .map((providerId) => {
-      const source = providers.find((provider) => provider.id === providerId);
-      const curated = VLM_IMAGE_TO_IMAGE_CAPABLE_MODELS
-        .filter((item) => item.provider === providerId)
+export function saveVlmCuratedModels(models: VlmCuratedModel[]): void {
+  commitKeysSlice('vlmCuratedModels', models);
+}
+
+export function imageToImageModelDisplayName(provider: string, model: string): string {
+  return loadVlmCuratedModels().find((item) => item.provider === provider && item.model === model)?.label ?? model;
+}
+
+/**
+ * Dual-source model list (F50 Phase 3): curated seed + dynamically discovered
+ * image-capable models, but ONLY for providers in the validated input list.
+ * (Pre-F50 this offered gemini's curated models even when gemini had no
+ * validated key, so runs failed at execution instead of selection.)
+ */
+export function imageToImageProvidersFrom(
+  providers: readonly ProviderLike[],
+  curatedModels: VlmCuratedModel[] = loadVlmCuratedModels(),
+): ProviderLike[] {
+  return providers
+    .map((source) => {
+      const curated = curatedModels
+        .filter((item) => item.provider === source.id)
         .map((item) => item.model);
-      const dynamic = source?.availableModels.filter((model) => isImageToImageCapableModel(providerId, model)) ?? [];
+      const dynamic = source.availableModels.filter((model) => isImageToImageCapableModel(source.id, model));
       const availableModels = unique([...curated, ...dynamic]);
       if (availableModels.length === 0) return null;
       return {
-        id: providerId,
-        label: source?.label ?? providerLabel(providers, providerId),
+        id: source.id,
+        label: source.label || providerLabel(providers, source.id),
         availableModels,
       };
     })
     .filter((provider): provider is ProviderLike => provider !== null);
+}
+
+/**
+ * Browser-mode gate (tdd-spec E3): the image pipelines call provider image
+ * APIs directly and are only supported inside the desktop (Tauri) runtime.
+ */
+export function canRunVlmImageToImage(): boolean {
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
 
 export function coerceImageToImageSelections(
@@ -291,29 +333,22 @@ function sanitizeHistory(value: unknown): Record<string, RunHistoryEntry[]> {
 
 function loadStoredVlmImageToImageState(): VlmImageToImageState {
   if (!canUseLocalStorage()) return emptyVlmImageToImageState();
-  try {
-    const raw = window.localStorage.getItem(VLM_IMAGE_TO_IMAGE_STORAGE_KEY);
-    if (!raw) return emptyVlmImageToImageState();
-    const parsed = JSON.parse(raw) as Partial<VlmImageToImageState>;
-    return {
-      version: 1,
-      rows: Array.isArray(parsed.rows)
-        ? parsed.rows.map((item, index) => sanitizeRow(item, index)).filter((row): row is VlmImageToImageRow => row !== null)
-        : [],
-      historyByResultKey: sanitizeHistory(parsed.historyByResultKey),
-    };
-  } catch {
-    return emptyVlmImageToImageState();
-  }
+  const parsedValue = readKeysSlice('vlmImageToImage');
+  if (!parsedValue || typeof parsedValue !== 'object') return emptyVlmImageToImageState();
+  const parsed = parsedValue as Partial<VlmImageToImageState>;
+  return {
+    version: 1,
+    rows: Array.isArray(parsed.rows)
+      ? parsed.rows.map((item, index) => sanitizeRow(item, index)).filter((row): row is VlmImageToImageRow => row !== null)
+      : [],
+    historyByResultKey: sanitizeHistory(parsed.historyByResultKey),
+  };
 }
 
 function persistVlmImageToImageState(state: VlmImageToImageState): void {
-  if (!canUseLocalStorage()) return;
-  try {
-    window.localStorage.setItem(VLM_IMAGE_TO_IMAGE_STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // Keep the in-memory store usable if localStorage is full or disabled.
-  }
+  // commitKeysSlice absorbs quota/private-mode failures; the in-memory store
+  // stays usable either way.
+  commitKeysSlice('vlmImageToImage', state);
 }
 
 export function getVlmImageToImageState(): VlmImageToImageState {
@@ -400,14 +435,7 @@ export function clearVlmImageToImageRuns(): void {
 export function resetVlmImageToImageStoreForTests(state: VlmImageToImageState = emptyVlmImageToImageState()): void {
   currentState = cloneState(state);
   activeImageTasks.clear();
-  if (canUseLocalStorage()) {
-    try {
-      window.localStorage.removeItem(VLM_IMAGE_TO_IMAGE_STORAGE_KEY);
-      window.localStorage.setItem(VLM_IMAGE_TO_IMAGE_STORAGE_KEY, JSON.stringify(currentState));
-    } catch {
-      // Test-only reset should not fail when localStorage is mocked read-only.
-    }
-  }
+  persistVlmImageToImageState(currentState);
   const snapshot = cloneState(currentState);
   listeners.forEach((listener) => listener(snapshot));
 }
@@ -501,6 +529,17 @@ export function runVlmImageRow(
   const row = getVlmImageToImageState().rows.find((item) => item.id === rowId);
   if (!row || !imageDataUrl) return Promise.resolve();
 
+  if (!canRunVlmImageToImage()) {
+    patchVlmImageToImageRow(row.id, {
+      runStatus: 'failed',
+      message: '影像評測需要在桌面 App（Tauri）執行；瀏覽器模式不支援。',
+      runStartedAtMs: null,
+      e2eMs: null,
+      httpStatus: null,
+    });
+    return Promise.resolve();
+  }
+
   const nowEpochMs = Date.now();
   const startedAtMs = row.runStatus === 'running' && row.runStartedAtMs ? row.runStartedAtMs : nowEpochMs;
   const elapsedBeforeDispatchMs = Math.max(0, nowEpochMs - startedAtMs);
@@ -565,6 +604,9 @@ export function resumePersistedVlmImageTasks(
   testModel: VlmImageToImageTestFn = testImageToImageModel,
 ): void {
   if (!imageDataUrl) return;
+  // Don't convert persisted 'running' rows into failures on a browser reload —
+  // they resume next time the desktop app opens.
+  if (!canRunVlmImageToImage()) return;
   getVlmImageToImageState().rows
     .filter((row) => row.runStatus === 'running' && !isVlmImageTaskActive(row.id))
     .forEach((row) => {

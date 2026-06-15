@@ -5674,6 +5674,19 @@ async fn skill_move_files(
 mod browser_tests {
     use super::*;
 
+    fn load_dev_provider_key(provider: &str) -> Option<String> {
+        let raw = dev_secrets::get_dev_secret("projectmanager", "llm-provider-keys")
+            .ok()
+            .flatten()?;
+        let parsed = serde_json::from_str::<HashMap<String, String>>(&raw).ok()?;
+        let value = parsed.get(provider)?.trim().to_string();
+        if value.is_empty() {
+            None
+        } else {
+            Some(value)
+        }
+    }
+
     #[tokio::test]
     async fn list_installed_browsers_never_errors() {
         // Detection must degrade to an empty list, never an error — the UI
@@ -5692,6 +5705,49 @@ mod browser_tests {
         {
             assert!(scan_macos_applications().await.is_err());
         }
+    }
+
+    #[tokio::test]
+    async fn run_validation_accepts_real_openai_key_when_available() {
+        let Some(api_key) = load_dev_provider_key("openai") else {
+            return;
+        };
+
+        let result = run_validation(
+            "openai-compatible",
+            Some("https://api.openai.com/v1"),
+            &api_key,
+        )
+        .await
+        .expect("validation should return a business result");
+
+        assert!(
+            result.ok,
+            "expected a saved real OpenAI key to validate, got {:?}",
+            result.error_reason
+        );
+        assert!(!result.models.is_empty(), "expected models for a valid OpenAI key");
+    }
+
+    #[tokio::test]
+    async fn run_validation_rejects_invalid_openai_key() {
+        let result = run_validation(
+            "openai-compatible",
+            Some("https://api.openai.com/v1"),
+            "sk-invalid-debug-test",
+        )
+        .await
+        .expect("validation should return a business result");
+
+        assert!(!result.ok);
+        assert!(result.models.is_empty());
+        assert!(
+            result
+                .error_reason
+                .unwrap_or_default()
+                .contains("401"),
+            "expected 401-style provider error",
+        );
     }
 
     #[cfg(target_os = "macos")]

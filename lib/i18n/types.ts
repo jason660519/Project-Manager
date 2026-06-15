@@ -762,6 +762,7 @@ export interface Translations {
     vlm: {
       inputTitle: string;
       uploadImage: string;
+      browserModeNotice: string;
       removeUploadedImage: string;
       tableTitle: string;
       clearResults: string;
@@ -842,6 +843,10 @@ export interface Translations {
     };
     coding: {
       tableTitle: string;
+      suggestionsTitle: string;
+      suggestionAccept: string;
+      suggestionDismiss: string;
+      staleWarning: string;
       addCandidate: string;
       emptyNoRows: string;
       notePlaceholder: string;

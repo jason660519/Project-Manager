@@ -75,7 +75,6 @@ export async function saveAndValidateKey(
     baseUrl: contract.baseUrl,
     apiKey,
   });
-
   const now = new Date().toISOString();
 
   if (result.ok) {
@@ -118,18 +117,18 @@ export async function revalidateStoredKey(
       ? await getProviderKey(provider.id as Parameters<typeof getProviderKey>[0])
       : await loadProviderSecret(provider);
 
-  const result = apiKey
+  const trimmedKey = apiKey.trim();
+  const result = trimmedKey
     ? await bridgeValidate({
         apiKind: contract.apiKind,
         baseUrl: contract.baseUrl,
-        apiKey,
+        apiKey: trimmedKey,
       })
     : {
         ok: false,
         models: [],
         errorReason: 'No key configured',
       };
-
   const now = new Date().toISOString();
   if (result.ok) {
     saveProviderMetadata(provider.id, {

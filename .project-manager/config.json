@@ -1577,6 +1577,38 @@
         ],
         "kickoffAt": "2026-06-04T09:14:20.412Z"
       }
+    },
+    {
+      "id": "F50",
+      "name": "Keys 三工作表重構：store v2 + arenaRunner + promotion 管線",
+      "category": "Frontend/UI",
+      "status": "done",
+      "progress": 100,
+      "phase": "development",
+      "points": 8,
+      "locatedSection": "app/ui/views/Keys",
+      "readmePath": ".project-manager/features/F50/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F50/",
+        "spec": ".project-manager/features/F50/feature-spec.md",
+        "tdd": ".project-manager/features/F50/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F50/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F50/",
+        "implementation": "lib/keys/store",
+        "test": "__tests__"
+      },
+      "notes": "5 phases shipped: store v2 + arenaRunner + preflight gate + VLM dual-source + promotion pipeline. verify:baseline green; 1139 tests pass.",
+      "createdAt": "2026-06-10T06:27:47.657Z",
+      "updatedAt": "2026-06-14T16:17:27.646Z",
+      "updatedBy": "Claude Code",
+      "metadata": {
+        "evidencePaths": [
+          "lib/keys/store",
+          "__tests__",
+          ".project-manager/features/F50/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-10T06:27:47.657Z"
+      }
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",
@@ -1587,6 +1619,6 @@
     "root": "/Users/Project-Manager"
   },
   "schemaVersion": 9,
-  "updatedAt": "2026-06-04T10:47:54.315Z",
-  "updatedBy": "Codex"
+  "updatedAt": "2026-06-14T16:17:27.646Z",
+  "updatedBy": "Claude Code"
 }

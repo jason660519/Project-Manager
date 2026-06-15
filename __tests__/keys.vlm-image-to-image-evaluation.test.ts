@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildImageToImagePrompt,
   coerceImageToImageSelections,
@@ -75,6 +75,13 @@ describe('Keys / VLM Arena image-to-image evaluation logic', () => {
   beforeEach(() => {
     resetVlmImageToImageStoreForTests();
     vi.restoreAllMocks();
+    // Image runs are desktop-only since F50 Phase 3; these logic tests run
+    // the engine, so emulate the Tauri runtime.
+    (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {};
+  });
+
+  afterEach(() => {
+    delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
   });
 
   it('matches the reference prompt contract for style, output mode, and hard constraints', () => {
@@ -99,9 +106,11 @@ describe('Keys / VLM Arena image-to-image evaluation logic', () => {
     const providerIds = imageProviders.map((provider) => provider.id);
     const allModels = imageProviders.flatMap((provider) => provider.availableModels);
 
-    expect(providerIds).toEqual(expect.arrayContaining(['gemini', 'openai', 'qwen']));
-    expect(providerIds).not.toEqual(expect.arrayContaining(['anthropic', 'zhipu']));
-    expect(allModels).toEqual(expect.arrayContaining(['gemini-3.1-flash-image-preview', 'gpt-image-1', 'qwen-image-2.0-pro']));
+    expect(providerIds).toEqual(expect.arrayContaining(['openai', 'qwen']));
+    // gemini is NOT in the validated input, so its curated models must not be
+    // offered (pre-F50 it always appeared and runs failed at execution).
+    expect(providerIds).not.toEqual(expect.arrayContaining(['gemini', 'anthropic', 'zhipu']));
+    expect(allModels).toEqual(expect.arrayContaining(['gpt-image-1', 'qwen-image-2.0-pro']));
     expect(allModels).not.toEqual(expect.arrayContaining(['gpt-5.5', 'qwen-max', 'glm-image']));
     expect(isImageToImageCapableModel('openai', 'gpt-image-1')).toBe(true);
     expect(isImageToImageCapableModel('anthropic', 'claude-opus-4-7')).toBe(false);
@@ -301,5 +310,32 @@ describe('Keys / VLM Arena image-to-image evaluation logic', () => {
       resultImage2dUrl: 'data:image/png;base64,resumed-image',
       message: '測試完成。',
     });
+  });
+
+  it('blocks image runs in browser mode without calling the model (F50 E3)', async () => {
+    delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
+    resetVlmImageToImageStoreForTests({ version: 1, rows: [row()], historyByResultKey: {} });
+    const testModel = vi.fn();
+
+    await Promise.allSettled([runVlmImageRows(['row-1'], 'data:image/png;base64,input', testModel)]);
+
+    expect(testModel).not.toHaveBeenCalled();
+    const blockedRow = getVlmImageToImageState().rows[0];
+    expect(blockedRow.runStatus).toBe('failed');
+    expect(blockedRow.message).toContain('桌面 App');
+  });
+
+  it('does not resume persisted running rows in browser mode (F50 E3)', async () => {
+    delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
+    const runningRow = row({ id: 'row-resume', runStatus: 'running', runStartedAtMs: Date.now() });
+    resetVlmImageToImageStoreForTests({ version: 1, rows: [runningRow], historyByResultKey: {} });
+    const testModel = vi.fn();
+
+    resumePersistedVlmImageTasks('data:image/png;base64,input', testModel);
+    await flushPromises();
+
+    expect(testModel).not.toHaveBeenCalled();
+    // The row stays 'running' so the desktop app can resume it later.
+    expect(getVlmImageToImageState().rows[0].runStatus).toBe('running');
   });
 });

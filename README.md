@@ -1,8 +1,10 @@
-# Project Manager: The Context-Aware Engineering Dashboard
+# Project Manager: Cross-Discipline Project Orchestration
 
 [**📖 Project Public Docs (GitHub Pages)**](https://jason660519.github.io/Project-Manager/) | [繁體中文 README](./README.zh-Hant.md)
 
-Project Manager is a cross-project development progress management and task dispatching tool, designed to decouple traditional heavy project management systems and deeply interact with developers' local development environments (IDEs & Agents).
+Project Manager is a cross-project, cross-discipline project-management orchestration app. It ingests project specs and work inputs from folders, GitHub, and domain documents, normalizes them into canonical project data, then helps PMs and discipline specialists triage, plan, dispatch, and report work across human roles, AI agents, tools, and review queues.
+
+Software projects, IDEs, and coding agents are one supported vertical, not the product boundary. The same orchestration model should support software, product, architecture, construction, structural, civil, MEP, procurement, operations, QA, and executive stakeholders.
 
 ## Project Paths
 
@@ -20,7 +22,7 @@ Project Manager is a cross-project development progress management and task disp
 
 1. **Decentralization**: Progress data stays with the project (Progress as Code) without strict dependence on a centralized database.
 2. **AI-Powered Ingestion**: Supports importing various non-standard specifications (e.g., Word, Excel, Markdown, Project Folder) and dynamically maps them to standard or custom schemas using AI.
-3. **Adapter Pattern**: Seamlessly switch between IDEs (Cursor/Trae) or Agents (Claude Code/Codex).
+3. **Adapter Pattern**: Seamlessly switch between execution surfaces such as IDEs (Cursor/Trae), agent CLIs (Claude Code/Codex), domain tools, or future service integrations.
 4. **Context-Aware**: Automatically extracts and stores context from user projects or existing specification documents to provide precise prompts for downstream AI Agents.
 
 ## Execution Modes
@@ -36,7 +38,7 @@ Project Manager supports two execution modes sharing the same codebase, with sli
 | Read/Write Local Files | ✅ Next.js server host machine | ✅ |
 | System Tray / Global Hotkey | ❌ | Planned (P2) |
 
-> **Ideal Audience for Browser Mode**: Developers or power users who run `next dev` / `next start` on their local machine and use a browser as the UI. It is not suitable for deployment on remote servers for multiple users (since spawns run on the server machine, not the user's machine).
+> **Ideal Audience for Browser Mode**: Developers, PM power users, or domain specialists who run `next dev` / `next start` on their local machine and use a browser as the UI. It is not suitable for deployment on remote servers for multiple users (since spawns run on the server machine, not the user's machine).
 
 ## Quick Start
 
@@ -105,7 +107,7 @@ npm run tauri:build           # Builds production installer (.app / .exe; reject
 
 - Load projects, features, and adapters from `config/samples/project-manager.sample.json`.
 - Display feature progress, status, and dispatch actions on the dashboard home page.
-- Generate IDE/Agent dry-run execution plans via `/api/bridge/execute`.
+- Generate adapter dry-run execution plans via `/api/bridge/execute` for IDE, agent, and future domain-tool targets.
 - Browser Mode: AI calls proxy via `/api/anthropic` server route, preventing key exposure to browser.
 - Tauri Mode: AI calls executed in Rust layer; keys managed by Rust (Keychain for release, local dev file for debug), keeping renderer key-blind. See `.project-manager/dev-logs/dev-keychain-bypass-2026-05-20.md`.
 
@@ -176,7 +178,7 @@ Project Manager's UI is fully internationalized. Translations live in [`lib/i18n
 
 This project is licensed under the **Business Source License 1.1 (BSL 1.1)**. 
 - **Non-commercial / Personal use**: Free and unrestricted.
-- **Commercial use**: Allowed for individuals or teams of 3 or fewer developers. Production use by teams of more than 3 developers for commercial purposes, or hosting the software as a service (SaaS), requires a commercial license.
+- **Commercial use**: Allowed for individuals or teams of 3 or fewer users. Production use by teams of more than 3 users for commercial purposes, or hosting the software as a service (SaaS), requires a commercial license.
 - **Future Open Source**: On **2029-05-26**, the license for this version of the code will automatically convert to the **Apache License, Version 2.0**.
 
 For more details, please see the [LICENSE](./LICENSE) file.

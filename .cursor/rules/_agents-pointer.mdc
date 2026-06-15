@@ -8,6 +8,7 @@ alwaysApply: true
 **Shared facts for every AI agent in this repo live in [`AGENTS.md`](../../AGENTS.md).**
 Read it before any non-trivial change. It defines:
 
+- Cross-discipline product scope; software/IDE/coding-agent workflows are one vertical, not the boundary
 - Stack, directory map, ADR-locked decisions
 - Iron Rules (zero silent failures, bridge discipline, schemaVersion, key boundary, static export)
 - The single completion gate: `npm run verify:baseline`

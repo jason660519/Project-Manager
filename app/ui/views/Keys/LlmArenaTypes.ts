@@ -20,6 +20,22 @@ export interface RunHistoryEntry {
   error?: string;
 }
 
+export const LLM_ARENA_HISTORY_WINDOW = 10;
+
+/**
+ * Sanitizer for the `llmArenaHistory` keys-store slice. Entry contents keep
+ * the same trust level as the pre-v2 in-memory history (loose cast); only the
+ * container shape and the window size are enforced.
+ */
+export function sanitizeLlmArenaHistory(value: unknown): Record<string, RunHistoryEntry[]> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([, history]) => Array.isArray(history))
+      .map(([key, history]) => [key, (history as RunHistoryEntry[]).slice(0, LLM_ARENA_HISTORY_WINDOW)]),
+  );
+}
+
 export function invocationPathLabel(v: InvocationPath, copy: LlmArenaCopy): string {
   return v === 'cli' ? copy.invocationPath.cli : copy.invocationPath.http;
 }

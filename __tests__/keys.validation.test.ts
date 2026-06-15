@@ -131,6 +131,20 @@ describe('keys validation orchestration', () => {
     expect(validateProviderKeyMock).not.toHaveBeenCalled();
   });
 
+  it('does not call validation when the stored key is whitespace-only', async () => {
+    const { setProviderKey, __resetProviderKeyStoreForTests } = await import(
+      '../lib/keys/providerKeyStore'
+    );
+    const { revalidateStoredKey } = await import('../lib/keys/validation');
+    __resetProviderKeyStoreForTests();
+    await setProviderKey('openai', '   ');
+
+    const result = await revalidateStoredKey(provider('openai'));
+
+    expect(result.errorReason).toBe('No key configured');
+    expect(validateProviderKeyMock).not.toHaveBeenCalled();
+  });
+
   it('uses the global Moonshot endpoint for Kimi keys', async () => {
     const { getProviderApiContract } = await import('../lib/keys/validation');
 

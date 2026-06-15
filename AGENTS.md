@@ -17,8 +17,18 @@
 
 ## 1. Project
 
-Cross-project engineering dashboard: ingests specs (Folder / GitHub) → AI-normalizes →
-canonical JSON → dashboard → dispatches to local IDEs / agents via a Tauri desktop shell.
+Cross-project, cross-discipline project-management orchestration app: ingests
+project specs / work inputs (Folder / GitHub / domain documents) → AI-normalizes
+them into canonical JSON → dashboard → triages, plans, dispatches, and reports
+work across human roles, AI agents, tools, and review queues via a Tauri desktop
+shell.
+
+The product must not be constrained to a software-engineering workflow. Software
+features, local IDEs, and coding agents are one supported vertical, not the
+domain boundary. The app should support PMs and discipline specialists across
+languages, trades, professions, and engineering domains — for example software,
+product, architecture, construction, structural, civil, MEP, procurement,
+operations, QA, and executive stakeholders.
 
 Full pipeline + data flow: [`docs/architecture/architecture-overview.md`](./docs/architecture/architecture-overview.md).
 

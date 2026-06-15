@@ -23,10 +23,21 @@ export interface CodingCandidateRow {
   model: string;
   note: string;
   enabled: boolean;
+  /** Provenance (F50 Phase 4): absent = manual curation (pre-F50 rows). */
+  origin?: 'manual' | 'accepted';
+  /** run_id of the arena run whose promotion suggested this row. */
+  sourceRunId?: string;
+  /** overall_score snapshot at acceptance time. */
+  scoreSnapshot?: number;
 }
 
 export interface CodingCandidateState {
   rows: CodingCandidateRow[];
+  /**
+   * Dismissed arena suggestions, keyed by `codingCandidateId(provider, model)`
+   * → ISO timestamp. A dismissed pair is never re-suggested.
+   */
+  dismissedSuggestions?: Record<string, string>;
 }
 
 export interface CodingCandidate {
@@ -35,6 +46,10 @@ export interface CodingCandidate {
   provider: LlmProviderId;
   model: string;
   note: string;
+  /** Provenance passthrough for consumers that care where a row came from. */
+  origin?: 'manual' | 'accepted';
+  sourceRunId?: string;
+  scoreSnapshot?: number;
 }
 
 /** Stable UUIDv5 row id derived from the provider:model natural key. */
@@ -54,5 +69,8 @@ export function listCodingAgentCandidates(state: CodingCandidateState): CodingCa
       provider: row.provider,
       model: row.model,
       note: row.note,
+      ...(row.origin ? { origin: row.origin } : {}),
+      ...(row.sourceRunId ? { sourceRunId: row.sourceRunId } : {}),
+      ...(typeof row.scoreSnapshot === 'number' ? { scoreSnapshot: row.scoreSnapshot } : {}),
     }));
 }

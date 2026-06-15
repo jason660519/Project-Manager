@@ -18,14 +18,14 @@ Status: Draft
 
 ### 1.1 One-Line Definition
 
-Project Manager is a local mission-control app for engineering teams that unifies specs, tasks, and AI-agent execution in one desktop workflow.
+Project Manager is a local mission-control app for cross-discipline project teams that unifies specs, domain work inputs, tasks, AI-assisted planning, dispatch, and execution visibility in one desktop workflow.
 
 ### 1.2 Problem Statement
 
 | Current Pain                                                                                                                         | Project Manager Solution                                                                                  | Solution Detail & Flow URL |
 | ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- | -------------------------- |
 | Specs, regulations, projects, tasks, and execution are fragmented across tools, making progress hard to connect                      | One desktop control surface to unify view, dispatch, and tracking                                         | https://jason660519.github.io/Project-Manager/solutions/fragmented-tools |
-| Multi-task and multi-project work is cumbersome; IDE/TUI-first workflows make parallel tracking and fast context switching difficult | A workspace and dashboard built for multi-project, multi-task execution                                   | https://jason660519.github.io/Project-Manager/solutions/multi-project-multi-task |
+| Multi-task and multi-project work is cumbersome; single-tool workflows make parallel tracking and fast context switching difficult | A workspace and dashboard built for multi-project, multi-task execution                                   | https://jason660519.github.io/Project-Manager/solutions/multi-project-multi-task |
 | Manual context and prompt assembly for every dispatch is time-consuming and inconsistent                                             | Automatic context assembly and prompt generation for higher first-pass quality                            | https://jason660519.github.io/Project-Manager/solutions/prompt-context-automation |
 | No visibility into running agents, making bottlenecks hard to detect and audits hard to perform                                      | Built-in live execution logs and status observability                                                     | https://jason660519.github.io/Project-Manager/solutions/live-agent-observability |
 | Lack of a customizable planning and collaboration framework; workflows are hard to reuse and scale across projects                   | Built-in and user-defined Coordinators + AI Agents to modularize decomposition, delegation, and execution | https://jason660519.github.io/Project-Manager/solutions/coordinator-agent-framework |
@@ -43,7 +43,7 @@ Project Manager is a local mission-control app for engineering teams that unifie
 
 1. Progress as Code via project-scoped config.
 2. Context-aware dispatch for higher first-pass quality.
-3. Adapter architecture for multiple IDE/agent tools.
+3. Adapter architecture for multiple execution surfaces, including IDEs, agents, domain tools, and service integrations.
 4. Local-first and privacy-first execution model.
 
 ## 2. Goals and Success Metrics
@@ -51,7 +51,7 @@ Project Manager is a local mission-control app for engineering teams that unifie
 ### 2.1 MVP Goals
 
 - Complete loop: review -> select feature -> dispatch -> monitor.
-- Import specs from Word/Excel into feature drafts.
+- Import specs from Word/Excel/Markdown and domain documents into executable project drafts.
 - Desktop-first shipping, macOS priority.
 
 ### 2.2 KPIs
@@ -101,7 +101,7 @@ Project Manager is a local mission-control app for engineering teams that unifie
 
 - No centralized backend/database in MVP.
 - No real-time multi-user collaboration.
-- No built-in IDE code editing.
+- No built-in IDE code editing; Project Manager orchestrates external execution surfaces instead of replacing them.
 - No custom model training.
 - No mobile app.
 
@@ -134,14 +134,14 @@ Project Manager is a local mission-control app for engineering teams that unifie
 
 ### 1.1 一句話定義
 
-Project Manager 是工程師的專案管理指揮中心，把各類工程專案(包括但不限於軟體工程,建築設計工程...等等)、設計規範、以User 設計的Coordinators調度系統預設的AI Engineers或User自定義的AI Agents 執行跨專案跨sessions的系統級工程設計規劃管理的Desktop Apps。
+Project Manager 是跨專案、跨工種、跨專業、跨語言、跨工程領域的桌面指揮中心，把各類專案輸入（包括但不限於軟體、產品、建築、結構、土木、MEP、採購、營運、QA 與管理決策）、設計規範、政府法規、任務與執行紀錄整合成可規劃、可派遣、可追蹤的工作流；軟體工程、IDE 與 coding agents 只是其中一個 supported vertical，不是產品邊界。
 
 ### 1.2 問題陳述
 
 | 現有痛點                                    | Project Manager 解法                           | 解法細節與流程說明的URL |
 | --------------------------------------- | -------------------------------------------- | ------------- |
 | 公司的設計規範、政府法規、專案、任務、執行分散在不同工具，資訊與進度難以串起來 | 提供單一桌面控制面板，統一檢視、派遣與追蹤                        | https://jason660519.github.io/Project-Manager/solutions/fragmented-tools |
-| 多任務與跨專案管理不便，傳統 IDE/TUI 不利於並行追蹤與快速切換     | 以跨專案、多任務為核心的工作區與 Dashboard 聚合進度              | https://jason660519.github.io/Project-Manager/solutions/multi-project-multi-task |
+| 多任務與跨專案管理不便，單一工具導向流程不利於並行追蹤與快速切換     | 以跨專案、多任務為核心的工作區與 Dashboard 聚合進度              | https://jason660519.github.io/Project-Manager/solutions/multi-project-multi-task |
 | 看不到 Agent 執行過程，無法即時定位卡點與回溯              | 內建即時執行日誌與狀態觀測，支援過程追蹤與問題定位                    | https://jason660519.github.io/Project-Manager/solutions/live-agent-observability |
 | 缺少可客製化的規劃與協作框架，難以重用流程並擴展跨專案能力           | 支援內建與自定義 Coordinator + AI Agents，模組化拆解、分派與執行 | https://jason660519.github.io/Project-Manager/solutions/coordinator-agent-framework |
 | 語音互動多為錄音模式（啟動／說完／結束），缺少即時回饋與修正          | 即時 ASR + TTS：說話內容實時顯示，並支援錯別字即時修正             | https://jason660519.github.io/Project-Manager/solutions/realtime-voice-asr-tts |
@@ -158,7 +158,7 @@ Project Manager 是工程師的專案管理指揮中心，把各類工程專案(
 
 1. Progress as Code：進度跟著專案設定檔走。
 2. Context-Aware Dispatch：提升首次派遣成功率。
-3. Adapter Pattern：支援多種 IDE/Agent。
+3. Adapter Pattern：支援 IDE、agent、domain tools 與 service integrations 等多種 execution surfaces。
 4. Hybrid Cloud + Local-First：混合雲架構＋優先保留本機資料與隱私。
 
 ## 2. 目標與成功指標
@@ -166,7 +166,7 @@ Project Manager 是工程師的專案管理指揮中心，把各類工程專案(
 ### 2.1 MVP 目標
 
 - 完成查看 -> 選擇 -> 派遣 -> 監控的完整迴圈。
-- 支援從 Github/Excel 匯入專案。
+- 支援從 GitHub、Excel、Word、Markdown 與 domain documents 匯入專案。
 - 以桌面版為主，macOS 優先。
 
 ### 2.2 KPI
@@ -216,7 +216,7 @@ Project Manager 是工程師的專案管理指揮中心，把各類工程專案(
 
 - MVP 不做中心化後端與資料庫。
 - 不做多人即時協作。
-- 不做 IDE 內建編輯器。
+- 不做 IDE 內建編輯器；Project Manager 負責編排外部 execution surfaces，而不是取代它們。
 - 不做自訓練模型。
 - 不做行動版。
 

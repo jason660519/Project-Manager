@@ -2,6 +2,8 @@
 
 > **Shared facts for all AI agents live in [`AGENTS.md`](./AGENTS.md).**
 > Read it first. This file holds Gemini-specific guidance only.
+> Product scope is cross-discipline project orchestration; software/IDE/coding-agent
+> workflows are one supported vertical, not the boundary.
 
 ## Gemini-specific surfaces
 

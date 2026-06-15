@@ -51,6 +51,11 @@ function parseBundle(raw: string | null): ProviderKeyMap | null {
   }
 }
 
+function hasStoredKeys(map: ProviderKeyMap | null): boolean {
+  if (!map) return false;
+  return Object.values(map).some((value) => typeof value === 'string' && value.trim().length > 0);
+}
+
 async function readLegacyTauri(): Promise<ProviderKeyMap> {
   const ids = getLlmProviderIds();
   const out: ProviderKeyMap = {};
@@ -109,9 +114,14 @@ async function loadOnce(): Promise<ProviderKeyMap> {
       } catch {
         map = null;
       }
-      if (!map) {
-        map = await readLegacyTauri();
-        migrated = true;
+      if (!hasStoredKeys(map)) {
+        const legacy = await readLegacyTauri();
+        if (hasStoredKeys(legacy)) {
+          map = legacy;
+          migrated = true;
+        } else {
+          map = map ?? {};
+        }
       }
     } else if (typeof window !== 'undefined') {
       try {
@@ -119,9 +129,14 @@ async function loadOnce(): Promise<ProviderKeyMap> {
       } catch {
         map = null;
       }
-      if (!map) {
-        map = readLegacyLocalStorage();
-        migrated = true;
+      if (!hasStoredKeys(map)) {
+        const legacy = readLegacyLocalStorage();
+        if (hasStoredKeys(legacy)) {
+          map = legacy;
+          migrated = true;
+        } else {
+          map = map ?? {};
+        }
       }
     } else {
       map = {};
@@ -150,7 +165,8 @@ async function loadOnce(): Promise<ProviderKeyMap> {
  */
 export async function getProviderKey(provider: LlmProviderId): Promise<string> {
   const map = await loadOnce();
-  return (map[provider] ?? '').trim() === '' ? map[provider] ?? '' : map[provider]!;
+  const value = (map[provider] ?? '').trim();
+  return value;
 }
 
 /** Returns true when a non-empty key is stored for this provider. */

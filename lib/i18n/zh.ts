@@ -752,6 +752,7 @@ export const zh: Translations = {
     vlm: {
       inputTitle: 'Test Input',
       uploadImage: 'Upload Test Image',
+      browserModeNotice: '影像评测仅支持在桌面 App（Tauri）中执行；浏览器模式仅供查看。',
       removeUploadedImage: 'Remove uploaded image',
       tableTitle: 'VLM Arena Evaluation Table',
       clearResults: 'Clear Results',
@@ -832,6 +833,10 @@ export const zh: Translations = {
     },
     coding: {
       tableTitle: '编程代理候选',
+      suggestionsTitle: '来自 LLM Arena 的建议',
+      suggestionAccept: '接受',
+      suggestionDismiss: '忽略',
+      staleWarning: '以下候选的 provider 金钥已失效：',
       addCandidate: '新增候选',
       emptyNoRows: '尚无编程候选模型 — 新增一个开始。',
       notePlaceholder: '为何选此模型做编程…',

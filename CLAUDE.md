@@ -2,6 +2,8 @@
 
 > **Shared facts for all AI agents live in [`AGENTS.md`](./AGENTS.md).**
 > Read it first. This file holds Claude-Code-specific guidance only.
+> Product scope is cross-discipline project orchestration; software/IDE/coding-agent
+> workflows are one supported vertical, not the boundary.
 >
 > Tier model (see [`docs/engineering/multi-ai-config.md`](./docs/engineering/multi-ai-config.md)):
 > 1. Global — `~/.claude/CLAUDE.md` (personal preferences, all projects)

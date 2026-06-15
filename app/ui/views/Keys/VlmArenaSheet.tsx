@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useKeysContext } from './KeysContext';
-import { listLlmProviders, type LlmProviderId } from '../../../../lib/keys/llmProviders';
+import type { LlmProviderId } from '../../../../lib/keys/llmProviders';
 import { useI18n } from '../../../../lib/i18n';
 import type { ArenaModelSpec } from './useArenaChat';
 import { VlmArenaMethodPanel } from './VlmArenaMethodPanel';
@@ -10,6 +10,7 @@ import { VlmArenaMatrixTable } from './VlmArenaMatrixTable';
 import { VlmArenaDetailSheet } from './VlmArenaDetailSheet';
 import {
   buildImageToImagePrompt,
+  canRunVlmImageToImage,
   clearVlmImageToImageRuns,
   coerceImageToImageSelections,
   getVlmImageToImageState,
@@ -44,13 +45,23 @@ function moveItem<T>(items: T[], fromIndex: number, toIndex: number): T[] {
 export function VlmArenaSheet() {
   const { t } = useI18n();
   const copy = t.keysArena.vlm;
-  const { vlmState, setVlmState } = useKeysContext();
-  const allProviders = useMemo(() => imageToImageProvidersFrom(listLlmProviders()), []);
+  const { vlmState, setVlmState, validatedLlmProviders } = useKeysContext();
+  // Dual-source list scoped to VALIDATED providers only (F50 Phase 3) — a
+  // model the user can pick is a model the user can actually run.
+  const allProviders = useMemo(
+    () => imageToImageProvidersFrom(validatedLlmProviders),
+    [validatedLlmProviders],
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedDetailIndex, setSelectedDetailIndex] = useState<number | null>(null);
   const [arenaState, setArenaState] = useState(getVlmImageToImageState);
+  const [canRunImages, setCanRunImages] = useState(true);
   const rows = arenaState.rows;
   const historyByResultKey = arenaState.historyByResultKey;
+
+  useEffect(() => {
+    setCanRunImages(canRunVlmImageToImage());
+  }, []);
 
   useEffect(() => subscribeVlmImageToImageState(setArenaState), []);
 
@@ -195,6 +206,14 @@ export function VlmArenaSheet() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
+      {!canRunImages && (
+        <div
+          role="note"
+          className="rounded-md border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300"
+        >
+          {copy.browserModeNotice}
+        </div>
+      )}
       <VlmArenaMethodPanel
         copy={copy}
         imageDataUrl={vlmState.imageDataUrl}

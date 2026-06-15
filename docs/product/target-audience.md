@@ -15,14 +15,16 @@ Date: 2026-05-12
 
 ## 1. Positioning
 
-Project Manager is not for all developers. It is for developers who already run AI-agent workflows and need a local control center for dispatch and execution visibility.
+Project Manager is not limited to developers. It is for PMs, discipline specialists, and technical operators who coordinate work across fragmented specs, tools, agents, and review queues and need a local control center for dispatch and execution visibility.
+
+The MVP beachhead remains software-heavy because local IDE and coding-agent adapters are the first mature execution surfaces. That beachhead must not narrow the long-term product boundary.
 
 ## 2. Primary Segments
 
-### Segment A: AI-Native Solo Developers
+### Segment A: AI-Native Solo Operators
 
-- Individual builders managing 3-10 projects.
-- Toolchain centered on Cursor/Claude Code/Codex + GitHub.
+- Individual builders, PMs, or domain specialists managing 3-10 projects.
+- Toolchain may include Cursor/Claude Code/Codex + GitHub for software work, plus folders, spreadsheets, domain docs, and review queues for non-software work.
 - Highly automation-driven and ROI-sensitive.
 
 Motivation:
@@ -36,9 +38,9 @@ Pain:
 - Manual prompt assembly for every dispatch.
 - Poor runtime visibility from terminal-only workflow.
 
-### Segment B: Tech Leads in Small Teams (2-10 engineers)
+### Segment B: Cross-Functional Leads in Small Teams (2-10 people)
 
-- Team leads with delivery responsibility.
+- Team leads, PMs, or discipline leads with delivery responsibility.
 - Need to keep feature throughput predictable.
 - Require practical security and auditability.
 
@@ -56,7 +58,7 @@ Pain:
 
 ### Segment C: Senior Individual Contributors
 
-- Staff/principal engineers in mid-large organizations.
+- Staff/principal engineers, senior PMs, project architects, or discipline specialists in mid-large organizations.
 - Personal tooling decisions, power-user behavior.
 - Use agents to accelerate large scoped tasks.
 
@@ -69,7 +71,7 @@ Motivation:
 
 | Segment | Why Not Primary in MVP |
 | --- | --- |
-| Non-engineering PM/Designer | Higher learning curve for CLI/agent concepts |
+| Large non-software departments | Need richer domain adapters, templates, and governance packs |
 | Enterprise procurement users | Need SSO/compliance/audit stack |
 | Students/beginners | Lower need for multi-project orchestration |
 
@@ -77,13 +79,13 @@ Motivation:
 
 Primary MVP beachhead:
 
-**Segment A + GitHub + Claude Code/Cursor + macOS users**
+**Segment A + GitHub/folder imports + Claude Code/Cursor + macOS users**
 
 Why:
 
 - Fast onboarding and high tolerance for early products.
 - Strong feedback quality.
-- High concentration in public dev communities.
+- High concentration in public dev communities, while still validating the broader orchestration model.
 
 ## 5. Customer Journey
 
@@ -102,7 +104,7 @@ Critical conversion event: first successful dispatch with live log visibility.
 | --- | --- | --- |
 | Cross-project daily triage | Multiple tabs/tools | Unified dashboard |
 | Convert specs to tasks | Manual copy/paste | AI-assisted ingestion |
-| Dispatch agent task | Terminal command + manual prompt | Dispatch in <=3 clicks |
+| Dispatch work to an execution surface | Terminal command, manual prompt, spreadsheet handoff, or message thread | Dispatch in <=3 clicks |
 | Monitor execution | Watch terminal manually | Live log with status |
 | Weekly reporting | Manual git/PR summary | One-click Markdown report |
 
@@ -122,14 +124,16 @@ MVP recommendation: keep free first, validate retention before monetization.
 
 ## 1. 市場定位
 
-Project Manager 不是面向所有工程師，而是面向已經在使用 AI Agent 工作流、需要本機任務指揮中心的工程師。
+Project Manager 不只面向工程師，而是面向需要在分散規格、工具、agents 與 review queues 之間協調工作的 PM、領域專家與技術操作者；它提供本機任務指揮中心，用來派遣、監控與回報工作。
+
+MVP 仍以 software-heavy beachhead 起步，因為本機 IDE 與 coding-agent adapters 是第一批成熟 execution surfaces；但這不應縮窄長期產品邊界。
 
 ## 2. 主要族群
 
-### Segment A：AI-Native 獨立開發者
+### Segment A：AI-Native 獨立操作者
 
-- 一人管理 3 到 10 個專案。
-- 以 Cursor、Claude Code、Codex 與 GitHub 為核心工具鏈。
+- 一人管理 3 到 10 個專案的 builder、PM 或領域專家。
+- 軟體工作可能以 Cursor、Claude Code、Codex 與 GitHub 為核心；非軟體工作則可能以 folders、spreadsheets、domain docs 與 review queues 為核心。
 - 高度重視自動化與工具 ROI。
 
 核心動機：
@@ -143,9 +147,9 @@ Project Manager 不是面向所有工程師，而是面向已經在使用 AI Age
 - 每次都要手動組 Prompt。
 - 只能在 terminal 追執行狀態。
 
-### Segment B：小型團隊 Tech Lead（2 到 10 人）
+### Segment B：小型跨職能團隊 Lead（2 到 10 人）
 
-- 需維持 feature 交付節奏與品質。
+- 需維持交付節奏、品質與可追溯性。
 - 對安全性與可追溯性有基本要求。
 
 核心動機：
@@ -160,9 +164,9 @@ Project Manager 不是面向所有工程師，而是面向已經在使用 AI Age
 - Agent 結果仍需人工覆核。
 - 現有整合方案設定複雜。
 
-### Segment C：資深個人工程師
+### Segment C：資深個人貢獻者 / 領域專家
 
-- 屬於中大型公司中的 Staff/Principal IC。
+- 屬於中大型組織中的 Staff/Principal IC、資深 PM、project architect 或 discipline specialist。
 - 偏好可程式化、快捷鍵與高效率工具。
 
 核心動機：
@@ -174,7 +178,7 @@ Project Manager 不是面向所有工程師，而是面向已經在使用 AI Age
 
 | 族群 | 暫不主力原因 |
 | --- | --- |
-| 非工程背景 PM/Designer | Agent/CLI 學習門檻較高 |
+| 大型非軟體部門 | 需要更完整的 domain adapters、templates 與 governance packs |
 | 企業採購角色 | 需要 SSO/合規/audit 能力 |
 | 學生與初學者 | 多專案與 Agent 協作需求較低 |
 
@@ -182,13 +186,13 @@ Project Manager 不是面向所有工程師，而是面向已經在使用 AI Age
 
 MVP 先聚焦：
 
-**Segment A + GitHub + Claude Code/Cursor + macOS**
+**Segment A + GitHub/folder imports + Claude Code/Cursor + macOS**
 
 原因：
 
 - 上手快，對早期產品容錯高。
 - 回饋密度與品質高。
-- 在開發者社群擴散速度快。
+- 在開發者社群擴散速度快，同時可驗證更廣義的 orchestration model。
 
 ## 5. 使用者旅程
 

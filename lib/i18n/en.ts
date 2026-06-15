@@ -751,6 +751,7 @@ export const en: Translations = {
     vlm: {
       inputTitle: 'Test Input',
       uploadImage: 'Upload Test Image',
+      browserModeNotice: 'Image evaluation runs in the desktop app only — browser mode is view-only.',
       removeUploadedImage: 'Remove uploaded image',
       tableTitle: 'VLM Arena Evaluation Table',
       clearResults: 'Clear Results',
@@ -831,6 +832,10 @@ export const en: Translations = {
     },
     coding: {
       tableTitle: 'Coding Agent Candidates',
+      suggestionsTitle: 'Suggested from LLM Arena',
+      suggestionAccept: 'Accept',
+      suggestionDismiss: 'Dismiss',
+      staleWarning: 'Provider key no longer validated for:',
       addCandidate: 'Add candidate',
       emptyNoRows: 'No coding candidates yet — add one to start.',
       notePlaceholder: 'Why this model for coding…',
