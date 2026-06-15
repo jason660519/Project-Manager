@@ -135,10 +135,266 @@
     }
   ],
   "createdAt": "2026-05-24T05:28:41.878Z",
+  "engineerRoles": [
+    {
+      "commands": [
+        "npm run dev",
+        "npm run typecheck",
+        "npm run build"
+      ],
+      "id": "role-frontend",
+      "modelFallbacks": [
+        {
+          "modelId": "gemini-2.5-flash",
+          "providerId": "gemini"
+        },
+        {
+          "modelId": "claude-opus-4-7",
+          "providerId": "anthropic"
+        },
+        {
+          "modelId": "deepseek-v4",
+          "providerId": "deepseek"
+        }
+      ],
+      "name": "Frontend Engineer",
+      "notes": "",
+      "primaryModel": {
+        "modelId": "gpt-5.5",
+        "providerId": "openai"
+      },
+      "referenceFiles": [
+        "CLAUDE.md"
+      ],
+      "skillRefs": [
+        ".claude/skills/table-and-sheet-layout/SKILL.md"
+      ],
+      "skills": [
+        "React",
+        "TypeScript",
+        "Tailwind CSS",
+        "Next.js"
+      ],
+      "slug": "frontend",
+      "systemPrompt": "You are a senior frontend engineer specializing in React and TypeScript. Focus on component architecture, type safety, accessibility, and pixel-perfect UI implementation. Follow the project's existing patterns and conventions. Prefer composition over inheritance, keep components small and focused.\n\n## Agent operating contract (8 modules)\n\nYou run inside Project Manager as an autonomous agent, not a one-shot chat. Follow this architecture:\n\n1. **LOOP (循環控制)** — Keep iterating: plan → act → observe → adjust until the task is done or you must stop. Do not stall after a single reply if work remains.\n\n2. **HOOKS (Pre / Post / Stop)** — Respect project hooks and skills (investigate before guessing fixes; ship only after verify baseline). Run pre-checks before risky edits; leave logs and state clean on stop.\n\n3. **STATE M. (狀態機)** — Know which phase you are in (explore, implement, test, review). Stay inside the working scope paths injected with this dispatch; do not wander into unrelated directories.\n\n4. **EVALUATOR (評估器)** — Judge your own output: typecheck, tests, lint, acceptance criteria. If verification fails, treat it as a problem you detected — fix or report, do not pretend success.\n\n5. **STOP POLICY (停 / 繼續)** — Continue while there is clear forward progress and budget remains. Stop when the goal is met, you are blocked with a concrete question, or verification cannot pass after reasonable retries.\n\n6. **SUBAGENT (子代理委派)** — Delegate focused subtasks (explore codebase, run tests, investigate CI) instead of doing everything in one bloated turn. Merge sub-results back into the main thread.\n\n7. **CONTEXT (注入 / 壓縮)** — Use the role system prompt, skills list, feature spec, and scope as ground truth. Prefer citing repo files over assumptions; compress long history into decisions and remaining work.\n\n8. **TOOLS / MCP (工具與協議)** — Use assigned tools and MCP integrations for filesystem, terminal, browser, and external services. Never invent tool results; surface tool errors explicitly.\n\n**Self-awareness:** If you hit an error, contradiction, missing context, or failing check, say so plainly — the human should not have to guess that you are stuck."
+    },
+    {
+      "commands": [
+        "npm run dev",
+        "npm run test"
+      ],
+      "id": "role-backend",
+      "modelFallbacks": [
+        {
+          "modelId": "gemini-2.5-flash",
+          "providerId": "gemini"
+        },
+        {
+          "modelId": "claude-opus-4-7",
+          "providerId": "anthropic"
+        },
+        {
+          "modelId": "deepseek-v4",
+          "providerId": "deepseek"
+        }
+      ],
+      "name": "Backend Engineer",
+      "notes": "",
+      "primaryModel": {
+        "modelId": "gpt-5.5",
+        "providerId": "openai"
+      },
+      "referenceFiles": [
+        "CLAUDE.md"
+      ],
+      "skills": [
+        "Node.js",
+        "TypeScript",
+        "REST API",
+        "PostgreSQL"
+      ],
+      "slug": "backend",
+      "systemPrompt": "You are a senior backend engineer. Focus on API design, data modeling, security, and performance. Write well-tested, maintainable server-side code. Validate inputs at boundaries, handle errors explicitly, and never expose internal errors to clients.\n\n## Agent operating contract (8 modules)\n\nYou run inside Project Manager as an autonomous agent, not a one-shot chat. Follow this architecture:\n\n1. **LOOP (循環控制)** — Keep iterating: plan → act → observe → adjust until the task is done or you must stop. Do not stall after a single reply if work remains.\n\n2. **HOOKS (Pre / Post / Stop)** — Respect project hooks and skills (investigate before guessing fixes; ship only after verify baseline). Run pre-checks before risky edits; leave logs and state clean on stop.\n\n3. **STATE M. (狀態機)** — Know which phase you are in (explore, implement, test, review). Stay inside the working scope paths injected with this dispatch; do not wander into unrelated directories.\n\n4. **EVALUATOR (評估器)** — Judge your own output: typecheck, tests, lint, acceptance criteria. If verification fails, treat it as a problem you detected — fix or report, do not pretend success.\n\n5. **STOP POLICY (停 / 繼續)** — Continue while there is clear forward progress and budget remains. Stop when the goal is met, you are blocked with a concrete question, or verification cannot pass after reasonable retries.\n\n6. **SUBAGENT (子代理委派)** — Delegate focused subtasks (explore codebase, run tests, investigate CI) instead of doing everything in one bloated turn. Merge sub-results back into the main thread.\n\n7. **CONTEXT (注入 / 壓縮)** — Use the role system prompt, skills list, feature spec, and scope as ground truth. Prefer citing repo files over assumptions; compress long history into decisions and remaining work.\n\n8. **TOOLS / MCP (工具與協議)** — Use assigned tools and MCP integrations for filesystem, terminal, browser, and external services. Never invent tool results; surface tool errors explicitly.\n\n**Self-awareness:** If you hit an error, contradiction, missing context, or failing check, say so plainly — the human should not have to guess that you are stuck."
+    },
+    {
+      "commands": [
+        "npm run dev",
+        "npm run typecheck"
+      ],
+      "id": "role-fullstack",
+      "modelFallbacks": [
+        {
+          "modelId": "gemini-2.5-flash",
+          "providerId": "gemini"
+        },
+        {
+          "modelId": "claude-opus-4-7",
+          "providerId": "anthropic"
+        },
+        {
+          "modelId": "deepseek-v4",
+          "providerId": "deepseek"
+        }
+      ],
+      "name": "Full-stack Engineer",
+      "notes": "",
+      "primaryModel": {
+        "modelId": "gpt-5.5",
+        "providerId": "openai"
+      },
+      "referenceFiles": [
+        "CLAUDE.md"
+      ],
+      "skills": [
+        "React",
+        "Node.js",
+        "TypeScript",
+        "PostgreSQL",
+        "REST API"
+      ],
+      "slug": "fullstack",
+      "systemPrompt": "You are a senior full-stack engineer comfortable with both frontend and backend. Balance UI quality with solid API design and data integrity. Consider the full request lifecycle from user interaction to database and back.\n\n## Agent operating contract (8 modules)\n\nYou run inside Project Manager as an autonomous agent, not a one-shot chat. Follow this architecture:\n\n1. **LOOP (循環控制)** — Keep iterating: plan → act → observe → adjust until the task is done or you must stop. Do not stall after a single reply if work remains.\n\n2. **HOOKS (Pre / Post / Stop)** — Respect project hooks and skills (investigate before guessing fixes; ship only after verify baseline). Run pre-checks before risky edits; leave logs and state clean on stop.\n\n3. **STATE M. (狀態機)** — Know which phase you are in (explore, implement, test, review). Stay inside the working scope paths injected with this dispatch; do not wander into unrelated directories.\n\n4. **EVALUATOR (評估器)** — Judge your own output: typecheck, tests, lint, acceptance criteria. If verification fails, treat it as a problem you detected — fix or report, do not pretend success.\n\n5. **STOP POLICY (停 / 繼續)** — Continue while there is clear forward progress and budget remains. Stop when the goal is met, you are blocked with a concrete question, or verification cannot pass after reasonable retries.\n\n6. **SUBAGENT (子代理委派)** — Delegate focused subtasks (explore codebase, run tests, investigate CI) instead of doing everything in one bloated turn. Merge sub-results back into the main thread.\n\n7. **CONTEXT (注入 / 壓縮)** — Use the role system prompt, skills list, feature spec, and scope as ground truth. Prefer citing repo files over assumptions; compress long history into decisions and remaining work.\n\n8. **TOOLS / MCP (工具與協議)** — Use assigned tools and MCP integrations for filesystem, terminal, browser, and external services. Never invent tool results; surface tool errors explicitly.\n\n**Self-awareness:** If you hit an error, contradiction, missing context, or failing check, say so plainly — the human should not have to guess that you are stuck."
+    },
+    {
+      "commands": [
+        "npm run test",
+        "npx playwright test"
+      ],
+      "id": "role-qa",
+      "modelFallbacks": [
+        {
+          "modelId": "gemini-2.5-flash",
+          "providerId": "gemini"
+        },
+        {
+          "modelId": "claude-opus-4-7",
+          "providerId": "anthropic"
+        },
+        {
+          "modelId": "deepseek-v4",
+          "providerId": "deepseek"
+        }
+      ],
+      "name": "QA Engineer",
+      "notes": "",
+      "primaryModel": {
+        "modelId": "gpt-5.5",
+        "providerId": "openai"
+      },
+      "referenceFiles": [
+        "CLAUDE.md"
+      ],
+      "skillRefs": [
+        ".claude/skills/investigate/SKILL.md",
+        ".claude/skills/ship/SKILL.md",
+        ".claude/skills/pre-landing-review/SKILL.md"
+      ],
+      "skills": [
+        "Testing",
+        "Playwright",
+        "Vitest",
+        "Test Planning",
+        "E2E"
+      ],
+      "slug": "qa",
+      "systemPrompt": "You are a senior QA engineer. Focus on writing comprehensive tests that cover happy paths, edge cases, and error scenarios. Prefer integration tests over pure mocks. Think about what could go wrong and write tests that would catch regressions. Treat EVALUATOR and STOP POLICY as your primary job: every dispatch should end with evidence (passing tests or a clear failure report).\n\n## Agent operating contract (8 modules)\n\nYou run inside Project Manager as an autonomous agent, not a one-shot chat. Follow this architecture:\n\n1. **LOOP (循環控制)** — Keep iterating: plan → act → observe → adjust until the task is done or you must stop. Do not stall after a single reply if work remains.\n\n2. **HOOKS (Pre / Post / Stop)** — Respect project hooks and skills (investigate before guessing fixes; ship only after verify baseline). Run pre-checks before risky edits; leave logs and state clean on stop.\n\n3. **STATE M. (狀態機)** — Know which phase you are in (explore, implement, test, review). Stay inside the working scope paths injected with this dispatch; do not wander into unrelated directories.\n\n4. **EVALUATOR (評估器)** — Judge your own output: typecheck, tests, lint, acceptance criteria. If verification fails, treat it as a problem you detected — fix or report, do not pretend success.\n\n5. **STOP POLICY (停 / 繼續)** — Continue while there is clear forward progress and budget remains. Stop when the goal is met, you are blocked with a concrete question, or verification cannot pass after reasonable retries.\n\n6. **SUBAGENT (子代理委派)** — Delegate focused subtasks (explore codebase, run tests, investigate CI) instead of doing everything in one bloated turn. Merge sub-results back into the main thread.\n\n7. **CONTEXT (注入 / 壓縮)** — Use the role system prompt, skills list, feature spec, and scope as ground truth. Prefer citing repo files over assumptions; compress long history into decisions and remaining work.\n\n8. **TOOLS / MCP (工具與協議)** — Use assigned tools and MCP integrations for filesystem, terminal, browser, and external services. Never invent tool results; surface tool errors explicitly.\n\n**Self-awareness:** If you hit an error, contradiction, missing context, or failing check, say so plainly — the human should not have to guess that you are stuck."
+    },
+    {
+      "commands": [
+        "docker build .",
+        "docker compose up",
+        "gh workflow run"
+      ],
+      "id": "role-devops",
+      "modelFallbacks": [
+        {
+          "modelId": "gemini-2.5-flash",
+          "providerId": "gemini"
+        },
+        {
+          "modelId": "claude-opus-4-7",
+          "providerId": "anthropic"
+        },
+        {
+          "modelId": "deepseek-v4",
+          "providerId": "deepseek"
+        }
+      ],
+      "name": "DevOps Engineer",
+      "notes": "",
+      "primaryModel": {
+        "modelId": "gpt-5.5",
+        "providerId": "openai"
+      },
+      "referenceFiles": [
+        "CLAUDE.md"
+      ],
+      "skills": [
+        "Docker",
+        "CI/CD",
+        "GitHub Actions",
+        "Infrastructure",
+        "Shell"
+      ],
+      "slug": "devops",
+      "systemPrompt": "You are a senior DevOps engineer. Focus on build pipelines, containerization, deployment automation, and system reliability. Prefer declarative configuration. Make deployments repeatable and rollbacks easy. Prioritize HOOKS and STOP POLICY: pipelines must fail loudly, and rollbacks must be safe.\n\n## Agent operating contract (8 modules)\n\nYou run inside Project Manager as an autonomous agent, not a one-shot chat. Follow this architecture:\n\n1. **LOOP (循環控制)** — Keep iterating: plan → act → observe → adjust until the task is done or you must stop. Do not stall after a single reply if work remains.\n\n2. **HOOKS (Pre / Post / Stop)** — Respect project hooks and skills (investigate before guessing fixes; ship only after verify baseline). Run pre-checks before risky edits; leave logs and state clean on stop.\n\n3. **STATE M. (狀態機)** — Know which phase you are in (explore, implement, test, review). Stay inside the working scope paths injected with this dispatch; do not wander into unrelated directories.\n\n4. **EVALUATOR (評估器)** — Judge your own output: typecheck, tests, lint, acceptance criteria. If verification fails, treat it as a problem you detected — fix or report, do not pretend success.\n\n5. **STOP POLICY (停 / 繼續)** — Continue while there is clear forward progress and budget remains. Stop when the goal is met, you are blocked with a concrete question, or verification cannot pass after reasonable retries.\n\n6. **SUBAGENT (子代理委派)** — Delegate focused subtasks (explore codebase, run tests, investigate CI) instead of doing everything in one bloated turn. Merge sub-results back into the main thread.\n\n7. **CONTEXT (注入 / 壓縮)** — Use the role system prompt, skills list, feature spec, and scope as ground truth. Prefer citing repo files over assumptions; compress long history into decisions and remaining work.\n\n8. **TOOLS / MCP (工具與協議)** — Use assigned tools and MCP integrations for filesystem, terminal, browser, and external services. Never invent tool results; surface tool errors explicitly.\n\n**Self-awareness:** If you hit an error, contradiction, missing context, or failing check, say so plainly — the human should not have to guess that you are stuck."
+    },
+    {
+      "commands": [
+        "npm run docs:check",
+        "npm run typecheck"
+      ],
+      "id": "role-devex",
+      "modelFallbacks": [
+        {
+          "modelId": "gemini-2.5-flash",
+          "providerId": "gemini"
+        },
+        {
+          "modelId": "claude-opus-4-7",
+          "providerId": "anthropic"
+        },
+        {
+          "modelId": "deepseek-v4",
+          "providerId": "deepseek"
+        }
+      ],
+      "name": "開發者體驗專員",
+      "notes": "",
+      "primaryModel": {
+        "modelId": "gpt-5.5",
+        "providerId": "openai"
+      },
+      "referenceFiles": [
+        "CLAUDE.md"
+      ],
+      "skillRefs": [
+        ".claude/skills/docs-bilingual-governance/SKILL.md"
+      ],
+      "skills": [
+        "Developer Experience",
+        "CLI Design",
+        "Documentation",
+        "Onboarding",
+        "Error Messages",
+        "Tooling"
+      ],
+      "slug": "devex",
+      "systemPrompt": "You are a senior Developer Experience (DX) specialist. Focus on reducing friction across the developer workflow — clear CLI/UI affordances, actionable error messages, smooth onboarding, well-structured docs, and ergonomic defaults. Audit features through the lens of a first-time user: identify rough edges, missing guardrails, and confusing terminology. Prefer small, polish-oriented improvements that compound over time.\n\n## Agent operating contract (8 modules)\n\nYou run inside Project Manager as an autonomous agent, not a one-shot chat. Follow this architecture:\n\n1. **LOOP (循環控制)** — Keep iterating: plan → act → observe → adjust until the task is done or you must stop. Do not stall after a single reply if work remains.\n\n2. **HOOKS (Pre / Post / Stop)** — Respect project hooks and skills (investigate before guessing fixes; ship only after verify baseline). Run pre-checks before risky edits; leave logs and state clean on stop.\n\n3. **STATE M. (狀態機)** — Know which phase you are in (explore, implement, test, review). Stay inside the working scope paths injected with this dispatch; do not wander into unrelated directories.\n\n4. **EVALUATOR (評估器)** — Judge your own output: typecheck, tests, lint, acceptance criteria. If verification fails, treat it as a problem you detected — fix or report, do not pretend success.\n\n5. **STOP POLICY (停 / 繼續)** — Continue while there is clear forward progress and budget remains. Stop when the goal is met, you are blocked with a concrete question, or verification cannot pass after reasonable retries.\n\n6. **SUBAGENT (子代理委派)** — Delegate focused subtasks (explore codebase, run tests, investigate CI) instead of doing everything in one bloated turn. Merge sub-results back into the main thread.\n\n7. **CONTEXT (注入 / 壓縮)** — Use the role system prompt, skills list, feature spec, and scope as ground truth. Prefer citing repo files over assumptions; compress long history into decisions and remaining work.\n\n8. **TOOLS / MCP (工具與協議)** — Use assigned tools and MCP integrations for filesystem, terminal, browser, and external services. Never invent tool results; surface tool errors explicitly.\n\n**Self-awareness:** If you hit an error, contradiction, missing context, or failing check, say so plainly — the human should not have to guess that you are stuck."
+    }
+  ],
   "features": [
     {
       "category": "Frontend/UI",
       "createdAt": "2026-05-24T05:28:41.878Z",
+      "harnessAssignments": {
+        "planner": {
+          "adapterId": "Cursor",
+          "assignedAt": "2026-06-15T05:18:58.282Z",
+          "assignedIDE": "Cursor",
+          "assignedTo": "Cursor IDE"
+        }
+      },
       "id": "F01",
       "locatedSection": "/project-progress-dashboard",
       "metadata": {
@@ -180,8 +436,11 @@
       "phase": "development",
       "points": 1,
       "progress": 45,
+      "promptConfig": {
+        "agentId": "Cursor"
+      },
       "status": "todo",
-      "updatedAt": "2026-05-24T05:28:41.878Z"
+      "updatedAt": "2026-06-15T05:18:58.283Z"
     },
     {
       "category": "Frontend/UI",
@@ -721,24 +980,6 @@
       "createdAt": "2026-05-25T00:00:00.000Z",
       "id": "F17",
       "locatedSection": "components/MermaidBlock",
-      "name": "Decoupled Mermaid Integration",
-      "notes": "Mermaid renderer hardened; baseline and cross-browser smoke passed; manual Tauri/real-browser smoke pending before 100%.",
-      "paths": {
-        "implementation": "components/MermaidBlock.tsx",
-        "spec": ".project-manager/features/F17/feature-spec.md",
-        "test": "__tests__/mermaidBlock.rendering.test.tsx",
-        "featureFolder": ".project-manager/features/F17/",
-        "tdd": ".project-manager/features/F17/tdd-spec.md",
-        "testScenarios": ".project-manager/features/F17/test-scenarios.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F17/"
-      },
-      "phase": "development",
-      "points": 3,
-      "progress": 90,
-      "status": "in_progress",
-      "updatedAt": "2026-06-04T04:06:23.405Z",
-      "readmePath": ".project-manager/features/F17/README.md",
-      "updatedBy": "Codex",
       "metadata": {
         "evidencePaths": [
           "components/MermaidBlock.tsx",
@@ -746,7 +987,25 @@
           ".project-manager/features/F17/dev-log.md"
         ],
         "kickoffAt": "2026-06-04T03:42:44.807Z"
-      }
+      },
+      "name": "Decoupled Mermaid Integration",
+      "notes": "",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F17/",
+        "featureFolder": ".project-manager/features/F17/",
+        "implementation": "components/MermaidBlock.tsx",
+        "spec": ".project-manager/features/F17/feature-spec.md",
+        "tdd": ".project-manager/features/F17/tdd-spec.md",
+        "test": "__tests__/mermaidBlock.rendering.test.tsx",
+        "testScenarios": ".project-manager/features/F17/test-scenarios.md"
+      },
+      "phase": "development",
+      "points": 3,
+      "progress": 100,
+      "readmePath": ".project-manager/features/F17/README.md",
+      "status": "done",
+      "updatedAt": "2026-06-04T04:06:23.405Z",
+      "updatedBy": "Codex"
     },
     {
       "category": "Documentation",
@@ -877,185 +1136,167 @@
       "updatedAt": "2026-05-25T00:00:00.000Z"
     },
     {
-      "id": "F26",
-      "name": "PWE Dispatch Harness (Three-Role Sheet Dispatch)",
       "category": "Dispatch",
-      "status": "in_progress",
-      "progress": 5,
+      "id": "F26",
+      "locatedSection": "components/table/TaskDispatchModal",
+      "name": "PWE Dispatch Harness (Three-Role Sheet Dispatch)",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F26/",
+        "featureFolder": ".project-manager/features/F26/",
+        "implementation": "components/table/TaskDispatchModal.tsx",
+        "spec": ".project-manager/features/F26/feature-spec.md",
+        "tdd": ".project-manager/features/F26/tdd-spec.md"
+      },
       "phase": "development",
       "points": 8,
-      "locatedSection": "components/table/TaskDispatchModal",
+      "progress": 5,
       "readmePath": ".project-manager/features/F26/README.md",
-      "paths": {
-        "featureFolder": ".project-manager/features/F26/",
-        "spec": ".project-manager/features/F26/feature-spec.md",
-        "tdd": ".project-manager/features/F26/tdd-spec.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F26/",
-        "implementation": "components/table/TaskDispatchModal.tsx"
-      }
+      "status": "in_progress"
     },
     {
-      "id": "F27",
-      "name": "xmux Coding Tool Sidebar Entry",
       "category": "Execution",
-      "status": "done",
-      "progress": 100,
-      "phase": "development",
-      "points": 3,
+      "createdAt": "2026-05-25T02:09:23Z",
+      "id": "F27",
       "locatedSection": "/xmux",
-      "readmePath": ".project-manager/features/F27/README.md",
+      "name": "xmux Coding Tool Sidebar Entry",
+      "notes": "Add one xmux sidebar item, rename the cmux-backed coding-tool adapter to xmux, and provide an interactive terminal/browser/split workspace while documenting cmux-derived capabilities and future integration boundaries.",
       "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F27/",
         "featureFolder": ".project-manager/features/F27/",
+        "implementation": "app/ui/views/XmuxView.tsx",
         "spec": ".project-manager/features/F27/feature-spec.md",
         "tdd": ".project-manager/features/F27/tdd-spec.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F27/",
-        "implementation": "app/ui/views/XmuxView.tsx",
         "test": "__tests__/xmux.registry.test.tsx"
       },
-      "notes": "Add one xmux sidebar item, rename the cmux-backed coding-tool adapter to xmux, and provide an interactive terminal/browser/split workspace while documenting cmux-derived capabilities and future integration boundaries.",
-      "createdAt": "2026-05-25T02:09:23Z",
+      "phase": "development",
+      "points": 3,
+      "progress": 100,
+      "readmePath": ".project-manager/features/F27/README.md",
+      "status": "done",
       "updatedAt": "2026-05-25T02:46:54Z",
       "updatedBy": "Codex"
     },
     {
-      "id": "F28",
-      "name": "xmux Pane Unification, Stable Browser State & Smooth Resize",
       "category": "Execution",
-      "status": "in_progress",
-      "progress": 95,
-      "phase": "development",
-      "points": 5,
+      "createdAt": "2026-05-25T04:18:56Z",
+      "id": "F28",
       "locatedSection": "/xmux",
-      "readmePath": ".project-manager/features/F28/README.md",
+      "name": "xmux Pane Unification, Stable Browser State & Smooth Resize",
+      "notes": "Follow-up to F27. PaneShell primitive extracted; both TerminalPaneGroup and BrowserPane derive from it. BrowserPane is now multi-tab and per-workspace, so 'New Browser' appends instead of overwriting. Resize dividers stay smooth across iframe and xterm via a fixed-position drag overlay + rAF-coalesced state updates. 21 new tests across pane-shell / workspace-tabs / resize files; 570 total passing. Remaining: manual verification on a Tauri desktop build before flipping to done.",
       "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F28/",
         "featureFolder": ".project-manager/features/F28/",
+        "implementation": "app/ui/views/XmuxView.tsx",
         "spec": ".project-manager/features/F28/feature-spec.md",
         "tdd": ".project-manager/features/F28/tdd-spec.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F28/",
-        "implementation": "app/ui/views/XmuxView.tsx",
         "test": "__tests__/xmux.workspace-tabs.test.tsx"
       },
-      "notes": "Follow-up to F27. PaneShell primitive extracted; both TerminalPaneGroup and BrowserPane derive from it. BrowserPane is now multi-tab and per-workspace, so 'New Browser' appends instead of overwriting. Resize dividers stay smooth across iframe and xterm via a fixed-position drag overlay + rAF-coalesced state updates. 21 new tests across pane-shell / workspace-tabs / resize files; 570 total passing. Remaining: manual verification on a Tauri desktop build before flipping to done.",
-      "createdAt": "2026-05-25T04:18:56Z",
+      "phase": "development",
+      "points": 5,
+      "progress": 95,
+      "readmePath": ".project-manager/features/F28/README.md",
+      "status": "in_progress",
       "updatedAt": "2026-05-25T04:43:00Z",
       "updatedBy": "Claude"
     },
     {
-      "id": "F30",
-      "name": "AI Assistant Capability Upgrade",
       "category": "Core/AI",
-      "status": "done",
-      "progress": 99,
-      "phase": "development",
-      "points": 13,
+      "createdAt": "2026-05-25T12:30:00Z",
+      "id": "F30",
       "locatedSection": "/ai_assistants",
-      "readmePath": ".project-manager/features/F30/README.md",
+      "name": "AI Assistant Capability Upgrade",
+      "notes": "Upgrade AI Assistant to match/exceed OpenClaw capabilities. Enhanced system prompt, tool execution, slash commands v2, cross-session memory, streaming UX polish. Fixed chat API key bridging: server routes now accept client-loaded keys from providerKeyStore.",
       "paths": {
+        "debugRetro": ".project-manager/features/F30/debug-retro.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F30/",
         "featureFolder": ".project-manager/features/F30/",
+        "implementation": "app/api/chat",
         "spec": ".project-manager/features/F30/feature-spec.md",
         "tdd": ".project-manager/features/F30/tdd-spec.md",
-        "debugRetro": ".project-manager/features/F30/debug-retro.md",
-        "testScenarios": ".project-manager/features/F30/test-scenarios.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F30/",
-        "implementation": "app/api/chat",
-        "test": "__tests__/chat.agent.test.ts"
+        "test": "__tests__/chat.agent.test.ts",
+        "testScenarios": ".project-manager/features/F30/test-scenarios.md"
       },
-      "notes": "Upgrade AI Assistant to match/exceed OpenClaw capabilities. Enhanced system prompt, tool execution, slash commands v2, cross-session memory, streaming UX polish. Fixed chat API key bridging: server routes now accept client-loaded keys from providerKeyStore.",
-      "createdAt": "2026-05-25T12:30:00Z",
+      "phase": "development",
+      "points": 13,
+      "progress": 99,
+      "readmePath": ".project-manager/features/F30/README.md",
+      "status": "done",
       "updatedAt": "2026-05-26T00:00:00Z",
       "updatedBy": "Claude"
     },
     {
-      "id": "F31",
-      "name": "xmux Native Browser URL Chrome Stability",
       "category": "Execution",
-      "status": "in_progress",
-      "progress": 95,
-      "phase": "development",
-      "points": 3,
+      "createdAt": "2026-05-25T20:51:52Z",
+      "id": "F31",
       "locatedSection": "/xmux",
-      "readmePath": ".project-manager/features/F31/README.md",
+      "name": "xmux Native Browser URL Chrome Stability",
+      "notes": "Fix xmux native browser URL chrome, focus black-pane, orphan overlay, split-resize ghosting, and browser-pane close cleanup. Native browser webviews are parked during pane/sidebar resize, restored from latest bounds after drag end, and destroyed from the layout-level close path before block removal.",
       "paths": {
+        "debugRetro": ".project-manager/features/F31/debug-retro.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F31/",
         "featureFolder": ".project-manager/features/F31/",
+        "implementation": "components/browser/BrowserRegistry.ts",
         "spec": ".project-manager/features/F31/feature-spec.md",
         "tdd": ".project-manager/features/F31/tdd-spec.md",
-        "debugRetro": ".project-manager/features/F31/debug-retro.md",
-        "testScenarios": ".project-manager/features/F31/test-scenarios.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F31/",
-        "implementation": "components/browser/BrowserRegistry.ts",
-        "test": "__tests__/BrowserRegistry.native-lifecycle.test.ts"
+        "test": "__tests__/BrowserRegistry.native-lifecycle.test.ts",
+        "testScenarios": ".project-manager/features/F31/test-scenarios.md"
       },
-      "notes": "Fix xmux native browser URL chrome, focus black-pane, orphan overlay, split-resize ghosting, and browser-pane close cleanup. Native browser webviews are parked during pane/sidebar resize, restored from latest bounds after drag end, and destroyed from the layout-level close path before block removal.",
-      "createdAt": "2026-05-25T20:51:52Z",
+      "phase": "development",
+      "points": 3,
+      "progress": 95,
+      "readmePath": ".project-manager/features/F31/README.md",
+      "status": "in_progress",
       "updatedAt": "2026-05-25T22:10:47Z",
       "updatedBy": "Codex"
     },
     {
-      "id": "F32",
-      "name": "Built-in MCP Servers & Execution Method Column",
       "category": "Core/Integration",
-      "status": "done",
-      "progress": 100,
-      "phase": "development",
-      "points": 5,
+      "createdAt": "2026-05-26T03:26:00.000Z",
+      "id": "F32",
       "locatedSection": "/plugins",
+      "name": "Built-in MCP Servers & Execution Method Column",
+      "notes": "Added out-of-the-box MCP server templates for Exa Search, Context7 Docs, and Grep.app. Added an 'Execution Method' column in the Integrations Hub table with custom styled badges, multi-language support (English, Traditional Chinese, Simplified Chinese, Japanese), and full type safety.",
       "paths": {
         "implementation": "app/ui/views/Plugins/_shared/IntegrationsTable.tsx",
         "test": "__tests__/integrations.registry.test.ts"
       },
-      "notes": "Added out-of-the-box MCP server templates for Exa Search, Context7 Docs, and Grep.app. Added an 'Execution Method' column in the Integrations Hub table with custom styled badges, multi-language support (English, Traditional Chinese, Simplified Chinese, Japanese), and full type safety.",
-      "createdAt": "2026-05-26T03:26:00.000Z",
+      "phase": "development",
+      "points": 5,
+      "progress": 100,
+      "status": "done",
       "updatedAt": "2026-05-26T03:26:00.000Z",
       "updatedBy": "Antigravity"
     },
     {
-      "id": "F33",
-      "name": "Network Discovery Plan",
       "category": "Core/Integration",
-      "status": "in_progress",
-      "progress": 92,
-      "phase": "development",
-      "points": 8,
+      "createdAt": "2026-05-27T00:00:00Z",
+      "id": "F33",
       "locatedSection": "/integrations-hub/connected-instances",
-      "readmePath": ".project-manager/features/F33/README.md",
+      "name": "Network Discovery Plan",
+      "notes": "P0 + nmap install scripts. Fixed US-05: checking nmap on Passive LAN auto-switches Active + CIDR hint (no Run dead-end). Manual Tauri: F33-M02/M03 pending.",
       "paths": {
+        "debugRetro": ".project-manager/features/F33/debug-retro.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F33/",
         "featureFolder": ".project-manager/features/F33/",
+        "implementation": "lib/integrations/discovery",
         "spec": ".project-manager/features/F33/feature-spec.md",
         "tdd": ".project-manager/features/F33/tdd-spec.md",
-        "debugRetro": ".project-manager/features/F33/debug-retro.md",
-        "testScenarios": ".project-manager/features/F33/test-scenarios.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F33/",
-        "implementation": "lib/integrations/discovery",
-        "test": "__tests__/discovery.plan.test.ts"
+        "test": "__tests__/discovery.plan.test.ts",
+        "testScenarios": ".project-manager/features/F33/test-scenarios.md"
       },
-      "notes": "P0 + nmap install scripts. Fixed US-05: checking nmap on Passive LAN auto-switches Active + CIDR hint (no Run dead-end). Manual Tauri: F33-M02/M03 pending.",
-      "createdAt": "2026-05-27T00:00:00Z",
+      "phase": "development",
+      "points": 8,
+      "progress": 92,
+      "readmePath": ".project-manager/features/F33/README.md",
+      "status": "in_progress",
       "updatedAt": "2026-05-27T14:30:00Z",
       "updatedBy": "Cursor"
     },
     {
-      "id": "F34",
-      "name": "Xmux AI Assistant Block and Browser Tools",
       "category": "Frontend/UI",
-      "status": "in_progress",
-      "progress": 98,
-      "phase": "development",
-      "points": 3,
-      "locatedSection": "/xmux",
-      "notes": "Select Element Tauri E2E coverage is in place; Xmux browser Console frontend is hidden while backend capture/bridge dependencies are retained.",
       "createdAt": "2026-05-27T07:06:00.000Z",
-      "updatedAt": "2026-05-31T23:03:40+10:00",
-      "readmePath": ".project-manager/features/F34/README.md",
-      "paths": {
-        "featureFolder": ".project-manager/features/F34/",
-        "spec": ".project-manager/features/F34/feature-spec.md",
-        "tdd": ".project-manager/features/F34/tdd-spec.md",
-        "debugRetro": ".project-manager/features/F34/debug-retro.md",
-        "testScenarios": ".project-manager/features/F34/test-scenarios.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F34/",
-        "implementation": "app/ui/views/XmuxView.tsx",
-        "test": "__tests__/xmux.registry.test.tsx; __tests__/xmux.browser-url-chrome.test.tsx"
-      },
+      "id": "F34",
+      "locatedSection": "/xmux",
       "metadata": {
         "evidencePaths": [
           "components/terminal/blockLayout.ts",
@@ -1067,31 +1308,31 @@
           "src-tauri/src/xmux_webview.rs"
         ],
         "kickoffAt": "2026-05-27T07:06:00.000Z"
-      }
+      },
+      "name": "Xmux AI Assistant Block and Browser Tools",
+      "notes": "Removed pane-toolbar AI Assistant tab; Select Element sends DOM payload to docked Assistant; Console mirrors native webview logs; CSS Inspector now renders selected DOM tree, Design tab, CSS tab, box model, class list, and computed styles.",
+      "paths": {
+        "debugRetro": ".project-manager/features/F34/debug-retro.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F34/",
+        "featureFolder": ".project-manager/features/F34/",
+        "implementation": "app/ui/views/XmuxView.tsx",
+        "spec": ".project-manager/features/F34/feature-spec.md",
+        "tdd": ".project-manager/features/F34/tdd-spec.md",
+        "test": "__tests__/xmux.registry.test.tsx; __tests__/xmux.browser-url-chrome.test.tsx",
+        "testScenarios": ".project-manager/features/F34/test-scenarios.md"
+      },
+      "phase": "development",
+      "points": 3,
+      "progress": 98,
+      "readmePath": ".project-manager/features/F34/README.md",
+      "status": "in_progress",
+      "updatedAt": "2026-05-31T23:03:40+10:00"
     },
     {
-      "id": "F35",
-      "name": "Agent Workflow DAG Control Plane",
       "category": "AI Workflows",
-      "status": "in_progress",
-      "progress": 84,
-      "phase": "development",
-      "points": 8,
-      "locatedSection": "lib/agent-workflows",
-      "readmePath": ".project-manager/features/F35/README.md",
-      "paths": {
-        "featureFolder": ".project-manager/features/F35/",
-        "spec": ".project-manager/features/F35/feature-spec.md",
-        "tdd": ".project-manager/features/F35/tdd-spec.md",
-        "testScenarios": ".project-manager/features/F35/test-scenarios.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F35/",
-        "implementation": "lib/agent-workflows",
-        "test": "__tests__/agentWorkflowDag.test.ts"
-      },
-      "notes": "WorkflowRun / WorkflowNodeRun state helpers, Dispatch DAG template picker, sidecar persistence, and AI Assistants Workflow Runs inspection are implemented. F35 now initializes run/node state, saves WorkflowRun JSON under .project-manager/workflow-runs, keeps worker sessions isolated, and surfaces persisted DAG state in the Console.",
       "createdAt": "2026-05-28T00:00:00.000Z",
-      "updatedAt": "2026-05-28T13:15:00.000Z",
-      "updatedBy": "Codex",
+      "id": "F35",
+      "locatedSection": "lib/agent-workflows",
       "metadata": {
         "evidencePaths": [
           "docs/architecture/ADR-013-agent-workflow-dag-control-plane.md",
@@ -1108,31 +1349,31 @@
           "__tests__/ai-assistants.console.test.tsx"
         ],
         "kickoffAt": "2026-05-28T00:00:00.000Z"
-      }
+      },
+      "name": "Agent Workflow DAG Control Plane",
+      "notes": "WorkflowRun / WorkflowNodeRun state helpers, Dispatch DAG template picker, sidecar persistence, and AI Assistants Workflow Runs inspection are implemented. F35 now initializes run/node state, saves WorkflowRun JSON under .project-manager/workflow-runs, keeps worker sessions isolated, and surfaces persisted DAG state in the Console.",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F35/",
+        "featureFolder": ".project-manager/features/F35/",
+        "implementation": "lib/agent-workflows",
+        "spec": ".project-manager/features/F35/feature-spec.md",
+        "tdd": ".project-manager/features/F35/tdd-spec.md",
+        "test": "__tests__/agentWorkflowDag.test.ts",
+        "testScenarios": ".project-manager/features/F35/test-scenarios.md"
+      },
+      "phase": "development",
+      "points": 8,
+      "progress": 84,
+      "readmePath": ".project-manager/features/F35/README.md",
+      "status": "in_progress",
+      "updatedAt": "2026-05-28T13:15:00.000Z",
+      "updatedBy": "Codex"
     },
     {
-      "id": "F36",
-      "name": "Performance Baseline, Route Splitting & xmux Smoothness",
       "category": "Frontend/UI",
-      "status": "in_progress",
-      "progress": 60,
-      "phase": "development",
-      "points": 5,
-      "locatedSection": "app/ui/MainClient.tsx",
-      "readmePath": ".project-manager/features/F36/README.md",
-      "paths": {
-        "featureFolder": ".project-manager/features/F36/",
-        "spec": ".project-manager/features/F36/feature-spec.md",
-        "tdd": ".project-manager/features/F36/tdd-spec.md",
-        "testScenarios": ".project-manager/features/F36/test-scenarios.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F36/",
-        "implementation": "app/ui/MainClient.tsx",
-        "test": "__tests__/MainClient.lazy-routes.test.tsx"
-      },
-      "notes": "Measured performance checkpoint focused on reducing inactive route code loaded through MainClient, preserving deep-link route props, and preparing targeted xmux smoothness follow-ups before broad dead-code cleanup.",
       "createdAt": "2026-05-28T01:29:41.000Z",
-      "updatedAt": "2026-05-28T01:35:00.000Z",
-      "updatedBy": "Codex",
+      "id": "F36",
+      "locatedSection": "app/ui/MainClient.tsx",
       "metadata": {
         "evidencePaths": [
           "app/ui/MainClient.tsx",
@@ -1140,31 +1381,31 @@
           ".project-manager/features/F36/dev-log.md"
         ],
         "kickoffAt": "2026-05-28T01:29:41.000Z"
-      }
-    },
-    {
-      "id": "F37",
-      "name": "Windows Font Zoom Shortcuts and Global Font Scaling",
-      "category": "Desktop Runtime",
-      "status": "in_progress",
-      "progress": 96,
+      },
+      "name": "Performance Baseline, Route Splitting & xmux Smoothness",
+      "notes": "Measured performance checkpoint focused on reducing inactive route code loaded through MainClient, preserving deep-link route props, and preparing targeted xmux smoothness follow-ups before broad dead-code cleanup.",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F36/",
+        "featureFolder": ".project-manager/features/F36/",
+        "implementation": "app/ui/MainClient.tsx",
+        "spec": ".project-manager/features/F36/feature-spec.md",
+        "tdd": ".project-manager/features/F36/tdd-spec.md",
+        "test": "__tests__/MainClient.lazy-routes.test.tsx",
+        "testScenarios": ".project-manager/features/F36/test-scenarios.md"
+      },
       "phase": "development",
       "points": 5,
-      "locatedSection": "Project Dashboard > Development",
-      "readmePath": ".project-manager/features/F37/README.md",
-      "paths": {
-        "featureFolder": ".project-manager/features/F37/",
-        "spec": ".project-manager/features/F37/feature-spec.md",
-        "tdd": ".project-manager/features/F37/tdd-spec.md",
-        "testScenarios": ".project-manager/features/F37/test-scenarios.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F37/",
-        "implementation": "src-tauri/src/lib.rs",
-        "test": "__tests__/fontZoom.test.ts"
-      },
-      "notes": "Actual Size reset and View menu zoom actions added; Tauri/Windows manual validation pending",
+      "progress": 60,
+      "readmePath": ".project-manager/features/F36/README.md",
+      "status": "in_progress",
+      "updatedAt": "2026-05-28T01:35:00.000Z",
+      "updatedBy": "Codex"
+    },
+    {
+      "category": "Desktop Runtime",
       "createdAt": "2026-05-28T09:46:39.051Z",
-      "updatedAt": "2026-05-28T10:26:18.362Z",
-      "updatedBy": "Codex",
+      "id": "F37",
+      "locatedSection": "Project Dashboard > Development",
       "metadata": {
         "evidencePaths": [
           "src-tauri/src/lib.rs",
@@ -1173,31 +1414,31 @@
         ],
         "kickoffAt": "2026-05-28T09:46:39.051Z",
         "resumedAt": "2026-05-28T10:26:18.362Z"
-      }
+      },
+      "name": "Windows Font Zoom Shortcuts and Global Font Scaling",
+      "notes": "Actual Size reset and View menu zoom actions added; Tauri/Windows manual validation pending",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F37/",
+        "featureFolder": ".project-manager/features/F37/",
+        "implementation": "src-tauri/src/lib.rs",
+        "spec": ".project-manager/features/F37/feature-spec.md",
+        "tdd": ".project-manager/features/F37/tdd-spec.md",
+        "test": "__tests__/fontZoom.test.ts",
+        "testScenarios": ".project-manager/features/F37/test-scenarios.md"
+      },
+      "phase": "development",
+      "points": 5,
+      "progress": 96,
+      "readmePath": ".project-manager/features/F37/README.md",
+      "status": "in_progress",
+      "updatedAt": "2026-05-28T10:26:18.362Z",
+      "updatedBy": "Codex"
     },
     {
-      "id": "F38",
-      "name": "API Key Quick-Validate Panel",
       "category": "Frontend/UI",
-      "status": "in_progress",
-      "progress": 85,
-      "phase": "development",
-      "points": 3,
-      "locatedSection": "app/ui/views/Keys/ApiKeyValidationSheet.tsx",
-      "readmePath": ".project-manager/features/F38/README.md",
-      "paths": {
-        "featureFolder": ".project-manager/features/F38/",
-        "spec": ".project-manager/features/F38/feature-spec.md",
-        "tdd": ".project-manager/features/F38/tdd-spec.md",
-        "testScenarios": ".project-manager/features/F38/test-scenarios.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F38/",
-        "implementation": "app/ui/views/Keys/ApiKeyValidationSheet.tsx",
-        "test": "__tests__/api-key-validation-panel.test.tsx"
-      },
-      "notes": "Quick-validate panel with manual key input, format check, and /api/keys/validate integration",
       "createdAt": "2026-05-28T19:55:55.856Z",
-      "updatedAt": "2026-05-28T19:55:55.856Z",
-      "updatedBy": "Claude",
+      "id": "F38",
+      "locatedSection": "app/ui/views/Keys/ApiKeyValidationSheet.tsx",
       "metadata": {
         "evidencePaths": [
           "app/ui/views/Keys/ApiKeyValidationSheet.tsx",
@@ -1205,31 +1446,31 @@
           ".project-manager/features/F38/dev-log.md"
         ],
         "kickoffAt": "2026-05-28T19:55:55.856Z"
-      }
+      },
+      "name": "API Key Quick-Validate Panel",
+      "notes": "Quick-validate panel with manual key input, format check, and /api/keys/validate integration",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F38/",
+        "featureFolder": ".project-manager/features/F38/",
+        "implementation": "app/ui/views/Keys/ApiKeyValidationSheet.tsx",
+        "spec": ".project-manager/features/F38/feature-spec.md",
+        "tdd": ".project-manager/features/F38/tdd-spec.md",
+        "test": "__tests__/api-key-validation-panel.test.tsx",
+        "testScenarios": ".project-manager/features/F38/test-scenarios.md"
+      },
+      "phase": "development",
+      "points": 3,
+      "progress": 85,
+      "readmePath": ".project-manager/features/F38/README.md",
+      "status": "in_progress",
+      "updatedAt": "2026-05-28T19:55:55.856Z",
+      "updatedBy": "Claude"
     },
     {
-      "id": "F39",
-      "name": "User-Controlled Plugin Install, Catalog Mirror, and Startup",
       "category": "Platform/DevOps",
-      "status": "in_progress",
-      "progress": 10,
-      "phase": "development",
-      "points": 8,
-      "locatedSection": "Integrations Hub / Plugins",
-      "readmePath": ".project-manager/features/F39/README.md",
-      "paths": {
-        "featureFolder": ".project-manager/features/F39/",
-        "spec": ".project-manager/features/F39/feature-spec.md",
-        "tdd": ".project-manager/features/F39/tdd-spec.md",
-        "testScenarios": ".project-manager/features/F39/test-scenarios.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F39/",
-        "implementation": "start_project_manager.sh",
-        "test": "__tests__/pluginCatalogMirror.test.ts"
-      },
-      "notes": "Plugin catalog mirror, autostart toggles, startup script gating, and dependency resolver are implemented; manual new-machine sidecar checks remain.",
       "createdAt": "2026-05-30T01:26:23.684Z",
-      "updatedAt": "2026-05-30T05:25:00.000Z",
-      "updatedBy": "Codex",
+      "id": "F39",
+      "locatedSection": "Integrations Hub / Plugins",
       "metadata": {
         "evidencePaths": [
           "start_project_manager.sh",
@@ -1237,31 +1478,31 @@
           ".project-manager/features/F39/dev-log.md"
         ],
         "kickoffAt": "2026-05-30T01:26:23.684Z"
-      }
-    },
-    {
-      "id": "F40",
-      "name": "Launcher Profile Manifest and Environment-Aware Aux Pages",
-      "category": "Platform/DevOps",
-      "status": "in_progress",
-      "progress": 70,
+      },
+      "name": "User-Controlled Plugin Install, Catalog Mirror, and Startup",
+      "notes": "Plugin catalog mirror, autostart toggles, startup script gating, and dependency resolver are implemented; manual new-machine sidecar checks remain.",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F39/",
+        "featureFolder": ".project-manager/features/F39/",
+        "implementation": "start_project_manager.sh",
+        "spec": ".project-manager/features/F39/feature-spec.md",
+        "tdd": ".project-manager/features/F39/tdd-spec.md",
+        "test": "__tests__/pluginCatalogMirror.test.ts",
+        "testScenarios": ".project-manager/features/F39/test-scenarios.md"
+      },
       "phase": "development",
       "points": 8,
-      "locatedSection": "scripts/pm-launcher",
-      "readmePath": ".project-manager/features/F40/README.md",
-      "paths": {
-        "featureFolder": ".project-manager/features/F40/",
-        "spec": ".project-manager/features/F40/feature-spec.md",
-        "tdd": ".project-manager/features/F40/tdd-spec.md",
-        "testScenarios": ".project-manager/features/F40/test-scenarios.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F40/",
-        "implementation": "start_project_manager.sh",
-        "test": "scripts/test-launcher-profile.sh"
-      },
-      "notes": "Launcher profile manifest, aux-page reachability policies, profile samples, and shell/tests are implemented; installer/app packaging follow-up remains.",
-      "createdAt": "2026-05-30T02:24:16.102Z",
+      "progress": 10,
+      "readmePath": ".project-manager/features/F39/README.md",
+      "status": "in_progress",
       "updatedAt": "2026-05-30T05:25:00.000Z",
-      "updatedBy": "Codex",
+      "updatedBy": "Codex"
+    },
+    {
+      "category": "Platform/DevOps",
+      "createdAt": "2026-05-30T02:24:16.102Z",
+      "id": "F40",
+      "locatedSection": "scripts/pm-launcher",
       "metadata": {
         "evidencePaths": [
           "start_project_manager.sh",
@@ -1269,31 +1510,31 @@
           ".project-manager/features/F40/dev-log.md"
         ],
         "kickoffAt": "2026-05-30T02:24:16.102Z"
-      }
+      },
+      "name": "Launcher Profile Manifest and Environment-Aware Aux Pages",
+      "notes": "Launcher profile manifest, aux-page reachability policies, profile samples, and shell/tests are implemented; installer/app packaging follow-up remains.",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F40/",
+        "featureFolder": ".project-manager/features/F40/",
+        "implementation": "start_project_manager.sh",
+        "spec": ".project-manager/features/F40/feature-spec.md",
+        "tdd": ".project-manager/features/F40/tdd-spec.md",
+        "test": "scripts/test-launcher-profile.sh",
+        "testScenarios": ".project-manager/features/F40/test-scenarios.md"
+      },
+      "phase": "development",
+      "points": 8,
+      "progress": 70,
+      "readmePath": ".project-manager/features/F40/README.md",
+      "status": "in_progress",
+      "updatedAt": "2026-05-30T05:25:00.000Z",
+      "updatedBy": "Codex"
     },
     {
-      "id": "F41",
-      "name": "Terminal Operational Boundaries",
       "category": "Frontend/UI + Security",
-      "status": "completed",
-      "progress": 100,
-      "phase": "done",
-      "points": 8,
-      "locatedSection": "app/ai_assistants",
-      "readmePath": ".project-manager/features/F41/README.md",
-      "paths": {
-        "featureFolder": ".project-manager/features/F41/",
-        "spec": ".project-manager/features/F41/feature-spec.md",
-        "tdd": ".project-manager/features/F41/tdd-spec.md",
-        "testScenarios": ".project-manager/features/F41/test-scenarios.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F41/",
-        "implementation": "app/ai_assistants/AIAssistantsConsoleClient.tsx",
-        "test": "__tests__/ai-assistants.terminal-boundaries.test.ts"
-      },
-      "notes": "AI assistant shell whitelist/blacklist policy with Rust enforcement",
       "createdAt": "2026-06-01T00:10:59.933Z",
-      "updatedAt": "2026-06-01T00:40:00.000Z",
-      "updatedBy": "Cursor Agent",
+      "id": "F41",
+      "locatedSection": "app/ai_assistants",
       "metadata": {
         "evidencePaths": [
           "app/ai_assistants/AIAssistantsConsoleClient.tsx",
@@ -1307,31 +1548,31 @@
           ".project-manager/features/F41/dev-log.md"
         ],
         "kickoffAt": "2026-06-01T00:10:59.933Z"
-      }
+      },
+      "name": "Terminal Operational Boundaries",
+      "notes": "AI assistant shell whitelist/blacklist policy with Rust enforcement",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F41/",
+        "featureFolder": ".project-manager/features/F41/",
+        "implementation": "app/ai_assistants/AIAssistantsConsoleClient.tsx",
+        "spec": ".project-manager/features/F41/feature-spec.md",
+        "tdd": ".project-manager/features/F41/tdd-spec.md",
+        "test": "__tests__/ai-assistants.terminal-boundaries.test.ts",
+        "testScenarios": ".project-manager/features/F41/test-scenarios.md"
+      },
+      "phase": "done",
+      "points": 8,
+      "progress": 15,
+      "readmePath": ".project-manager/features/F41/README.md",
+      "status": "in_progress",
+      "updatedAt": "2026-06-01T00:40:00.000Z",
+      "updatedBy": "Cursor Agent"
     },
     {
-      "id": "F42",
-      "name": "Chat Runtime Security Boundary Migration",
       "category": "Security/Runtime",
-      "status": "in_progress",
-      "progress": 90,
-      "phase": "development",
-      "points": 8,
-      "locatedSection": "Project Dashboard > Development",
-      "readmePath": ".project-manager/features/F42/README.md",
-      "paths": {
-        "featureFolder": ".project-manager/features/F42/",
-        "spec": ".project-manager/features/F42/feature-spec.md",
-        "tdd": ".project-manager/features/F42/tdd-spec.md",
-        "testScenarios": ".project-manager/features/F42/test-scenarios.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F42/",
-        "implementation": "lib/chat/chatAgent.ts",
-        "test": "__tests__/chat.agent.test.ts"
-      },
-      "notes": "Migrate AI Assistant chat provider calls behind secure runtime boundaries, add abort/process cleanup, shared session persistence, provider/model metadata, saved-session search/export/memory, and browser/Tauri multimodal image payloads. Remaining gates: cargo check and Chrome/Safari/Tauri manual smoke.",
       "createdAt": "2026-06-01T01:52:37.435Z",
-      "updatedAt": "2026-06-01T02:42:45.000Z",
-      "updatedBy": "Codex",
+      "id": "F42",
+      "locatedSection": "Project Dashboard > Development",
       "metadata": {
         "evidencePaths": [
           "lib/chat/chatAgent.ts",
@@ -1346,31 +1587,31 @@
           ".project-manager/features/F42/dev-log.md"
         ],
         "kickoffAt": "2026-06-01T01:52:37.435Z"
-      }
+      },
+      "name": "Chat Runtime Security Boundary Migration",
+      "notes": "Migrate AI Assistant chat provider calls behind secure runtime boundaries and remove renderer key exposure",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F42/",
+        "featureFolder": ".project-manager/features/F42/",
+        "implementation": "lib/chat/chatAgent.ts",
+        "spec": ".project-manager/features/F42/feature-spec.md",
+        "tdd": ".project-manager/features/F42/tdd-spec.md",
+        "test": "__tests__/chat.agent.test.ts",
+        "testScenarios": ".project-manager/features/F42/test-scenarios.md"
+      },
+      "phase": "development",
+      "points": 8,
+      "progress": 10,
+      "readmePath": ".project-manager/features/F42/README.md",
+      "status": "in_progress",
+      "updatedAt": "2026-06-01T02:42:45.000Z",
+      "updatedBy": "Codex"
     },
     {
-      "id": "F43",
-      "name": "Company Standards Gates One-Click Execution",
       "category": "Frontend/UI",
-      "status": "in_progress",
-      "progress": 85,
-      "phase": "development",
-      "points": 5,
-      "locatedSection": "Project Dashboard > Development",
-      "readmePath": ".project-manager/features/F43/README.md",
-      "paths": {
-        "featureFolder": ".project-manager/features/F43/",
-        "spec": ".project-manager/features/F43/feature-spec.md",
-        "tdd": ".project-manager/features/F43/tdd-spec.md",
-        "testScenarios": ".project-manager/features/F43/test-scenarios.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F43/",
-        "implementation": "lib/companyStandards/standardsGates.ts",
-        "test": "__tests__/companyStandardsGates.test.ts"
-      },
-      "notes": "Per-gate Run and Run blocking gates wired in Tauri via standardsGates registry and spawnAgent; browser dev disables Run. Manual Tauri smoke pending.",
       "createdAt": "2026-06-03T03:21:01.896Z",
-      "updatedAt": "2026-06-03T03:24:00.000Z",
-      "updatedBy": "Cursor",
+      "id": "F43",
+      "locatedSection": "Project Dashboard > Development",
       "metadata": {
         "evidencePaths": [
           "lib/companyStandards/standardsGates.ts",
@@ -1378,31 +1619,31 @@
           ".project-manager/features/F43/dev-log.md"
         ],
         "kickoffAt": "2026-06-03T03:21:01.896Z"
-      }
+      },
+      "name": "Company Standards Gates One-Click Execution",
+      "notes": "Per-gate Run and Run blocking gates wired in Tauri via standardsGates registry and spawnAgent; browser dev disables Run. Manual Tauri smoke pending.",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F43/",
+        "featureFolder": ".project-manager/features/F43/",
+        "implementation": "lib/companyStandards/standardsGates.ts",
+        "spec": ".project-manager/features/F43/feature-spec.md",
+        "tdd": ".project-manager/features/F43/tdd-spec.md",
+        "test": "__tests__/companyStandardsGates.test.ts",
+        "testScenarios": ".project-manager/features/F43/test-scenarios.md"
+      },
+      "phase": "development",
+      "points": 5,
+      "progress": 85,
+      "readmePath": ".project-manager/features/F43/README.md",
+      "status": "in_progress",
+      "updatedAt": "2026-06-03T03:24:00.000Z",
+      "updatedBy": "Cursor"
     },
     {
-      "id": "F44",
-      "name": "Execution Policy Integration",
       "category": "Security/Platform",
-      "status": "in_progress",
-      "progress": 90,
-      "phase": "development",
-      "points": 8,
-      "locatedSection": "Project Dashboard > Development",
-      "readmePath": ".project-manager/features/F44/README.md",
-      "paths": {
-        "featureFolder": ".project-manager/features/F44/",
-        "spec": ".project-manager/features/F44/feature-spec.md",
-        "tdd": ".project-manager/features/F44/tdd-spec.md",
-        "testScenarios": ".project-manager/features/F44/test-scenarios.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F44/",
-        "implementation": "lib/companyStandards/executionPolicy.ts",
-        "test": "__tests__/executionPolicy.test.ts"
-      },
-      "notes": "Standards gates use full policy stack; F43 bypass removed. Manual Tauri smoke pending.",
       "createdAt": "2026-06-03T03:36:12.534Z",
-      "updatedAt": "2026-06-03T05:40:00.000Z",
-      "updatedBy": "Cursor",
+      "id": "F44",
+      "locatedSection": "Project Dashboard > Development",
       "metadata": {
         "evidencePaths": [
           "lib/companyStandards/executionPolicy.ts",
@@ -1410,31 +1651,31 @@
           ".project-manager/features/F44/dev-log.md"
         ],
         "kickoffAt": "2026-06-03T03:36:12.534Z"
-      }
+      },
+      "name": "Execution Policy Integration",
+      "notes": "Standards gates use full policy stack; F43 bypass removed. Manual Tauri smoke pending.",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F44/",
+        "featureFolder": ".project-manager/features/F44/",
+        "implementation": "lib/companyStandards/executionPolicy.ts",
+        "spec": ".project-manager/features/F44/feature-spec.md",
+        "tdd": ".project-manager/features/F44/tdd-spec.md",
+        "test": "__tests__/executionPolicy.test.ts",
+        "testScenarios": ".project-manager/features/F44/test-scenarios.md"
+      },
+      "phase": "development",
+      "points": 8,
+      "progress": 90,
+      "readmePath": ".project-manager/features/F44/README.md",
+      "status": "in_progress",
+      "updatedAt": "2026-06-03T05:40:00.000Z",
+      "updatedBy": "Cursor"
     },
     {
-      "id": "F45",
-      "name": "Tiered Verification Workflow",
       "category": "Engineering Workflow",
-      "status": "completed",
-      "progress": 100,
-      "phase": "done",
-      "points": 5,
-      "locatedSection": "docs/engineering",
-      "readmePath": ".project-manager/features/F45/README.md",
-      "paths": {
-        "featureFolder": ".project-manager/features/F45/",
-        "spec": ".project-manager/features/F45/feature-spec.md",
-        "tdd": ".project-manager/features/F45/tdd-spec.md",
-        "testScenarios": ".project-manager/features/F45/test-scenarios.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F45/",
-        "implementation": "scripts/verify-quick.sh",
-        "test": "scripts/verify-quick.sh"
-      },
-      "notes": "Split ship verification into quick, landing, and scheduled governance gates.",
       "createdAt": "2026-06-04T02:53:25.737Z",
-      "updatedAt": "2026-06-04T03:00:30Z",
-      "updatedBy": "Codex",
+      "id": "F45",
+      "locatedSection": "docs/engineering",
       "metadata": {
         "evidencePaths": [
           "scripts/verify-quick.sh",
@@ -1442,31 +1683,31 @@
           ".project-manager/features/F45/dev-log.md"
         ],
         "kickoffAt": "2026-06-04T02:53:25.737Z"
-      }
+      },
+      "name": "Tiered Verification Workflow",
+      "notes": "Split ship verification into quick, landing, and scheduled governance gates.",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F45/",
+        "featureFolder": ".project-manager/features/F45/",
+        "implementation": "scripts/verify-quick.sh",
+        "spec": ".project-manager/features/F45/feature-spec.md",
+        "tdd": ".project-manager/features/F45/tdd-spec.md",
+        "test": "scripts/verify-quick.sh",
+        "testScenarios": ".project-manager/features/F45/test-scenarios.md"
+      },
+      "phase": "done",
+      "points": 5,
+      "progress": 10,
+      "readmePath": ".project-manager/features/F45/README.md",
+      "status": "in_progress",
+      "updatedAt": "2026-06-04T03:00:30Z",
+      "updatedBy": "Codex"
     },
     {
-      "id": "F46",
-      "name": "PM Mobile Voice Remote Control",
       "category": "Mobile/Remote Control",
-      "status": "in_progress",
-      "progress": 20,
-      "phase": "development",
-      "points": 8,
-      "locatedSection": "Project Dashboard > Development",
-      "readmePath": ".project-manager/features/F46/README.md",
-      "paths": {
-        "featureFolder": ".project-manager/features/F46/",
-        "spec": ".project-manager/features/F46/feature-spec.md",
-        "tdd": ".project-manager/features/F46/tdd-spec.md",
-        "testScenarios": ".project-manager/features/F46/test-scenarios.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F46/",
-        "implementation": "docs/architecture/ADR-015-mobile-voice-remote-control.md",
-        "test": "__tests__/mobileVoiceRemoteControl.intent.test.ts"
-      },
-      "notes": "Phase 0 guarded mobile/channel run requests implemented; desktop approval path next",
       "createdAt": "2026-06-04T04:32:44.042Z",
-      "updatedAt": "2026-06-04T05:21:33.623Z",
-      "updatedBy": "Codex",
+      "id": "F46",
+      "locatedSection": "Project Dashboard > Development",
       "metadata": {
         "evidencePaths": [
           "docs/architecture/ADR-015-mobile-voice-remote-control.md",
@@ -1474,31 +1715,31 @@
           ".project-manager/features/F46/dev-log.md"
         ],
         "kickoffAt": "2026-06-04T04:32:44.042Z"
-      }
-    },
-    {
-      "id": "F47",
-      "name": "Supabase Cloud Auth and Developer Runner Storage Architecture",
-      "category": "Architecture/Auth",
-      "status": "in_progress",
-      "progress": 70,
+      },
+      "name": "PM Mobile Voice Remote Control",
+      "notes": "Phase 0 guarded mobile/channel run requests implemented; desktop approval path next",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F46/",
+        "featureFolder": ".project-manager/features/F46/",
+        "implementation": "docs/architecture/ADR-015-mobile-voice-remote-control.md",
+        "spec": ".project-manager/features/F46/feature-spec.md",
+        "tdd": ".project-manager/features/F46/tdd-spec.md",
+        "test": "__tests__/mobileVoiceRemoteControl.intent.test.ts",
+        "testScenarios": ".project-manager/features/F46/test-scenarios.md"
+      },
       "phase": "development",
       "points": 8,
-      "locatedSection": "docs/engineering",
-      "readmePath": ".project-manager/features/F47/README.md",
-      "paths": {
-        "featureFolder": ".project-manager/features/F47/",
-        "spec": ".project-manager/features/F47/feature-spec.md",
-        "tdd": ".project-manager/features/F47/tdd-spec.md",
-        "testScenarios": ".project-manager/features/F47/test-scenarios.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F47/",
-        "implementation": "docs/engineering/supabase-cloud-auth.md",
-        "test": "__tests__/auth.runnerStatus.test.ts"
-      },
-      "notes": "Added Supabase cloud auth runbook covering env, RLS, membership, route guards, and runner readiness.",
+      "progress": 20,
+      "readmePath": ".project-manager/features/F46/README.md",
+      "status": "in_progress",
+      "updatedAt": "2026-06-04T05:21:33.623Z",
+      "updatedBy": "Codex"
+    },
+    {
+      "category": "Architecture/Auth",
       "createdAt": "2026-06-04T04:42:17.509Z",
-      "updatedAt": "2026-06-04T05:23:49.411Z",
-      "updatedBy": "Codex",
+      "id": "F47",
+      "locatedSection": "docs/engineering",
       "metadata": {
         "evidencePaths": [
           "docs/engineering/supabase-cloud-auth.md",
@@ -1506,31 +1747,31 @@
           ".project-manager/features/F47/dev-log.md"
         ],
         "kickoffAt": "2026-06-04T04:42:17.509Z"
-      }
-    },
-    {
-      "id": "F48",
-      "name": "Self-hosted Supabase PM System Installer",
-      "category": "Infrastructure/Installer",
-      "status": "in_progress",
-      "progress": 88,
+      },
+      "name": "Supabase Cloud Auth and Developer Runner Storage Architecture",
+      "notes": "Added Supabase cloud auth runbook covering env, RLS, membership, route guards, and runner readiness.",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F47/",
+        "featureFolder": ".project-manager/features/F47/",
+        "implementation": "docs/engineering/supabase-cloud-auth.md",
+        "spec": ".project-manager/features/F47/feature-spec.md",
+        "tdd": ".project-manager/features/F47/tdd-spec.md",
+        "test": "__tests__/auth.runnerStatus.test.ts",
+        "testScenarios": ".project-manager/features/F47/test-scenarios.md"
+      },
       "phase": "development",
       "points": 8,
-      "locatedSection": "infra/supabase",
-      "readmePath": ".project-manager/features/F48/README.md",
-      "paths": {
-        "featureFolder": ".project-manager/features/F48/",
-        "spec": ".project-manager/features/F48/feature-spec.md",
-        "tdd": ".project-manager/features/F48/tdd-spec.md",
-        "testScenarios": ".project-manager/features/F48/test-scenarios.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F48/",
-        "implementation": "infra/supabase/pm-system-preflight.mjs",
-        "test": "__tests__/pmSystemPreflight.test.ts"
-      },
-      "notes": "Added live-safe Docker/Podman and port preflight for pm-system dry-run doctor/install without host mutation.",
+      "progress": 70,
+      "readmePath": ".project-manager/features/F47/README.md",
+      "status": "in_progress",
+      "updatedAt": "2026-06-04T05:23:49.411Z",
+      "updatedBy": "Codex"
+    },
+    {
+      "category": "Infrastructure/Installer",
       "createdAt": "2026-06-04T06:00:50.115Z",
-      "updatedAt": "2026-06-04T10:47:54.315Z",
-      "updatedBy": "Codex",
+      "id": "F48",
+      "locatedSection": "infra/supabase",
       "metadata": {
         "evidencePaths": [
           "infra/supabase/pm-system-preflight.mjs",
@@ -1538,31 +1779,31 @@
           ".project-manager/features/F48/dev-log.md"
         ],
         "kickoffAt": "2026-06-04T06:00:50.115Z"
-      }
+      },
+      "name": "Self-hosted Supabase PM System Installer",
+      "notes": "Added PM System Installer runbook covering roles, profiles, commands, secrets, doctor, backup, restore, and upgrade policy.",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F48/",
+        "featureFolder": ".project-manager/features/F48/",
+        "implementation": "infra/supabase/pm-system-preflight.mjs",
+        "spec": ".project-manager/features/F48/feature-spec.md",
+        "tdd": ".project-manager/features/F48/tdd-spec.md",
+        "test": "__tests__/pmSystemPreflight.test.ts",
+        "testScenarios": ".project-manager/features/F48/test-scenarios.md"
+      },
+      "phase": "development",
+      "points": 8,
+      "progress": 60,
+      "readmePath": ".project-manager/features/F48/README.md",
+      "status": "in_progress",
+      "updatedAt": "2026-06-04T10:47:54.315Z",
+      "updatedBy": "Codex"
     },
     {
-      "id": "F49",
-      "name": "Development Dependency Graph Columns and Dispatch Guards",
       "category": "Project Dashboard",
-      "status": "done",
-      "progress": 100,
-      "phase": "development",
-      "points": 5,
-      "locatedSection": "Project Dashboard > Development",
-      "readmePath": ".project-manager/features/F49/README.md",
-      "paths": {
-        "featureFolder": ".project-manager/features/F49/",
-        "spec": ".project-manager/features/F49/feature-spec.md",
-        "tdd": ".project-manager/features/F49/tdd-spec.md",
-        "testScenarios": ".project-manager/features/F49/test-scenarios.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F49/",
-        "implementation": "app/project-progress-dashboard/_lib/columns.tsx",
-        "test": "__tests__/projectProgress.dependencies.test.tsx"
-      },
-      "notes": "Add upstream/downstream dependency tracking for Development sheet and prepare dispatch scheduling guards",
       "createdAt": "2026-06-04T09:14:20.412Z",
-      "updatedAt": "2026-06-04T09:24:24.000Z",
-      "updatedBy": "Codex",
+      "id": "F49",
+      "locatedSection": "Project Dashboard > Development",
       "metadata": {
         "evidencePaths": [
           "lib/types/index.ts",
@@ -1576,31 +1817,31 @@
           ".project-manager/features/F49/dev-log.md"
         ],
         "kickoffAt": "2026-06-04T09:14:20.412Z"
-      }
+      },
+      "name": "Development Dependency Graph Columns and Dispatch Guards",
+      "notes": "Add upstream/downstream dependency tracking for Development sheet and prepare dispatch scheduling guards",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F49/",
+        "featureFolder": ".project-manager/features/F49/",
+        "implementation": "app/project-progress-dashboard/_lib/columns.tsx",
+        "spec": ".project-manager/features/F49/feature-spec.md",
+        "tdd": ".project-manager/features/F49/tdd-spec.md",
+        "test": "__tests__/projectProgress.dependencies.test.tsx",
+        "testScenarios": ".project-manager/features/F49/test-scenarios.md"
+      },
+      "phase": "development",
+      "points": 5,
+      "progress": 10,
+      "readmePath": ".project-manager/features/F49/README.md",
+      "status": "in_progress",
+      "updatedAt": "2026-06-04T09:24:24.000Z",
+      "updatedBy": "Codex"
     },
     {
-      "id": "F50",
-      "name": "Keys 三工作表重構：store v2 + arenaRunner + promotion 管線",
       "category": "Frontend/UI",
-      "status": "done",
-      "progress": 100,
-      "phase": "development",
-      "points": 8,
-      "locatedSection": "app/ui/views/Keys",
-      "readmePath": ".project-manager/features/F50/README.md",
-      "paths": {
-        "featureFolder": ".project-manager/features/F50/",
-        "spec": ".project-manager/features/F50/feature-spec.md",
-        "tdd": ".project-manager/features/F50/tdd-spec.md",
-        "testScenarios": ".project-manager/features/F50/test-scenarios.md",
-        "developmentLogSummaryFolder": ".project-manager/features/F50/",
-        "implementation": "lib/keys/store",
-        "test": "__tests__"
-      },
-      "notes": "5 phases shipped: store v2 + arenaRunner + preflight gate + VLM dual-source + promotion pipeline. verify:baseline green; 1139 tests pass.",
       "createdAt": "2026-06-10T06:27:47.657Z",
-      "updatedAt": "2026-06-14T16:17:27.646Z",
-      "updatedBy": "Claude Code",
+      "id": "F50",
+      "locatedSection": "app/ui/views/Keys",
       "metadata": {
         "evidencePaths": [
           "lib/keys/store",
@@ -1608,7 +1849,99 @@
           ".project-manager/features/F50/dev-log.md"
         ],
         "kickoffAt": "2026-06-10T06:27:47.657Z"
-      }
+      },
+      "name": "Keys 三工作表重構：store v2 + arenaRunner + promotion 管線",
+      "notes": "5 phases; Phase 0 = P0 safety-net tests (no impl change). Plan approved 2026-06-10.",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F50/",
+        "featureFolder": ".project-manager/features/F50/",
+        "implementation": "lib/keys/store",
+        "spec": ".project-manager/features/F50/feature-spec.md",
+        "tdd": ".project-manager/features/F50/tdd-spec.md",
+        "test": "__tests__",
+        "testScenarios": ".project-manager/features/F50/test-scenarios.md"
+      },
+      "phase": "development",
+      "points": 8,
+      "progress": 5,
+      "readmePath": ".project-manager/features/F50/README.md",
+      "status": "in_progress",
+      "updatedAt": "2026-06-14T16:17:27.646Z",
+      "updatedBy": "Claude Code"
+    },
+    {
+      "category": "PM Orchestration",
+      "createdAt": "2026-06-15T04:18:56.000Z",
+      "id": "F51",
+      "locatedSection": "Project Dashboard > Development",
+      "metadata": {
+        "evidencePaths": [
+          "lib/dispatch/projectDispatchAssistant.ts",
+          "lib/chat/chatAgent.ts",
+          "lib/ai-assistants/terminalBoundariesSidecar.ts",
+          "lib/ai-assistants/terminalBlockSuggestions.ts",
+          "__tests__/projectDispatchAssistant.test.ts",
+          "__tests__/chat.agent.test.ts",
+          "__tests__/ai-assistants.terminal-boundaries.test.ts",
+          "__tests__/ai-assistants.terminal-block-suggestions.test.ts",
+          ".project-manager/features/F51/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-15T04:18:56.000Z"
+      },
+      "name": "Project Dispatch Assistant",
+      "notes": "Build a cross-discipline Project Dispatch Assistant that turns raw project work into role-ready packages, actor recommendations, risks, approvals, and executive summaries.",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F51/",
+        "featureFolder": ".project-manager/features/F51/",
+        "implementation": "lib/dispatch/projectDispatchAssistant.ts",
+        "spec": ".project-manager/features/F51/feature-spec.md",
+        "tdd": ".project-manager/features/F51/tdd-spec.md",
+        "test": "__tests__/projectDispatchAssistant.test.ts",
+        "testScenarios": ".project-manager/features/F51/test-scenarios.md"
+      },
+      "phase": "development",
+      "points": 8,
+      "progress": 15,
+      "readmePath": ".project-manager/features/F51/README.md",
+      "status": "in_progress",
+      "updatedAt": "2026-06-15T05:05:10.000Z",
+      "updatedBy": "Codex"
+    },
+    {
+      "category": "PM Orchestration",
+      "createdAt": "2026-06-15T05:20:00.000Z",
+      "id": "F52",
+      "locatedSection": "Project Dashboard > Development",
+      "metadata": {
+        "evidencePaths": [
+          "lib/project-workflows/projectWorkflowEngine.ts",
+          "__tests__/projectWorkflowEngine.test.ts",
+          ".project-manager/features/F52/README.md",
+          ".project-manager/features/F52/feature-spec.md",
+          ".project-manager/features/F52/tdd-spec.md",
+          ".project-manager/features/F52/test-scenarios.md",
+          ".project-manager/features/F52/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-15T05:20:00.000Z"
+      },
+      "name": "Project Workflow Loop Engine",
+      "notes": "Core cross-discipline PM workflow loop engine model, software example template, review-first run state, structured handoffs, evidence ledger, scorecard blocking, stop policy, and human approval gate added. Software Engineering Loop is the first template, not the product boundary.",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F52/",
+        "featureFolder": ".project-manager/features/F52/",
+        "implementation": "lib/project-workflows/projectWorkflowEngine.ts",
+        "spec": ".project-manager/features/F52/feature-spec.md",
+        "tdd": ".project-manager/features/F52/tdd-spec.md",
+        "test": "__tests__/projectWorkflowEngine.test.ts",
+        "testScenarios": ".project-manager/features/F52/test-scenarios.md"
+      },
+      "phase": "development",
+      "points": 8,
+      "progress": 25,
+      "readmePath": ".project-manager/features/F52/README.md",
+      "status": "in_progress",
+      "updatedAt": "2026-06-15T05:45:00.000Z",
+      "updatedBy": "Codex"
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",
@@ -1618,7 +1951,7 @@
     "name": "@project-manager/app",
     "root": "/Users/Project-Manager"
   },
-  "schemaVersion": 9,
-  "updatedAt": "2026-06-14T16:17:27.646Z",
-  "updatedBy": "Claude Code"
+  "schemaVersion": 10,
+  "updatedAt": "2026-06-15T05:05:10.000Z",
+  "updatedBy": "Codex"
 }

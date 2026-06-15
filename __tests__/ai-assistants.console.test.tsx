@@ -118,6 +118,27 @@ describe('AIAssistantsConsoleClient', () => {
     vi.unstubAllGlobals();
   });
 
+  it('does not request sidecar data when projectRoot is unavailable', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 400 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<AIAssistantsConsoleClient activeSheet="overview" />);
+
+    await screen.findByText('Terminal Operational Boundaries');
+    await waitFor(() => {
+      expect(fetchMock).not.toHaveBeenCalledWith(
+        expect.stringContaining('/api/assistants/terminal-boundaries'),
+        expect.anything(),
+      );
+      expect(fetchMock).not.toHaveBeenCalledWith(
+        expect.stringContaining('/api/assistants/terminal-block-suggestions'),
+        expect.anything(),
+      );
+    });
+
+    vi.unstubAllGlobals();
+  });
+
   it('renders persisted workflow runs and isolated node session scopes', () => {
     const sampleRun: AgentWorkflowRun = {
       id: 'workflow-run-F35-software-dev-20260528041000',

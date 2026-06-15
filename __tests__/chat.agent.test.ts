@@ -134,6 +134,19 @@ describe('sendChatMessage', () => {
     expect(spawnAgent).not.toHaveBeenCalled();
   });
 
+  it('returns a Project Dispatch Assistant decision package for /dispatch <id>', async () => {
+    const result = await sendChatMessage({ content: '/dispatch F14', history: [], context });
+
+    expect(result.content).toContain('Dispatch Decision Package');
+    expect(result.content).toContain('F14');
+    expect(result.content).toContain('Sidebar Chatbot');
+    expect(result.content).toContain('Status: needs_review');
+    expect(result.content).toContain('Codex');
+    expect(result.content).toContain('Human lead reviews and edits the dispatch plan before execution.');
+    expect(result.content).not.toContain('請從 Dashboard 或 Features 頁面使用 Dispatch 功能');
+    expect(spawnAgent).not.toHaveBeenCalled();
+  });
+
   it('returns error for non-existent feature', async () => {
     const result = await sendChatMessage({ content: '/feature F99', history: [], context });
     expect(result.content).toContain('找不到功能');

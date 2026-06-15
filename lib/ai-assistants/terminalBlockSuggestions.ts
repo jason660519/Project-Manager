@@ -4,6 +4,10 @@ function isSafeAssistantId(value: string): boolean {
   return /^[A-Za-z0-9_-]+$/.test(value);
 }
 
+function isAbsoluteProjectRoot(value: string): boolean {
+  return value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value);
+}
+
 export function terminalBlockSuggestionsSidecarPath(projectRoot: string, assistantId: string): string {
   const root = projectRoot.replace(/\/+$/, '');
   const id = assistantId.trim();
@@ -50,7 +54,7 @@ export async function loadTerminalBlockSuggestions(
 ): Promise<TerminalBlockSuggestion[]> {
   const trimmedRoot = projectRoot.trim();
   const trimmedId = assistantId.trim();
-  if (!trimmedRoot || !trimmedId || !isSafeAssistantId(trimmedId)) return [];
+  if (!trimmedRoot || !trimmedId || !isAbsoluteProjectRoot(trimmedRoot) || !isSafeAssistantId(trimmedId)) return [];
   if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
     try {
       const { readFile } = await import('../bridge');

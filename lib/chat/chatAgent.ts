@@ -14,6 +14,11 @@ import {
   type AgentStdioPayload,
 } from '../bridge';
 import type { Feature } from '../types';
+import type { ActorProfile } from '../dispatch/projectDispatchAssistant';
+import {
+  createProjectDispatchPlanForFeature,
+  renderProjectDispatchDecisionPackage,
+} from '../dispatch/projectDispatchAssistant';
 import { loadAIAssistantsConsoleState } from '../ai-assistants/repository';
 import type { PermissionState, TerminalOperationalBoundaries } from '../ai-assistants/types';
 import { createDefaultTerminalBoundaries } from '../ai-assistants/terminalBoundaries';
@@ -505,17 +510,16 @@ function buildDispatchResponse(context: ChatContext, featureId: string): string 
   if (!feature) {
     return `找不到功能 **${featureId}**。請用 \`/status\` 查看所有功能。`;
   }
-  return [
-    `## 🚀 Dispatch: ${feature.id} ${feature.name}`,
-    '',
-    `**狀態：** ${feature.status}（${feature.progress}%）`,
-    `**分類：** ${feature.category}`,
-    `**實作路徑：** ${feature.paths?.implementation ?? '未指定'}`,
-    `**測試路徑：** ${feature.paths?.test ?? '未指定'}`,
-    '',
-    '請從 Dashboard 或 Features 頁面使用 Dispatch 功能來分派此任務。',
-    `或直接輸入 \`/go features\` 前往功能頁面。`,
-  ].join('\n');
+  const actors = context.adapters.map((adapter): ActorProfile => ({
+    id: adapter.id,
+    kind: adapter.type === 'agent' ? 'ai_agent' : 'tool',
+    name: adapter.name,
+    discipline: 'software',
+    role: adapter.type === 'agent' ? 'Software implementation agent' : 'Software execution tool',
+    capabilities: [adapter.type, adapter.command, ...(adapter.supports ?? [])].filter(Boolean),
+  }));
+  const plan = createProjectDispatchPlanForFeature(feature, { actors });
+  return renderProjectDispatchDecisionPackage(plan);
 }
 
 function naturalLanguageRoute(content: string): string | undefined {

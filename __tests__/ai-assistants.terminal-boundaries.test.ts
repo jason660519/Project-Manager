@@ -1,9 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultTerminalBoundaries, evaluateTerminalCommand, parseAllowedCommandForExec, splitCompoundCommand } from '../lib/ai-assistants/terminalBoundaries';
+import { loadTerminalBoundariesSidecar } from '../lib/ai-assistants/terminalBoundariesSidecar';
 import { listNpmScriptNames, validateNpmRunScript } from '../lib/ai-assistants/terminalBoundaries.server';
 
 describe('terminalBoundaries', () => {
   const boundaries = createDefaultTerminalBoundaries();
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 
   it('allows whitelisted inspection commands', () => {
     expect(evaluateTerminalCommand('pwd', boundaries)).toBe('allowed');
@@ -47,5 +52,15 @@ describe('terminalBoundaries', () => {
     expect(boundaries.whitelist.length).toBeGreaterThan(0);
     expect(boundaries.blacklist.length).toBeGreaterThan(0);
     expect(boundaries.policyMode).toBe('default-deny');
+  });
+
+  it('does not request sidecar data for relative project roots', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 400 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const loaded = await loadTerminalBoundariesSidecar('./internal-resources/project', 'pm-assistant');
+
+    expect(loaded).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
