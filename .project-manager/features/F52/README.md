@@ -14,8 +14,8 @@ authorities, and client review queues.
 
 ## Current State
 
-- Status: in_progress
-- Progress: 5%
+- Status: done
+- Progress: 100%
 - Phase: development
 - Category: PM Orchestration
 - Created: 2026-06-15
@@ -23,7 +23,11 @@ authorities, and client review queues.
 ## Scope
 
 - `lib/project-workflows/projectWorkflowEngine.ts`
+- `lib/project-workflows/projectWorkflowRunStore.ts`
+- `lib/project-workflows/index.ts`
+- `lib/chat/chatAgent.ts`
 - `__tests__/projectWorkflowEngine.test.ts`
+- `__tests__/chat.agent.test.ts`
 - `.project-manager/features/F52/`
 - `.project-manager/config.json`
 
@@ -32,7 +36,8 @@ authorities, and client review queues.
 - No autonomous command execution in the first slice.
 - No PR, commit, procurement order, authority submission, or vendor dispatch
   without explicit human approval.
-- No UI route in the first slice; the first delivery is a tested core engine.
+- No dedicated UI route in this feature; F52 exposes the first product entry
+  through the local chat `/workflow <featureId>` command.
 - No schemaVersion bump unless durable project config shape changes beyond
   feature metadata.
 
@@ -50,3 +55,16 @@ authorities, and client review queues.
 - TDD spec: `tdd-spec.md`
 - Test scenarios: `test-scenarios.md`
 - Dev log: `dev-log.md`
+
+## Completed Capability
+
+- Domain-neutral workflow loop model.
+- Software Engineering Loop as the first template, explicitly not the product
+  boundary.
+- Construction Quality Loop to prove cross-professional workflow support.
+- Review-first workflow run state with no automatic actor or command execution.
+- Structured handoff artifacts, evidence ledger, scorecards, workflow events,
+  approval gates, and stop-policy blocking.
+- Durable project workflow run sidecar helpers under
+  `.project-manager/project-workflow-runs/`.
+- Local chat `/workflow <featureId>` decision package entry.

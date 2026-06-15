@@ -34,10 +34,9 @@ describe('F52 feature metadata', () => {
       name: 'Project Workflow Loop Engine',
       category: 'PM Orchestration',
       phase: 'development',
-      status: 'in_progress',
+      status: 'done',
     });
-    expect(feature.progress).toBeGreaterThanOrEqual(25);
-    expect(feature.progress).toBeLessThan(100);
+    expect(feature.progress).toBe(100);
     expect(feature.notes).toContain('cross-discipline PM workflow loop engine');
     expect(feature.notes).toContain('Software Engineering Loop is the first template');
     expect(feature.paths).toMatchObject({

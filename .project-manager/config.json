@@ -1929,7 +1929,7 @@
         "kickoffAt": "2026-06-15T05:20:00.000Z"
       },
       "name": "Project Workflow Loop Engine",
-      "notes": "Core cross-discipline PM workflow loop engine model, software and construction quality templates, review-first run state, structured handoffs, evidence ledger, workflow events, persistent run store, chat /workflow decision package, scorecard blocking, stop policy, and human approval gates added. Software Engineering Loop is the first template, not the product boundary.",
+      "notes": "Completed F52 core: cross-discipline PM workflow loop engine model, software and construction quality templates, review-first run state, structured handoffs, evidence ledger, workflow events, persistent run store, chat /workflow decision package, scorecard blocking, stop policy, and human approval gates. Software Engineering Loop is the first template, not the product boundary.",
       "paths": {
         "developmentLogSummaryFolder": ".project-manager/features/F52/",
         "featureFolder": ".project-manager/features/F52/",
@@ -1941,10 +1941,10 @@
       },
       "phase": "development",
       "points": 8,
-      "progress": 75,
+      "progress": 100,
       "readmePath": ".project-manager/features/F52/README.md",
-      "status": "in_progress",
-      "updatedAt": "2026-06-15T07:05:00.000Z",
+      "status": "done",
+      "updatedAt": "2026-06-15T07:25:00.000Z",
       "updatedBy": "Codex"
     }
   ],

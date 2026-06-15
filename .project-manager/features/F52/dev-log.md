@@ -140,3 +140,39 @@
   - Existing Turbopack warnings remain in `app/api/integrations/scan-applications/route.ts`
     broad `/Applications` tracing and `next.config.mjs` NFT trace; baseline still
     completed with `== verify:baseline: PASS ==`.
+
+## 2026-06-15 - Completion Marker
+
+- Marked F52 complete after the implemented slices satisfied the feature spec
+  acceptance criteria:
+  - dashboard feature metadata and artifacts exist;
+  - public model is generic Project Workflow, not AgentWorkflow or software-only;
+  - Software Engineering Loop is the first template but not the product boundary;
+  - Construction Quality Loop proves cross-discipline support;
+  - runs are review-first and do not execute actors or commands automatically;
+  - structured handoff artifacts, evidence ledger, scorecards, workflow events,
+    approval gates, stop policy, and durable run sidecar helpers are implemented;
+  - `/workflow <featureId>` returns a reviewable decision package from chat.
+- No dedicated UI route was changed, so manual browser smoke is not required for
+  this completion marker.
+
+## Verification - Completion Marker
+
+- PASS: `npm run docs:check`
+- PASS: `npm run test -- __tests__/projectWorkflowEngine.test.ts __tests__/chat.agent.test.ts __tests__/agentWorkflowDag.test.ts __tests__/projectDispatchAssistant.test.ts`
+  - 4 files / 63 tests.
+- PASS: `npm run verify:baseline`
+  - typecheck PASS
+  - agents:check PASS
+  - docs:check PASS
+  - docs:site:check PASS
+  - table sheet audit PASS
+  - static export hygiene PASS
+  - native dialog guard PASS
+  - UI i18n PASS
+  - vitest PASS: 173 files / 1171 tests
+  - cargo check PASS
+  - build PASS
+  - Existing Turbopack warnings remain in `app/api/integrations/scan-applications/route.ts`
+    broad `/Applications` tracing and `next.config.mjs` NFT trace; baseline still
+    completed with `== verify:baseline: PASS ==`.
