@@ -13,6 +13,14 @@ import {
   startProjectWorkflowNode,
   validateProjectWorkflowTemplate,
 } from '../lib/project-workflows/projectWorkflowEngine';
+import {
+  listProjectWorkflowRuns,
+  parseProjectWorkflowRun,
+  projectWorkflowRunPath,
+  projectWorkflowRunsDirectory,
+  saveProjectWorkflowRun,
+  serializeProjectWorkflowRun,
+} from '../lib/project-workflows/projectWorkflowRunStore';
 
 const projectRoot = path.resolve(__dirname, '..');
 
@@ -320,6 +328,65 @@ describe('Project Workflow Loop Engine run state', () => {
       type: 'stop_policy_blocked',
       nodeId: 'intake',
     });
+  });
+});
+
+describe('Project Workflow Loop Engine persistent memory store', () => {
+  it('builds stable project workflow run sidecar paths', () => {
+    expect(projectWorkflowRunsDirectory('/tmp/project/')).toBe('/tmp/project/.project-manager/project-workflow-runs');
+    expect(projectWorkflowRunPath('/tmp/project', 'run:2026/06/15')).toBe(
+      '/tmp/project/.project-manager/project-workflow-runs/run-2026-06-15.json',
+    );
+  });
+
+  it('serializes and parses workflow runs with validation', () => {
+    const template = getProjectWorkflowTemplateById('construction-quality-loop')!;
+    const run = createProjectWorkflowRun(template, {
+      projectId: 'site-project',
+      workItemId: 'QC-12',
+      now: '2026-06-15T06:30:00.000Z',
+    });
+
+    expect(parseProjectWorkflowRun(serializeProjectWorkflowRun(run))).toEqual(run);
+    expect(() => parseProjectWorkflowRun('{}')).toThrow('ProjectWorkflowRun file is missing id, templateId, or nodeRuns.');
+  });
+
+  it('saves and lists workflow runs as durable evidence outside chat transcript', async () => {
+    const template = getProjectWorkflowTemplateById('construction-quality-loop')!;
+    const run = createProjectWorkflowRun(template, {
+      projectId: 'site-project',
+      workItemId: 'QC-12',
+      now: '2026-06-15T06:30:00.000Z',
+    });
+    const writes = new Map<string, string>();
+    const adapter = {
+      readFile: async (filePath: string) => writes.get(filePath) ?? '{}',
+      writeFile: async (filePath: string, content: string) => {
+        writes.set(filePath, content);
+      },
+      listProjectFiles: async (root: string) => [
+        {
+          name: 'run-valid.json',
+          path: `${root}/run-valid.json`,
+          isDir: false,
+          children: [],
+        },
+        {
+          name: 'run-corrupt.json',
+          path: `${root}/run-corrupt.json`,
+          isDir: false,
+          children: [],
+        },
+      ],
+    };
+
+    const savedPath = await saveProjectWorkflowRun('/tmp/project', run, adapter);
+    writes.set('/tmp/project/.project-manager/project-workflow-runs/run-valid.json', serializeProjectWorkflowRun(run));
+    writes.set('/tmp/project/.project-manager/project-workflow-runs/run-corrupt.json', '{}');
+
+    expect(savedPath).toBe(`/tmp/project/.project-manager/project-workflow-runs/${run.id}.json`);
+    expect(writes.get(savedPath)).toContain('"templateId": "construction-quality-loop"');
+    await expect(listProjectWorkflowRuns('/tmp/project', adapter)).resolves.toEqual([run]);
   });
 });
 

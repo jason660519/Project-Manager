@@ -75,3 +75,35 @@
   - Existing Turbopack warnings remain in `app/api/integrations/scan-applications/route.ts`
     broad `/Applications` tracing and `next.config.mjs` NFT trace; baseline still
     completed with `== verify:baseline: PASS ==`.
+
+## 2026-06-15 - Persistent Memory Store Slice
+
+- Added project workflow run sidecar persistence helpers under
+  `.project-manager/project-workflow-runs/`.
+- Added serialization, validation, save, read, and list helpers with adapter
+  injection so tests do not need real filesystem writes.
+- Added public `lib/project-workflows/index.ts` exports for the engine and store.
+
+## Verification - Persistent Memory Store Slice
+
+- PASS: `npm run test -- __tests__/projectWorkflowEngine.test.ts`
+  - 15 tests.
+- PASS: `npm run typecheck`
+- PASS: `npm run docs:check`
+- PASS: `npm run test -- __tests__/projectWorkflowEngine.test.ts __tests__/agentWorkflowDag.test.ts __tests__/projectDispatchAssistant.test.ts`
+  - 3 files / 42 tests.
+- PASS: `npm run verify:baseline`
+  - typecheck PASS
+  - agents:check PASS
+  - docs:check PASS
+  - docs:site:check PASS
+  - table sheet audit PASS
+  - static export hygiene PASS
+  - native dialog guard PASS
+  - UI i18n PASS
+  - vitest PASS: 173 files / 1170 tests
+  - cargo check PASS
+  - build PASS
+  - Existing Turbopack warnings remain in `app/api/integrations/scan-applications/route.ts`
+    broad `/Applications` tracing and `next.config.mjs` NFT trace; baseline still
+    completed with `== verify:baseline: PASS ==`.
