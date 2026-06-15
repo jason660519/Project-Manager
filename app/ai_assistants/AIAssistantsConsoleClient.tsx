@@ -72,8 +72,10 @@ import {
 } from '../../lib/agent-workflows';
 import {
   buildProjectWorkflowGraphView,
+  createProjectWorkflowRun,
   getProjectWorkflowTemplateById,
   listProjectWorkflowRuns,
+  saveProjectWorkflowRun,
   type ProjectWorkflowGraphView,
   type ProjectWorkflowRun,
 } from '../../lib/project-workflows';
@@ -874,6 +876,10 @@ function WorkflowRunsSheet({
   const [selectedRunId, setSelectedRunId] = useState<string | null>(initialWorkflowRuns[0]?.id ?? null);
   const [selectedProjectRunId, setSelectedProjectRunId] = useState<string | null>(initialProjectWorkflowRuns[0]?.id ?? null);
   const [selectedProjectNodeId, setSelectedProjectNodeId] = useState<string | null>(null);
+  const [saveWorkItemId, setSaveWorkItemId] = useState(initialProjectWorkflowRuns[0]?.workItemId ?? '');
+  const [savingWorkflowRun, setSavingWorkflowRun] = useState(false);
+  const [saveWorkflowRunMessage, setSaveWorkflowRunMessage] = useState<string | null>(null);
+  const [saveWorkflowRunError, setSaveWorkflowRunError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -926,6 +932,47 @@ function WorkflowRunsSheet({
       })
     : null;
 
+  const handleSaveProjectWorkflowRun = async () => {
+    const workItemId = saveWorkItemId.trim();
+    if (!projectRoot) {
+      setSaveWorkflowRunError('Select a project before saving a workflow run.');
+      setSaveWorkflowRunMessage(null);
+      return;
+    }
+    if (!workItemId) {
+      setSaveWorkflowRunError('Enter a feature or work item id before saving.');
+      setSaveWorkflowRunMessage(null);
+      return;
+    }
+    const template = getProjectWorkflowTemplateById('software-engineering-loop');
+    if (!template) {
+      setSaveWorkflowRunError('Software Engineering Loop template is unavailable.');
+      setSaveWorkflowRunMessage(null);
+      return;
+    }
+    setSavingWorkflowRun(true);
+    setSaveWorkflowRunError(null);
+    setSaveWorkflowRunMessage(null);
+    try {
+      const run = createProjectWorkflowRun(template, {
+        projectId: 'project-manager',
+        workItemId,
+        createdBy: 'PM Lead',
+      });
+      const savedPath = await saveProjectWorkflowRun(projectRoot, run);
+      const loadedProjectRuns = await listProjectWorkflowRuns(projectRoot);
+      setProjectRuns(loadedProjectRuns);
+      const matchingRun = loadedProjectRuns.find((loadedRun) => loadedRun.workItemId === workItemId);
+      setSelectedProjectRunId(matchingRun?.id ?? loadedProjectRuns[0]?.id ?? run.id);
+      setSelectedProjectNodeId(null);
+      setSaveWorkflowRunMessage(`Saved workflow run: ${savedPath}`);
+    } catch (saveError: unknown) {
+      setSaveWorkflowRunError(saveError instanceof Error ? saveError.message : 'Unable to save workflow run.');
+    } finally {
+      setSavingWorkflowRun(false);
+    }
+  };
+
   if (projectGraphView) {
     return (
       <ProjectWorkflowRunsGraphSheet
@@ -934,6 +981,12 @@ function WorkflowRunsSheet({
         graphView={projectGraphView}
         loading={loading}
         error={error}
+        saveWorkItemId={saveWorkItemId}
+        savingWorkflowRun={savingWorkflowRun}
+        saveWorkflowRunMessage={saveWorkflowRunMessage}
+        saveWorkflowRunError={saveWorkflowRunError}
+        onSaveWorkItemIdChange={setSaveWorkItemId}
+        onSaveWorkflowRun={handleSaveProjectWorkflowRun}
         onSelectRun={(runId) => {
           setSelectedProjectRunId(runId);
           setSelectedProjectNodeId(null);
@@ -954,6 +1007,17 @@ function WorkflowRunsSheet({
             Use /workflow &lt;featureId&gt; in AI Assistant chat to prepare a review-first Project Workflow decision package,
             then save or start a manual run when the human lead approves it.
           </p>
+          <div className="mt-5 text-left">
+            <SaveWorkflowRunControl
+              projectRoot={projectRoot}
+              workItemId={saveWorkItemId}
+              saving={savingWorkflowRun}
+              message={saveWorkflowRunMessage}
+              error={saveWorkflowRunError}
+              onWorkItemIdChange={setSaveWorkItemId}
+              onSave={handleSaveProjectWorkflowRun}
+            />
+          </div>
           <p className="mt-3 font-mono text-[10px] text-stone-500">
             {projectRoot ? `${projectRoot}/.project-manager/project-workflow-runs` : 'Select a project to load Project Workflow run sidecars.'}
           </p>
@@ -1113,6 +1177,12 @@ function ProjectWorkflowRunsGraphSheet({
   error,
   onSelectRun,
   onSelectNode,
+  saveWorkItemId,
+  savingWorkflowRun,
+  saveWorkflowRunMessage,
+  saveWorkflowRunError,
+  onSaveWorkItemIdChange,
+  onSaveWorkflowRun,
 }: {
   projectRoot?: string;
   runs: ProjectWorkflowRun[];
@@ -1121,6 +1191,12 @@ function ProjectWorkflowRunsGraphSheet({
   error: string | null;
   onSelectRun: (runId: string) => void;
   onSelectNode: (nodeId: string) => void;
+  saveWorkItemId: string;
+  savingWorkflowRun: boolean;
+  saveWorkflowRunMessage: string | null;
+  saveWorkflowRunError: string | null;
+  onSaveWorkItemIdChange: (value: string) => void;
+  onSaveWorkflowRun: () => void;
 }) {
   const inspector = graphView.inspector;
   return (
@@ -1173,7 +1249,19 @@ function ProjectWorkflowRunsGraphSheet({
               {graphView.run.title} · {graphView.run.workItemId}
             </p>
           </div>
-          <Badge tone={graphView.run.status}>{graphView.run.status}</Badge>
+          <div className="flex flex-col items-end gap-2">
+            <Badge tone={graphView.run.status}>{graphView.run.status}</Badge>
+            <SaveWorkflowRunControl
+              compact
+              projectRoot={projectRoot}
+              workItemId={saveWorkItemId}
+              saving={savingWorkflowRun}
+              message={saveWorkflowRunMessage}
+              error={saveWorkflowRunError}
+              onWorkItemIdChange={onSaveWorkItemIdChange}
+              onSave={onSaveWorkflowRun}
+            />
+          </div>
         </div>
         <div className="min-h-0 flex-1 overflow-auto bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[length:22px_22px] p-4">
           <div className="grid min-w-[820px] grid-cols-4 gap-4">
@@ -1271,6 +1359,55 @@ function ProjectWorkflowRunsGraphSheet({
           </div>
         )}
       </aside>
+    </div>
+  );
+}
+
+function SaveWorkflowRunControl({
+  projectRoot,
+  workItemId,
+  saving,
+  message,
+  error,
+  compact = false,
+  onWorkItemIdChange,
+  onSave,
+}: {
+  projectRoot?: string;
+  workItemId: string;
+  saving: boolean;
+  message: string | null;
+  error: string | null;
+  compact?: boolean;
+  onWorkItemIdChange: (value: string) => void;
+  onSave: () => void;
+}) {
+  const disabled = saving || !projectRoot || !workItemId.trim();
+  return (
+    <div className={clsx('space-y-2', compact ? 'w-[280px]' : 'w-full')}>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="min-w-[170px] flex-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-500">
+          Feature or work item id
+          <input
+            value={workItemId}
+            onChange={(event) => onWorkItemIdChange(event.target.value)}
+            placeholder="F53"
+            className="mt-1 w-full border border-stone-200/15 bg-stone-950/80 px-2 py-1.5 font-mono text-[11px] text-stone-100 outline-none focus:border-amber-200/45"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={disabled}
+          className="inline-flex items-center gap-1 border border-emerald-300/30 bg-emerald-950/30 px-3 py-1.5 text-[11px] font-semibold text-emerald-50 hover:border-emerald-200/60 disabled:cursor-not-allowed disabled:border-stone-200/10 disabled:bg-stone-950/50 disabled:text-stone-600"
+        >
+          <GitBranch size={13} />
+          {saving ? 'Saving...' : 'Save workflow run'}
+        </button>
+      </div>
+      {message && <p className="break-words font-mono text-[10px] text-emerald-200">{message}</p>}
+      {error && <p className="break-words font-mono text-[10px] text-red-200">{error}</p>}
+      {!projectRoot && <p className="text-[10px] text-stone-500">Select a project before saving workflow runs.</p>}
     </div>
   );
 }

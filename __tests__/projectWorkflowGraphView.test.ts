@@ -12,7 +12,7 @@ import { buildProjectWorkflowGraphView } from '../lib/project-workflows/projectW
 const projectRoot = path.resolve(__dirname, '..');
 
 describe('F53 feature metadata', () => {
-  it('registers F53 dashboard artifacts after graph execution console completion', () => {
+  it('registers F53 dashboard artifacts for the graph execution console', () => {
     const config = JSON.parse(readFileSync(path.join(projectRoot, '.project-manager/config.json'), 'utf8'));
     const feature = config.features.find((entry: { id: string }) => entry.id === 'F53');
 
@@ -21,12 +21,13 @@ describe('F53 feature metadata', () => {
       name: 'Workflow Graph Execution Console',
       category: 'PM Orchestration',
       phase: 'development',
-      status: 'done',
     });
-    expect(feature.progress).toBe(100);
+    expect(['in_progress', 'done']).toContain(feature.status);
+    expect(feature.progress).toBeGreaterThanOrEqual(90);
     expect(feature.notes).toContain('graph canvas');
     expect(feature.metadata.scope).toContain('Workflow Runs tab');
     expect(feature.metadata.plannedTestScope).toContain('unit: Project Workflow graph projection');
+    expect(feature.metadata.plannedTestScope).toContain('integration: Workflow Runs save action creates and reloads a Project Workflow sidecar');
     expect(feature.paths).toMatchObject({
       spec: '.project-manager/features/F53/feature-spec.md',
       tdd: '.project-manager/features/F53/tdd-spec.md',

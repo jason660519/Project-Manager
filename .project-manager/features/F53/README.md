@@ -15,6 +15,7 @@ Create a review-first graph console for F52 Project Workflow runs:
   outputs.
 - Inspector for selected node details, required handoff, evidence, scorecards,
   and approval gates.
+- UI action to save a review-first workflow run sidecar for a typed feature id.
 - Existing `Workflow Runs` tab remains the entry point.
 
 ## First Slice
@@ -38,6 +39,8 @@ Create a review-first graph console for F52 Project Workflow runs:
 - `/workflow <featureId>`: generate a review-only decision package.
 - `/workflow-save <featureId>`: save the review-first Project Workflow run
   sidecar for the Workflow Runs graph; no node is executed.
+- `Workflow Runs > Save workflow run`: create and save the same review-first
+  Project Workflow sidecar from the graph UI; no node is executed.
 
 ## Files
 

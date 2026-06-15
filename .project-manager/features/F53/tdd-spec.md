@@ -17,6 +17,7 @@ F53 is UI-heavy but must be driven by testable projection logic first.
 | Unit | `lib/project-workflows/projectWorkflowGraphView.ts` | Convert run/template data into graph nodes, edges, inspector facts, gates, and aggregate counts. |
 | Integration | `app/ai_assistants/AIAssistantsConsoleClient.tsx` | Render Project Workflow graph view in the existing Workflow Runs sheet. |
 | Chat integration | `lib/chat/chatAgent.ts` | Persist `/workflow <featureId>` into a Project Workflow run sidecar only when explicitly requested. |
+| UI integration | `app/ai_assistants/AIAssistantsConsoleClient.tsx` | Save a review-first Project Workflow run sidecar from the Workflow Runs tab and reload graph data. |
 | E2E/manual | `/ai_assistants/workflow-runs` | Confirm the graph is visible, selectable, and has no browser console or Next dev overlay errors. |
 
 ## Scenarios
@@ -124,6 +125,22 @@ Acceptance:
 
 - Store adapter `writeFile` is not called.
 - Response still contains `No actor or command is executed by this package.`
+
+### S9 UI Save Action - Explicit Sidecar Creation
+
+Given the Workflow Runs tab has a selected project root  
+When the PM enters a feature/work item id and clicks `Save workflow run`  
+Then the UI creates a Software Engineering Loop Project Workflow run sidecar  
+And reloads Project Workflow runs from disk  
+And displays the saved path or a clear error  
+And no actor/tool command is executed.
+
+Acceptance:
+
+- `saveProjectWorkflowRun(projectRoot, run)` is called once.
+- The saved run uses `templateId = software-engineering-loop`.
+- `listProjectWorkflowRuns(projectRoot)` is called after saving.
+- Button is disabled while saving or when the feature id is blank.
 
 ## Red / Green / Refactor Protocol
 

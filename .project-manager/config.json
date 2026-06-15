@@ -1973,6 +1973,7 @@
         "plannedTestScope": [
           "unit: Project Workflow graph projection",
           "integration: AI Assistants Workflow Runs graph rendering",
+          "integration: Workflow Runs save action creates and reloads a Project Workflow sidecar",
           "manual E2E: /ai_assistants/workflow-runs browser smoke"
         ],
         "risks": [
@@ -1980,10 +1981,10 @@
           "Graph UI can become crowded; first slice avoids drag/drop and zoom.",
           "Prompt/tool/memory metadata may need inferred labels until templates grow first-class fields."
         ],
-        "scope": "Upgrade AI Assistants Workflow Runs tab into a review-first Project Workflow graph execution console."
+        "scope": "Upgrade AI Assistants Workflow Runs tab into a review-first Project Workflow graph execution console with an explicit UI save action."
       },
       "name": "Workflow Graph Execution Console",
-      "notes": "F53 turns Project Workflow runs into an inspectable graph canvas: run browser, node graph, prompt/tool/memory/handoff/evidence inspector, approval gates, and review-first manual execution controls. Current slice has graph projection, UI rendering, empty state, /workflow-save explicit chat workflow-run persistence, focused unit/integration coverage, browser smoke with zero Next dev issues, and green verify:baseline.",
+      "notes": "F53 graph canvas console is complete: run browser, node graph, prompt/tool/memory/handoff/evidence inspector, approval gates, /workflow-save chat persistence, and a Workflow Runs UI Save workflow run action that creates review-first Project Workflow sidecars without executing agents or tools. Verified with focused unit/integration tests, browser smoke, Next dev issues check, and green verify:baseline.",
       "paths": {
         "developmentLogSummaryFolder": ".project-manager/features/F53/",
         "featureFolder": ".project-manager/features/F53/",
@@ -1998,7 +1999,7 @@
       "progress": 100,
       "readmePath": ".project-manager/features/F53/README.md",
       "status": "done",
-      "updatedAt": "2026-06-16T04:50:00.000Z",
+      "updatedAt": "2026-06-16T05:08:00.000Z",
       "updatedBy": "Codex"
     }
   ],

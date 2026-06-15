@@ -106,6 +106,27 @@
 - PASS: `npm run verify:dev-issues -- --routes /ai_assistants/workflow-runs`
   - Result: `Next dev Issues: 0`.
 
+## Verification - UI Save Action Baseline
+
+- PASS: `npm run verify:baseline`
+  - typecheck PASS
+  - agents:check PASS
+  - docs:check PASS
+  - docs:site:check PASS
+  - table sheet audit PASS
+  - static export hygiene PASS
+  - native dialog guard PASS
+  - UI i18n PASS
+  - vitest PASS: 174 files / 1181 tests
+  - cargo check PASS
+  - build PASS
+  - Existing Turbopack warnings remain in `app/api/integrations/scan-applications/route.ts`
+    broad `/Applications` tracing and `next.config.mjs` NFT trace; baseline still
+    completed with `== verify:baseline: PASS ==`.
+- Final dashboard update:
+  - F53 status: `done`
+  - F53 progress: `100`
+
 ## Verification - Baseline
 
 - PASS: `npm run verify:baseline`
@@ -201,3 +222,58 @@
   - Existing Turbopack warnings remain in `app/api/integrations/scan-applications/route.ts`
     broad `/Applications` tracing and `next.config.mjs` NFT trace; baseline still
     completed with `== verify:baseline: PASS ==`.
+
+## 2026-06-16 - UI Save Action Slice Kickoff
+
+- Committed and pushed completed F53 graph console:
+  - `dbd19ad0 feat(pm): add workflow graph execution console`
+  - `git push origin main`
+  - pre-push `npm run verify:quick` PASS.
+- Reopened F53 for a narrow usability slice requested by PM:
+  - add a visible `Save workflow run` button in AI Assistants > Workflow Runs;
+  - allow a PM to type a feature/work item id and create a review-first Software
+    Engineering Loop sidecar without remembering `/workflow-save <featureId>`;
+  - reload graph sidecars after save;
+  - keep the same safety policy: saving does not execute agents, tools, PRs,
+    pushes, deploys, or external commands.
+- Planned tests:
+  - RED integration test for save button calling `saveProjectWorkflowRun`;
+  - focused Workflow Runs rendering tests;
+  - route browser smoke and dev issues check;
+  - final `npm run verify:baseline`.
+
+## 2026-06-16 - TDD Round 4: Workflow Runs UI Save Button
+
+- RED:
+  - Added `__tests__/ai-assistants.console.test.tsx` coverage for saving a
+    Project Workflow run sidecar from the Workflow Runs tab.
+  - Confirmed failure: test could not find the `Feature or work item id` field,
+    because the UI save control did not exist.
+- GREEN:
+  - Added `SaveWorkflowRunControl` to `AIAssistantsConsoleClient`.
+  - Empty Workflow Runs state now lets a PM enter a feature/work item id and
+    click `Save workflow run`.
+  - Graph header also exposes the same compact save control.
+  - Save flow creates a `software-engineering-loop` Project Workflow run,
+    persists it through `saveProjectWorkflowRun(projectRoot, run)`, reloads
+    `listProjectWorkflowRuns(projectRoot)`, selects the matching run, and shows
+    the saved path.
+  - Safety remains unchanged: this creates a sidecar only and does not execute
+    agents, tools, PRs, pushes, deploys, or external commands.
+
+## Verification - TDD Round 4
+
+- PASS: `npm run test -- __tests__/ai-assistants.console.test.tsx -t "saves a Project Workflow run sidecar"`
+  - 1 focused test.
+- PASS: `npm run test -- __tests__/ai-assistants.console.test.tsx`
+  - 10 tests.
+- PASS: `npm run typecheck`
+- PASS: `npm run test -- __tests__/chat.agent.test.ts __tests__/projectWorkflowGraphView.test.ts __tests__/projectWorkflowEngine.test.ts __tests__/ai-assistants.console.test.tsx`
+  - 4 files / 53 tests.
+- PASS: Browser smoke opened
+  `http://localhost:43187/ai_assistants/workflow-runs`.
+  - Empty Project Workflow state rendered.
+  - `Save workflow run` control rendered.
+  - Browser console error count: 0.
+- PASS: `npm run verify:dev-issues -- --routes /ai_assistants/workflow-runs`
+  - Result: `Next dev Issues: 0`.

@@ -7,12 +7,33 @@ import {
   createProjectWorkflowRun,
   getProjectWorkflowTemplateById,
 } from '../lib/project-workflows/projectWorkflowEngine';
+import {
+  listProjectWorkflowRuns,
+  saveProjectWorkflowRun,
+} from '../lib/project-workflows';
 
 const push = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
 }));
+
+vi.mock('../lib/agent-workflows', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/agent-workflows')>();
+  return {
+    ...actual,
+    listAgentWorkflowRuns: vi.fn(async () => []),
+  };
+});
+
+vi.mock('../lib/project-workflows', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/project-workflows')>();
+  return {
+    ...actual,
+    listProjectWorkflowRuns: vi.fn(async () => []),
+    saveProjectWorkflowRun: vi.fn(async () => '/repo/Project-Manager/.project-manager/project-workflow-runs/project-workflow-run-F53.json'),
+  };
+});
 
 const localStorageStore: Record<string, string> = {};
 const localStorageMock = {
@@ -234,5 +255,44 @@ describe('AIAssistantsConsoleClient', () => {
 
     expect(screen.getByText(/No Project Workflow runs found yet/)).toBeInTheDocument();
     expect(screen.getByText(/Use \/workflow <featureId>/)).toBeInTheDocument();
+  });
+
+  it('saves a Project Workflow run sidecar from the Workflow Runs tab and reloads graph data', async () => {
+    const user = userEvent.setup();
+    const template = getProjectWorkflowTemplateById('software-engineering-loop')!;
+    const savedRun = createProjectWorkflowRun(template, {
+      projectId: 'project-manager',
+      workItemId: 'F53',
+      createdBy: 'PM Lead',
+      now: '2026-06-16T05:05:00.000Z',
+    });
+    vi.mocked(listProjectWorkflowRuns)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([savedRun]);
+
+    render(
+      <AIAssistantsConsoleClient
+        activeSheet="workflow-runs"
+        projectRoot="/repo/Project-Manager"
+        initialProjectWorkflowRuns={[]}
+      />,
+    );
+
+    const featureInput = await screen.findByLabelText(/Feature or work item id/i);
+    await user.clear(featureInput);
+    await user.type(featureInput, 'F53');
+    await user.click(screen.getByRole('button', { name: /Save workflow run/i }));
+
+    await waitFor(() => expect(saveProjectWorkflowRun).toHaveBeenCalledTimes(1));
+    expect(saveProjectWorkflowRun).toHaveBeenCalledWith(
+      '/repo/Project-Manager',
+      expect.objectContaining({
+        templateId: 'software-engineering-loop',
+        workItemId: 'F53',
+      }),
+    );
+    expect(listProjectWorkflowRuns).toHaveBeenCalledTimes(2);
+    expect(await screen.findByText(/Saved workflow run:/)).toBeInTheDocument();
+    expect(await screen.findByText('Workflow Graph')).toBeInTheDocument();
   });
 });

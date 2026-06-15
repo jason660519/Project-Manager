@@ -75,3 +75,11 @@ And Workflow Runs can load it as graph data.
 Given the user sends `/workflow F53` without save confirmation  
 When the command returns  
 Then it produces the decision package only and does not write files.
+
+### TS11 - UI Save Workflow Run Button
+
+Given AI Assistants > Workflow Runs has a selected project root  
+When the PM enters `F53` and clicks `Save workflow run`  
+Then a Software Engineering Loop Project Workflow sidecar is written  
+And the tab reloads Project Workflow runs  
+And the UI reports the saved path without executing agents or tools.

@@ -43,6 +43,8 @@ orchestration inspectable before anything executes. The graph should answer:
   `.project-manager/project-workflow-runs`.
 - Persist a reviewed `/workflow <featureId>` package into a Project Workflow run
   sidecar only when the caller explicitly requests persistence.
+- Provide an explicit UI action in `Workflow Runs` to save a review-first
+  Software Engineering Loop run sidecar for a typed feature/work item id.
 - Keep the console review-first. UI actions may prepare a selected state, but no
   actor or command is executed in this slice.
 - Keep old agent-workflow data from crashing the tab while project-workflow data
@@ -66,6 +68,8 @@ orchestration inspectable before anything executes. The graph should answer:
   Project Workflow run.
 - A reviewed workflow package can be saved as a sidecar with explicit
   persistence, then appears in the Workflow Runs graph.
+- A PM can save a workflow run from the `Workflow Runs` tab without remembering
+  `/workflow-save <featureId>`.
 - Selecting a node updates the inspector with prompts/tools/memory/handoff and
   evidence requirements.
 - Blocked approval gates are visible without reading the raw JSON sidecar.
