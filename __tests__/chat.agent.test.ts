@@ -159,6 +159,33 @@ describe('sendChatMessage', () => {
     expect(spawnAgent).not.toHaveBeenCalled();
   });
 
+  it('finds /workflow features from selected project config when dashboard features are filtered', async () => {
+    const result = await sendChatMessage({
+      content: '/workflow F14',
+      history: [],
+      context: {
+        ...context,
+        features: [
+          {
+            id: 'F99',
+            name: 'Filtered Dashboard Feature',
+            category: 'Frontend',
+            status: 'todo',
+            progress: 0,
+            phase: 'development',
+            paths: { implementation: 'components/filtered' },
+          },
+        ],
+      },
+    });
+
+    expect(result.content).toContain('Project Workflow Loop Decision Package');
+    expect(result.content).toContain('F14');
+    expect(result.content).toContain('Sidebar Chatbot');
+    expect(result.content).not.toContain('找不到功能');
+    expect(spawnAgent).not.toHaveBeenCalled();
+  });
+
   it('returns error for non-existent feature', async () => {
     const result = await sendChatMessage({ content: '/feature F99', history: [], context });
     expect(result.content).toContain('找不到功能');

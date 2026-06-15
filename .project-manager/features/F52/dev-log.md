@@ -176,3 +176,44 @@
   - Existing Turbopack warnings remain in `app/api/integrations/scan-applications/route.ts`
     broad `/Applications` tracing and `next.config.mjs` NFT trace; baseline still
     completed with `== verify:baseline: PASS ==`.
+
+## 2026-06-15 - Chat Workflow Feature Lookup Fix
+
+- Investigated a user-reported issue where `/status` worked in AI Assistants
+  Console, but `/workflow F52` and `/workflow F14` returned "feature not found".
+- Root cause: chat feature lookup treated the dashboard-scoped `context.features`
+  array as authoritative, so a filtered/stale dashboard list masked the full
+  `selectedProject.config.features` list.
+- Fixed `findFeature` to search a deduplicated union of dashboard features and
+  selected project config features. This also improves `/feature` and `/dispatch`
+  lookup behavior because they share the same helper.
+- Added a regression test that reproduces the AI Assistants Console shape:
+  dashboard context contains a filtered feature, while the selected project config
+  contains the requested workflow feature.
+
+## Verification - Chat Workflow Feature Lookup Fix
+
+- RED confirmed before fix:
+  - `npm run test -- __tests__/chat.agent.test.ts -t "finds /workflow features"`
+  - Failed with `找不到功能 **F14**。請用 /status 查看所有功能。`
+- PASS: `npm run test -- __tests__/chat.agent.test.ts -t "finds /workflow features"`
+- PASS: `npm run test -- __tests__/chat.agent.test.ts`
+  - 22 tests.
+- PASS: `npm run test -- __tests__/projectWorkflowEngine.test.ts __tests__/chat.agent.test.ts`
+  - 2 files / 37 tests.
+- PASS: `npm run typecheck`
+- PASS: `npm run verify:baseline`
+  - typecheck PASS
+  - agents:check PASS
+  - docs:check PASS
+  - docs:site:check PASS
+  - table sheet audit PASS
+  - static export hygiene PASS
+  - native dialog guard PASS
+  - UI i18n PASS
+  - vitest PASS: 173 files / 1172 tests
+  - cargo check PASS
+  - build PASS
+  - Existing Turbopack warnings remain in `app/api/integrations/scan-applications/route.ts`
+    broad `/Applications` tracing and `next.config.mjs` NFT trace; baseline still
+    completed with `== verify:baseline: PASS ==`.

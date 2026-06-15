@@ -347,8 +347,23 @@ function routeForView(view: string): string | undefined {
   return ROUTES[normalize(view).replace(/^\//, '')];
 }
 
+function featureLookupList(context: ChatContext): Feature[] {
+  const seen = new Set<string>();
+  const features: Feature[] = [];
+  for (const feature of [
+    ...(context.features ?? []),
+    ...(context.selectedProject?.config.features ?? []),
+  ]) {
+    const key = normalize(feature.id);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    features.push(feature);
+  }
+  return features;
+}
+
 function findFeature(context: ChatContext, featureId: string): Feature | undefined {
-  const features = context.features ?? context.selectedProject?.config.features ?? [];
+  const features = featureLookupList(context);
   const normalizedId = normalize(featureId);
   return features.find(
     (f) => normalize(f.id) === normalizedId || normalize(f.name) === normalizedId,
