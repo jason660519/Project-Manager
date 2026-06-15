@@ -28,6 +28,13 @@ export type ProjectWorkflowNodeStatus = 'queued' | 'ready' | 'running' | 'succee
 export type ProjectWorkflowRunStatus = 'draft' | 'queued' | 'running' | 'blocked' | 'completed' | 'cancelled';
 export type ProjectWorkflowEvidenceKind = 'document' | 'test_result' | 'command_output' | 'approval' | 'artifact';
 export type ProjectWorkflowScorecardStatus = 'passed' | 'failed' | 'missing';
+export type ProjectWorkflowEventType =
+  | 'run_created'
+  | 'node_started'
+  | 'node_completed'
+  | 'node_ready'
+  | 'approval_recorded'
+  | 'stop_policy_blocked';
 
 export interface ProjectWorkflowRuntimeHint {
   mode: 'manual' | 'agent' | 'tool' | 'external';
@@ -156,6 +163,14 @@ export interface ProjectWorkflowApprovalRecord {
   approvedAt: string;
 }
 
+export interface ProjectWorkflowEvent {
+  type: ProjectWorkflowEventType;
+  occurredAt: string;
+  summary: string;
+  nodeId?: string;
+  gateId?: string;
+}
+
 export interface ProjectWorkflowRun {
   id: string;
   templateId: string;
@@ -172,6 +187,7 @@ export interface ProjectWorkflowRun {
   evidenceLedger: ProjectWorkflowEvidenceRecord[];
   scorecardResults: ProjectWorkflowScorecardResult[];
   approvals: ProjectWorkflowApprovalRecord[];
+  events: ProjectWorkflowEvent[];
   nextAction: string;
   blockedReason?: string;
 }
@@ -308,22 +324,120 @@ const SOFTWARE_ENGINEERING_LOOP: ProjectWorkflowTemplate = {
   ],
 };
 
-const PROJECT_WORKFLOW_TEMPLATES: ProjectWorkflowTemplate[] = [SOFTWARE_ENGINEERING_LOOP];
+const CONSTRUCTION_QUALITY_LOOP: ProjectWorkflowTemplate = {
+  id: 'construction-quality-loop',
+  kind: 'project-workflow-loop',
+  title: 'Construction Quality Loop',
+  version: 1,
+  discipline: 'construction',
+  isExampleTemplate: false,
+  summary:
+    'Construction Quality Loop coordinates site intake, inspection, QA review, procurement impact, PM approval, and operations handoff.',
+  trigger: 'manual',
+  stopPolicy: {
+    maxNodeAttempts: 2,
+    maxRunIterations: 6,
+    budgetLabel: 'bounded site-quality loop budget',
+    scopeLock: 'Declared inspection package, defect evidence, procurement impact, and PM approval only.',
+  },
+  approvalGates: [
+    {
+      gateId: 'pm-closeout-approval',
+      title: 'PM Closeout Approval',
+      requiredBeforeNodeId: 'operations-handoff',
+      approverRole: 'Project manager',
+      reason: 'Site quality closeout changes downstream trade sequencing and needs explicit PM approval.',
+    },
+  ],
+  nodes: [
+    projectNode({
+      id: 'site-intake',
+      title: 'Site Intake',
+      discipline: 'construction',
+      actorKind: 'human',
+      summary: 'Confirm inspection scope, location, drawings, constraints, and affected trades.',
+      dependsOn: [],
+      isolation: 'document-package',
+      handoffArtifactId: 'site-intake-brief',
+      evidence: [{ evidenceId: 'inspection-scope', kind: 'document', description: 'Inspection scope and location package.' }],
+    }),
+    projectNode({
+      id: 'field-inspection',
+      title: 'Field Inspection',
+      discipline: 'construction',
+      actorKind: 'vendor',
+      summary: 'Capture field observations, defects, photos, and immediate safety constraints.',
+      dependsOn: ['site-intake'],
+      isolation: 'document-package',
+      handoffArtifactId: 'field-inspection-report',
+      evidence: [{ evidenceId: 'photo-log', kind: 'artifact', description: 'Photo log and defect observations.' }],
+    }),
+    projectNode({
+      id: 'qa-review',
+      title: 'QA Review',
+      discipline: 'qa',
+      actorKind: 'review_queue',
+      summary: 'Review field evidence against checklist and acceptance criteria.',
+      dependsOn: ['field-inspection'],
+      isolation: 'shared-review-queue',
+      handoffArtifactId: 'qa-review-note',
+      evidence: [{ evidenceId: 'qa-checklist', kind: 'document', description: 'Completed QA checklist.' }],
+    }),
+    projectNode({
+      id: 'procurement-impact',
+      title: 'Procurement Impact',
+      discipline: 'procurement',
+      actorKind: 'human',
+      summary: 'Assess whether defects affect lead times, replacements, vendors, or cost risk.',
+      dependsOn: ['qa-review'],
+      isolation: 'document-package',
+      handoffArtifactId: 'procurement-impact-note',
+      evidence: [{ evidenceId: 'vendor-impact', kind: 'document', description: 'Vendor and material impact note.' }],
+    }),
+    projectNode({
+      id: 'pm-approval',
+      title: 'PM Approval',
+      discipline: 'project_management',
+      actorKind: 'human',
+      summary: 'Approve closeout, rework, or escalation path.',
+      dependsOn: ['procurement-impact'],
+      isolation: 'per-node-context',
+      handoffArtifactId: 'pm-approval-note',
+      evidence: [{ evidenceId: 'pm-decision', kind: 'approval', description: 'PM decision record.' }],
+    }),
+    projectNode({
+      id: 'operations-handoff',
+      title: 'Operations Handoff',
+      discipline: 'operations',
+      actorKind: 'human',
+      summary: 'Hand approved outcome to operations or next trade sequencing.',
+      dependsOn: ['pm-approval'],
+      highRiskAction: true,
+      isolation: 'document-package',
+      handoffArtifactId: 'operations-handoff',
+      evidence: [{ evidenceId: 'handoff-record', kind: 'document', description: 'Operations handoff record.' }],
+    }),
+  ],
+};
+
+const PROJECT_WORKFLOW_TEMPLATES: ProjectWorkflowTemplate[] = [SOFTWARE_ENGINEERING_LOOP, CONSTRUCTION_QUALITY_LOOP];
 
 function projectNode(input: {
   id: string;
   title: string;
+  discipline?: ProjectWorkflowDiscipline;
   actorKind: ProjectWorkflowActorKind;
   summary: string;
   dependsOn: string[];
   handoffArtifactId: string;
   evidence: Array<{ evidenceId: string; kind: ProjectWorkflowEvidenceKind; description: string }>;
   highRiskAction?: boolean;
+  isolation?: ProjectWorkflowRuntimeHint['isolation'];
 }): ProjectWorkflowNodeDefinition {
   return {
     id: input.id,
     title: input.title,
-    discipline: 'software',
+    discipline: input.discipline ?? 'software',
     actorKind: input.actorKind,
     summary: input.summary,
     dependsOn: input.dependsOn,
@@ -331,7 +445,7 @@ function projectNode(input: {
     runtime: {
       mode: input.actorKind === 'human' ? 'manual' : input.actorKind === 'tool' ? 'tool' : 'agent',
       actorKind: input.actorKind,
-      isolation: input.id === 'implementation' ? 'worktree' : 'per-node-context',
+      isolation: input.isolation ?? (input.id === 'implementation' ? 'worktree' : 'per-node-context'),
       execution: 'human-start-required',
     },
     handoffContract: {
@@ -424,7 +538,74 @@ export function createProjectWorkflowRun(
     evidenceLedger: [],
     scorecardResults: [],
     approvals: [],
+    events: [
+      {
+        type: 'run_created',
+        occurredAt: createdAt,
+        summary: 'Workflow run created; no actor or command executed.',
+      },
+    ],
     nextAction: 'Human lead reviews ready nodes and starts execution explicitly.',
+  };
+}
+
+export function startProjectWorkflowNode(
+  template: ProjectWorkflowTemplate,
+  run: ProjectWorkflowRun,
+  nodeId: string,
+  now?: string,
+): ProjectWorkflowRun {
+  const node = requireNode(template, nodeId);
+  const occurredAt = nowIso(now);
+  const current = run.nodeRuns.find((nodeRun) => nodeRun.nodeId === nodeId);
+  if (!current) throw new Error(`Unknown project workflow node: ${nodeId}`);
+  if (current.attempts >= template.stopPolicy.maxNodeAttempts) {
+    const reason = `Stop policy reached max attempts for node ${nodeId}.`;
+    return blockRun({
+      ...run,
+      updatedAt: occurredAt,
+      nodeRuns: run.nodeRuns.map((nodeRun) =>
+        nodeRun.nodeId === nodeId
+          ? { ...nodeRun, status: 'blocked', blockedReason: reason }
+          : nodeRun,
+      ),
+      events: [
+        ...run.events,
+        {
+          type: 'stop_policy_blocked',
+          occurredAt,
+          nodeId,
+          summary: reason,
+        },
+      ],
+    }, reason);
+  }
+
+  return {
+    ...run,
+    status: 'running',
+    executionStarted: true,
+    updatedAt: occurredAt,
+    nodeRuns: run.nodeRuns.map((nodeRun) =>
+      nodeRun.nodeId === nodeId
+        ? {
+            ...nodeRun,
+            status: 'running',
+            attempts: nodeRun.attempts + 1,
+            startedAt: occurredAt,
+            blockedReason: undefined,
+          }
+        : nodeRun,
+    ),
+    events: [
+      ...run.events,
+      {
+        type: 'node_started',
+        occurredAt,
+        nodeId: node.id,
+        summary: `${node.title} started.`,
+      },
+    ],
   };
 }
 
@@ -479,6 +660,15 @@ export function completeProjectWorkflowNode(
         evaluatedAt: completedAt,
       })),
     ],
+    events: [
+      ...run.events,
+      {
+        type: 'node_completed',
+        occurredAt: completedAt,
+        nodeId,
+        summary: isBlocked ? `Node ${nodeId} blocked: ${blockedReasons.join('; ')}` : `Node ${nodeId} completed.`,
+      },
+    ],
     nodeRuns: run.nodeRuns.map((nodeRun) =>
       nodeRun.nodeId === nodeId
         ? {
@@ -529,6 +719,16 @@ export function approveProjectWorkflowRun(
           gateId: input.gateId,
           approvedBy: input.approvedBy,
           approvedAt,
+        },
+      ],
+      events: [
+        ...run.events,
+        {
+          type: 'approval_recorded',
+          occurredAt: approvedAt,
+          gateId: input.gateId,
+          nodeId: gate.requiredBeforeNodeId,
+          summary: `${gate.title} approved by ${input.approvedBy}.`,
         },
       ],
       nextAction: 'Approved gate recorded. Human lead may start the next ready node explicitly.',
@@ -609,11 +809,17 @@ function recomputeRun(run: ProjectWorkflowRun): ProjectWorkflowRun {
   const succeeded = new Set(
     run.nodeRuns.filter((nodeRun) => nodeRun.status === 'succeeded' || nodeRun.status === 'skipped').map((nodeRun) => nodeRun.nodeId),
   );
+  const readyEvents: ProjectWorkflowEvent[] = [];
   const nodeRuns = run.nodeRuns.map((nodeRun) => {
     if (nodeRun.status !== 'queued') return nodeRun;
-    return nodeRun.dependencies.every((dependency) => succeeded.has(dependency))
-      ? { ...nodeRun, status: 'ready' as const }
-      : nodeRun;
+    if (!nodeRun.dependencies.every((dependency) => succeeded.has(dependency))) return nodeRun;
+    readyEvents.push({
+      type: 'node_ready',
+      occurredAt: run.updatedAt,
+      nodeId: nodeRun.nodeId,
+      summary: `Node ${nodeRun.nodeId} is ready after dependencies completed.`,
+    });
+    return { ...nodeRun, status: 'ready' as const };
   });
 
   const completed = nodeRuns.every((nodeRun) => nodeRun.status === 'succeeded' || nodeRun.status === 'skipped');
@@ -621,6 +827,7 @@ function recomputeRun(run: ProjectWorkflowRun): ProjectWorkflowRun {
     ...run,
     status: completed ? 'completed' : nodeRuns.some((nodeRun) => nodeRun.status === 'running') ? 'running' : 'queued',
     nodeRuns,
+    events: [...run.events, ...readyEvents],
     blockedReason: undefined,
     nextAction: completed
       ? 'Workflow loop completed. Human lead reviews final report and closes or starts the next loop.'

@@ -10,6 +10,7 @@ import {
   getProjectWorkflowTemplateById,
   listProjectWorkflowTemplates,
   renderProjectWorkflowDecisionPackage,
+  startProjectWorkflowNode,
   validateProjectWorkflowTemplate,
 } from '../lib/project-workflows/projectWorkflowEngine';
 
@@ -92,6 +93,27 @@ describe('Project Workflow Loop Engine templates', () => {
     expect(JSON.stringify(softwareLoop)).toContain('"scorecards"');
     expect(JSON.stringify(softwareLoop)).not.toContain('AgentWorkflowDag');
   });
+
+  it('ships a construction quality loop to prove software is not the engine boundary', () => {
+    const template = getProjectWorkflowTemplateById('construction-quality-loop');
+
+    expect(template).toBeDefined();
+    expect(template?.kind).toBe('project-workflow-loop');
+    expect(template?.discipline).toBe('construction');
+    expect(template?.isExampleTemplate).toBe(false);
+    expect(template?.nodes.map((node) => node.discipline)).toEqual([
+      'construction',
+      'construction',
+      'qa',
+      'procurement',
+      'project_management',
+      'operations',
+    ]);
+    expect(template?.nodes.map((node) => node.actorKind)).toContain('vendor');
+    expect(template?.nodes.map((node) => node.actorKind)).toContain('review_queue');
+    expect(JSON.stringify(template)).not.toMatch(/\bPR\b|\brepo\b|coding agent|worktree/i);
+    expect(validateProjectWorkflowTemplate(template!)).toEqual({ valid: true, errors: [] });
+  });
 });
 
 describe('Project Workflow Loop Engine run state', () => {
@@ -106,6 +128,12 @@ describe('Project Workflow Loop Engine run state', () => {
 
     expect(run.status).toBe('queued');
     expect(run.executionStarted).toBe(false);
+    expect(run.events).toEqual([
+      expect.objectContaining({
+        type: 'run_created',
+        summary: 'Workflow run created; no actor or command executed.',
+      }),
+    ]);
     expect(run.nodeRuns.filter((node) => node.status === 'ready').map((node) => node.nodeId)).toEqual(['intake']);
     expect(run.nodeRuns.find((node) => node.nodeId === 'analysis')?.status).toBe('queued');
     expect(run.nextAction).toBe('Human lead reviews ready nodes and starts execution explicitly.');
@@ -162,6 +190,11 @@ describe('Project Workflow Loop Engine run state', () => {
     ]);
     expect(afterIntake.nodeRuns.find((node) => node.nodeId === 'intake')?.status).toBe('succeeded');
     expect(afterIntake.nodeRuns.find((node) => node.nodeId === 'analysis')?.status).toBe('ready');
+    expect(afterIntake.events.map((event) => event.type)).toEqual([
+      'run_created',
+      'node_completed',
+      'node_ready',
+    ]);
   });
 
   it('blocks progress when required evidence or scorecards are missing', () => {
@@ -226,4 +259,100 @@ describe('Project Workflow Loop Engine run state', () => {
     expect(rendered).toContain('Human approval gates');
     expect(rendered).toContain('No actor or command is executed by this package.');
   });
+
+  it('records successful human approval once upstream evidence gates are complete', () => {
+    const template = getProjectWorkflowTemplateById('software-engineering-loop')!;
+    const initial = createProjectWorkflowRun(template, {
+      projectId: 'project-manager',
+      workItemId: 'F52',
+      now: '2026-06-15T05:30:00.000Z',
+    });
+    const readyForApproval = completeNodesForGate(template, initial, [
+      'intake',
+      'analysis',
+      'implementation',
+      'verification',
+      'quality-gate',
+      'human-approval',
+    ]);
+
+    const result = approveProjectWorkflowRun(readyForApproval, {
+      approvedBy: 'PM Lead',
+      approvedAt: '2026-06-15T06:10:00.000Z',
+      gateId: 'human-pr-approval',
+    });
+
+    expect(result.status).toBe('approved');
+    expect(result.run.approvals).toEqual([
+      {
+        gateId: 'human-pr-approval',
+        approvedBy: 'PM Lead',
+        approvedAt: '2026-06-15T06:10:00.000Z',
+      },
+    ]);
+    expect(result.run.events.at(-1)).toMatchObject({
+      type: 'approval_recorded',
+      nodeId: 'pr-preparation',
+      summary: 'Human PR Preparation Approval approved by PM Lead.',
+    });
+    expect(result.run.nodeRuns.find((node) => node.nodeId === 'pr-preparation')?.status).toBe('ready');
+  });
+
+  it('blocks a node instead of overbaking past its attempt budget', () => {
+    const template = getProjectWorkflowTemplateById('software-engineering-loop')!;
+    const initial = createProjectWorkflowRun(template, {
+      projectId: 'project-manager',
+      workItemId: 'F52',
+      now: '2026-06-15T05:30:00.000Z',
+    });
+
+    const firstAttempt = startProjectWorkflowNode(template, initial, 'intake', '2026-06-15T05:31:00.000Z');
+    const secondAttempt = startProjectWorkflowNode(template, firstAttempt, 'intake', '2026-06-15T05:32:00.000Z');
+    const blocked = startProjectWorkflowNode(template, secondAttempt, 'intake', '2026-06-15T05:33:00.000Z');
+
+    expect(blocked.status).toBe('blocked');
+    expect(blocked.nodeRuns.find((node) => node.nodeId === 'intake')).toMatchObject({
+      attempts: 2,
+      status: 'blocked',
+      blockedReason: 'Stop policy reached max attempts for node intake.',
+    });
+    expect(blocked.events.at(-1)).toMatchObject({
+      type: 'stop_policy_blocked',
+      nodeId: 'intake',
+    });
+  });
 });
+
+function completeNodesForGate(
+  template: NonNullable<ReturnType<typeof getProjectWorkflowTemplateById>>,
+  initialRun: ReturnType<typeof createProjectWorkflowRun>,
+  nodeIds: string[],
+): ReturnType<typeof createProjectWorkflowRun> {
+  return nodeIds.reduce((run, nodeId, index) => {
+    const node = template.nodes.find((candidate) => candidate.id === nodeId)!;
+    const evidence = node.evidenceRequirements[0]!;
+    const scorecard = node.scorecards[0]!;
+    return completeProjectWorkflowNode(run, nodeId, {
+      completedAt: `2026-06-15T05:${String(35 + index).padStart(2, '0')}:00.000Z`,
+      handoff: {
+        artifactId: node.handoffContract.artifactId,
+        summary: `${node.title} complete.`,
+        fields: { summary: `${node.title} complete.` },
+      },
+      evidence: [
+        {
+          evidenceId: evidence.evidenceId,
+          kind: evidence.kind,
+          summary: evidence.description,
+        },
+      ],
+      scorecardResults: [
+        {
+          scorecardId: scorecard.scorecardId,
+          status: 'passed',
+          summary: scorecard.description,
+        },
+      ],
+    });
+  }, initialRun);
+}
