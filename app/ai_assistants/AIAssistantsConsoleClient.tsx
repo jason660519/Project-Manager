@@ -70,6 +70,13 @@ import {
   type AgentWorkflowNodeRun,
   type AgentWorkflowRun,
 } from '../../lib/agent-workflows';
+import {
+  buildProjectWorkflowGraphView,
+  getProjectWorkflowTemplateById,
+  listProjectWorkflowRuns,
+  type ProjectWorkflowGraphView,
+  type ProjectWorkflowRun,
+} from '../../lib/project-workflows';
 import { ChatPageClient } from '../chat/ChatPageClient';
 
 interface AIAssistantsConsoleClientProps {
@@ -78,6 +85,7 @@ interface AIAssistantsConsoleClientProps {
   engineersPanel?: React.ReactNode;
   projectRoot?: string;
   initialWorkflowRuns?: AgentWorkflowRun[];
+  initialProjectWorkflowRuns?: ProjectWorkflowRun[];
 }
 
 const SHEET_TABS: ReadonlyArray<SheetTabItem<AIAssistantSheetId>> = [
@@ -176,6 +184,7 @@ const selectClass =
   'w-full rounded border border-stone-200/15 bg-stone-950/70 px-3 py-2 text-[12px] text-stone-100 outline-none focus:border-amber-200/40';
 
 const EMPTY_WORKFLOW_RUNS: AgentWorkflowRun[] = [];
+const EMPTY_PROJECT_WORKFLOW_RUNS: ProjectWorkflowRun[] = [];
 
 function TerminalCommandList({
   title,
@@ -854,12 +863,17 @@ function workflowRunNodeCounts(run: AgentWorkflowRun): Record<AgentWorkflowNodeR
 function WorkflowRunsSheet({
   projectRoot,
   initialWorkflowRuns = EMPTY_WORKFLOW_RUNS,
+  initialProjectWorkflowRuns = EMPTY_PROJECT_WORKFLOW_RUNS,
 }: {
   projectRoot?: string;
   initialWorkflowRuns?: AgentWorkflowRun[];
+  initialProjectWorkflowRuns?: ProjectWorkflowRun[];
 }) {
   const [runs, setRuns] = useState<AgentWorkflowRun[]>(initialWorkflowRuns);
+  const [projectRuns, setProjectRuns] = useState<ProjectWorkflowRun[]>(initialProjectWorkflowRuns);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(initialWorkflowRuns[0]?.id ?? null);
+  const [selectedProjectRunId, setSelectedProjectRunId] = useState<string | null>(initialProjectWorkflowRuns[0]?.id ?? null);
+  const [selectedProjectNodeId, setSelectedProjectNodeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -869,13 +883,23 @@ function WorkflowRunsSheet({
   }, [initialWorkflowRuns]);
 
   useEffect(() => {
+    setProjectRuns(initialProjectWorkflowRuns);
+    setSelectedProjectRunId((prev) => prev ?? initialProjectWorkflowRuns[0]?.id ?? null);
+  }, [initialProjectWorkflowRuns]);
+
+  useEffect(() => {
     if (!projectRoot) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
-    listAgentWorkflowRuns(projectRoot)
-      .then((loadedRuns) => {
+    Promise.all([listProjectWorkflowRuns(projectRoot), listAgentWorkflowRuns(projectRoot)])
+      .then(([loadedProjectRuns, loadedRuns]) => {
         if (cancelled) return;
+        setProjectRuns(loadedProjectRuns);
+        setSelectedProjectRunId((prev) => {
+          if (prev && loadedProjectRuns.some((run) => run.id === prev)) return prev;
+          return loadedProjectRuns[0]?.id ?? null;
+        });
         setRuns(loadedRuns);
         setSelectedRunId((prev) => {
           if (prev && loadedRuns.some((run) => run.id === prev)) return prev;
@@ -893,6 +917,50 @@ function WorkflowRunsSheet({
       cancelled = true;
     };
   }, [projectRoot]);
+
+  const selectedProjectRun = projectRuns.find((run) => run.id === selectedProjectRunId) ?? projectRuns[0] ?? null;
+  const selectedProjectTemplate = selectedProjectRun ? getProjectWorkflowTemplateById(selectedProjectRun.templateId) : undefined;
+  const projectGraphView = selectedProjectRun && selectedProjectTemplate
+    ? buildProjectWorkflowGraphView(selectedProjectTemplate, selectedProjectRun, {
+        selectedNodeId: selectedProjectNodeId ?? undefined,
+      })
+    : null;
+
+  if (projectGraphView) {
+    return (
+      <ProjectWorkflowRunsGraphSheet
+        projectRoot={projectRoot}
+        runs={projectRuns}
+        graphView={projectGraphView}
+        loading={loading}
+        error={error}
+        onSelectRun={(runId) => {
+          setSelectedProjectRunId(runId);
+          setSelectedProjectNodeId(null);
+        }}
+        onSelectNode={setSelectedProjectNodeId}
+      />
+    );
+  }
+
+  if (projectRuns.length === 0 && runs.length === 0 && !loading) {
+    return (
+      <div className="flex min-h-full items-center justify-center p-6">
+        <div className="max-w-xl rounded border border-stone-200/15 bg-white/[0.03] p-6 text-center">
+          <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-stone-200">
+            No Project Workflow runs found yet
+          </h2>
+          <p className="mt-3 text-[12px] leading-relaxed text-stone-400">
+            Use /workflow &lt;featureId&gt; in AI Assistant chat to prepare a review-first Project Workflow decision package,
+            then save or start a manual run when the human lead approves it.
+          </p>
+          <p className="mt-3 font-mono text-[10px] text-stone-500">
+            {projectRoot ? `${projectRoot}/.project-manager/project-workflow-runs` : 'Select a project to load Project Workflow run sidecars.'}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const selectedRun = runs.find((run) => run.id === selectedRunId) ?? runs[0] ?? null;
   const selectedCounts = selectedRun ? workflowRunNodeCounts(selectedRun) : null;
@@ -1033,6 +1101,194 @@ function WorkflowRunsSheet({
           </div>
         )}
       </aside>
+    </div>
+  );
+}
+
+function ProjectWorkflowRunsGraphSheet({
+  projectRoot,
+  runs,
+  graphView,
+  loading,
+  error,
+  onSelectRun,
+  onSelectNode,
+}: {
+  projectRoot?: string;
+  runs: ProjectWorkflowRun[];
+  graphView: ProjectWorkflowGraphView;
+  loading: boolean;
+  error: string | null;
+  onSelectRun: (runId: string) => void;
+  onSelectNode: (nodeId: string) => void;
+}) {
+  const inspector = graphView.inspector;
+  return (
+    <div className="grid min-h-full gap-4 p-4 xl:grid-cols-[240px_minmax(0,1fr)_340px]">
+      <section className="flex min-h-0 flex-col overflow-hidden rounded border border-stone-200/15 bg-white/[0.03]">
+        <div className="border-b border-stone-200/10 px-4 py-3">
+          <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-stone-200">Project Workflow Runs</h2>
+          <p className="mt-1 text-[11px] leading-relaxed text-stone-500">
+            {projectRoot ? `${projectRoot}/.project-manager/project-workflow-runs` : 'Review-first graph runs loaded from the selected project.'}
+          </p>
+        </div>
+        <div className="grid grid-cols-2 border-b border-stone-200/10">
+          <Metric label="Runs" value={runs.length} detail="Project Workflow sidecars" />
+          <Metric label="Ready" value={graphView.metrics.readyNodes} detail="Manual start required" />
+          <Metric label="Blocked" value={graphView.metrics.blockedNodes} detail="Needs evidence or approval" />
+          <Metric label="Gates" value={graphView.metrics.approvalGates} detail="Human approval controls" />
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto p-3">
+          <div className="space-y-2">
+            {runs.map((run) => (
+              <button
+                key={run.id}
+                type="button"
+                onClick={() => onSelectRun(run.id)}
+                className={clsx(
+                  'w-full border px-3 py-2 text-left text-[11px] hover:border-emerald-300/30',
+                  run.id === graphView.run.id
+                    ? 'border-emerald-300/30 bg-emerald-950/20 text-emerald-50'
+                    : 'border-stone-200/10 bg-stone-950/45 text-stone-300',
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold">{run.workItemId}</span>
+                  <Badge tone={run.status}>{run.status}</Badge>
+                </div>
+                <div className="mt-1 truncate font-mono text-[9px] text-stone-500">{run.templateId}@v{run.templateVersion}</div>
+              </button>
+            ))}
+          </div>
+          {error && <p className="mt-3 rounded border border-red-400/25 bg-red-950/20 px-3 py-2 text-[11px] text-red-100">{error}</p>}
+          {loading && <p className="mt-3 text-[11px] text-stone-500">Loading Project Workflow sidecars...</p>}
+        </div>
+      </section>
+
+      <section className="flex min-h-0 flex-col overflow-hidden rounded border border-stone-200/15 bg-white/[0.03]">
+        <div className="flex items-start justify-between gap-3 border-b border-stone-200/10 px-4 py-3">
+          <div>
+            <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-stone-200">Workflow Graph</h2>
+            <p className="mt-1 text-[11px] text-stone-500">
+              {graphView.run.title} · {graphView.run.workItemId}
+            </p>
+          </div>
+          <Badge tone={graphView.run.status}>{graphView.run.status}</Badge>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[length:22px_22px] p-4">
+          <div className="grid min-w-[820px] grid-cols-4 gap-4">
+            {graphView.nodes.map((node) => (
+              <button
+                key={node.nodeId}
+                type="button"
+                onClick={() => onSelectNode(node.nodeId)}
+                className={clsx(
+                  'min-h-[146px] border p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-amber-200/40',
+                  graphView.selectedNode?.nodeId === node.nodeId
+                    ? 'border-amber-200/50 bg-amber-950/20'
+                    : 'border-stone-200/12 bg-stone-950/75',
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-[12px] font-semibold text-stone-100">{node.title}</div>
+                    <div className="mt-1 font-mono text-[9px] text-stone-500">{node.nodeId}</div>
+                  </div>
+                  <Badge tone={node.status}>{node.status}</Badge>
+                </div>
+                <div className="mt-3 space-y-1 text-[10px] leading-relaxed text-stone-400">
+                  <div>actor: {node.actorKind}</div>
+                  <div>system: {node.systemPromptLabel}</div>
+                  <div>memory: {node.memoryFiles.join(', ')}</div>
+                  <div>out: {node.outputArtifact}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+          <div className="mt-4 rounded border border-stone-200/10 bg-stone-950/55 px-3 py-2 text-[11px] text-stone-500">
+            Dependency edges: {graphView.edges.map((edge) => `${edge.source} -> ${edge.target}`).join(' · ')}
+          </div>
+        </div>
+        <div className="border-t border-stone-200/10 px-4 py-3 text-[11px] text-amber-100">
+          {graphView.safetyNotice}
+        </div>
+      </section>
+
+      <aside className="flex min-h-0 flex-col overflow-hidden rounded border border-stone-200/15 bg-white/[0.03]">
+        <div className="border-b border-stone-200/10 px-4 py-3">
+          <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-stone-200">Node Inspector</h2>
+          <p className="mt-1 font-mono text-[10px] text-stone-500">{inspector?.nodeId ?? 'No node selected'}</p>
+        </div>
+        {inspector ? (
+          <div className="min-h-0 flex-1 overflow-auto p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-stone-100">{inspector.title}</h3>
+                <p className="mt-1 text-[11px] text-stone-500">{inspector.summary}</p>
+              </div>
+              <Badge tone={inspector.status}>{inspector.status}</Badge>
+            </div>
+            <InspectorBlock title="Prompts">
+              <InspectorLine label="System" value={inspector.systemPromptLabel} />
+              <InspectorLine label="Task" value={inspector.taskPromptLabel} />
+            </InspectorBlock>
+            <InspectorBlock title="Tools + Memory">
+              <InspectorLine label="Tools" value={inspector.tools.join(', ')} />
+              <InspectorLine label="Memory" value={inspector.memoryFiles.join(', ')} />
+            </InspectorBlock>
+            <InspectorBlock title="Handoff">
+              <InspectorLine label="Input" value={inspector.inputArtifacts.join(', ') || 'none'} />
+              <InspectorLine label="Output" value={inspector.outputArtifact} />
+            </InspectorBlock>
+            <InspectorBlock title="Evidence">
+              {inspector.evidenceRequirements.map((evidence) => (
+                <InspectorLine
+                  key={evidence.evidenceId}
+                  label={evidence.evidenceId}
+                  value={`${evidence.kind}${evidence.required ? ' · required' : ''}`}
+                />
+              ))}
+            </InspectorBlock>
+            <InspectorBlock title="Scorecards">
+              {inspector.scorecards.map((scorecard) => (
+                <InspectorLine key={scorecard.scorecardId} label={scorecard.scorecardId} value={scorecard.status} />
+              ))}
+            </InspectorBlock>
+            {inspector.approvalGate && (
+              <InspectorBlock title="Approval Gate">
+                <InspectorLine label="Gate" value={inspector.approvalGate.title} />
+                <InspectorLine label="Approver" value={inspector.approvalGate.approverRole} />
+                <InspectorLine label="Reason" value={inspector.approvalGate.reason} />
+              </InspectorBlock>
+            )}
+            <div className="mt-4 rounded border border-amber-300/25 bg-amber-950/20 px-3 py-2 text-[11px] text-amber-100">
+              {inspector.reviewFirstActionLabel}
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-1 items-center justify-center p-6 text-center text-[12px] text-stone-500">
+            Select a workflow node to inspect prompts, tools, memory, handoffs, evidence, and gates.
+          </div>
+        )}
+      </aside>
+    </div>
+  );
+}
+
+function InspectorBlock({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="mt-4 rounded border border-stone-200/10 bg-stone-950/45 p-3">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-500">{title}</div>
+      <div className="mt-2 space-y-1.5">{children}</div>
+    </div>
+  );
+}
+
+function InspectorLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid grid-cols-[82px_minmax(0,1fr)] gap-2 text-[11px] leading-relaxed">
+      <span className="text-stone-500">{label}</span>
+      <span className="break-words font-mono text-stone-200">{value}</span>
     </div>
   );
 }
@@ -1309,6 +1565,7 @@ export function AIAssistantsConsoleClient({
   engineersPanel,
   projectRoot,
   initialWorkflowRuns,
+  initialProjectWorkflowRuns,
 }: AIAssistantsConsoleClientProps) {
   const router = useRouter();
   const [state, setState] = useState<AIAssistantsConsoleState>(createDefaultConsoleState);
@@ -1409,7 +1666,13 @@ export function AIAssistantsConsoleClient({
   } else if (effectiveSheet === 'skills') {
     content = <SkillsSheet assistant={selectedAssistant} onToggle={(skill) => updateSelected((assistant) => updateSkill(assistant, skill))} />;
   } else if (effectiveSheet === 'workflow-runs') {
-    content = <WorkflowRunsSheet projectRoot={projectRoot} initialWorkflowRuns={initialWorkflowRuns} />;
+    content = (
+      <WorkflowRunsSheet
+        projectRoot={projectRoot}
+        initialWorkflowRuns={initialWorkflowRuns}
+        initialProjectWorkflowRuns={initialProjectWorkflowRuns}
+      />
+    );
   } else if (effectiveSheet === 'daily-logs') {
     content = <DailyLogsSheet assistant={selectedAssistant} />;
   } else if (effectiveSheet === 'dreaming') {

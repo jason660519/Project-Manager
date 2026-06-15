@@ -54,6 +54,8 @@ export interface SendChatMessageRequest {
   chatSettings?: { provider: string; model: string; systemPrompt: string };
   /** Optional user-provided files. Images are sent as multimodal attachments when the provider route supports it. */
   attachments?: ChatAttachment[];
+  /** Explicitly persists a local `/workflow <id>` package as a Project Workflow run sidecar. */
+  persistWorkflowRun?: boolean;
   /** Agent API callbacks for tool calling support */
   onThinkingStart?: () => void;
   onThinking?: (text: string) => void;

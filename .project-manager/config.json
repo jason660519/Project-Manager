@@ -1946,6 +1946,60 @@
       "status": "done",
       "updatedAt": "2026-06-15T07:25:00.000Z",
       "updatedBy": "Codex"
+    },
+    {
+      "category": "PM Orchestration",
+      "createdAt": "2026-06-16T00:00:00.000Z",
+      "id": "F53",
+      "locatedSection": "Project Dashboard > Development",
+      "metadata": {
+        "evidencePaths": [
+          ".project-manager/features/F53/README.md",
+          ".project-manager/features/F53/feature-spec.md",
+          ".project-manager/features/F53/tdd-spec.md",
+          ".project-manager/features/F53/test-scenarios.md",
+          ".project-manager/features/F53/test-assets.md",
+          ".project-manager/features/F53/implementation-plan.md",
+          ".project-manager/features/F53/dev-log.md",
+          "lib/project-workflows/projectWorkflowGraphView.ts",
+          "app/ai_assistants/AIAssistantsConsoleClient.tsx",
+          "lib/chat/chatAgent.ts",
+          "lib/chat/types.ts",
+          "__tests__/projectWorkflowGraphView.test.ts",
+          "__tests__/chat.agent.test.ts",
+          "__tests__/ai-assistants.console.test.tsx"
+        ],
+        "kickoffAt": "2026-06-16T00:00:00.000Z",
+        "plannedTestScope": [
+          "unit: Project Workflow graph projection",
+          "integration: AI Assistants Workflow Runs graph rendering",
+          "manual E2E: /ai_assistants/workflow-runs browser smoke"
+        ],
+        "risks": [
+          "Existing Workflow Runs tab is agent-workflow based and must migrate without route regression.",
+          "Graph UI can become crowded; first slice avoids drag/drop and zoom.",
+          "Prompt/tool/memory metadata may need inferred labels until templates grow first-class fields."
+        ],
+        "scope": "Upgrade AI Assistants Workflow Runs tab into a review-first Project Workflow graph execution console."
+      },
+      "name": "Workflow Graph Execution Console",
+      "notes": "F53 turns Project Workflow runs into an inspectable graph canvas: run browser, node graph, prompt/tool/memory/handoff/evidence inspector, approval gates, and review-first manual execution controls. Current slice has graph projection, UI rendering, empty state, /workflow-save explicit chat workflow-run persistence, focused unit/integration coverage, browser smoke with zero Next dev issues, and green verify:baseline.",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F53/",
+        "featureFolder": ".project-manager/features/F53/",
+        "implementation": "app/ai_assistants/AIAssistantsConsoleClient.tsx",
+        "spec": ".project-manager/features/F53/feature-spec.md",
+        "tdd": ".project-manager/features/F53/tdd-spec.md",
+        "test": "__tests__/projectWorkflowGraphView.test.ts",
+        "testScenarios": ".project-manager/features/F53/test-scenarios.md"
+      },
+      "phase": "development",
+      "points": 8,
+      "progress": 100,
+      "readmePath": ".project-manager/features/F53/README.md",
+      "status": "done",
+      "updatedAt": "2026-06-16T04:50:00.000Z",
+      "updatedBy": "Codex"
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",
@@ -1956,6 +2010,6 @@
     "root": "/Users/Project-Manager"
   },
   "schemaVersion": 10,
-  "updatedAt": "2026-06-15T05:05:10.000Z",
+  "updatedAt": "2026-06-16T00:00:00.000Z",
   "updatedBy": "Codex"
 }

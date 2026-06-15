@@ -387,6 +387,7 @@ const HELP_TEXT = `**🦞 Project Manager 小龍蝦助手**
 | \`/go <view>\` | 導航至頁面 |
 | \`/dispatch <id>\` | 準備 Dispatch 提示 |
 | \`/workflow <id>\` | 準備 Workflow Loop 決策包 |
+| \`/workflow-save <id>\` | 保存 Workflow Run sidecar（不執行節點） |
 
 **自然語言：**
 - 「搜尋 &lt;關鍵字&gt;」— 搜尋專案檔案
@@ -543,14 +544,14 @@ function buildDispatchResponse(context: ChatContext, featureId: string): string 
   return renderProjectDispatchDecisionPackage(plan);
 }
 
-function buildWorkflowResponse(context: ChatContext, featureId: string): string {
+function buildWorkflowPackage(context: ChatContext, featureId: string): { content: string; run?: ReturnType<typeof createProjectWorkflowRun> } {
   const feature = findFeature(context, featureId);
   if (!feature) {
-    return `找不到功能 **${featureId}**。請用 \`/status\` 查看所有功能。`;
+    return { content: `找不到功能 **${featureId}**。請用 \`/status\` 查看所有功能。` };
   }
   const template = getProjectWorkflowTemplateById('software-engineering-loop');
   if (!template) {
-    return '找不到 Software Engineering Loop workflow template。';
+    return { content: '找不到 Software Engineering Loop workflow template。' };
   }
   const run = createProjectWorkflowRun(template, {
     projectId: context.selectedProject?.id ?? context.selectedProject?.config.project.name ?? 'project-manager',
@@ -558,10 +559,19 @@ function buildWorkflowResponse(context: ChatContext, featureId: string): string 
     createdBy: 'Chat command',
   });
   return [
-    `## Workflow Loop: ${feature.id} ${feature.name}`,
-    '',
-    renderProjectWorkflowDecisionPackage(template, run),
-  ].join('\n');
+    {
+      content: [
+        `## Workflow Loop: ${feature.id} ${feature.name}`,
+        '',
+        renderProjectWorkflowDecisionPackage(template, run),
+      ].join('\n'),
+      run,
+    },
+  ][0];
+}
+
+function buildWorkflowResponse(context: ChatContext, featureId: string): string {
+  return buildWorkflowPackage(context, featureId).content;
 }
 
 function naturalLanguageRoute(content: string): string | undefined {
@@ -672,8 +682,24 @@ function localCommand(request: SendChatMessageRequest): SendChatMessageResult | 
   }
 
   // /workflow <id>
+  if (lowered.startsWith('/workflow-save ')) {
+    saveMemory('lastInteraction', content, request.context);
+    return {
+      content: '正在保存 workflow run...',
+      handledLocally: true,
+      route: 'persist-workflow-run',
+    };
+  }
+
   if (lowered.startsWith('/workflow ')) {
     saveMemory('lastInteraction', content, request.context);
+    if (request.persistWorkflowRun) {
+      return {
+        content: '正在保存 workflow run...',
+        handledLocally: true,
+        route: 'persist-workflow-run',
+      };
+    }
     return {
       content: buildWorkflowResponse(request.context, content.slice('/workflow '.length)),
       handledLocally: true,
@@ -1270,6 +1296,36 @@ export async function sendChatMessage(
   // 1. Check for local commands
   const local = localCommand(request);
   if (local) {
+    if (local.handledLocally && local.route === 'persist-workflow-run') {
+      const trimmedContent = request.content.trim();
+      const featureId = normalize(trimmedContent).startsWith('/workflow-save ')
+        ? trimmedContent.slice('/workflow-save '.length)
+        : trimmedContent.slice('/workflow '.length);
+      const packageResult = buildWorkflowPackage(request.context, featureId);
+      if (!packageResult.run) return { content: packageResult.content, handledLocally: true, error: local.error };
+      const projectRoot = request.context.selectedProject?.config.project.root;
+      if (!projectRoot) {
+        return {
+          content: `${packageResult.content}\n\n無法保存 workflow run：目前專案沒有 project root。`,
+          handledLocally: true,
+          error: true,
+        };
+      }
+      try {
+        const { saveProjectWorkflowRun } = await import('../project-workflows/projectWorkflowRunStore');
+        const savedPath = await saveProjectWorkflowRun(projectRoot, packageResult.run);
+        return {
+          content: `${packageResult.content}\n\nSaved workflow run: ${savedPath}`,
+          handledLocally: true,
+        };
+      } catch (error) {
+        return {
+          content: `${packageResult.content}\n\n無法保存 workflow run：${(error as Error).message}`,
+          handledLocally: true,
+          error: true,
+        };
+      }
+    }
     // If it was a search query that needs async execution
     if (local.handledLocally && local.content.startsWith('正在搜尋')) {
       const query = request.content.replace(/^搜尋\s+/i, '').replace(/^search\s+(?:for\s+)?/i, '');

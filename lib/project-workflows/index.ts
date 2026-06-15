@@ -9,6 +9,9 @@ export {
   validateProjectWorkflowTemplate,
 } from './projectWorkflowEngine';
 export {
+  buildProjectWorkflowGraphView,
+} from './projectWorkflowGraphView';
+export {
   listProjectWorkflowRuns,
   parseProjectWorkflowRun,
   projectWorkflowRunPath,
@@ -46,4 +49,15 @@ export type {
   ProjectWorkflowTemplate,
   ProjectWorkflowValidationResult,
 } from './projectWorkflowEngine';
+export type {
+  BuildProjectWorkflowGraphViewOptions,
+  ProjectWorkflowGraphApprovalGate,
+  ProjectWorkflowGraphEdge,
+  ProjectWorkflowGraphInspector,
+  ProjectWorkflowGraphMetrics,
+  ProjectWorkflowGraphNode,
+  ProjectWorkflowGraphRunSummary,
+  ProjectWorkflowGraphScorecard,
+  ProjectWorkflowGraphView,
+} from './projectWorkflowGraphView';
 export type { ProjectWorkflowRunStoreAdapter } from './projectWorkflowRunStore';

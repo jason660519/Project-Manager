@@ -3,6 +3,10 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AIAssistantsConsoleClient } from '../app/ai_assistants/AIAssistantsConsoleClient';
 import type { AgentWorkflowRun } from '../lib/agent-workflows';
+import {
+  createProjectWorkflowRun,
+  getProjectWorkflowTemplateById,
+} from '../lib/project-workflows/projectWorkflowEngine';
 
 const push = vi.fn();
 
@@ -195,5 +199,40 @@ describe('AIAssistantsConsoleClient', () => {
     expect(screen.getAllByText('Workflow Runs').length).toBeGreaterThan(0);
     expect(screen.getByText('Software Development Parallel DAG')).toBeInTheDocument();
     expect(screen.getByText(/workflow-run-F35-software-dev-20260528041000\/planner\/planner-planner/)).toBeInTheDocument();
+  });
+
+  it('renders Project Workflow runs as a graph canvas with node inspector context', async () => {
+    const template = getProjectWorkflowTemplateById('software-engineering-loop')!;
+    const projectWorkflowRun = createProjectWorkflowRun(template, {
+      projectId: 'project-manager',
+      workItemId: 'F53',
+      createdBy: 'PM Lead',
+      now: '2026-06-16T00:00:00.000Z',
+    });
+
+    render(
+      <AIAssistantsConsoleClient
+        activeSheet="workflow-runs"
+        initialProjectWorkflowRuns={[projectWorkflowRun]}
+      />,
+    );
+
+    expect(screen.getByText('Workflow Graph')).toBeInTheDocument();
+    expect(screen.getByText(/Software Engineering Loop/)).toBeInTheDocument();
+    expect(screen.getByText('F53')).toBeInTheDocument();
+    expect(screen.getByText('Analysis')).toBeInTheDocument();
+    expect(screen.getByText('Implementation')).toBeInTheDocument();
+    expect(screen.getByText('Node Inspector')).toBeInTheDocument();
+    expect(screen.getByText('Software PM workflow human')).toBeInTheDocument();
+    expect(screen.getByText('.project-manager/features/F53/')).toBeInTheDocument();
+    expect(screen.getByText('intake-brief')).toBeInTheDocument();
+    expect(screen.getByText(/No actor or command is executed/)).toBeInTheDocument();
+  });
+
+  it('shows a Project Workflow empty state when no graph runs exist', () => {
+    render(<AIAssistantsConsoleClient activeSheet="workflow-runs" initialProjectWorkflowRuns={[]} />);
+
+    expect(screen.getByText(/No Project Workflow runs found yet/)).toBeInTheDocument();
+    expect(screen.getByText(/Use \/workflow <featureId>/)).toBeInTheDocument();
   });
 });

@@ -3,6 +3,7 @@ import { sendChatMessage } from '../lib/chat/chatAgent';
 import type { ChatContext } from '../lib/chat/types';
 import { callLlmRouted, isTauriRuntime, killProcess, spawnAgent } from '../lib/bridge';
 import { createRuntimeAdapterFromConfig } from '../lib/adapters/registry';
+import { saveProjectWorkflowRun } from '../lib/project-workflows/projectWorkflowRunStore';
 
 // Mock global fetch so AI chat API fallback doesn't throw in tests
 const mockFetch = vi.fn().mockResolvedValue({
@@ -47,6 +48,10 @@ vi.mock('../lib/adapters/registry', () => ({
     }),
   }),
   getAdapterExecutionKind: vi.fn((adapter) => (adapter?.type === 'agent' ? 'agent-cli' : adapter?.type)),
+}));
+
+vi.mock('../lib/project-workflows/projectWorkflowRunStore', () => ({
+  saveProjectWorkflowRun: vi.fn().mockResolvedValue('/tmp/project-manager/.project-manager/project-workflow-runs/project-workflow-run-F14.json'),
 }));
 
 const context: ChatContext = {
@@ -123,6 +128,7 @@ describe('sendChatMessage', () => {
     const result = await sendChatMessage({ content: '/help', history: [], context });
     expect(result.content).toContain('/help');
     expect(result.content).toContain('/status');
+    expect(result.content).toContain('/workflow-save');
     expect(spawnAgent).not.toHaveBeenCalled();
   });
 
@@ -156,6 +162,46 @@ describe('sendChatMessage', () => {
     expect(result.content).toContain('Sidebar Chatbot');
     expect(result.content).toContain('Persistent memory: handoff artifacts and evidence ledger');
     expect(result.content).toContain('No actor or command is executed by this package.');
+    expect(saveProjectWorkflowRun).not.toHaveBeenCalled();
+    expect(spawnAgent).not.toHaveBeenCalled();
+  });
+
+  it('persists /workflow <id> as a Project Workflow run sidecar only when explicitly requested', async () => {
+    const result = await sendChatMessage({
+      content: '/workflow F14',
+      history: [],
+      context,
+      persistWorkflowRun: true,
+    });
+
+    expect(saveProjectWorkflowRun).toHaveBeenCalledTimes(1);
+    expect(saveProjectWorkflowRun).toHaveBeenCalledWith(
+      '/tmp/project-manager',
+      expect.objectContaining({
+        templateId: 'software-engineering-loop',
+        workItemId: 'F14',
+        executionStarted: false,
+        nodeRuns: expect.arrayContaining([
+          expect.objectContaining({ nodeId: 'intake', status: 'ready' }),
+        ]),
+      }),
+    );
+    expect(result.content).toContain('Project Workflow Loop Decision Package');
+    expect(result.content).toContain('Saved workflow run:');
+    expect(result.content).toContain('/tmp/project-manager/.project-manager/project-workflow-runs/project-workflow-run-F14.json');
+    expect(spawnAgent).not.toHaveBeenCalled();
+  });
+
+  it('persists workflow runs through the explicit /workflow-save command', async () => {
+    const result = await sendChatMessage({
+      content: '/workflow-save F14',
+      history: [],
+      context,
+    });
+
+    expect(saveProjectWorkflowRun).toHaveBeenCalledTimes(1);
+    expect(result.content).toContain('Saved workflow run:');
+    expect(result.content).toContain('Project Workflow Loop Decision Package');
     expect(spawnAgent).not.toHaveBeenCalled();
   });
 
