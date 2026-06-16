@@ -8,8 +8,10 @@ import {
   killProcess,
   onAgentExit,
   onAgentStdout,
+  safeUnlisten,
   spawnAgent,
   spawnTerminal,
+  type UnlistenFn,
 } from '../../lib/bridge';
 import {
   buildAgentWorkflowRunPrompt,
@@ -208,7 +210,7 @@ export function TaskDispatchModal({
   // ── Merged log panel ──────────────────────────────────────────────────────
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const logEndRef = useRef<HTMLDivElement>(null);
-  const unlistenRefs = useRef<Array<() => void>>([]);
+  const unlistenRefs = useRef<UnlistenFn[]>([]);
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView?.({ behavior: 'smooth' });
@@ -216,7 +218,7 @@ export function TaskDispatchModal({
 
   useEffect(() => {
     return () => {
-      unlistenRefs.current.forEach((fn) => fn());
+      unlistenRefs.current.forEach((fn) => safeUnlisten(fn));
     };
   }, []);
 

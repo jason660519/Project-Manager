@@ -25,6 +25,12 @@ const isTauri = (): boolean =>
 
 export const isTauriRuntime = (): boolean => isTauri();
 
+function canUseTauriEventRuntime(): boolean {
+  if (typeof window === 'undefined') return false;
+  const internals = (window as unknown as { __TAURI_INTERNALS__?: { transformCallback?: unknown } }).__TAURI_INTERNALS__;
+  return typeof internals?.transformCallback === 'function';
+}
+
 async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   const { invoke: tauriInvoke } = await import('@tauri-apps/api/core');
   return tauriInvoke<T>(command, args);
@@ -1194,21 +1200,41 @@ export type FontZoomShortcutPayload = {
   shortcut: string;
   source: string;
 };
-export type UnlistenFn = () => void;
+export type UnlistenFn = () => void | Promise<void>;
 
 export function safeUnlisten(unlisten: UnlistenFn | undefined): void {
   if (!unlisten) return;
   try {
-    unlisten();
+    const result = unlisten();
+    if (result && typeof result.catch === 'function') {
+      void result.catch((error: unknown) => {
+        console.warn(
+          '[bridge] event unlisten skipped (already removed or never registered)',
+          error instanceof Error ? error.message : String(error),
+        );
+      });
+    }
   } catch (error) {
-    console.warn('[bridge] event unlisten skipped (already removed or never registered)', error);
+    console.warn(
+      '[bridge] event unlisten skipped (already removed or never registered)',
+      error instanceof Error ? error.message : String(error),
+    );
   }
 }
 
 async function listen<T>(event: string, cb: (payload: T) => void): Promise<UnlistenFn> {
-  const { listen: tauriListen } = await import('@tauri-apps/api/event');
-  const unlisten = await tauriListen<T>(event, (e) => cb(e.payload));
-  return () => safeUnlisten(unlisten);
+  if (!canUseTauriEventRuntime()) return () => {};
+  try {
+    const { listen: tauriListen } = await import('@tauri-apps/api/event');
+    const unlisten = await tauriListen<T>(event, (e) => cb(e.payload));
+    return () => safeUnlisten(unlisten);
+  } catch (error) {
+    console.warn(
+      '[bridge] event listener skipped',
+      error instanceof Error ? error.message : String(error),
+    );
+    return () => {};
+  }
 }
 
 export function onAgentStdout(cb: (p: AgentStdioPayload) => void): Promise<UnlistenFn> {
@@ -2243,11 +2269,22 @@ export interface FileNode {
 /**
  * Recursively list files and directories under `root` up to `maxDepth` levels.
  * Common build/cache folders (.git, node_modules, target, .next, …) are pruned.
- * Tauri only — throws in browser dev mode.
+ * In Tauri mode uses the Rust bridge; in browser dev mode uses
+ * the /api/editor/list-files Next.js route.
  */
 export async function listProjectFiles(root: string, maxDepth = 4): Promise<FileNode[]> {
-  if (!isTauri()) throw new Error('listProjectFiles requires Tauri runtime');
-  return invoke<FileNode[]>('list_project_files', { root, maxDepth });
+  if (isTauri()) return invoke<FileNode[]>('list_project_files', { root, maxDepth });
+  if (typeof window === 'undefined') return [];
+  const res = await fetch('/api/editor/list-files', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ root, maxDepth }),
+  });
+  const body = (await res.json().catch(() => null)) as { nodes?: unknown; error?: string } | null;
+  if (!res.ok) {
+    throw new Error(body?.error ?? `List files failed (${res.status})`);
+  }
+  return Array.isArray(body?.nodes) ? (body.nodes as FileNode[]) : [];
 }
 
 // ── Telegram polling (Channels Phase 2) ──────────────────────────────────────

@@ -39,6 +39,7 @@ vi.mock('../lib/bridge', () => ({
   githubOAuthDevicePoll: (...args: any[]) => mockGithubOAuthDevicePoll(...args),
   getSecretsStorageBackend: (...args: any[]) => mockGetSecretsStorageBackend(...args),
   getSecret: (...args: any[]) => mockGetSecret(...args),
+  safeUnlisten: (fn: (() => void) | undefined) => fn?.(),
   setSecret: (...args: any[]) => mockSetSecret(...args),
 }));
 

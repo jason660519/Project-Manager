@@ -25,6 +25,7 @@ vi.mock('../lib/bridge', () => ({
     stdoutHandler = handler;
     return vi.fn();
   }),
+  safeUnlisten: vi.fn((fn: (() => void) | undefined) => fn?.()),
   spawnAgent: spawnAgentMock,
 }));
 

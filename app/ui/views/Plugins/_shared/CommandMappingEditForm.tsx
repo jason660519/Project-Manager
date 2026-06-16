@@ -33,6 +33,7 @@ export interface CommandMappingEditFormProps {
     description: string;
     action: CommandAction;
     enabled: boolean;
+    executor?: CommandMapping['executor'];
   }) => void;
 }
 
@@ -46,6 +47,15 @@ export function CommandMappingEditForm({
   const [description, setDescription] = useState(mapping.description);
   const [action, setAction] = useState<CommandAction>(mapping.action);
   const [enabled, setEnabled] = useState(mapping.enabled);
+  const [executorCapabilityId, setExecutorCapabilityId] = useState(mapping.executor?.capabilityId ?? '');
+  const [executorExecutionState, setExecutorExecutionState] = useState<
+    NonNullable<CommandMapping['executor']>['executionState']
+  >(mapping.executor?.executionState ?? 'dry_run_only');
+  const [executorCommand, setExecutorCommand] = useState(mapping.executor?.command.command ?? '');
+  const [executorArgs, setExecutorArgs] = useState(mapping.executor?.command.args.join(' ') ?? '');
+  const [executorPreview, setExecutorPreview] = useState(mapping.executor?.commandPreview ?? '');
+  const [executorLabel, setExecutorLabel] = useState(mapping.executor?.label ?? '');
+  const [executorSafetyNotice, setExecutorSafetyNotice] = useState(mapping.executor?.safetyNotice ?? '');
   const [error, setError] = useState<string | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
 
@@ -54,9 +64,16 @@ export function CommandMappingEditForm({
     setDescription(mapping.description);
     setAction(mapping.action);
     setEnabled(mapping.enabled);
+    setExecutorCapabilityId(mapping.executor?.capabilityId ?? '');
+    setExecutorExecutionState(mapping.executor?.executionState ?? 'dry_run_only');
+    setExecutorCommand(mapping.executor?.command.command ?? '');
+    setExecutorArgs(mapping.executor?.command.args.join(' ') ?? '');
+    setExecutorPreview(mapping.executor?.commandPreview ?? '');
+    setExecutorLabel(mapping.executor?.label ?? '');
+    setExecutorSafetyNotice(mapping.executor?.safetyNotice ?? '');
     setError(null);
     setSavedFlash(false);
-  }, [mapping.id, mapping.trigger, mapping.description, mapping.action, mapping.enabled]);
+  }, [mapping.id, mapping.trigger, mapping.description, mapping.action, mapping.enabled, mapping.executor]);
 
   const handleSave = () => {
     const t = trigger.trim();
@@ -83,6 +100,19 @@ export function CommandMappingEditForm({
       description: description.trim(),
       action,
       enabled,
+      executor: executorCapabilityId.trim() || executorCommand.trim()
+        ? {
+          capabilityId: executorCapabilityId.trim(),
+          command: {
+            command: executorCommand.trim(),
+            args: executorArgs.trim().split(/\s+/).filter(Boolean),
+          },
+          executionState: executorExecutionState === 'live_command_allowed' ? executorExecutionState : undefined,
+          commandPreview: executorPreview.trim(),
+          label: executorLabel.trim(),
+          safetyNotice: executorSafetyNotice.trim(),
+        }
+        : undefined,
     });
     setSavedFlash(true);
     setTimeout(() => setSavedFlash(false), 1500);
@@ -149,6 +179,125 @@ export function CommandMappingEditForm({
         />
         Enabled (matched against inbound messages)
       </label>
+
+      <div className="space-y-3 border-t border-stone-200/10 pt-3">
+        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-stone-500">
+          Workflow executor metadata
+        </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <label
+              htmlFor={`executor-capability-${mapping.id}`}
+              className="block text-[11px] uppercase tracking-[0.14em] text-stone-500"
+            >
+              Executor capability
+            </label>
+            <input
+              id={`executor-capability-${mapping.id}`}
+              value={executorCapabilityId}
+              onChange={(e) => setExecutorCapabilityId(e.target.value)}
+              placeholder="construction:qa:inspection-tool"
+              className={inputCls}
+            />
+          </div>
+          <div className="space-y-1">
+            <label
+              htmlFor={`executor-execution-state-${mapping.id}`}
+              className="block text-[11px] uppercase tracking-[0.14em] text-stone-500"
+            >
+              Executor execution mode
+            </label>
+            <select
+              id={`executor-execution-state-${mapping.id}`}
+              value={executorExecutionState}
+              onChange={(e) => setExecutorExecutionState(
+                e.target.value === 'live_command_allowed' ? 'live_command_allowed' : 'dry_run_only',
+              )}
+              className={inputCls}
+            >
+              <option value="dry_run_only">Dry-run only</option>
+              <option value="live_command_allowed">Live command allowed</option>
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label
+              htmlFor={`executor-command-${mapping.id}`}
+              className="block text-[11px] uppercase tracking-[0.14em] text-stone-500"
+            >
+              Executor command
+            </label>
+            <input
+              id={`executor-command-${mapping.id}`}
+              value={executorCommand}
+              onChange={(e) => setExecutorCommand(e.target.value)}
+              placeholder="pm-inspection"
+              className={inputCls}
+            />
+          </div>
+        </div>
+        <div className="space-y-1">
+          <label
+            htmlFor={`executor-args-${mapping.id}`}
+            className="block text-[11px] uppercase tracking-[0.14em] text-stone-500"
+          >
+            Executor args
+          </label>
+          <input
+            id={`executor-args-${mapping.id}`}
+            value={executorArgs}
+            onChange={(e) => setExecutorArgs(e.target.value)}
+            placeholder="verify --package daily-punch-list"
+            className={inputCls}
+          />
+        </div>
+        <div className="space-y-1">
+          <label
+            htmlFor={`executor-preview-${mapping.id}`}
+            className="block text-[11px] uppercase tracking-[0.14em] text-stone-500"
+          >
+            Executor preview
+          </label>
+          <input
+            id={`executor-preview-${mapping.id}`}
+            value={executorPreview}
+            onChange={(e) => setExecutorPreview(e.target.value)}
+            placeholder="pm-inspection verify --package daily-punch-list"
+            className={inputCls}
+          />
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <label
+              htmlFor={`executor-label-${mapping.id}`}
+              className="block text-[11px] uppercase tracking-[0.14em] text-stone-500"
+            >
+              Executor label
+            </label>
+            <input
+              id={`executor-label-${mapping.id}`}
+              value={executorLabel}
+              onChange={(e) => setExecutorLabel(e.target.value)}
+              placeholder="Shown in execution request details"
+              className={inputCls}
+            />
+          </div>
+          <div className="space-y-1">
+            <label
+              htmlFor={`executor-safety-${mapping.id}`}
+              className="block text-[11px] uppercase tracking-[0.14em] text-stone-500"
+            >
+              Executor safety notice
+            </label>
+            <input
+              id={`executor-safety-${mapping.id}`}
+              value={executorSafetyNotice}
+              onChange={(e) => setExecutorSafetyNotice(e.target.value)}
+              placeholder="Dry-run candidate only"
+              className={inputCls}
+            />
+          </div>
+        </div>
+      </div>
 
       {error && (
         <p className="border border-red-500/30 bg-red-950/30 px-2 py-1 text-[11px] text-red-300">

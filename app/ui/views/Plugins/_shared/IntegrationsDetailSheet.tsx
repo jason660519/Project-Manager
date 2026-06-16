@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import {
+  CheckCircle2,
   ExternalLink,
   FileText,
   FolderOpen,
@@ -40,6 +41,10 @@ import type {
 } from '../../../../../lib/types/channels';
 import { updatePlugin } from '../../../../../lib/storage/plugins';
 import { PROJECT_SCOPED_AUTOSTART_PLUGIN_IDS } from '../../../../../lib/project-manager-root';
+import {
+  evaluateProjectWorkflowExecutionRequestConsumption,
+  type ProjectWorkflowExecutionRequestPackage,
+} from '../../../../../lib/project-workflows';
 import { useI18n } from '../../../../../lib/i18n';
 import { StatusBadge } from './status-badge';
 import {
@@ -77,6 +82,145 @@ function formatRuntimeCommand(command: IntegrationRuntimeCommand): string {
   return [command.command, ...command.args].join(' ');
 }
 
+interface WorkflowExecutionRequestPayload {
+  workflowRunId?: string;
+  workItemId?: string;
+  nodeId?: string;
+  nodeTitle?: string;
+  actorKind?: string;
+  status?: string;
+  executionState?: string;
+  reviewStatus?: string;
+  policyGateReason?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  requestedBy?: string;
+  requestedAt?: string;
+  capabilityId?: string;
+  commandPreview?: string;
+  systemPromptLabel?: string;
+  taskPromptLabel?: string;
+  memoryFiles?: string[];
+  allowedTools?: string[];
+  expectedHandoffArtifactId?: string;
+  expectedEvidenceIds?: string[];
+  safetyNotice?: string;
+}
+
+interface WorkflowExecutionRecordPayload {
+  requestId?: string;
+  workflowRunId?: string;
+  workItemId?: string;
+  nodeId?: string;
+  nodeTitle?: string;
+  draftId?: string;
+  status?: string;
+  consumedBy?: string;
+  consumedAt?: string;
+  executionState?: string;
+  capabilityId?: string;
+  workingDir?: string;
+  commandPreview?: string;
+  policyState?: string;
+  policyReason?: string;
+  runnerState?: string;
+  runnerExitCode?: string;
+  runnerPid?: string;
+  runnerSpawnToken?: string;
+  runnerStdoutPreview?: string;
+  runnerStderrPreview?: string;
+  safetyNotice?: string;
+}
+
+interface WorkflowRunNavigationTarget {
+  workItemId?: string;
+  workflowRunId?: string;
+  nodeId?: string;
+}
+
+function workflowExecutionRequestPayload(value: Record<string, unknown>): WorkflowExecutionRequestPayload {
+  const policyGate = value.policyGate && typeof value.policyGate === 'object'
+    ? value.policyGate as Record<string, unknown>
+    : {};
+  return {
+    workflowRunId: stringMeta(value.workflowRunId),
+    workItemId: stringMeta(value.workItemId),
+    nodeId: stringMeta(value.nodeId),
+    nodeTitle: stringMeta(value.nodeTitle),
+    actorKind: stringMeta(value.actorKind),
+    status: stringMeta(value.status),
+    executionState: stringMeta(value.executionState),
+    reviewStatus: stringMeta(value.reviewStatus) || stringMeta(policyGate.state),
+    policyGateReason: stringMeta(policyGate.reason),
+    approvedBy: stringMeta(value.approvedBy),
+    approvedAt: stringMeta(value.approvedAt),
+    requestedBy: stringMeta(value.requestedBy),
+    requestedAt: stringMeta(value.requestedAt),
+    capabilityId: stringMeta(value.capabilityId),
+    commandPreview: stringMeta(value.commandPreview),
+    systemPromptLabel: stringMeta(value.systemPromptLabel),
+    taskPromptLabel: stringMeta(value.taskPromptLabel),
+    memoryFiles: stringArrayMeta(value.memoryFiles),
+    allowedTools: stringArrayMeta(value.allowedTools),
+    expectedHandoffArtifactId: stringMeta(value.expectedHandoffArtifactId),
+    expectedEvidenceIds: stringArrayMeta(value.expectedEvidenceIds),
+    safetyNotice: stringMeta(value.safetyNotice),
+  };
+}
+
+function workflowExecutionRecordPayload(value: Record<string, unknown>): WorkflowExecutionRecordPayload {
+  const policyDecision = value.policyDecision && typeof value.policyDecision === 'object'
+    ? value.policyDecision as Record<string, unknown>
+    : {};
+  const runnerResult = value.runnerResult && typeof value.runnerResult === 'object'
+    ? value.runnerResult as Record<string, unknown>
+    : {};
+  return {
+    requestId: stringMeta(value.requestId),
+    workflowRunId: stringMeta(value.workflowRunId),
+    workItemId: stringMeta(value.workItemId),
+    nodeId: stringMeta(value.nodeId),
+    nodeTitle: stringMeta(value.nodeTitle),
+    draftId: stringMeta(value.draftId),
+    status: stringMeta(value.status),
+    consumedBy: stringMeta(value.consumedBy),
+    consumedAt: stringMeta(value.consumedAt),
+    executionState: stringMeta(value.executionState),
+    capabilityId: stringMeta(value.capabilityId),
+    workingDir: stringMeta(value.workingDir),
+    commandPreview: stringMeta(value.commandPreview),
+    policyState: stringMeta(policyDecision.state),
+    policyReason: stringMeta(policyDecision.reason),
+    runnerState: stringMeta(runnerResult.state),
+    runnerExitCode: numberMeta(runnerResult.exitCode),
+    runnerPid: numberMeta(runnerResult.pid),
+    runnerSpawnToken: numberMeta(runnerResult.spawnToken),
+    runnerStdoutPreview: stringMeta(runnerResult.stdoutPreview),
+    runnerStderrPreview: stringMeta(runnerResult.stderrPreview),
+    safetyNotice: stringMeta(value.safetyNotice),
+  };
+}
+
+function workflowRunNavigationTarget(
+  payload: WorkflowExecutionRequestPayload | WorkflowExecutionRecordPayload,
+): WorkflowRunNavigationTarget | null {
+  const target: WorkflowRunNavigationTarget = {};
+  if (payload.workItemId) target.workItemId = payload.workItemId;
+  if (payload.workflowRunId) target.workflowRunId = payload.workflowRunId;
+  if (payload.nodeId) target.nodeId = payload.nodeId;
+  return Object.keys(target).length > 0 ? target : null;
+}
+
+function safeEvaluateWorkflowExecutionGate(value: Record<string, unknown>) {
+  try {
+    return evaluateProjectWorkflowExecutionRequestConsumption(
+      value as unknown as ProjectWorkflowExecutionRequestPackage,
+    );
+  } catch {
+    return null;
+  }
+}
+
 export interface IntegrationsDetailSheetProps {
   row: IntegrationRow | null;
   onClose: () => void;
@@ -112,10 +256,10 @@ export interface IntegrationsDetailSheetProps {
   onChannelDelete?: (channelId: string) => void;
   /** Validate a Telegram bot token; throws on rejection. */
   onTestTelegramToken?: (botToken: string) => Promise<{ username?: string }>;
-  /** Update a command mapping (trigger/description/action/enabled). */
+  /** Update a command mapping (trigger/description/action/enabled/executor metadata). */
   onCommandMappingUpdate?: (
     mappingId: string,
-    patch: { trigger: string; description: string; action: CommandAction; enabled: boolean },
+    patch: { trigger: string; description: string; action: CommandAction; enabled: boolean; executor?: CommandMapping['executor'] },
   ) => void;
   /** Delete a non-default command mapping. */
   onCommandMappingDelete?: (mappingId: string) => void;
@@ -124,6 +268,12 @@ export interface IntegrationsDetailSheetProps {
   /** True when the mapping id is one of the seeded defaults. */
   isDefaultCommandMapping?: (mappingId: string) => boolean;
   onManualSaved?: () => void;
+  onApproveWorkflowExecutionRequest?: (row: IntegrationRow) => Promise<void> | void;
+  onRecordWorkflowExecutionHandoff?: (row: IntegrationRow) => Promise<void> | void;
+  onRunWorkflowExecutionDryRun?: (row: IntegrationRow) => Promise<void> | void;
+  onRunWorkflowExecutionLive?: (row: IntegrationRow) => Promise<void> | void;
+  onOpenWorkflowRun?: (target: WorkflowRunNavigationTarget) => void;
+  onOpenWorkflowExecutionRequest?: (requestId: string) => void;
 }
 
 export function IntegrationsDetailSheet({
@@ -161,6 +311,12 @@ export function IntegrationsDetailSheet({
   otherCommandTriggers,
   isDefaultCommandMapping,
   onManualSaved,
+  onApproveWorkflowExecutionRequest,
+  onRecordWorkflowExecutionHandoff,
+  onRunWorkflowExecutionDryRun,
+  onRunWorkflowExecutionLive,
+  onOpenWorkflowRun,
+  onOpenWorkflowExecutionRequest,
 }: IntegrationsDetailSheetProps) {
   const { t } = useI18n();
   const [notes, setNotes] = useState('');
@@ -171,6 +327,26 @@ export function IntegrationsDetailSheet({
     message: string;
     status: 'idle' | 'success' | 'error';
   }>({ runningId: null, message: '', status: 'idle' });
+  const [executionApproval, setExecutionApproval] = useState<{
+    message: string;
+    status: 'idle' | 'success' | 'error';
+    running: boolean;
+  }>({ message: '', status: 'idle', running: false });
+  const [executionRecordAction, setExecutionRecordAction] = useState<{
+    message: string;
+    status: 'idle' | 'success' | 'error';
+    running: boolean;
+  }>({ message: '', status: 'idle', running: false });
+  const [executionDryRunAction, setExecutionDryRunAction] = useState<{
+    message: string;
+    status: 'idle' | 'success' | 'error';
+    running: boolean;
+  }>({ message: '', status: 'idle', running: false });
+  const [executionLiveRunAction, setExecutionLiveRunAction] = useState<{
+    message: string;
+    status: 'idle' | 'success' | 'error';
+    running: boolean;
+  }>({ message: '', status: 'idle', running: false });
 
   useEffect(() => {
     if (!row) return;
@@ -178,6 +354,9 @@ export function IntegrationsDetailSheet({
     setLv(row.lv != null ? String(row.lv) : '');
     setShowConfig(true);
     setRuntimeAction({ runningId: null, message: '', status: 'idle' });
+    setExecutionApproval({ message: '', status: 'idle', running: false });
+    setExecutionRecordAction({ message: '', status: 'idle', running: false });
+    setExecutionDryRunAction({ message: '', status: 'idle', running: false });
   }, [row?.rowKey]);
 
   useEffect(() => {
@@ -206,6 +385,20 @@ export function IntegrationsDetailSheet({
   const skillPath = (row.payload.skill as { absPath?: string } | undefined)?.absPath ?? row.sourceId;
   const filePath = (row.payload.file as { absPath?: string } | undefined)?.absPath;
   const instancePayload = row.sourceKind === 'connected-instance' ? row.payload : null;
+  const executionRequest = row.sourceKind === 'workflow-execution-request'
+    ? workflowExecutionRequestPayload(row.payload)
+    : null;
+  const executionRecord = row.sourceKind === 'workflow-execution-record'
+    ? workflowExecutionRecordPayload(row.payload)
+    : null;
+  const executionGate = row.sourceKind === 'workflow-execution-request'
+    ? safeEvaluateWorkflowExecutionGate(row.payload)
+    : null;
+  const executionNavigationTarget = executionRequest
+    ? workflowRunNavigationTarget(executionRequest)
+    : executionRecord
+      ? workflowRunNavigationTarget(executionRecord)
+      : null;
 
   const runRuntimeCommand = async (command: IntegrationRuntimeCommand) => {
     if (!onRunRuntimeCommand) return;
@@ -222,6 +415,82 @@ export function IntegrationsDetailSheet({
         runningId: null,
         message: error instanceof Error ? error.message : 'Runtime command failed',
         status: 'error',
+      });
+    }
+  };
+
+  const approveWorkflowExecutionRequest = async () => {
+    if (!onApproveWorkflowExecutionRequest) return;
+    setExecutionApproval({ message: '', status: 'idle', running: true });
+    try {
+      await onApproveWorkflowExecutionRequest(row);
+      setExecutionApproval({
+        message: 'Approved for future executor handoff.',
+        status: 'success',
+        running: false,
+      });
+    } catch (error) {
+      setExecutionApproval({
+        message: error instanceof Error ? error.message : 'Unable to approve execution request.',
+        status: 'error',
+        running: false,
+      });
+    }
+  };
+
+  const recordWorkflowExecutionHandoff = async () => {
+    if (!onRecordWorkflowExecutionHandoff) return;
+    setExecutionRecordAction({ message: '', status: 'idle', running: true });
+    try {
+      await onRecordWorkflowExecutionHandoff(row);
+      setExecutionRecordAction({
+        message: 'Recorded dry-run executor handoff.',
+        status: 'success',
+        running: false,
+      });
+    } catch (error) {
+      setExecutionRecordAction({
+        message: error instanceof Error ? error.message : 'Unable to record executor handoff.',
+        status: 'error',
+        running: false,
+      });
+    }
+  };
+
+  const runWorkflowExecutionDryRun = async () => {
+    if (!onRunWorkflowExecutionDryRun) return;
+    setExecutionDryRunAction({ message: '', status: 'idle', running: true });
+    try {
+      await onRunWorkflowExecutionDryRun(row);
+      setExecutionDryRunAction({
+        message: 'Dry-run executor result recorded.',
+        status: 'success',
+        running: false,
+      });
+    } catch (error) {
+      setExecutionDryRunAction({
+        message: error instanceof Error ? error.message : 'Unable to run dry-run executor.',
+        status: 'error',
+        running: false,
+      });
+    }
+  };
+
+  const runWorkflowExecutionLive = async () => {
+    if (!onRunWorkflowExecutionLive) return;
+    setExecutionLiveRunAction({ message: '', status: 'idle', running: true });
+    try {
+      await onRunWorkflowExecutionLive(row);
+      setExecutionLiveRunAction({
+        message: 'Live executor spawn recorded.',
+        status: 'success',
+        running: false,
+      });
+    } catch (error) {
+      setExecutionLiveRunAction({
+        message: error instanceof Error ? error.message : 'Unable to run live executor.',
+        status: 'error',
+        running: false,
       });
     }
   };
@@ -293,6 +562,263 @@ export function IntegrationsDetailSheet({
               {t.integrations.saveManual}
             </button>
           </section>
+
+          {executionRequest && (
+            <section className="space-y-3 border-t border-stone-200/12 pt-4">
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-stone-500">
+                  Execution Request Package
+                </p>
+                <p className="mt-1 text-[11px] leading-relaxed text-stone-400">
+                  Read-only dry-run handoff for a future Integration Hub executor. This inspector does not run commands or agents.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <MetaRow label="workflow" value={executionRequest.workflowRunId ?? ''} />
+                <MetaRow label="work item" value={executionRequest.workItemId ?? ''} />
+                <MetaRow label="node" value={executionRequest.nodeId ?? ''} />
+                <MetaRow label="actor" value={executionRequest.actorKind ?? ''} />
+                <MetaRow label="review" value={executionRequest.reviewStatus ?? ''} />
+                <MetaRow label="state" value={executionRequest.executionState ?? ''} />
+                <MetaRow label="capability" value={executionRequest.capabilityId ?? ''} />
+                <MetaRow label="approved by" value={executionRequest.approvedBy ?? ''} />
+                <MetaRow label="approved at" value={executionRequest.approvedAt ?? ''} />
+                <MetaRow label="requested by" value={executionRequest.requestedBy ?? ''} />
+                <MetaRow label="requested at" value={executionRequest.requestedAt ?? ''} />
+                <MetaRow label="command" value={executionRequest.commandPreview ?? ''} />
+                <MetaRow label="system" value={executionRequest.systemPromptLabel ?? ''} />
+                <MetaRow label="task" value={executionRequest.taskPromptLabel ?? ''} />
+                <MetaRow label="handoff" value={executionRequest.expectedHandoffArtifactId ?? ''} />
+              </div>
+              {executionNavigationTarget && onOpenWorkflowRun && (
+                <button
+                  type="button"
+                  onClick={() => onOpenWorkflowRun(executionNavigationTarget)}
+                  className="flex items-center gap-2 border border-stone-200/15 bg-stone-950/50 px-3 py-2 text-xs font-medium text-stone-100 hover:border-emerald-300/35 hover:bg-emerald-950/20"
+                >
+                  <ExternalLink size={14} />
+                  Open workflow run
+                </button>
+              )}
+
+              {executionRequest.memoryFiles && executionRequest.memoryFiles.length > 0 && (
+                <TokenList title="Memory files" values={executionRequest.memoryFiles} />
+              )}
+              {executionRequest.allowedTools && executionRequest.allowedTools.length > 0 && (
+                <TokenList title="Allowed tools" values={executionRequest.allowedTools} />
+              )}
+              {executionRequest.expectedEvidenceIds && executionRequest.expectedEvidenceIds.length > 0 && (
+                <TokenList title="Expected evidence" values={executionRequest.expectedEvidenceIds} />
+              )}
+              {executionRequest.policyGateReason && (
+                <p className="border border-stone-200/15 bg-white/[0.025] px-3 py-2 text-[11px] leading-relaxed text-stone-300">
+                  {executionRequest.policyGateReason}
+                </p>
+              )}
+              {executionGate && (
+                <div
+                  className={`space-y-2 border px-3 py-2 ${
+                    executionGate.state === 'ready'
+                      ? 'border-emerald-400/25 bg-emerald-950/15'
+                      : 'border-amber-400/25 bg-amber-950/15'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-stone-500">
+                      Executor gate
+                    </p>
+                    <span
+                      className={`border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] ${
+                        executionGate.state === 'ready'
+                          ? 'border-emerald-400/30 text-emerald-200'
+                          : 'border-amber-400/30 text-amber-200'
+                      }`}
+                    >
+                      {executionGate.state}
+                    </span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-stone-300">
+                    {executionGate.reason}
+                  </p>
+                  {executionGate.state === 'ready' && (
+                    <p className="font-mono text-[10px] text-stone-400">
+                      {[executionGate.command.command, ...executionGate.command.args].join(' ')}
+                    </p>
+                  )}
+                </div>
+              )}
+              {executionRequest.safetyNotice && (
+                <p className="border border-amber-400/25 bg-amber-950/20 px-3 py-2 text-[11px] leading-relaxed text-amber-100/90">
+                  {executionRequest.safetyNotice}
+                </p>
+              )}
+              {onRecordWorkflowExecutionHandoff && (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => void recordWorkflowExecutionHandoff()}
+                    disabled={executionRecordAction.running}
+                    className="flex items-center gap-2 border border-cyan-400/35 bg-cyan-950/30 px-3 py-2 text-xs font-medium text-cyan-200 hover:bg-cyan-950/45 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <FileText size={14} />
+                    {executionRecordAction.running ? 'Recording...' : 'Record executor handoff'}
+                  </button>
+                  {executionRecordAction.message && (
+                    <p
+                      className={`text-[11px] ${
+                        executionRecordAction.status === 'error' ? 'text-red-300' : 'text-cyan-300'
+                      }`}
+                    >
+                      {executionRecordAction.message}
+                    </p>
+                  )}
+                </div>
+              )}
+              {onRunWorkflowExecutionDryRun && (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => void runWorkflowExecutionDryRun()}
+                    disabled={executionDryRunAction.running}
+                    className="flex items-center gap-2 border border-emerald-400/35 bg-emerald-950/30 px-3 py-2 text-xs font-medium text-emerald-200 hover:bg-emerald-950/45 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Play size={14} />
+                    {executionDryRunAction.running ? 'Running dry-run...' : 'Run dry-run executor'}
+                  </button>
+                  {executionDryRunAction.message && (
+                    <p
+                      className={`text-[11px] ${
+                        executionDryRunAction.status === 'error' ? 'text-red-300' : 'text-emerald-300'
+                      }`}
+                    >
+                      {executionDryRunAction.message}
+                    </p>
+                  )}
+                </div>
+              )}
+              {executionRequest.executionState === 'live_command_allowed' &&
+                executionRequest.reviewStatus === 'approved_for_executor' &&
+                onRunWorkflowExecutionLive && (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => void runWorkflowExecutionLive()}
+                    disabled={executionLiveRunAction.running}
+                    className="flex items-center gap-2 border border-red-400/35 bg-red-950/30 px-3 py-2 text-xs font-medium text-red-100 hover:bg-red-950/45 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Play size={14} />
+                    {executionLiveRunAction.running ? 'Spawning live executor...' : 'Run live executor'}
+                  </button>
+                  {executionLiveRunAction.message && (
+                    <p
+                      className={`text-[11px] ${
+                        executionLiveRunAction.status === 'error' ? 'text-red-300' : 'text-emerald-300'
+                      }`}
+                    >
+                      {executionLiveRunAction.message}
+                    </p>
+                  )}
+                </div>
+              )}
+              {executionRequest.reviewStatus === 'review_required' && onApproveWorkflowExecutionRequest && (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => void approveWorkflowExecutionRequest()}
+                    disabled={executionApproval.running}
+                    className="flex items-center gap-2 border border-emerald-400/35 bg-emerald-950/30 px-3 py-2 text-xs font-medium text-emerald-200 hover:bg-emerald-950/45 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <CheckCircle2 size={14} />
+                    {executionApproval.running ? 'Approving...' : 'Approve for executor'}
+                  </button>
+                  {executionApproval.message && (
+                    <p
+                      className={`text-[11px] ${
+                        executionApproval.status === 'error' ? 'text-red-300' : 'text-emerald-300'
+                      }`}
+                    >
+                      {executionApproval.message}
+                    </p>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
+
+          {executionRecord && (
+            <section className="space-y-3 border-t border-stone-200/12 pt-4">
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-stone-500">
+                  Execution Record
+                </p>
+                <p className="mt-1 text-[11px] leading-relaxed text-stone-400">
+                  Read-only audit evidence for a future executor handoff attempt. This inspector does not run commands or agents.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <MetaRow label="request" value={executionRecord.requestId ?? ''} />
+                <MetaRow label="workflow" value={executionRecord.workflowRunId ?? ''} />
+                <MetaRow label="work item" value={executionRecord.workItemId ?? ''} />
+                <MetaRow label="node" value={executionRecord.nodeId ?? ''} />
+                <MetaRow label="draft" value={executionRecord.draftId ?? ''} />
+                <MetaRow label="status" value={executionRecord.status ?? ''} />
+                <MetaRow label="state" value={executionRecord.executionState ?? ''} />
+                <MetaRow label="capability" value={executionRecord.capabilityId ?? ''} />
+                <MetaRow label="working dir" value={executionRecord.workingDir ?? ''} />
+                <MetaRow label="consumed by" value={executionRecord.consumedBy ?? ''} />
+                <MetaRow label="consumed at" value={executionRecord.consumedAt ?? ''} />
+                <MetaRow label="command" value={executionRecord.commandPreview ?? ''} />
+                <MetaRow label="policy" value={executionRecord.policyState ?? ''} />
+                <MetaRow label="runner" value={executionRecord.runnerState ?? ''} />
+                <MetaRow label="exit code" value={executionRecord.runnerExitCode ?? ''} />
+                <MetaRow label="pid" value={executionRecord.runnerPid ?? ''} />
+                <MetaRow label="spawn token" value={executionRecord.runnerSpawnToken ?? ''} />
+              </div>
+              {executionNavigationTarget && onOpenWorkflowRun && (
+                <button
+                  type="button"
+                  onClick={() => onOpenWorkflowRun(executionNavigationTarget)}
+                  className="flex items-center gap-2 border border-stone-200/15 bg-stone-950/50 px-3 py-2 text-xs font-medium text-stone-100 hover:border-emerald-300/35 hover:bg-emerald-950/20"
+                >
+                  <ExternalLink size={14} />
+                  Open workflow run
+                </button>
+              )}
+              {executionRecord.requestId && onOpenWorkflowExecutionRequest && (
+                <button
+                  type="button"
+                  onClick={() => onOpenWorkflowExecutionRequest(executionRecord.requestId!)}
+                  className="flex items-center gap-2 border border-stone-200/15 bg-stone-950/50 px-3 py-2 text-xs font-medium text-stone-100 hover:border-emerald-300/35 hover:bg-emerald-950/20"
+                >
+                  <ExternalLink size={14} />
+                  Open execution request
+                </button>
+              )}
+
+              {executionRecord.policyReason && (
+                <p className="border border-stone-200/15 bg-white/[0.025] px-3 py-2 text-[11px] leading-relaxed text-stone-300">
+                  {executionRecord.policyReason}
+                </p>
+              )}
+              {executionRecord.runnerStdoutPreview && (
+                <p className="border border-emerald-400/20 bg-emerald-950/15 px-3 py-2 font-mono text-[11px] leading-relaxed text-emerald-100/90">
+                  {executionRecord.runnerStdoutPreview}
+                </p>
+              )}
+              {executionRecord.runnerStderrPreview && (
+                <p className="border border-red-400/20 bg-red-950/15 px-3 py-2 font-mono text-[11px] leading-relaxed text-red-100/90">
+                  {executionRecord.runnerStderrPreview}
+                </p>
+              )}
+              {executionRecord.safetyNotice && (
+                <p className="border border-amber-400/25 bg-amber-950/20 px-3 py-2 text-[11px] leading-relaxed text-amber-100/90">
+                  {executionRecord.safetyNotice}
+                </p>
+              )}
+            </section>
+          )}
 
           {row.sourceKind === 'plugin-marketplace' && onInstallMarketplace && (
             <section className="border-t border-stone-200/12 pt-4">
@@ -716,6 +1242,32 @@ function stringMeta(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }
 
+function numberMeta(value: unknown): string {
+  return typeof value === 'number' && Number.isFinite(value) ? String(value) : '';
+}
+
+function stringArrayMeta(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
 function arrayMeta(value: unknown): string {
-  return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string').join(', ') : '';
+  return stringArrayMeta(value).join(', ');
+}
+
+function TokenList({ title, values }: { title: string; values: string[] }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-[10px] uppercase tracking-[0.14em] text-stone-500">{title}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {values.map((value) => (
+          <span
+            key={value}
+            className="rounded border border-stone-200/15 bg-white/[0.035] px-2 py-1 font-mono text-[10px] text-stone-300"
+          >
+            {value}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
 }

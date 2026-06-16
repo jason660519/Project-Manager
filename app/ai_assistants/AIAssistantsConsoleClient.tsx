@@ -71,14 +71,28 @@ import {
   type AgentWorkflowRun,
 } from '../../lib/agent-workflows';
 import {
+  autoRequestEligibleProjectWorkflowDrafts,
   buildProjectWorkflowGraphView,
   createProjectWorkflowRun,
+  DEFAULT_PROJECT_WORKFLOW_EXECUTOR_REGISTRY,
   getProjectWorkflowTemplateById,
   listProjectWorkflowRuns,
+  requestProjectWorkflowDraftRun,
+  saveProjectWorkflowExecutionRequests,
   saveProjectWorkflowRun,
+  setProjectWorkflowExecutionMode,
+  startProjectWorkflowNode,
   type ProjectWorkflowGraphView,
   type ProjectWorkflowRun,
 } from '../../lib/project-workflows';
+import { getProjectManagerRoot } from '../../lib/bridge';
+import {
+  loadWorkflowExecutionRecordRows,
+  loadWorkflowExecutionRequestRows,
+} from '../../lib/integrations/load-project-inventory';
+import { buildExecutorRegistryFromCommandMappings } from '../../lib/integrations/mappers/channels';
+import type { IntegrationRow } from '../../lib/integrations/types';
+import { loadChannelCatalog } from '../../lib/storage/channels';
 import { ChatPageClient } from '../chat/ChatPageClient';
 
 interface AIAssistantsConsoleClientProps {
@@ -187,6 +201,65 @@ const selectClass =
 
 const EMPTY_WORKFLOW_RUNS: AgentWorkflowRun[] = [];
 const EMPTY_PROJECT_WORKFLOW_RUNS: ProjectWorkflowRun[] = [];
+const PERSISTED_SAMPLE_PROJECT_MANAGER_ROOT = '/Users/Project-Manager';
+
+interface WorkflowRunDeepLink {
+  workItemId?: string;
+  workflowRunId?: string;
+  nodeId?: string;
+}
+
+function trimRoot(projectRoot?: string): string {
+  return projectRoot?.trim().replace(/\/+$/, '') ?? '';
+}
+
+function queryParam(params: URLSearchParams, key: string): string | undefined {
+  const value = params.get(key)?.trim();
+  return value ? value : undefined;
+}
+
+function readWorkflowRunDeepLink(): WorkflowRunDeepLink {
+  if (typeof window === 'undefined') return {};
+  const params = new URLSearchParams(window.location.search);
+  return {
+    workItemId: queryParam(params, 'workItemId') ?? queryParam(params, 'featureId'),
+    workflowRunId: queryParam(params, 'workflowRunId') ?? queryParam(params, 'runId'),
+    nodeId: queryParam(params, 'nodeId'),
+  };
+}
+
+function selectProjectWorkflowRunFromDeepLink(
+  runs: ProjectWorkflowRun[],
+  deepLink: WorkflowRunDeepLink,
+): ProjectWorkflowRun | undefined {
+  if (deepLink.workflowRunId) {
+    const byRunId = runs.find((run) => run.id === deepLink.workflowRunId);
+    if (byRunId) return byRunId;
+  }
+  if (deepLink.workItemId) {
+    return runs.find((run) => run.workItemId.toLowerCase() === deepLink.workItemId?.toLowerCase());
+  }
+  return undefined;
+}
+
+function needsProjectManagerRootResolution(projectRoot?: string): boolean {
+  const root = trimRoot(projectRoot);
+  return root === '.' ||
+    root === PERSISTED_SAMPLE_PROJECT_MANAGER_ROOT ||
+    root.startsWith(`${PERSISTED_SAMPLE_PROJECT_MANAGER_ROOT}/`);
+}
+
+function rewriteProjectManagerSampleRoot(projectRoot: string, detectedRoot: string): string {
+  const root = trimRoot(projectRoot);
+  const detected = trimRoot(detectedRoot);
+  if (!detected) return root;
+  if (root === '.') return detected;
+  if (root === PERSISTED_SAMPLE_PROJECT_MANAGER_ROOT) return detected;
+  if (root.startsWith(`${PERSISTED_SAMPLE_PROJECT_MANAGER_ROOT}/`)) {
+    return `${detected}${root.slice(PERSISTED_SAMPLE_PROJECT_MANAGER_ROOT.length)}`;
+  }
+  return root;
+}
 
 function TerminalCommandList({
   title,
@@ -871,15 +944,28 @@ function WorkflowRunsSheet({
   initialWorkflowRuns?: AgentWorkflowRun[];
   initialProjectWorkflowRuns?: ProjectWorkflowRun[];
 }) {
+  const workflowRunDeepLink = useMemo(readWorkflowRunDeepLink, []);
+  const initialSelectedProjectRun =
+    selectProjectWorkflowRunFromDeepLink(initialProjectWorkflowRuns, workflowRunDeepLink) ??
+    initialProjectWorkflowRuns[0] ??
+    null;
+  const router = useRouter();
   const [runs, setRuns] = useState<AgentWorkflowRun[]>(initialWorkflowRuns);
   const [projectRuns, setProjectRuns] = useState<ProjectWorkflowRun[]>(initialProjectWorkflowRuns);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(initialWorkflowRuns[0]?.id ?? null);
-  const [selectedProjectRunId, setSelectedProjectRunId] = useState<string | null>(initialProjectWorkflowRuns[0]?.id ?? null);
-  const [selectedProjectNodeId, setSelectedProjectNodeId] = useState<string | null>(null);
+  const [selectedProjectRunId, setSelectedProjectRunId] = useState<string | null>(initialSelectedProjectRun?.id ?? null);
+  const [selectedProjectNodeId, setSelectedProjectNodeId] = useState<string | null>(
+    initialSelectedProjectRun && workflowRunDeepLink.nodeId ? workflowRunDeepLink.nodeId : null,
+  );
   const [saveWorkItemId, setSaveWorkItemId] = useState(initialProjectWorkflowRuns[0]?.workItemId ?? '');
   const [savingWorkflowRun, setSavingWorkflowRun] = useState(false);
   const [saveWorkflowRunMessage, setSaveWorkflowRunMessage] = useState<string | null>(null);
   const [saveWorkflowRunError, setSaveWorkflowRunError] = useState<string | null>(null);
+  const [effectiveProjectRoot, setEffectiveProjectRoot] = useState(() =>
+    needsProjectManagerRootResolution(projectRoot) ? '' : trimRoot(projectRoot),
+  );
+  const [workflowExecutionRequestRows, setWorkflowExecutionRequestRows] = useState<IntegrationRow[]>([]);
+  const [workflowExecutionRecordRows, setWorkflowExecutionRecordRows] = useState<IntegrationRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -890,22 +976,50 @@ function WorkflowRunsSheet({
 
   useEffect(() => {
     setProjectRuns(initialProjectWorkflowRuns);
-    setSelectedProjectRunId((prev) => prev ?? initialProjectWorkflowRuns[0]?.id ?? null);
+    const deepLinkedRun = selectProjectWorkflowRunFromDeepLink(initialProjectWorkflowRuns, workflowRunDeepLink);
+    setSelectedProjectRunId((prev) => deepLinkedRun?.id ?? prev ?? initialProjectWorkflowRuns[0]?.id ?? null);
+    if (deepLinkedRun && workflowRunDeepLink.nodeId) setSelectedProjectNodeId(workflowRunDeepLink.nodeId);
   }, [initialProjectWorkflowRuns]);
 
   useEffect(() => {
-    if (!projectRoot) return;
+    const rawRoot = trimRoot(projectRoot);
+    if (!rawRoot) {
+      setEffectiveProjectRoot('');
+      return;
+    }
+    if (!needsProjectManagerRootResolution(rawRoot)) {
+      setEffectiveProjectRoot(rawRoot);
+      return;
+    }
+    let cancelled = false;
+    void getProjectManagerRoot()
+      .then((detectedRoot) => {
+        if (!cancelled) setEffectiveProjectRoot(rewriteProjectManagerSampleRoot(rawRoot, detectedRoot));
+      })
+      .catch(() => {
+        if (!cancelled) setEffectiveProjectRoot(rawRoot);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectRoot]);
+
+  useEffect(() => {
+    if (!effectiveProjectRoot) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
-    Promise.all([listProjectWorkflowRuns(projectRoot), listAgentWorkflowRuns(projectRoot)])
+    Promise.all([listProjectWorkflowRuns(effectiveProjectRoot), listAgentWorkflowRuns(effectiveProjectRoot)])
       .then(([loadedProjectRuns, loadedRuns]) => {
         if (cancelled) return;
+        const deepLinkedRun = selectProjectWorkflowRunFromDeepLink(loadedProjectRuns, workflowRunDeepLink);
         setProjectRuns(loadedProjectRuns);
         setSelectedProjectRunId((prev) => {
+          if (deepLinkedRun) return deepLinkedRun.id;
           if (prev && loadedProjectRuns.some((run) => run.id === prev)) return prev;
           return loadedProjectRuns[0]?.id ?? null;
         });
+        if (deepLinkedRun && workflowRunDeepLink.nodeId) setSelectedProjectNodeId(workflowRunDeepLink.nodeId);
         setRuns(loadedRuns);
         setSelectedRunId((prev) => {
           if (prev && loadedRuns.some((run) => run.id === prev)) return prev;
@@ -922,19 +1036,62 @@ function WorkflowRunsSheet({
     return () => {
       cancelled = true;
     };
-  }, [projectRoot]);
+  }, [effectiveProjectRoot]);
+
+  useEffect(() => {
+    if (!effectiveProjectRoot) {
+      setWorkflowExecutionRequestRows([]);
+      setWorkflowExecutionRecordRows([]);
+      return;
+    }
+    let cancelled = false;
+    Promise.all([
+      loadWorkflowExecutionRequestRows(effectiveProjectRoot),
+      loadWorkflowExecutionRecordRows(effectiveProjectRoot),
+    ])
+      .then(([requestRows, recordRows]) => {
+        if (cancelled) return;
+        setWorkflowExecutionRequestRows(requestRows);
+        setWorkflowExecutionRecordRows(recordRows);
+      })
+      .catch((executionEvidenceError: unknown) => {
+        if (cancelled) return;
+        setWorkflowExecutionRequestRows([]);
+        setWorkflowExecutionRecordRows([]);
+        setError(
+          executionEvidenceError instanceof Error
+            ? executionEvidenceError.message
+            : 'Unable to load workflow execution evidence.',
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveProjectRoot]);
 
   const selectedProjectRun = projectRuns.find((run) => run.id === selectedProjectRunId) ?? projectRuns[0] ?? null;
   const selectedProjectTemplate = selectedProjectRun ? getProjectWorkflowTemplateById(selectedProjectRun.templateId) : undefined;
+  const projectWorkflowMappedExecutorRegistry = useMemo(
+    () => buildExecutorRegistryFromCommandMappings(loadChannelCatalog().commandMappings),
+    [],
+  );
+  const projectWorkflowExecutorRegistry = useMemo(
+    () => ({
+      ...DEFAULT_PROJECT_WORKFLOW_EXECUTOR_REGISTRY,
+      ...projectWorkflowMappedExecutorRegistry,
+    }),
+    [projectWorkflowMappedExecutorRegistry],
+  );
   const projectGraphView = selectedProjectRun && selectedProjectTemplate
     ? buildProjectWorkflowGraphView(selectedProjectTemplate, selectedProjectRun, {
         selectedNodeId: selectedProjectNodeId ?? undefined,
+        executorRegistry: projectWorkflowExecutorRegistry,
       })
     : null;
 
   const handleSaveProjectWorkflowRun = async () => {
     const workItemId = saveWorkItemId.trim();
-    if (!projectRoot) {
+    if (!effectiveProjectRoot) {
       setSaveWorkflowRunError('Select a project before saving a workflow run.');
       setSaveWorkflowRunMessage(null);
       return;
@@ -959,11 +1116,12 @@ function WorkflowRunsSheet({
         workItemId,
         createdBy: 'PM Lead',
       });
-      const savedPath = await saveProjectWorkflowRun(projectRoot, run);
-      const loadedProjectRuns = await listProjectWorkflowRuns(projectRoot);
-      setProjectRuns(loadedProjectRuns);
-      const matchingRun = loadedProjectRuns.find((loadedRun) => loadedRun.workItemId === workItemId);
-      setSelectedProjectRunId(matchingRun?.id ?? loadedProjectRuns[0]?.id ?? run.id);
+      const savedPath = await saveProjectWorkflowRun(effectiveProjectRoot, run);
+      const loadedProjectRuns = await listProjectWorkflowRuns(effectiveProjectRoot);
+      const nextProjectRuns = loadedProjectRuns.length > 0 ? loadedProjectRuns : [run];
+      setProjectRuns(nextProjectRuns);
+      const matchingRun = nextProjectRuns.find((loadedRun) => loadedRun.workItemId === workItemId);
+      setSelectedProjectRunId(matchingRun?.id ?? nextProjectRuns[0]?.id ?? run.id);
       setSelectedProjectNodeId(null);
       setSaveWorkflowRunMessage(`Saved workflow run: ${savedPath}`);
     } catch (saveError: unknown) {
@@ -973,12 +1131,73 @@ function WorkflowRunsSheet({
     }
   };
 
+  const handleStartProjectWorkflowNode = async (nodeId: string) => {
+    if (!effectiveProjectRoot || !selectedProjectRun || !selectedProjectTemplate) {
+      setError('Select a Project Workflow run before starting a node.');
+      return;
+    }
+    setError(null);
+    try {
+      const startedRun = startProjectWorkflowNode(selectedProjectTemplate, selectedProjectRun, nodeId);
+      const nextRun = autoRequestEligibleProjectWorkflowDrafts(startedRun, 'Auto Run Policy');
+      await persistProjectWorkflowRunUpdate(nextRun);
+      setSelectedProjectNodeId(nodeId);
+    } catch (startError: unknown) {
+      setError(startError instanceof Error ? startError.message : 'Unable to start workflow node.');
+    }
+  };
+
+  const persistProjectWorkflowRunUpdate = async (nextRun: ProjectWorkflowRun) => {
+    if (!effectiveProjectRoot) throw new Error('Select a project before updating a workflow run.');
+    await saveProjectWorkflowRun(effectiveProjectRoot, nextRun);
+    if (Object.keys(projectWorkflowMappedExecutorRegistry).length > 0) {
+      await saveProjectWorkflowExecutionRequests(effectiveProjectRoot, nextRun, undefined, projectWorkflowExecutorRegistry);
+    } else {
+      await saveProjectWorkflowExecutionRequests(effectiveProjectRoot, nextRun);
+    }
+    const loadedProjectRuns = await listProjectWorkflowRuns(effectiveProjectRoot);
+    setProjectRuns(loadedProjectRuns.length > 0 ? loadedProjectRuns : [nextRun]);
+    setSelectedProjectRunId(nextRun.id);
+  };
+
+  const handleChangeExecutionMode = async (mode: ProjectWorkflowRun['executionMode']) => {
+    if (!selectedProjectRun) {
+      setError('Select a Project Workflow run before changing execution mode.');
+      return;
+    }
+    setError(null);
+    try {
+      const nextRun = setProjectWorkflowExecutionMode(selectedProjectRun, mode, 'PM Lead');
+      await persistProjectWorkflowRunUpdate(nextRun);
+    } catch (modeError: unknown) {
+      setError(modeError instanceof Error ? modeError.message : 'Unable to update execution mode.');
+    }
+  };
+
+  const handleRunExecutionDraft = async (draftId: string) => {
+    if (!selectedProjectRun) {
+      setError('Select a Project Workflow run before requesting a draft run.');
+      return;
+    }
+    setError(null);
+    try {
+      const nextRun = requestProjectWorkflowDraftRun(selectedProjectRun, draftId, 'PM Lead');
+      await persistProjectWorkflowRunUpdate(nextRun);
+      const draft = nextRun.executionDrafts.find((candidate) => candidate.id === draftId);
+      if (draft) setSelectedProjectNodeId(draft.nodeId);
+    } catch (draftError: unknown) {
+      setError(draftError instanceof Error ? draftError.message : 'Unable to request draft run.');
+    }
+  };
+
   if (projectGraphView) {
     return (
       <ProjectWorkflowRunsGraphSheet
-        projectRoot={projectRoot}
+        projectRoot={effectiveProjectRoot}
         runs={projectRuns}
         graphView={projectGraphView}
+        workflowExecutionRequestRows={workflowExecutionRequestRows}
+        workflowExecutionRecordRows={workflowExecutionRecordRows}
         loading={loading}
         error={error}
         saveWorkItemId={saveWorkItemId}
@@ -987,6 +1206,20 @@ function WorkflowRunsSheet({
         saveWorkflowRunError={saveWorkflowRunError}
         onSaveWorkItemIdChange={setSaveWorkItemId}
         onSaveWorkflowRun={handleSaveProjectWorkflowRun}
+        onStartNode={handleStartProjectWorkflowNode}
+        onChangeExecutionMode={handleChangeExecutionMode}
+        onRunExecutionDraft={handleRunExecutionDraft}
+        onReviewExecutionRequest={(requestId) =>
+          router.push(
+            requestId
+              ? `/integrations-hub/workflow-execution-requests?requestId=${encodeURIComponent(requestId)}`
+              : '/integrations-hub/workflow-execution-requests',
+          )
+        }
+        onOpenExecutionRecord={(recordId) =>
+          router.push(`/integrations-hub/workflow-execution-records?recordId=${encodeURIComponent(recordId)}`)
+        }
+        onConfigureExecutor={() => router.push('/integrations-hub/commands')}
         onSelectRun={(runId) => {
           setSelectedProjectRunId(runId);
           setSelectedProjectNodeId(null);
@@ -1009,7 +1242,7 @@ function WorkflowRunsSheet({
           </p>
           <div className="mt-5 text-left">
             <SaveWorkflowRunControl
-              projectRoot={projectRoot}
+              projectRoot={effectiveProjectRoot}
               workItemId={saveWorkItemId}
               saving={savingWorkflowRun}
               message={saveWorkflowRunMessage}
@@ -1019,7 +1252,7 @@ function WorkflowRunsSheet({
             />
           </div>
           <p className="mt-3 font-mono text-[10px] text-stone-500">
-            {projectRoot ? `${projectRoot}/.project-manager/project-workflow-runs` : 'Select a project to load Project Workflow run sidecars.'}
+            {effectiveProjectRoot ? `${effectiveProjectRoot}/.project-manager/project-workflow-runs` : 'Select a project to load Project Workflow run sidecars.'}
           </p>
         </div>
       </div>
@@ -1173,6 +1406,8 @@ function ProjectWorkflowRunsGraphSheet({
   projectRoot,
   runs,
   graphView,
+  workflowExecutionRequestRows,
+  workflowExecutionRecordRows,
   loading,
   error,
   onSelectRun,
@@ -1183,10 +1418,18 @@ function ProjectWorkflowRunsGraphSheet({
   saveWorkflowRunError,
   onSaveWorkItemIdChange,
   onSaveWorkflowRun,
+  onStartNode,
+  onChangeExecutionMode,
+  onRunExecutionDraft,
+  onReviewExecutionRequest,
+  onOpenExecutionRecord,
+  onConfigureExecutor,
 }: {
   projectRoot?: string;
   runs: ProjectWorkflowRun[];
   graphView: ProjectWorkflowGraphView;
+  workflowExecutionRequestRows: IntegrationRow[];
+  workflowExecutionRecordRows: IntegrationRow[];
   loading: boolean;
   error: string | null;
   onSelectRun: (runId: string) => void;
@@ -1197,8 +1440,35 @@ function ProjectWorkflowRunsGraphSheet({
   saveWorkflowRunError: string | null;
   onSaveWorkItemIdChange: (value: string) => void;
   onSaveWorkflowRun: () => void;
+  onStartNode: (nodeId: string) => void;
+  onChangeExecutionMode: (mode: ProjectWorkflowRun['executionMode']) => void;
+  onRunExecutionDraft: (draftId: string) => void;
+  onReviewExecutionRequest: (requestId?: string) => void;
+  onOpenExecutionRecord: (recordId: string) => void;
+  onConfigureExecutor: () => void;
 }) {
   const inspector = graphView.inspector;
+  const canStartSelectedNode = inspector?.status === 'ready' && graphView.run.executionMode !== 'paused';
+  const canRunExecutionDraft =
+    inspector?.executionDraft?.status === 'manual_run_required' ||
+    inspector?.executionDraft?.status === 'auto_run_allowed';
+  const executionRequestRow = inspector?.executionDraft
+    ? findWorkflowExecutionRequestRow(
+        workflowExecutionRequestRows,
+        graphView.run.id,
+        inspector.executionDraft.id,
+        inspector.nodeId,
+      )
+    : undefined;
+  const executionRecordRow = inspector?.executionDraft
+    ? findWorkflowExecutionRecordRow(
+        workflowExecutionRecordRows,
+        graphView.run.id,
+        inspector.executionDraft.id,
+        inspector.nodeId,
+        executionRequestRow?.sourceId,
+      )
+    : undefined;
   return (
     <div className="grid min-h-full gap-4 p-4 xl:grid-cols-[240px_minmax(0,1fr)_340px]">
       <section className="flex min-h-0 flex-col overflow-hidden rounded border border-stone-200/15 bg-white/[0.03]">
@@ -1251,6 +1521,33 @@ function ProjectWorkflowRunsGraphSheet({
           </div>
           <div className="flex flex-col items-end gap-2">
             <Badge tone={graphView.run.status}>{graphView.run.status}</Badge>
+            <div className="rounded border border-stone-200/15 bg-stone-950/60 px-2 py-1 text-right">
+              <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-stone-500">Execution Mode</div>
+              <div className="mt-0.5 text-[11px] font-semibold text-stone-100">
+                {executionModeLabel(graphView.run.executionMode)}
+              </div>
+            </div>
+            <div className="grid grid-cols-3 overflow-hidden border border-stone-200/15 bg-stone-950/60 text-[10px] font-semibold">
+              {[
+                ['manual_only', 'Manual only'],
+                ['auto_safe_nodes', 'Auto-run safe nodes'],
+                ['paused', 'Paused'],
+              ].map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => onChangeExecutionMode(mode as ProjectWorkflowRun['executionMode'])}
+                  className={clsx(
+                    'border-r border-stone-200/10 px-2 py-1.5 last:border-r-0 hover:bg-white/[0.06]',
+                    graphView.run.executionMode === mode
+                      ? 'bg-emerald-600/20 text-emerald-50'
+                      : 'text-stone-400',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <SaveWorkflowRunControl
               compact
               projectRoot={projectRoot}
@@ -1349,6 +1646,114 @@ function ProjectWorkflowRunsGraphSheet({
                 <InspectorLine label="Reason" value={inspector.approvalGate.reason} />
               </InspectorBlock>
             )}
+            <InspectorBlock title="Execution Control">
+              <InspectorLine label="Mode" value={executionModeLabel(graphView.run.executionMode)} />
+              <InspectorLine label="Eligibility" value={canStartSelectedNode ? 'ready to draft' : 'not ready'} />
+              <button
+                type="button"
+                disabled={!canStartSelectedNode}
+                onClick={() => onStartNode(inspector.nodeId)}
+                className="mt-3 inline-flex w-full items-center justify-center gap-1 border border-emerald-300/30 bg-emerald-950/30 px-3 py-1.5 text-[11px] font-semibold text-emerald-50 hover:border-emerald-200/60 disabled:cursor-not-allowed disabled:border-stone-200/10 disabled:bg-stone-950/50 disabled:text-stone-600"
+              >
+                <GitBranch size={13} />
+                Start node
+              </button>
+            </InspectorBlock>
+            {inspector.executionDraft && (
+              <InspectorBlock title="Execution Draft">
+                <InspectorLine label="Status" value={inspector.executionDraft.status} />
+                <InspectorLine label="Risk" value={inspector.executionDraft.riskLevel} />
+                <InspectorLine label="Mode" value={executionModeLabel(inspector.executionDraft.runModeAtCreation)} />
+                <InspectorLine label="Tools" value={inspector.executionDraft.allowedTools.join(', ')} />
+                <InspectorLine label="Evidence" value={inspector.executionDraft.expectedEvidenceIds.join(', ')} />
+                <InspectorLine label="Policy" value={inspector.executionDraft.integrationPolicy.policyState} />
+                <InspectorLine label="Reason" value={inspector.executionDraft.eligibilityReason} />
+                {inspector.executionDraft.executionResult && (
+                  <InspectorLine label="Result" value={inspector.executionDraft.executionResult} />
+                )}
+                {inspector.executionDraft.runRequestedAt && (
+                  <InspectorLine label="Requested" value={inspector.executionDraft.runRequestedAt} />
+                )}
+                {inspector.executionDraft.runRequestedBy && (
+                  <InspectorLine label="By" value={inspector.executionDraft.runRequestedBy} />
+                )}
+                <button
+                  type="button"
+                  disabled={!canRunExecutionDraft}
+                  onClick={() => onRunExecutionDraft(inspector.executionDraft!.id)}
+                  className="mt-3 inline-flex w-full items-center justify-center gap-1 border border-amber-300/30 bg-amber-950/30 px-3 py-1.5 text-[11px] font-semibold text-amber-50 hover:border-amber-200/60 disabled:cursor-not-allowed disabled:border-stone-200/10 disabled:bg-stone-950/50 disabled:text-stone-600"
+                >
+                  <Terminal size={13} />
+                  Run draft
+                </button>
+                {inspector.executionDraft.status === 'run_requested' && (
+                  <button
+                    type="button"
+                    onClick={() => onReviewExecutionRequest(executionRequestRow?.sourceId)}
+                    className="mt-2 inline-flex w-full items-center justify-center gap-1 border border-stone-200/15 bg-stone-950/60 px-3 py-1.5 text-[11px] font-semibold text-stone-100 hover:border-amber-200/40"
+                  >
+                    <FileText size={13} />
+                    Review execution request
+                  </button>
+                )}
+              </InspectorBlock>
+            )}
+            {(executionRequestRow || executionRecordRow) && (
+              <InspectorBlock title="Execution Evidence">
+                {executionRequestRow && (
+                  <>
+                    <InspectorLine label="Request" value={executionRequestRow.sourceId} />
+                    <InspectorLine label="Review" value={workflowExecutionRequestReviewStatus(executionRequestRow)} />
+                    {workflowExecutionRequestPolicyState(executionRequestRow) !==
+                      workflowExecutionRequestReviewStatus(executionRequestRow) && (
+                      <InspectorLine label="Policy" value={workflowExecutionRequestPolicyState(executionRequestRow)} />
+                    )}
+                    <InspectorLine label="Command" value={workflowExecutionRequestCommandPreview(executionRequestRow)} />
+                  </>
+                )}
+                {executionRecordRow && (
+                  <>
+                    <InspectorLine label="Record" value={executionRecordRow.sourceId} />
+                    <InspectorLine label="Result" value={workflowExecutionRecordStatus(executionRecordRow)} />
+                    <InspectorLine label="Runner" value={workflowExecutionRecordRunnerSummary(executionRecordRow)} />
+                    <button
+                      type="button"
+                      onClick={() => onOpenExecutionRecord(executionRecordRow.sourceId)}
+                      className="mt-3 inline-flex w-full items-center justify-center gap-1 border border-stone-200/15 bg-stone-950/60 px-3 py-1.5 text-[11px] font-semibold text-stone-100 hover:border-cyan-200/40"
+                    >
+                      <FileText size={13} />
+                      Open execution record
+                    </button>
+                  </>
+                )}
+              </InspectorBlock>
+            )}
+            {inspector.executorResolution && (
+              <InspectorBlock title="Executor Candidate">
+                <InspectorLine label="State" value={inspector.executorResolution.state} />
+                <InspectorLine label="Mode" value={inspector.executorResolution.executionState} />
+                <InspectorLine label="Capability" value={inspector.executorResolution.capabilityId} />
+                {inspector.executorResolution.state === 'resolved' ? (
+                  <>
+                    <InspectorLine label="Label" value={inspector.executorResolution.label} />
+                    <InspectorLine label="Sheet" value={inspector.executorResolution.integrationSheet} />
+                    <InspectorLine label="Source" value={inspector.executorResolution.sourceKind} />
+                    <InspectorLine label="Command" value={inspector.executorResolution.commandPreview} />
+                  </>
+                ) : null}
+                <InspectorLine label="Notice" value={inspector.executorResolution.safetyNotice} />
+                {inspector.executorResolution.state === 'unresolved' && (
+                  <button
+                    type="button"
+                    onClick={onConfigureExecutor}
+                    className="mt-3 inline-flex w-full items-center justify-center gap-1 border border-amber-300/30 bg-amber-950/25 px-3 py-1.5 text-[11px] font-semibold text-amber-50 hover:border-amber-200/60"
+                  >
+                    <SlidersHorizontal size={13} />
+                    Configure executor
+                  </button>
+                )}
+              </InspectorBlock>
+            )}
             <div className="mt-4 rounded border border-amber-300/25 bg-amber-950/20 px-3 py-2 text-[11px] text-amber-100">
               {inspector.reviewFirstActionLabel}
             </div>
@@ -1410,6 +1815,89 @@ function SaveWorkflowRunControl({
       {!projectRoot && <p className="text-[10px] text-stone-500">Select a project before saving workflow runs.</p>}
     </div>
   );
+}
+
+function executionModeLabel(mode: ProjectWorkflowRun['executionMode']): string {
+  if (mode === 'auto_safe_nodes') return 'auto-run safe nodes';
+  if (mode === 'paused') return 'paused';
+  return 'manual only';
+}
+
+function integrationRowPayload(row: IntegrationRow): Record<string, unknown> {
+  return row.payload && typeof row.payload === 'object' ? row.payload : {};
+}
+
+function payloadString(payload: Record<string, unknown>, key: string): string | undefined {
+  const value = payload[key];
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function findWorkflowExecutionRequestRow(
+  rows: IntegrationRow[],
+  workflowRunId: string,
+  draftId: string,
+  nodeId: string,
+): IntegrationRow | undefined {
+  return rows.find((row) => {
+    const payload = integrationRowPayload(row);
+    return (
+      payloadString(payload, 'workflowRunId') === workflowRunId &&
+      (payloadString(payload, 'draftId') === draftId || payloadString(payload, 'nodeId') === nodeId)
+    );
+  });
+}
+
+function findWorkflowExecutionRecordRow(
+  rows: IntegrationRow[],
+  workflowRunId: string,
+  draftId: string,
+  nodeId: string,
+  requestId?: string,
+): IntegrationRow | undefined {
+  return rows.find((row) => {
+    const payload = integrationRowPayload(row);
+    return (
+      payloadString(payload, 'workflowRunId') === workflowRunId &&
+      (payloadString(payload, 'draftId') === draftId ||
+        payloadString(payload, 'nodeId') === nodeId ||
+        (requestId ? payloadString(payload, 'requestId') === requestId : false))
+    );
+  });
+}
+
+function workflowExecutionRequestReviewStatus(row: IntegrationRow): string {
+  const payload = integrationRowPayload(row);
+  return payloadString(payload, 'reviewStatus') ?? row.category2;
+}
+
+function workflowExecutionRequestPolicyState(row: IntegrationRow): string {
+  const payload = integrationRowPayload(row);
+  const policyGate = payload.policyGate;
+  if (policyGate && typeof policyGate === 'object') {
+    const state = (policyGate as Record<string, unknown>).state;
+    if (typeof state === 'string' && state.trim()) return state;
+  }
+  return workflowExecutionRequestReviewStatus(row);
+}
+
+function workflowExecutionRequestCommandPreview(row: IntegrationRow): string {
+  const payload = integrationRowPayload(row);
+  return payloadString(payload, 'commandPreview') ?? row.notes ?? 'not captured';
+}
+
+function workflowExecutionRecordStatus(row: IntegrationRow): string {
+  const payload = integrationRowPayload(row);
+  return payloadString(payload, 'status') ?? row.statusLabel ?? row.category2;
+}
+
+function workflowExecutionRecordRunnerSummary(row: IntegrationRow): string {
+  const payload = integrationRowPayload(row);
+  const runnerResult = payload.runnerResult;
+  if (!runnerResult || typeof runnerResult !== 'object') return row.statusLabel || 'not captured';
+  const runnerPayload = runnerResult as Record<string, unknown>;
+  const state = typeof runnerPayload.state === 'string' && runnerPayload.state.trim() ? runnerPayload.state : 'unknown';
+  const exitCode = typeof runnerPayload.exitCode === 'number' ? ` · exit ${runnerPayload.exitCode}` : '';
+  return `${state}${exitCode}`;
 }
 
 function InspectorBlock({ title, children }: { title: string; children: React.ReactNode }) {

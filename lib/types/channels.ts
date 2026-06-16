@@ -15,6 +15,17 @@ export interface CommandMapping {
   action: CommandAction;
   description: string;
   enabled: boolean;
+  executor?: {
+    capabilityId: string;
+    executionState?: 'dry_run_only' | 'live_command_allowed';
+    command: {
+      command: string;
+      args: string[];
+    };
+    commandPreview?: string;
+    label?: string;
+    safetyNotice?: string;
+  };
 }
 
 export interface ChannelConfig {

@@ -25,8 +25,12 @@ describe('integration hub sheet actions', () => {
   it('treats System Installed Apps as the first-class plugins inventory sheet', () => {
     expect(INTEGRATION_INVENTORY_SHEETS[0]).toBe(SYSTEM_INSTALLED_APPS_SHEET);
     expect(INTEGRATION_INVENTORY_SHEETS).not.toContain(LEGACY_PLUGINS_SHEET);
+    expect(INTEGRATION_INVENTORY_SHEETS).toContain('workflow-execution-requests');
+    expect(INTEGRATION_INVENTORY_SHEETS).toContain('workflow-execution-records');
     expect(isIntegrationInventorySheet(SYSTEM_INSTALLED_APPS_SHEET)).toBe(true);
     expect(isIntegrationInventorySheet(LEGACY_PLUGINS_SHEET)).toBe(false);
+    expect(isIntegrationInventorySheet('workflow-execution-requests')).toBe(true);
+    expect(isIntegrationInventorySheet('workflow-execution-records')).toBe(true);
   });
 
   it('requires every inventory sheet to expose independent scan and test methods', async () => {

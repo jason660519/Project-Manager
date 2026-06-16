@@ -108,6 +108,14 @@ vi.mock('../lib/adapters/registry', () => ({
   listAdapterDescriptors: () => [],
 }));
 
+vi.mock('../lib/bridge', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/bridge')>();
+  return {
+    ...actual,
+    getProjectManagerRoot: vi.fn(async () => '/Users/jasonmacbbookpro/Project/Project-Manager'),
+  };
+});
+
 const { MainClient } = await import('../app/ui/MainClient');
 
 function renderMainClient(
@@ -162,6 +170,16 @@ describe('MainClient lazy route views', () => {
     expect(await screen.findByTestId('ai-assistants-view')).toHaveAttribute(
       'data-active-sheet',
       'engineers',
+    );
+  });
+
+  it('passes the detected Project Manager root to AI Assistants workflow runs', async () => {
+    renderMainClient(<MainClient currentView="chat" assistantSheet="workflow-runs" />);
+    await flushRouteView();
+
+    expect(await screen.findByTestId('ai-assistants-view')).toHaveAttribute(
+      'data-project-root',
+      '/Users/jasonmacbbookpro/Project/Project-Manager',
     );
   });
 });

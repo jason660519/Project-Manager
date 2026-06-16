@@ -9,6 +9,8 @@ export const INTEGRATION_INVENTORY_SHEETS = [
   'channels',
   'memory',
   'commands',
+  'workflow-execution-requests',
+  'workflow-execution-records',
   'connected-instances',
 ] as const satisfies readonly IntegrationSheet[];
 
@@ -24,6 +26,8 @@ export const INTEGRATION_SHEET_ACTION_LABELS: Record<IntegrationInventorySheet, 
   channels: 'Channels',
   memory: 'Memory',
   commands: 'Commands',
+  'workflow-execution-requests': 'Execution Requests',
+  'workflow-execution-records': 'Execution Records',
   'connected-instances': 'Network Instances',
 };
 

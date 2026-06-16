@@ -9,8 +9,10 @@ import {
   mcpInjectionFlag,
   onAgentExit,
   onAgentStdout,
+  safeUnlisten,
   spawnAgent,
   supportsFileAccessEnforcement,
+  type UnlistenFn,
 } from '../../lib/bridge';
 import {
   DEFAULT_AGENT_WORKFLOWS,
@@ -140,11 +142,11 @@ export function BatchDispatchModal({
   const [killConfirmBatchPid, setKillConfirmBatchPid] = useState<number | null>(null);
   const killBatchPidRef = useRef<number | null>(null);
 
-  const unlistenRefs = useRef<Array<() => void>>([]);
+  const unlistenRefs = useRef<UnlistenFn[]>([]);
 
   useEffect(() => {
     return () => {
-      unlistenRefs.current.forEach((fn) => fn());
+      unlistenRefs.current.forEach((fn) => safeUnlisten(fn));
     };
   }, []);
 

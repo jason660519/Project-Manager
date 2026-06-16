@@ -36,8 +36,10 @@ import {
   getGithubToken,
   onGithubUpdated,
   reopenGithubIssueWithComment,
+  safeUnlisten,
   updateGithubIssue,
   type GithubIssueCommentPayload,
+  type UnlistenFn,
 } from '../../../lib/bridge';
 import { PROVIDERS } from '../../../lib/keys/registry';
 import { OAuthDeviceModal } from '../../ui/views/_components/OAuthDeviceModal';
@@ -619,13 +621,23 @@ export function IssuesTab({
   useEffect(() => {
     if (!isTauri() || repoTargets.length === 0) return;
     const watchedUrls = new Set(repoTargets.map((r) => r.repoUrl));
-    let unlisten: (() => void) | undefined;
+    let unlisten: UnlistenFn | undefined;
+    let cancelled = false;
     (async () => {
-      unlisten = await onGithubUpdated(({ repoUrl }) => {
+      const cleanup = await onGithubUpdated(({ repoUrl }) => {
         if (watchedUrls.has(repoUrl)) void onSyncRef.current();
       });
+      if (cancelled) {
+        safeUnlisten(cleanup);
+        return;
+      }
+      unlisten = cleanup;
     })();
-    return () => unlisten?.();
+    return () => {
+      cancelled = true;
+      safeUnlisten(unlisten);
+      unlisten = undefined;
+    };
   }, [repoTargets]);
 
   // Browser/web mode: periodic sync every 5 minutes (Tauri uses startGithubPoll instead).

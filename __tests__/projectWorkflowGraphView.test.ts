@@ -4,8 +4,11 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
+  autoRequestEligibleProjectWorkflowDrafts,
   createProjectWorkflowRun,
   getProjectWorkflowTemplateById,
+  setProjectWorkflowExecutionMode,
+  startProjectWorkflowNode,
 } from '../lib/project-workflows/projectWorkflowEngine';
 import { buildProjectWorkflowGraphView } from '../lib/project-workflows/projectWorkflowGraphView';
 
@@ -145,5 +148,98 @@ describe('Project Workflow graph projection', () => {
       },
     ]);
     expect(view.safetyNotice).toContain('No actor or command is executed');
+  });
+
+  it('projects run-level execution mode and selected-node execution drafts', () => {
+    const template = getProjectWorkflowTemplateById('software-engineering-loop')!;
+    const initial = createProjectWorkflowRun(template, {
+      projectId: 'project-manager',
+      workItemId: 'F54',
+      now: '2026-06-16T06:00:00.000Z',
+    });
+    const started = startProjectWorkflowNode(template, initial, 'intake', '2026-06-16T06:01:00.000Z');
+
+    const view = buildProjectWorkflowGraphView(template, started, { selectedNodeId: 'intake' });
+
+    expect(view.run.executionMode).toBe('manual_only');
+    expect(view.inspector?.executionDraft).toMatchObject({
+      nodeId: 'intake',
+      status: 'manual_run_required',
+      runModeAtCreation: 'manual_only',
+      expectedHandoffArtifactId: 'intake-brief',
+      expectedEvidenceIds: ['feature-spec'],
+      eligibilityReason: 'Run is manual-only; human must run the draft explicitly.',
+    });
+  });
+
+  it('projects dry-run Integration Hub executor candidates for tool drafts', () => {
+    const template = getProjectWorkflowTemplateById('software-engineering-loop')!;
+    const initial = createProjectWorkflowRun(template, {
+      projectId: 'project-manager',
+      workItemId: 'F54',
+      now: '2026-06-16T07:10:00.000Z',
+    });
+    const started = startProjectWorkflowNode(template, initial, 'verification', '2026-06-16T07:11:00.000Z');
+
+    const view = buildProjectWorkflowGraphView(template, started, { selectedNodeId: 'verification' });
+
+    expect(view.inspector?.executionDraft?.integrationPolicy.capabilityId).toBe('software:verification:tool');
+    expect(view.inspector?.executorResolution).toMatchObject({
+      state: 'resolved',
+      executionState: 'dry_run_only',
+      integrationSheet: 'commands',
+      sourceKind: 'command-mapping',
+      commandPreview: 'npm run verify:baseline',
+    });
+  });
+
+  it('projects injected Integration Hub executor candidates for agent drafts', () => {
+    const template = getProjectWorkflowTemplateById('software-engineering-loop')!;
+    const initial = createProjectWorkflowRun(template, {
+      projectId: 'project-manager',
+      workItemId: 'F54',
+      now: '2026-06-16T11:20:00.000Z',
+    });
+    const autoMode = setProjectWorkflowExecutionMode(initial, 'auto_safe_nodes', 'PM Lead', '2026-06-16T11:21:00.000Z');
+    const intakeDone = {
+      ...autoMode,
+      nodeRuns: autoMode.nodeRuns.map((nodeRun) =>
+        nodeRun.nodeId === 'intake'
+          ? { ...nodeRun, status: 'succeeded' as const, completedAt: '2026-06-16T11:22:00.000Z' }
+          : nodeRun.nodeId === 'analysis'
+            ? { ...nodeRun, status: 'ready' as const }
+            : nodeRun,
+      ),
+    };
+    const started = startProjectWorkflowNode(template, intakeDone, 'analysis', '2026-06-16T11:23:00.000Z');
+    const requested = autoRequestEligibleProjectWorkflowDrafts(started, 'Auto Run Policy', '2026-06-16T11:24:00.000Z');
+
+    const view = buildProjectWorkflowGraphView(template, requested, {
+      selectedNodeId: 'analysis',
+      executorRegistry: {
+        'software:analysis:agent': {
+          state: 'resolved',
+          executionState: 'dry_run_only',
+          integrationSheet: 'commands',
+          sourceKind: 'command-mapping',
+          sourceId: 'analysis-dry-run',
+          label: 'Analysis dry-run agent',
+          commandPreview: 'pm-agent dry-run analysis --feature F54',
+          command: { command: 'pm-agent', args: ['dry-run', 'analysis', '--feature', 'F54'] },
+          safetyNotice: 'Dry-run executor candidate only; Project Manager has not executed this command.',
+        },
+      },
+    });
+
+    expect(view.inspector?.executionDraft).toMatchObject({
+      nodeId: 'analysis',
+      status: 'run_requested',
+    });
+    expect(view.inspector?.executorResolution).toMatchObject({
+      state: 'resolved',
+      capabilityId: 'software:analysis:agent',
+      label: 'Analysis dry-run agent',
+      commandPreview: 'pm-agent dry-run analysis --feature F54',
+    });
   });
 });

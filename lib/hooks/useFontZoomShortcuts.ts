@@ -9,7 +9,7 @@ import {
   readStoredFontZoomScale,
 } from '../fontZoom';
 import type { FontZoomAction } from '../fontZoom';
-import { onFontZoomShortcut, safeUnlisten } from '../bridge';
+import { onFontZoomShortcut, safeUnlisten, type UnlistenFn } from '../bridge';
 
 function getFontZoomStorage(): Storage | undefined {
   try {
@@ -43,7 +43,7 @@ export function useFontZoomShortcuts() {
   }, []);
 
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
+    let unlisten: UnlistenFn | undefined;
     let cancelled = false;
 
     onFontZoomShortcut(({ action, direction }) => {

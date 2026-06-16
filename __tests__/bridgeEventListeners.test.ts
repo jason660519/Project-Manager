@@ -16,6 +16,20 @@ vi.mock('@tauri-apps/api/event', () => ({
 }));
 
 describe('agent event payload contract (spawnToken)', () => {
+  beforeEach(() => {
+    Object.defineProperty(window, '__TAURI_INTERNALS__', {
+      configurable: true,
+      value: {
+        transformCallback: vi.fn(() => 1),
+      },
+    });
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
+    listeners.clear();
+  });
+
   it('forwards spawnToken on agent-stdout / agent-stderr', async () => {
     const { onAgentStdout, onAgentStderr } = await import('../lib/bridge');
     const stdout: AgentStdioPayload[] = [];
@@ -58,5 +72,64 @@ describe('safeUnlisten', () => {
     });
     expect(() => safeUnlisten(unlisten)).not.toThrow();
     expect(() => safeUnlisten(unlisten)).not.toThrow();
+  });
+
+  it('swallows async double-unlisten rejections from Tauri event registry', async () => {
+    const unlisten = vi.fn(async () => {
+      throw new TypeError("undefined is not an object (evaluating 'listeners[eventId].handlerId')");
+    });
+
+    expect(() => safeUnlisten(unlisten)).not.toThrow();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(unlisten).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Tauri event listener runtime guard', () => {
+  afterEach(() => {
+    Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
+    listeners.clear();
+  });
+
+  it('returns a no-op subscription when Tauri internals are incomplete', async () => {
+    Object.defineProperty(window, '__TAURI_INTERNALS__', {
+      configurable: true,
+      value: {},
+    });
+    const { subscribeAgentProcessEvents } = await import('../lib/bridge');
+
+    const unlisten = await subscribeAgentProcessEvents({
+      onStdout: vi.fn(),
+      onStderr: vi.fn(),
+      onExit: vi.fn(),
+    });
+
+    expect(listeners.size).toBe(0);
+    expect(() => unlisten()).not.toThrow();
+  });
+
+  it('returns a no-op subscription when the Tauri event runtime rejects during registration', async () => {
+    Object.defineProperty(window, '__TAURI_INTERNALS__', {
+      configurable: true,
+      value: {
+        transformCallback: vi.fn(() => 1),
+      },
+    });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { listen: tauriListen } = await import('@tauri-apps/api/event');
+    vi.mocked(tauriListen).mockRejectedValueOnce(
+      new TypeError("Cannot read properties of undefined (reading 'transformCallback')"),
+    );
+    const { onAgentStdout } = await import('../lib/bridge');
+
+    const unlisten = await onAgentStdout(vi.fn());
+
+    expect(() => unlisten()).not.toThrow();
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[bridge] event listener skipped',
+      "Cannot read properties of undefined (reading 'transformCallback')",
+    );
+    warnSpy.mockRestore();
   });
 });

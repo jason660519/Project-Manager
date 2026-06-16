@@ -11,6 +11,8 @@ export const INTEGRATION_SHEETS = [
   'channels',
   'memory',
   'commands',
+  'workflow-execution-requests',
+  'workflow-execution-records',
   'connected-instances',
   'connect',
   'vla',
@@ -64,6 +66,8 @@ export type IntegrationSourceKind =
   | 'slash-command'
   | 'system-cli'
   | 'connected-instance'
+  | 'workflow-execution-request'
+  | 'workflow-execution-record'
   | 'capability-candidate';
 
 export interface IntegrationManualFields {

@@ -2,6 +2,8 @@ import type {
   ProjectWorkflowActorKind,
   ProjectWorkflowApprovalGateDefinition,
   ProjectWorkflowEvidenceRequirement,
+  ProjectWorkflowExecutionDraft,
+  ProjectWorkflowExecutionMode,
   ProjectWorkflowNodeDefinition,
   ProjectWorkflowNodeRun,
   ProjectWorkflowRun,
@@ -9,6 +11,11 @@ import type {
   ProjectWorkflowScorecardStatus,
   ProjectWorkflowTemplate,
 } from './projectWorkflowEngine';
+import {
+  resolveProjectWorkflowDraftExecutor,
+  type ProjectWorkflowExecutorResolution,
+  type ProjectWorkflowExecutorRegistry,
+} from './projectWorkflowExecutionResolver';
 
 export interface ProjectWorkflowGraphRunSummary {
   id: string;
@@ -17,6 +24,7 @@ export interface ProjectWorkflowGraphRunSummary {
   templateVersion: number;
   workItemId: string;
   status: ProjectWorkflowRun['status'];
+  executionMode: ProjectWorkflowExecutionMode;
   nextAction: string;
 }
 
@@ -65,6 +73,8 @@ export interface ProjectWorkflowGraphScorecard extends ProjectWorkflowScorecardD
 export interface ProjectWorkflowGraphInspector extends ProjectWorkflowGraphNode {
   scorecards: ProjectWorkflowGraphScorecard[];
   reviewFirstActionLabel: string;
+  executionDraft?: ProjectWorkflowExecutionDraft;
+  executorResolution?: ProjectWorkflowExecutorResolution;
 }
 
 export interface ProjectWorkflowGraphMetrics {
@@ -88,6 +98,7 @@ export interface ProjectWorkflowGraphView {
 
 export interface BuildProjectWorkflowGraphViewOptions {
   selectedNodeId?: string;
+  executorRegistry?: ProjectWorkflowExecutorRegistry;
 }
 
 export function buildProjectWorkflowGraphView(
@@ -109,6 +120,7 @@ export function buildProjectWorkflowGraphView(
       templateVersion: template.version,
       workItemId: run.workItemId,
       status: run.status,
+      executionMode: run.executionMode ?? 'manual_only',
       nextAction: run.nextAction,
     },
     metrics: {
@@ -122,7 +134,7 @@ export function buildProjectWorkflowGraphView(
     nodes,
     edges: buildGraphEdges(template),
     selectedNode,
-    inspector: selectedNode ? buildInspector(template, run, selectedNode) : undefined,
+    inspector: selectedNode ? buildInspector(template, run, selectedNode, options.executorRegistry) : undefined,
     safetyNotice: 'No actor or command is executed by this graph view. Nodes remain review-first until a human explicitly starts execution.',
   };
 }
@@ -174,11 +186,15 @@ function buildInspector(
   template: ProjectWorkflowTemplate,
   run: ProjectWorkflowRun,
   node: ProjectWorkflowGraphNode,
+  executorRegistry?: ProjectWorkflowExecutorRegistry,
 ): ProjectWorkflowGraphInspector {
   const definition = template.nodes.find((candidate) => candidate.id === node.nodeId);
   if (!definition) throw new Error(`Unknown graph node definition: ${node.nodeId}`);
+  const executionDraft = latestDraftForNode(run, node.nodeId);
   return {
     ...node,
+    executionDraft,
+    executorResolution: executionDraft ? resolveProjectWorkflowDraftExecutor(executionDraft, executorRegistry) : undefined,
     scorecards: definition.scorecards.map((scorecard) => {
       const result = run.scorecardResults.find(
         (candidate) => candidate.nodeId === node.nodeId && candidate.scorecardId === scorecard.scorecardId,
@@ -194,6 +210,15 @@ function buildInspector(
         ? 'Prepare manual start package'
         : 'Review node contract',
   };
+}
+
+function latestDraftForNode(
+  run: ProjectWorkflowRun,
+  nodeId: string,
+): ProjectWorkflowExecutionDraft | undefined {
+  return [...(run.executionDrafts ?? [])]
+    .reverse()
+    .find((draft) => draft.nodeId === nodeId);
 }
 
 function graphApprovalGateForNode(

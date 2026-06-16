@@ -50,7 +50,12 @@ import {
   type DiscoveryPlan,
 } from '../../../../lib/integrations/discovery';
 import { probeConnectedInstanceAvailability } from '../../../../lib/integrations/probe-connected-instance';
-import { loadMemoryRows, loadSlashCommandRows } from '../../../../lib/integrations/load-project-inventory';
+import {
+  loadMemoryRows,
+  loadSlashCommandRows,
+  loadWorkflowExecutionRecordRows,
+  loadWorkflowExecutionRequestRows,
+} from '../../../../lib/integrations/load-project-inventory';
 import { MARKETPLACE, buildFromMarketplace } from '../../../../lib/integrations/marketplace-catalog';
 import type { PluginCatalog, McpPlugin } from '../../../../lib/types/plugins';
 import type {
@@ -101,6 +106,7 @@ import {
   mcpKill,
   mcpSpawn,
   mcpStatusAll,
+  getProjectManagerRoot,
   onMcpStatus,
   onTelegramMessage,
   openPath,
@@ -118,10 +124,22 @@ import {
   telegramStatusAll,
   telegramStopPoll,
   onTelegramStatus,
+  safeUnlisten,
   spawnTerminal,
   scanMacosApplications,
+  writeFile,
   type ScanMacosApplicationsResult,
 } from '../../../../lib/bridge';
+import {
+  approveProjectWorkflowExecutionRequest,
+  buildProjectWorkflowExecutorHandoffRecord,
+  saveProjectWorkflowExecutorHandoffRecord,
+  saveProjectWorkflowExecutorRunRecord,
+  serializeProjectWorkflowExecutionRequest,
+  runProjectWorkflowExecutorDryRun,
+  runProjectWorkflowExecutorLive,
+  type ProjectWorkflowExecutionRequestPackage,
+} from '../../../../lib/project-workflows';
 import { checkCommandExists } from '../../../../lib/adapters/availability';
 import { getSkillsDir } from '../../../../lib/storage/settings';
 import { parseCategorySlug, parseFrontmatter } from '../../../../lib/skills/utils';
@@ -170,6 +188,24 @@ function newMappingId(): string {
 }
 
 type PluginsRowDensity = 'compact' | 'comfortable';
+const PERSISTED_SAMPLE_PROJECT_MANAGER_ROOT = '/Users/Project-Manager';
+
+function trimRoot(projectRoot?: string): string {
+  return projectRoot?.trim().replace(/\/+$/, '') ?? '';
+}
+
+function needsProjectManagerRootResolution(projectRoot?: string): boolean {
+  const root = trimRoot(projectRoot);
+  return root === PERSISTED_SAMPLE_PROJECT_MANAGER_ROOT ||
+    root.startsWith(`${PERSISTED_SAMPLE_PROJECT_MANAGER_ROOT}/`);
+}
+
+function rewriteProjectManagerSampleRoot(projectRoot: string, detectedRoot: string): string {
+  const root = trimRoot(projectRoot);
+  const detected = trimRoot(detectedRoot);
+  if (!detected || !needsProjectManagerRootResolution(root)) return root;
+  return `${detected}${root.slice(PERSISTED_SAMPLE_PROJECT_MANAGER_ROOT.length)}`;
+}
 
 export interface PluginsHubViewProps {
   projectRoot?: string;
@@ -179,8 +215,52 @@ export interface PluginsHubViewProps {
   initialSheet?: IntegrationSheet;
 }
 
+export interface IntegrationRowDeepLink {
+  recordId?: string;
+  requestId?: string;
+  sourceId?: string;
+  rowKey?: string;
+}
+
+function queryParam(params: URLSearchParams, key: string): string | undefined {
+  const value = params.get(key)?.trim();
+  return value ? value : undefined;
+}
+
+function readIntegrationRowDeepLink(): IntegrationRowDeepLink {
+  if (typeof window === 'undefined') return {};
+  const params = new URLSearchParams(window.location.search);
+  return {
+    recordId: queryParam(params, 'recordId'),
+    requestId: queryParam(params, 'requestId'),
+    sourceId: queryParam(params, 'sourceId'),
+    rowKey: queryParam(params, 'rowKey'),
+  };
+}
+
+export function selectIntegrationRowFromDeepLink(
+  rows: IntegrationRow[],
+  deepLink: IntegrationRowDeepLink,
+): IntegrationRow | undefined {
+  const targetSourceId = deepLink.recordId ?? deepLink.requestId ?? deepLink.sourceId;
+  if (targetSourceId) {
+    const bySource = rows.find((row) => row.sourceId === targetSourceId);
+    if (bySource) return bySource;
+  }
+  if (deepLink.rowKey) return rows.find((row) => row.rowKey === deepLink.rowKey);
+  return undefined;
+}
+
 export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: PluginsHubViewProps) {
-  const pmRoot = resolveProjectManagerRepoRoot(pmRepoRoot);
+  const currentSearch = typeof window === 'undefined' ? '' : window.location.search;
+  const rowDeepLink = useMemo(readIntegrationRowDeepLink, [currentSearch, initialSheet]);
+  const resolvedPmRoot = resolveProjectManagerRepoRoot(pmRepoRoot);
+  const [effectivePmRoot, setEffectivePmRoot] = useState(() =>
+    needsProjectManagerRootResolution(resolvedPmRoot) ? '' : trimRoot(resolvedPmRoot),
+  );
+  const pmRoot = effectivePmRoot;
+  const workflowExecutionRequestsRoot = effectivePmRoot;
+  const workflowExecutionRecordsRoot = effectivePmRoot;
   const pluginGuidePath = pmRoot ? `${pmRoot.replace(/\/+$/, '')}/docs/engineering/plugin-guide.md` : '';
   const { t } = useI18n();
   const router = useRouter();
@@ -206,12 +286,18 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
   const [skillRows, setSkillRows] = useState<IntegrationRow[]>([]);
   const [memoryRows, setMemoryRows] = useState<IntegrationRow[]>([]);
   const [commandRows, setCommandRows] = useState<IntegrationRow[]>([]);
+  const [workflowExecutionRequestRows, setWorkflowExecutionRequestRows] = useState<IntegrationRow[]>([]);
+  const [workflowExecutionRecordRows, setWorkflowExecutionRecordRows] = useState<IntegrationRow[]>([]);
   const [skillsLoading, setSkillsLoading] = useState(false);
   const [memoryLoading, setMemoryLoading] = useState(false);
   const [commandsLoading, setCommandsLoading] = useState(false);
+  const [workflowExecutionRequestsLoading, setWorkflowExecutionRequestsLoading] = useState(false);
+  const [workflowExecutionRecordsLoading, setWorkflowExecutionRecordsLoading] = useState(false);
   const [skillsError, setSkillsError] = useState<string | null>(null);
   const [memoryError, setMemoryError] = useState<string | null>(null);
   const [commandsError, setCommandsError] = useState<string | null>(null);
+  const [workflowExecutionRequestsError, setWorkflowExecutionRequestsError] = useState<string | null>(null);
+  const [workflowExecutionRecordsError, setWorkflowExecutionRecordsError] = useState<string | null>(null);
   const [systemCliExposure, setSystemCliExposure] = useState<Record<string, boolean>>({});
   const [systemCommandStatus, setSystemCommandStatus] = useState<Record<string, boolean>>({});
   const [resolvedInstallPaths, setResolvedInstallPaths] = useState<Record<string, ResolvedPluginPath>>({});
@@ -256,6 +342,29 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
       router.replace(`/integrations-hub/${SYSTEM_INSTALLED_APPS_SHEET}`);
     }
   }, [initialSheet, router]);
+
+  useEffect(() => {
+    const rawRoot = trimRoot(resolvedPmRoot);
+    if (!rawRoot) {
+      setEffectivePmRoot('');
+      return;
+    }
+    if (!needsProjectManagerRootResolution(rawRoot)) {
+      setEffectivePmRoot(rawRoot);
+      return;
+    }
+    let cancelled = false;
+    void getProjectManagerRoot()
+      .then((detectedRoot) => {
+        if (!cancelled) setEffectivePmRoot(rewriteProjectManagerSampleRoot(rawRoot, detectedRoot));
+      })
+      .catch(() => {
+        if (!cancelled) setEffectivePmRoot('');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [resolvedPmRoot]);
 
   const runMacosApplicationsScan = useCallback(async (): Promise<ScanMacosApplicationsResult> => {
     setMacosAppsScanning(true);
@@ -425,13 +534,142 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
     }
   }, [projectRoot, channelCatalog.commandMappings]);
 
-  useEffect(() => {
-    void loadMemory();
-  }, [loadMemory]);
+  const loadWorkflowExecutionRequests = useCallback(async () => {
+    setWorkflowExecutionRequestsLoading(true);
+    setWorkflowExecutionRequestsError(null);
+    try {
+      const rows = await loadWorkflowExecutionRequestRows(workflowExecutionRequestsRoot);
+      setWorkflowExecutionRequestRows(rows);
+    } catch (error) {
+      setWorkflowExecutionRequestRows([]);
+      setWorkflowExecutionRequestsError(
+        error instanceof Error ? error.message : 'Unknown workflow execution requests load error',
+      );
+    } finally {
+      setWorkflowExecutionRequestsLoading(false);
+    }
+  }, [workflowExecutionRequestsRoot]);
+
+  const loadWorkflowExecutionRecords = useCallback(async () => {
+    setWorkflowExecutionRecordsLoading(true);
+    setWorkflowExecutionRecordsError(null);
+    try {
+      const rows = await loadWorkflowExecutionRecordRows(workflowExecutionRecordsRoot);
+      setWorkflowExecutionRecordRows(rows);
+    } catch (error) {
+      setWorkflowExecutionRecordRows([]);
+      setWorkflowExecutionRecordsError(
+        error instanceof Error ? error.message : 'Unknown workflow execution records load error',
+      );
+    } finally {
+      setWorkflowExecutionRecordsLoading(false);
+    }
+  }, [workflowExecutionRecordsRoot]);
+
+  const handleApproveWorkflowExecutionRequest = useCallback(
+    async (row: IntegrationRow) => {
+      if (row.sourceKind !== 'workflow-execution-request') return;
+      const approved = approveProjectWorkflowExecutionRequest(
+        row.payload as unknown as ProjectWorkflowExecutionRequestPackage,
+        'Human Lead',
+        new Date().toISOString(),
+      );
+      await writeFile(row.installPath, serializeProjectWorkflowExecutionRequest(approved));
+      const integrationSheet = approved.executorResolution.state === 'resolved'
+        ? approved.executorResolution.integrationSheet
+        : undefined;
+      const badges = [
+        approved.reviewStatus,
+        approved.executionState,
+        integrationSheet,
+        approved.capabilityId,
+      ].filter((value): value is string => typeof value === 'string' && value.length > 0);
+      setSelectedRow((current) => current?.rowKey === row.rowKey
+        ? {
+            ...current,
+            category2: approved.reviewStatus,
+            badges,
+            payload: {
+              ...approved,
+              absPath: row.installPath,
+              commandPreview: approved.executorResolution.state === 'resolved'
+                ? approved.executorResolution.commandPreview
+                : undefined,
+            },
+          }
+        : current);
+      await loadWorkflowExecutionRequests();
+    },
+    [loadWorkflowExecutionRequests],
+  );
+
+  const handleRecordWorkflowExecutionHandoff = useCallback(
+    async (row: IntegrationRow) => {
+      if (row.sourceKind !== 'workflow-execution-request') return;
+      const record = buildProjectWorkflowExecutorHandoffRecord(
+        row.payload as unknown as ProjectWorkflowExecutionRequestPackage,
+        'Integration Hub dry-run recorder',
+        new Date().toISOString(),
+      );
+      await saveProjectWorkflowExecutorHandoffRecord(workflowExecutionRecordsRoot, record, { writeFile });
+      await Promise.all([
+        loadWorkflowExecutionRequests(),
+        loadWorkflowExecutionRecords(),
+      ]);
+    },
+    [loadWorkflowExecutionRecords, loadWorkflowExecutionRequests, workflowExecutionRecordsRoot],
+  );
+
+  const handleRunWorkflowExecutionDryRun = useCallback(
+    async (row: IntegrationRow) => {
+      if (row.sourceKind !== 'workflow-execution-request') return;
+      const record = await runProjectWorkflowExecutorDryRun(
+        row.payload as unknown as ProjectWorkflowExecutionRequestPackage,
+        'Integration Hub dry-run runner',
+        new Date().toISOString(),
+      );
+      await saveProjectWorkflowExecutorRunRecord(workflowExecutionRecordsRoot, record, { writeFile });
+      await Promise.all([
+        loadWorkflowExecutionRequests(),
+        loadWorkflowExecutionRecords(),
+      ]);
+    },
+    [loadWorkflowExecutionRecords, loadWorkflowExecutionRequests, workflowExecutionRecordsRoot],
+  );
+
+  const handleRunWorkflowExecutionLive = useCallback(
+    async (row: IntegrationRow) => {
+      if (row.sourceKind !== 'workflow-execution-request') return;
+      const record = await runProjectWorkflowExecutorLive(
+        row.payload as unknown as ProjectWorkflowExecutionRequestPackage,
+        pmRoot,
+        'Integration Hub live runner',
+        new Date().toISOString(),
+      );
+      await saveProjectWorkflowExecutorRunRecord(workflowExecutionRecordsRoot, record, { writeFile });
+      await Promise.all([
+        loadWorkflowExecutionRequests(),
+        loadWorkflowExecutionRecords(),
+      ]);
+    },
+    [loadWorkflowExecutionRecords, loadWorkflowExecutionRequests, pmRoot, workflowExecutionRecordsRoot],
+  );
 
   useEffect(() => {
-    void loadCommands();
-  }, [loadCommands]);
+    if (activeSheet === 'memory') void loadMemory();
+  }, [activeSheet, loadMemory]);
+
+  useEffect(() => {
+    if (activeSheet === 'commands') void loadCommands();
+  }, [activeSheet, loadCommands]);
+
+  useEffect(() => {
+    if (activeSheet === 'workflow-execution-requests') void loadWorkflowExecutionRequests();
+  }, [activeSheet, loadWorkflowExecutionRequests]);
+
+  useEffect(() => {
+    if (activeSheet === 'workflow-execution-records') void loadWorkflowExecutionRecords();
+  }, [activeSheet, loadWorkflowExecutionRecords]);
 
   // Probe each marketplace entry's command on $PATH and resolve install paths.
   // Returns the raw mapping so callers can both update React state AND build a
@@ -495,26 +733,42 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
       setMcpStatuses((prev) => new Map(prev).set(pluginId, status));
     })
       .then((fn) => {
+        if (cancelled) {
+          safeUnlisten(fn);
+          return;
+        }
         unlisten = fn;
       })
       .catch(() => {});
     return () => {
       cancelled = true;
-      unlisten?.();
+      safeUnlisten(unlisten);
+      unlisten = undefined;
     };
   }, []);
 
   useEffect(() => {
     let stop: UnlistenFn | undefined;
+    let cancelled = false;
     telegramStatusAll()
-      .then((arr) => setPollStatuses(new Map(arr.map((s) => [s.channelId, s]))))
+      .then((arr) => {
+        if (!cancelled) setPollStatuses(new Map(arr.map((s) => [s.channelId, s])));
+      })
       .catch(() => {});
     onTelegramStatus((s) => setPollStatuses((prev) => new Map(prev).set(s.channelId, s)))
       .then((fn) => {
+        if (cancelled) {
+          safeUnlisten(fn);
+          return;
+        }
         stop = fn;
       })
       .catch(() => {});
-    return () => stop?.();
+    return () => {
+      cancelled = true;
+      safeUnlisten(stop);
+      stop = undefined;
+    };
   }, []);
 
   useEffect(() => {
@@ -527,6 +781,7 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
 
   useEffect(() => {
     let stop: UnlistenFn | undefined;
+    let cancelled = false;
     onTelegramMessage((msg) => {
       const entry: ChannelActivityEntry = {
         channelId: msg.channelId,
@@ -542,10 +797,18 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
       void routeTelegramCommand(msg, channelCatalogRef.current);
     })
       .then((fn) => {
+        if (cancelled) {
+          safeUnlisten(fn);
+          return;
+        }
         stop = fn;
       })
       .catch(() => {});
-    return () => stop?.();
+    return () => {
+      cancelled = true;
+      safeUnlisten(stop);
+      stop = undefined;
+    };
   }, []);
 
   const updateCatalog = (next: PluginCatalog) => {
@@ -651,6 +914,14 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
       return { ...row, status: reach.status, statusLabel: reach.label };
     });
   }, [connectedInstanceScan, manualVersion, connectedReachability]);
+  const workflowExecutionRequestRowsMerged = useMemo(
+    () => mergeAllManual(workflowExecutionRequestRows),
+    [workflowExecutionRequestRows, manualVersion],
+  );
+  const workflowExecutionRecordRowsMerged = useMemo(
+    () => mergeAllManual(workflowExecutionRecordRows),
+    [workflowExecutionRecordRows, manualVersion],
+  );
   const systemCliRows = useMemo(
     () => commandRowsMerged.filter((row) => row.sourceKind === 'system-cli'),
     [commandRowsMerged],
@@ -912,7 +1183,7 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
   const rescanMemory = useCallback(async (): Promise<ScanOutcome> => {
     const startedAt = Date.now();
     const prev = memoryRowsMerged;
-    if (!projectRoot) {
+    if (!workflowExecutionRequestsRoot) {
       return {
         sheetId: 'memory',
         label: 'Memory',
@@ -990,6 +1261,88 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
     }
   }, [commandRowsMerged, projectRoot, channelCatalog]);
 
+  const rescanWorkflowExecutionRequests = useCallback(async (): Promise<ScanOutcome> => {
+    const startedAt = Date.now();
+    const prev = workflowExecutionRequestRowsMerged;
+    if (!projectRoot) {
+      return {
+        sheetId: 'workflow-execution-requests',
+        label: 'Execution Requests',
+        count: prev.length,
+        added: [],
+        removed: [],
+        updated: [],
+        skipped: 'No project selected',
+        durationMs: Date.now() - startedAt,
+      };
+    }
+    try {
+      const rows = await loadWorkflowExecutionRequestRows(workflowExecutionRequestsRoot);
+      setWorkflowExecutionRequestRows(rows);
+      setWorkflowExecutionRequestsError(null);
+      const next = mergeAllManual(rows);
+      return {
+        sheetId: 'workflow-execution-requests',
+        label: 'Execution Requests',
+        count: next.length,
+        ...diffRows(prev, next),
+        durationMs: Date.now() - startedAt,
+      };
+    } catch (e) {
+      return {
+        sheetId: 'workflow-execution-requests',
+        label: 'Execution Requests',
+        count: prev.length,
+        added: [],
+        removed: [],
+        updated: [],
+        error: e instanceof Error ? e.message : String(e),
+        durationMs: Date.now() - startedAt,
+      };
+    }
+  }, [workflowExecutionRequestsRoot, workflowExecutionRequestRowsMerged]);
+
+  const rescanWorkflowExecutionRecords = useCallback(async (): Promise<ScanOutcome> => {
+    const startedAt = Date.now();
+    const prev = workflowExecutionRecordRowsMerged;
+    if (!projectRoot) {
+      return {
+        sheetId: 'workflow-execution-records',
+        label: 'Execution Records',
+        count: prev.length,
+        added: [],
+        removed: [],
+        updated: [],
+        skipped: 'No project selected',
+        durationMs: Date.now() - startedAt,
+      };
+    }
+    try {
+      const rows = await loadWorkflowExecutionRecordRows(workflowExecutionRecordsRoot);
+      setWorkflowExecutionRecordRows(rows);
+      setWorkflowExecutionRecordsError(null);
+      const next = mergeAllManual(rows);
+      return {
+        sheetId: 'workflow-execution-records',
+        label: 'Execution Records',
+        count: next.length,
+        ...diffRows(prev, next),
+        durationMs: Date.now() - startedAt,
+      };
+    } catch (e) {
+      return {
+        sheetId: 'workflow-execution-records',
+        label: 'Execution Records',
+        count: prev.length,
+        added: [],
+        removed: [],
+        updated: [],
+        error: e instanceof Error ? e.message : String(e),
+        durationMs: Date.now() - startedAt,
+      };
+    }
+  }, [projectRoot, workflowExecutionRecordsRoot, workflowExecutionRecordRowsMerged]);
+
   const rescanConnectedInstances = useCallback(async (): Promise<ScanOutcome> => {
     const startedAt = Date.now();
     const prev = connectedInstanceRows;
@@ -1037,9 +1390,13 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
                   ? memoryRowsMerged
                   : activeSheet === 'commands'
                     ? commandRowsMerged
-                    : activeSheet === 'connected-instances'
-                      ? connectedInstanceRows
-                      : [];
+                    : activeSheet === 'workflow-execution-requests'
+                      ? workflowExecutionRequestRowsMerged
+                      : activeSheet === 'workflow-execution-records'
+                        ? workflowExecutionRecordRowsMerged
+                        : activeSheet === 'connected-instances'
+                          ? connectedInstanceRows
+                          : [];
     if (categoryFilter !== 'all') {
       rows = rows.filter((r) => r.category1 === categoryFilter);
     }
@@ -1053,6 +1410,8 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
     channelRows,
     memoryRowsMerged,
     commandRowsMerged,
+    workflowExecutionRequestRowsMerged,
+    workflowExecutionRecordRowsMerged,
     connectedInstanceRows,
     categoryFilter,
   ]);
@@ -1061,6 +1420,11 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
     const set = new Set(activeRows.map((r) => r.category1));
     return ['all', ...Array.from(set).sort()];
   }, [activeRows]);
+
+  useEffect(() => {
+    const linkedRow = selectIntegrationRowFromDeepLink(activeRows, rowDeepLink);
+    if (linkedRow) setSelectedRow(linkedRow);
+  }, [activeRows, rowDeepLink]);
 
   const handleTestPluginRow = useCallback(
     async (row: IntegrationRow) => {
@@ -1348,7 +1712,7 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
   const handleCommandMappingUpdate = useCallback(
     (
       mappingId: string,
-      patch: { trigger: string; description: string; action: CommandAction; enabled: boolean },
+      patch: { trigger: string; description: string; action: CommandAction; enabled: boolean; executor?: CommandMapping['executor'] },
     ) => {
       const current = channelCatalogRef.current;
       const target = current.commandMappings.find((m) => m.id === mappingId);
@@ -1359,6 +1723,7 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
         description: patch.description,
         action: DEFAULT_COMMAND_MAPPING_IDS.has(mappingId) ? target.action : patch.action,
         enabled: patch.enabled,
+        executor: patch.executor,
       };
       const nextCatalog: ChannelCatalog = {
         ...current,
@@ -1397,13 +1762,14 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
   );
 
   const handleCommandMappingAdd = useCallback(
-    (input: { trigger: string; description: string; action: CommandAction; enabled: boolean }) => {
+    (input: { trigger: string; description: string; action: CommandAction; enabled: boolean; executor?: CommandMapping['executor'] }) => {
       const mapping: CommandMapping = {
         id: newMappingId(),
         trigger: input.trigger,
         description: input.description,
         action: input.action,
         enabled: input.enabled,
+        executor: input.executor,
       };
       const current = channelCatalogRef.current;
       const nextCatalog: ChannelCatalog = {
@@ -1473,6 +1839,8 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
     { key: 'channels', label: t.integrations.sheetChannels, badge: channelRows.length },
     { key: 'memory', label: t.integrations.sheetMemory, badge: memoryRowsMerged.length },
     { key: 'commands', label: t.integrations.sheetCommands, badge: commandRowsMerged.length },
+    { key: 'workflow-execution-requests', label: 'Execution Requests', badge: workflowExecutionRequestRowsMerged.length },
+    { key: 'workflow-execution-records', label: 'Execution Records', badge: workflowExecutionRecordRowsMerged.length },
     { key: 'connected-instances', label: 'Network Instances', badge: connectedInstanceRows.length },
     { key: 'connect', label: 'Connect' },
   ];
@@ -1685,6 +2053,50 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
     [projectRoot],
   );
 
+  const testWorkflowExecutionRequestsSheet = useCallback(
+    async (rows: IntegrationRow[]): Promise<ScanOutcome> => {
+      const startedAt = Date.now();
+      try {
+        await loadWorkflowExecutionRequestRows(workflowExecutionRequestsRoot);
+        return createSheetTestOutcome({
+          sheetId: 'workflow-execution-requests',
+          count: rows.length,
+          durationMs: Date.now() - startedAt,
+        });
+      } catch (e) {
+        return createSheetTestOutcome({
+          sheetId: 'workflow-execution-requests',
+          count: rows.length,
+          error: e instanceof Error ? e.message : String(e),
+          durationMs: Date.now() - startedAt,
+        });
+      }
+    },
+    [workflowExecutionRequestsRoot],
+  );
+
+  const testWorkflowExecutionRecordsSheet = useCallback(
+    async (rows: IntegrationRow[]): Promise<ScanOutcome> => {
+      const startedAt = Date.now();
+      try {
+        await loadWorkflowExecutionRecordRows(workflowExecutionRecordsRoot);
+        return createSheetTestOutcome({
+          sheetId: 'workflow-execution-records',
+          count: rows.length,
+          durationMs: Date.now() - startedAt,
+        });
+      } catch (e) {
+        return createSheetTestOutcome({
+          sheetId: 'workflow-execution-records',
+          count: rows.length,
+          error: e instanceof Error ? e.message : String(e),
+          durationMs: Date.now() - startedAt,
+        });
+      }
+    },
+    [workflowExecutionRecordsRoot],
+  );
+
   const testConnectedInstancesSheet = useCallback(
     async (rows: IntegrationRow[]): Promise<ScanOutcome> => {
       const startedAt = Date.now();
@@ -1731,6 +2143,14 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
         channels: { scan: rescanChannels, test: testChannelsSheet },
         memory: { scan: rescanMemory, test: testMemorySheet },
         commands: { scan: rescanCommands, test: testCommandsSheet },
+        'workflow-execution-requests': {
+          scan: rescanWorkflowExecutionRequests,
+          test: testWorkflowExecutionRequestsSheet,
+        },
+        'workflow-execution-records': {
+          scan: rescanWorkflowExecutionRecords,
+          test: testWorkflowExecutionRecordsSheet,
+        },
         'connected-instances': { scan: rescanConnectedInstances, test: testConnectedInstancesSheet },
       }),
     [
@@ -1741,12 +2161,16 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
       rescanChannels,
       rescanMemory,
       rescanCommands,
+      rescanWorkflowExecutionRequests,
+      rescanWorkflowExecutionRecords,
       rescanConnectedInstances,
       testPluginRowsForSheet,
       testSkillsSheet,
       testChannelsSheet,
       testMemorySheet,
       testCommandsSheet,
+      testWorkflowExecutionRequestsSheet,
+      testWorkflowExecutionRecordsSheet,
       testConnectedInstancesSheet,
     ],
   );
@@ -1844,10 +2268,14 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
       : activeSheet === 'skills'
         ? skillsLoading
         : activeSheet === 'memory'
-          ? memoryLoading
-          : activeSheet === 'commands'
-            ? commandsLoading
-            : false;
+        ? memoryLoading
+        : activeSheet === 'commands'
+          ? commandsLoading
+          : activeSheet === 'workflow-execution-requests'
+            ? workflowExecutionRequestsLoading
+            : activeSheet === 'workflow-execution-records'
+              ? workflowExecutionRecordsLoading
+              : false;
 
   const activeSheetError =
     activeSheet === SYSTEM_INSTALLED_APPS_SHEET
@@ -1857,10 +2285,14 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
       : activeSheet === 'skills'
         ? skillsError
         : activeSheet === 'memory'
-          ? memoryError
-          : activeSheet === 'commands'
-            ? commandsError
-            : null;
+        ? memoryError
+        : activeSheet === 'commands'
+          ? commandsError
+          : activeSheet === 'workflow-execution-requests'
+            ? workflowExecutionRequestsError
+            : activeSheet === 'workflow-execution-records'
+              ? workflowExecutionRecordsError
+              : null;
 
   const RESCANABLE_SHEETS = new Set<IntegrationSheet>(INTEGRATION_INVENTORY_SHEETS);
 
@@ -2119,12 +2551,36 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
                 {t.integrations.selectProjectHint}
               </p>
             )}
+            {!workflowExecutionRequestsRoot && activeSheet === 'workflow-execution-requests' && (
+              <p className="shrink-0 border border-amber-400/25 bg-amber-950/25 px-3 py-2 text-xs text-amber-200/90">
+                Select a project to load workflow execution request packages.
+              </p>
+            )}
+            {!workflowExecutionRecordsRoot && activeSheet === 'workflow-execution-records' && (
+              <p className="shrink-0 border border-amber-400/25 bg-amber-950/25 px-3 py-2 text-xs text-amber-200/90">
+                Select a project to load workflow execution handoff records.
+              </p>
+            )}
             {activeSheet === 'commands' && (
               <div className="shrink-0 border border-cyan-400/20 bg-cyan-950/20 px-3 py-2 text-xs text-cyan-100/90">
                 {t.integrations.commandsInventorySummary
                   .replace('{detected}', String(systemCliRows.length))
                   .replace('{exposed}', String(exposedSystemCliCount))
                   .replace('{whitelisted}', String(exposedSystemCliConfigured))}
+              </div>
+            )}
+            {activeSheet === 'workflow-execution-requests' && (
+              <div className="shrink-0 border border-emerald-400/20 bg-emerald-950/20 px-3 py-2 text-xs text-emerald-100/90">
+                Dry-run queue for Project Workflow draft requests. Rows are
+                handoff packages for future Integration Hub executors; this sheet
+                does not run commands or agents.
+              </div>
+            )}
+            {activeSheet === 'workflow-execution-records' && (
+              <div className="shrink-0 border border-cyan-400/20 bg-cyan-950/20 px-3 py-2 text-xs text-cyan-100/90">
+                Audit log for executor handoff attempts. Rows show whether a
+                package was ready for a future executor or blocked by policy; this
+                sheet does not run commands or agents.
               </div>
             )}
             {activeSheet === 'connected-instances' && (
@@ -2262,6 +2718,21 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
         otherCommandTriggers={otherCommandTriggers}
         isDefaultCommandMapping={isDefaultCommandMapping}
         onManualSaved={refreshManual}
+        onApproveWorkflowExecutionRequest={handleApproveWorkflowExecutionRequest}
+        onRecordWorkflowExecutionHandoff={handleRecordWorkflowExecutionHandoff}
+        onRunWorkflowExecutionDryRun={handleRunWorkflowExecutionDryRun}
+        onRunWorkflowExecutionLive={handleRunWorkflowExecutionLive}
+        onOpenWorkflowRun={(target) => {
+          const params = new URLSearchParams();
+          if (target.workItemId) params.set('workItemId', target.workItemId);
+          if (target.workflowRunId) params.set('workflowRunId', target.workflowRunId);
+          if (target.nodeId) params.set('nodeId', target.nodeId);
+          const query = params.toString();
+          router.push(query ? `/ai_assistants/workflow-runs?${query}` : '/ai_assistants/workflow-runs');
+        }}
+        onOpenWorkflowExecutionRequest={(requestId) => {
+          router.push(`/integrations-hub/workflow-execution-requests?requestId=${encodeURIComponent(requestId)}`);
+        }}
       />
 
       {logsForId && <McpLogsViewer pluginId={logsForId} onClose={() => setLogsForId(null)} />}

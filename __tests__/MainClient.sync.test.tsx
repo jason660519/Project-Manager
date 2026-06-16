@@ -24,6 +24,24 @@ import {
 
 // ── Mock heavy / Tauri-specific dependencies ───────────────────────────────────
 
+const tauriEventMock = vi.hoisted(() => ({
+  cleanups: new Map<string, ReturnType<typeof vi.fn>>(),
+  resolvers: new Map<string, (eventId: number) => void>(),
+  unregisterListener: vi.fn(),
+  listen: vi.fn(),
+}));
+
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: vi.fn(async (command: string) => {
+    if (command === 'project_manager_root') return '';
+    return undefined;
+  }),
+}));
+
+vi.mock('@tauri-apps/api/event', () => ({
+  listen: tauriEventMock.listen,
+}));
+
 vi.mock('../app/ui/AppShell', () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
@@ -157,10 +175,66 @@ function getStoredDashboardIds(): string[] {
 
 beforeEach(() => {
   localStorage.clear();
+  tauriEventMock.cleanups.clear();
+  tauriEventMock.resolvers.clear();
+  tauriEventMock.unregisterListener.mockClear();
+  tauriEventMock.listen.mockReset();
+  tauriEventMock.listen.mockImplementation((event: string) => {
+    const cleanup = vi.fn();
+    tauriEventMock.cleanups.set(event, cleanup);
+    return new Promise<() => void>((resolve) => {
+      tauriEventMock.resolvers.set(event, () => resolve(cleanup));
+    });
+  });
+  Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
+  Reflect.deleteProperty(window, '__TAURI_EVENT_PLUGIN_INTERNALS__');
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
+  Reflect.deleteProperty(window, '__TAURI_EVENT_PLUGIN_INTERNALS__');
+});
+
+describe('Tauri event listener cleanup', () => {
+  it('safe-unlistens listeners that resolve after MainClient has already unmounted', async () => {
+    Object.defineProperty(window, '__TAURI_INTERNALS__', {
+      configurable: true,
+      value: {
+        transformCallback: vi.fn(() => 1),
+        invoke: vi.fn((command: string, args?: { event?: string }) => {
+          if (command === 'project_manager_root') return Promise.resolve('');
+          if (command === 'plugin:event|listen' && args?.event) {
+            return new Promise<number>((resolve) => {
+              tauriEventMock.resolvers.set(args.event!, resolve);
+            });
+          }
+          return Promise.resolve(undefined);
+        }),
+      },
+    });
+    Object.defineProperty(window, '__TAURI_EVENT_PLUGIN_INTERNALS__', {
+      configurable: true,
+      value: {
+        unregisterListener: tauriEventMock.unregisterListener,
+      },
+    });
+
+    const { unmount } = renderMainClient(<MainClient currentView="dashboard" />);
+    await flushEffects();
+    await vi.waitFor(() => {
+      expect(tauriEventMock.cleanups.has('config-changed')).toBe(true);
+    });
+
+    unmount();
+
+    await act(async () => {
+      let eventId = 1;
+      for (const resolve of tauriEventMock.resolvers.values()) resolve(eventId++);
+    });
+
+    expect(tauriEventMock.cleanups.get('config-changed')).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('checkbox toggle → localStorage sync', () => {

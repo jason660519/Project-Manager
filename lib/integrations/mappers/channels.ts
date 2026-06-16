@@ -1,6 +1,7 @@
 import type { TelegramPollStatus } from '../../bridge';
 import type { ChannelConfig, ChannelPlatform, CommandMapping } from '../../types/channels';
 import type { IntegrationRow, IntegrationStatus } from '../types';
+import type { ProjectWorkflowExecutorRegistry } from '../../project-workflows';
 
 const PLATFORM_LABELS: Record<ChannelPlatform, string> = {
   telegram: 'Telegram',
@@ -63,6 +64,8 @@ export function mapChannelRow(
 }
 
 export function mapCommandMappingRow(mapping: CommandMapping): IntegrationRow {
+  const badges: string[] = [mapping.action];
+  if (mapping.executor?.capabilityId) badges.push(mapping.executor.capabilityId);
   return {
     rowKey: `channels:cmd:${mapping.id}`,
     sheet: 'channels',
@@ -85,7 +88,38 @@ export function mapCommandMappingRow(mapping: CommandMapping): IntegrationRow {
     lastUpdated: '',
     notes: mapping.description,
     lv: null,
-    badges: [mapping.action],
+    badges,
     payload: { mapping },
   };
+}
+
+export function buildExecutorRegistryFromCommandMappings(
+  mappings: CommandMapping[],
+): ProjectWorkflowExecutorRegistry {
+  return mappings.reduce<ProjectWorkflowExecutorRegistry>((registry, mapping) => {
+    const executor = mapping.executor;
+    const command = executor?.command;
+    const commandName = command?.command.trim() ?? '';
+    const capabilityId = executor?.capabilityId.trim() ?? '';
+    if (!mapping.enabled || !executor || !command || !commandName || !capabilityId) {
+      return registry;
+    }
+
+    registry[capabilityId] = {
+      state: 'resolved',
+      executionState: executor.executionState === 'live_command_allowed' ? 'live_command_allowed' : 'dry_run_only',
+      integrationSheet: 'commands',
+      sourceKind: 'command-mapping',
+      sourceId: mapping.id,
+      label: executor.label?.trim() || mapping.description.trim() || mapping.trigger,
+      commandPreview: executor.commandPreview?.trim() || [commandName, ...command.args].join(' '),
+      command: {
+        command: commandName,
+        args: command.args,
+      },
+      safetyNotice: executor.safetyNotice?.trim()
+        || 'Dry-run executor candidate only; Project Manager has not executed this command.',
+    };
+    return registry;
+  }, {});
 }

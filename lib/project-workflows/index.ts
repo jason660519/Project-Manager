@@ -1,10 +1,13 @@
 export {
   approveProjectWorkflowRun,
+  autoRequestEligibleProjectWorkflowDrafts,
   completeProjectWorkflowNode,
   createProjectWorkflowRun,
   getProjectWorkflowTemplateById,
   listProjectWorkflowTemplates,
+  requestProjectWorkflowDraftRun,
   renderProjectWorkflowDecisionPackage,
+  setProjectWorkflowExecutionMode,
   startProjectWorkflowNode,
   validateProjectWorkflowTemplate,
 } from './projectWorkflowEngine';
@@ -20,6 +23,29 @@ export {
   saveProjectWorkflowRun,
   serializeProjectWorkflowRun,
 } from './projectWorkflowRunStore';
+export {
+  DEFAULT_PROJECT_WORKFLOW_EXECUTOR_REGISTRY,
+  resolveProjectWorkflowDraftExecutor,
+} from './projectWorkflowExecutionResolver';
+export {
+  approveProjectWorkflowExecutionRequest,
+  buildProjectWorkflowExecutorHandoffRecord,
+  buildProjectWorkflowExecutorRunRecord,
+  buildProjectWorkflowExecutionRequests,
+  evaluateProjectWorkflowExecutionRequestConsumption,
+  projectWorkflowExecutorHandoffRecordPath,
+  projectWorkflowExecutorHandoffRecordsDirectory,
+  projectWorkflowExecutionRequestPath,
+  projectWorkflowExecutionRequestsDirectory,
+  saveProjectWorkflowExecutorHandoffRecord,
+  saveProjectWorkflowExecutorRunRecord,
+  saveProjectWorkflowExecutionRequests,
+  serializeProjectWorkflowExecutorHandoffRecord,
+  serializeProjectWorkflowExecutorRunRecord,
+  serializeProjectWorkflowExecutionRequest,
+  runProjectWorkflowExecutorDryRun,
+  runProjectWorkflowExecutorLive,
+} from './projectWorkflowExecutionPackageStore';
 export type {
   CompleteProjectWorkflowNodeInput,
   CreateProjectWorkflowRunInput,
@@ -31,6 +57,9 @@ export type {
   ProjectWorkflowDiscipline,
   ProjectWorkflowEvent,
   ProjectWorkflowEventType,
+  ProjectWorkflowExecutionDraft,
+  ProjectWorkflowExecutionDraftStatus,
+  ProjectWorkflowExecutionMode,
   ProjectWorkflowEvidenceKind,
   ProjectWorkflowEvidenceRecord,
   ProjectWorkflowEvidenceRequirement,
@@ -61,3 +90,26 @@ export type {
   ProjectWorkflowGraphView,
 } from './projectWorkflowGraphView';
 export type { ProjectWorkflowRunStoreAdapter } from './projectWorkflowRunStore';
+export type {
+  ProjectWorkflowExecutorCandidate,
+  ProjectWorkflowExecutorCommandPreview,
+  ProjectWorkflowExecutorExecutionState,
+  ProjectWorkflowExecutorRegistry,
+  ProjectWorkflowExecutorResolution,
+  ProjectWorkflowExecutorResolutionState,
+  ProjectWorkflowExecutorUnresolved,
+} from './projectWorkflowExecutionResolver';
+export type {
+  ProjectWorkflowExecutionRequestPackage,
+  ProjectWorkflowExecutionRequestConsumptionDecision,
+  ProjectWorkflowExecutionRequestReviewStatus,
+  ProjectWorkflowExecutionRequestSchemaVersion,
+  ProjectWorkflowExecutionRequestStatus,
+  ProjectWorkflowExecutionRequestStoreAdapter,
+  ProjectWorkflowExecutorHandoffRecord,
+  ProjectWorkflowExecutorHandoffRecordStatus,
+  ProjectWorkflowExecutorRunRecord,
+  ProjectWorkflowExecutorRunRecordStatus,
+  ProjectWorkflowExecutorRunResult,
+  ProjectWorkflowExecutorLiveRunnerAdapter,
+} from './projectWorkflowExecutionPackageStore';

@@ -5,11 +5,14 @@ import { describe, expect, it } from 'vitest';
 
 import {
   approveProjectWorkflowRun,
+  autoRequestEligibleProjectWorkflowDrafts,
   completeProjectWorkflowNode,
   createProjectWorkflowRun,
   getProjectWorkflowTemplateById,
   listProjectWorkflowTemplates,
   renderProjectWorkflowDecisionPackage,
+  requestProjectWorkflowDraftRun,
+  setProjectWorkflowExecutionMode,
   startProjectWorkflowNode,
   validateProjectWorkflowTemplate,
 } from '../lib/project-workflows/projectWorkflowEngine';
@@ -134,6 +137,8 @@ describe('Project Workflow Loop Engine run state', () => {
     });
 
     expect(run.status).toBe('queued');
+    expect(run.executionMode).toBe('manual_only');
+    expect(run.executionDrafts).toEqual([]);
     expect(run.executionStarted).toBe(false);
     expect(run.events).toEqual([
       expect.objectContaining({
@@ -326,6 +331,207 @@ describe('Project Workflow Loop Engine run state', () => {
     expect(blocked.events.at(-1)).toMatchObject({
       type: 'stop_policy_blocked',
       nodeId: 'intake',
+    });
+  });
+
+  it('creates a manual execution draft when a ready node starts in manual-only mode', () => {
+    const template = getProjectWorkflowTemplateById('software-engineering-loop')!;
+    const initial = createProjectWorkflowRun(template, {
+      projectId: 'project-manager',
+      workItemId: 'F54',
+      now: '2026-06-16T06:00:00.000Z',
+    });
+
+    const started = startProjectWorkflowNode(template, initial, 'intake', '2026-06-16T06:01:00.000Z');
+
+    expect(started.executionMode).toBe('manual_only');
+    expect(started.executionDrafts).toEqual([
+      expect.objectContaining({
+        id: 'project-workflow-run-F54-software-engineering-loop-20260616060000:intake:draft-1',
+        nodeId: 'intake',
+        actorKind: 'human',
+        status: 'manual_run_required',
+        riskLevel: 'low',
+        runModeAtCreation: 'manual_only',
+        expectedHandoffArtifactId: 'intake-brief',
+        expectedEvidenceIds: ['feature-spec'],
+        autoRunEligible: false,
+        eligibilityReason: 'Run is manual-only; human must run the draft explicitly.',
+      }),
+    ]);
+    expect(started.events.map((event) => event.type)).toEqual([
+      'run_created',
+      'node_started',
+      'execution_draft_created',
+    ]);
+  });
+
+  it('blocks node start while the run-level execution mode is paused', () => {
+    const template = getProjectWorkflowTemplateById('software-engineering-loop')!;
+    const initial = {
+      ...createProjectWorkflowRun(template, {
+        projectId: 'project-manager',
+        workItemId: 'F54',
+        now: '2026-06-16T06:00:00.000Z',
+      }),
+      executionMode: 'paused' as const,
+    };
+
+    const paused = startProjectWorkflowNode(template, initial, 'intake', '2026-06-16T06:01:00.000Z');
+
+    expect(paused.status).toBe('blocked');
+    expect(paused.nodeRuns.find((node) => node.nodeId === 'intake')).toMatchObject({
+      status: 'ready',
+      attempts: 0,
+    });
+    expect(paused.executionDrafts).toEqual([]);
+    expect(paused.events.at(-1)).toMatchObject({
+      type: 'execution_draft_blocked',
+      nodeId: 'intake',
+      summary: 'Execution mode is paused; node intake cannot start.',
+    });
+  });
+
+  it('allows safe auto-run drafts only for low-risk agent or tool nodes under run-level auto mode', () => {
+    const template = getProjectWorkflowTemplateById('software-engineering-loop')!;
+    const initial = {
+      ...createProjectWorkflowRun(template, {
+        projectId: 'project-manager',
+        workItemId: 'F54',
+        now: '2026-06-16T06:00:00.000Z',
+      }),
+      executionMode: 'auto_safe_nodes' as const,
+    };
+    const readyForAnalysis = completeProjectWorkflowNode(initial, 'intake', {
+      completedAt: '2026-06-16T06:02:00.000Z',
+      handoff: {
+        artifactId: 'intake-brief',
+        summary: 'F54 scope approved.',
+        fields: { scope: 'Execution draft state only' },
+      },
+      evidence: [{ evidenceId: 'feature-spec', kind: 'document', summary: 'F54 spec exists.' }],
+      scorecardResults: [{ scorecardId: 'required-handoff', status: 'passed', summary: 'Intake complete.' }],
+    });
+
+    const started = startProjectWorkflowNode(template, readyForAnalysis, 'analysis', '2026-06-16T06:03:00.000Z');
+
+    expect(started.executionDrafts.at(-1)).toMatchObject({
+      nodeId: 'analysis',
+      actorKind: 'ai_agent',
+      status: 'auto_run_allowed',
+      autoRunEligible: true,
+      eligibilityReason: 'Run allows safe auto-run and node is low-risk with an agent/tool actor.',
+    });
+  });
+
+  it('never auto-runs high-risk nodes even when the run allows safe auto mode', () => {
+    const template = getProjectWorkflowTemplateById('software-engineering-loop')!;
+    const initial = {
+      ...createProjectWorkflowRun(template, {
+        projectId: 'project-manager',
+        workItemId: 'F54',
+        now: '2026-06-16T06:00:00.000Z',
+      }),
+      executionMode: 'auto_safe_nodes' as const,
+    };
+    const readyForPr = completeNodesForGate(template, initial, [
+      'intake',
+      'analysis',
+      'implementation',
+      'verification',
+      'quality-gate',
+      'human-approval',
+    ]);
+
+    const started = startProjectWorkflowNode(template, readyForPr, 'pr-preparation', '2026-06-16T06:20:00.000Z');
+
+    expect(started.executionDrafts.at(-1)).toMatchObject({
+      nodeId: 'pr-preparation',
+      status: 'blocked_needs_approval',
+      riskLevel: 'high',
+      autoRunEligible: false,
+      eligibilityReason: 'High-risk nodes cannot auto-run and require explicit approval/manual execution.',
+    });
+  });
+
+  it('changes run-level execution mode with an audit event', () => {
+    const template = getProjectWorkflowTemplateById('software-engineering-loop')!;
+    const initial = createProjectWorkflowRun(template, {
+      projectId: 'project-manager',
+      workItemId: 'F54',
+      now: '2026-06-16T06:00:00.000Z',
+    });
+
+    const changed = setProjectWorkflowExecutionMode(initial, 'auto_safe_nodes', 'PM Lead', '2026-06-16T06:04:00.000Z');
+
+    expect(changed.executionMode).toBe('auto_safe_nodes');
+    expect(changed.updatedAt).toBe('2026-06-16T06:04:00.000Z');
+    expect(changed.events.at(-1)).toMatchObject({
+      type: 'execution_mode_changed',
+      summary: 'Execution mode changed to auto_safe_nodes by PM Lead.',
+    });
+  });
+
+  it('marks a draft run request without executing an external actor or tool', () => {
+    const template = getProjectWorkflowTemplateById('software-engineering-loop')!;
+    const initial = createProjectWorkflowRun(template, {
+      projectId: 'project-manager',
+      workItemId: 'F54',
+      now: '2026-06-16T06:00:00.000Z',
+    });
+    const started = startProjectWorkflowNode(template, initial, 'intake', '2026-06-16T06:01:00.000Z');
+    const draftId = started.executionDrafts[0].id;
+
+    const requested = requestProjectWorkflowDraftRun(started, draftId, 'PM Lead', '2026-06-16T06:05:00.000Z');
+
+    expect(requested.executionDrafts[0]).toMatchObject({
+      id: draftId,
+      status: 'run_requested',
+      runRequestedBy: 'PM Lead',
+      runRequestedAt: '2026-06-16T06:05:00.000Z',
+      executionResult: 'pending_external_executor',
+    });
+    expect(requested.events.at(-1)).toMatchObject({
+      type: 'execution_draft_run_requested',
+      summary: 'Execution draft requested by PM Lead; no external actor or tool was executed by Project Manager.',
+    });
+  });
+
+  it('auto-requests eligible drafts when run-level auto mode is active without executing tools', () => {
+    const template = getProjectWorkflowTemplateById('software-engineering-loop')!;
+    const initial = {
+      ...createProjectWorkflowRun(template, {
+        projectId: 'project-manager',
+        workItemId: 'F54',
+        now: '2026-06-16T07:20:00.000Z',
+      }),
+      executionMode: 'auto_safe_nodes' as const,
+    };
+    const readyForAnalysis = completeProjectWorkflowNode(initial, 'intake', {
+      completedAt: '2026-06-16T07:21:00.000Z',
+      handoff: {
+        artifactId: 'intake-brief',
+        summary: 'F54 scope approved.',
+        fields: { scope: 'Auto-request safe execution drafts.' },
+      },
+      evidence: [{ evidenceId: 'feature-spec', kind: 'document', summary: 'F54 spec exists.' }],
+      scorecardResults: [{ scorecardId: 'required-handoff', status: 'passed', summary: 'Intake complete.' }],
+    });
+    const started = startProjectWorkflowNode(template, readyForAnalysis, 'analysis', '2026-06-16T07:22:00.000Z');
+
+    const requested = autoRequestEligibleProjectWorkflowDrafts(started, 'Auto Run Policy', '2026-06-16T07:23:00.000Z');
+
+    expect(requested.executionDrafts.at(-1)).toMatchObject({
+      nodeId: 'analysis',
+      status: 'run_requested',
+      runRequestedBy: 'Auto Run Policy',
+      runRequestedAt: '2026-06-16T07:23:00.000Z',
+      executionResult: 'pending_external_executor',
+    });
+    expect(requested.events.at(-1)).toMatchObject({
+      type: 'execution_draft_run_requested',
+      nodeId: 'analysis',
+      summary: 'Execution draft auto-requested by Auto Run Policy; no external actor or tool was executed by Project Manager.',
     });
   });
 });

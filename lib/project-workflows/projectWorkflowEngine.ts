@@ -28,13 +28,25 @@ export type ProjectWorkflowNodeStatus = 'queued' | 'ready' | 'running' | 'succee
 export type ProjectWorkflowRunStatus = 'draft' | 'queued' | 'running' | 'blocked' | 'completed' | 'cancelled';
 export type ProjectWorkflowEvidenceKind = 'document' | 'test_result' | 'command_output' | 'approval' | 'artifact';
 export type ProjectWorkflowScorecardStatus = 'passed' | 'failed' | 'missing';
+export type ProjectWorkflowExecutionMode = 'manual_only' | 'auto_safe_nodes' | 'paused';
+export type ProjectWorkflowExecutionDraftStatus =
+  | 'manual_run_required'
+  | 'auto_run_allowed'
+  | 'blocked_needs_approval'
+  | 'policy_blocked'
+  | 'run_requested';
+export type ProjectWorkflowRiskLevel = 'low' | 'medium' | 'high';
 export type ProjectWorkflowEventType =
   | 'run_created'
   | 'node_started'
   | 'node_completed'
   | 'node_ready'
   | 'approval_recorded'
-  | 'stop_policy_blocked';
+  | 'stop_policy_blocked'
+  | 'execution_draft_created'
+  | 'execution_draft_blocked'
+  | 'execution_mode_changed'
+  | 'execution_draft_run_requested';
 
 export interface ProjectWorkflowRuntimeHint {
   mode: 'manual' | 'agent' | 'tool' | 'external';
@@ -171,6 +183,34 @@ export interface ProjectWorkflowEvent {
   gateId?: string;
 }
 
+export interface ProjectWorkflowExecutionDraft {
+  id: string;
+  workflowRunId: string;
+  nodeId: string;
+  nodeTitle: string;
+  actorKind: ProjectWorkflowActorKind;
+  status: ProjectWorkflowExecutionDraftStatus;
+  riskLevel: ProjectWorkflowRiskLevel;
+  runModeAtCreation: ProjectWorkflowExecutionMode;
+  systemPromptLabel: string;
+  taskPromptLabel: string;
+  memoryFiles: string[];
+  allowedTools: string[];
+  expectedHandoffArtifactId: string;
+  expectedEvidenceIds: string[];
+  autoRunEligible: boolean;
+  eligibilityReason: string;
+  integrationPolicy: {
+    requiresRegisteredCapability: boolean;
+    capabilityId?: string;
+    policyState: 'not_required' | 'pending_integration_hub' | 'ready';
+  };
+  runRequestedBy?: string;
+  runRequestedAt?: string;
+  executionResult?: 'pending_external_executor';
+  createdAt: string;
+}
+
 export interface ProjectWorkflowRun {
   id: string;
   templateId: string;
@@ -178,11 +218,13 @@ export interface ProjectWorkflowRun {
   projectId: string;
   workItemId: string;
   status: ProjectWorkflowRunStatus;
+  executionMode: ProjectWorkflowExecutionMode;
   executionStarted: boolean;
   createdAt: string;
   updatedAt: string;
   createdBy?: string;
   nodeRuns: ProjectWorkflowNodeRun[];
+  executionDrafts: ProjectWorkflowExecutionDraft[];
   handoffArtifacts: ProjectWorkflowHandoffArtifact[];
   evidenceLedger: ProjectWorkflowEvidenceRecord[];
   scorecardResults: ProjectWorkflowScorecardResult[];
@@ -519,6 +561,7 @@ export function createProjectWorkflowRun(
     projectId: input.projectId,
     workItemId: input.workItemId,
     status: 'queued',
+    executionMode: 'manual_only',
     executionStarted: false,
     createdAt,
     updatedAt: createdAt,
@@ -534,6 +577,7 @@ export function createProjectWorkflowRun(
       actorKind: node.actorKind,
       highRiskAction: node.highRiskAction === true,
     })),
+    executionDrafts: [],
     handoffArtifacts: [],
     evidenceLedger: [],
     scorecardResults: [],
@@ -559,10 +603,31 @@ export function startProjectWorkflowNode(
   const occurredAt = nowIso(now);
   const current = run.nodeRuns.find((nodeRun) => nodeRun.nodeId === nodeId);
   if (!current) throw new Error(`Unknown project workflow node: ${nodeId}`);
+  const executionMode = run.executionMode ?? 'manual_only';
+  if (executionMode === 'paused') {
+    const reason = `Execution mode is paused; node ${nodeId} cannot start.`;
+    return blockRun({
+      ...run,
+      executionMode,
+      executionDrafts: run.executionDrafts ?? [],
+      updatedAt: occurredAt,
+      events: [
+        ...run.events,
+        {
+          type: 'execution_draft_blocked',
+          occurredAt,
+          nodeId,
+          summary: reason,
+        },
+      ],
+    }, reason);
+  }
   if (current.attempts >= template.stopPolicy.maxNodeAttempts) {
     const reason = `Stop policy reached max attempts for node ${nodeId}.`;
     return blockRun({
       ...run,
+      executionMode,
+      executionDrafts: run.executionDrafts ?? [],
       updatedAt: occurredAt,
       nodeRuns: run.nodeRuns.map((nodeRun) =>
         nodeRun.nodeId === nodeId
@@ -580,10 +645,13 @@ export function startProjectWorkflowNode(
       ],
     }, reason);
   }
+  const nextAttempt = current.attempts + 1;
+  const draft = createExecutionDraft(template, run, node, executionMode, nextAttempt, occurredAt);
 
   return {
     ...run,
     status: 'running',
+    executionMode,
     executionStarted: true,
     updatedAt: occurredAt,
     nodeRuns: run.nodeRuns.map((nodeRun) =>
@@ -591,12 +659,13 @@ export function startProjectWorkflowNode(
         ? {
             ...nodeRun,
             status: 'running',
-            attempts: nodeRun.attempts + 1,
+            attempts: nextAttempt,
             startedAt: occurredAt,
             blockedReason: undefined,
           }
         : nodeRun,
     ),
+    executionDrafts: [...(run.executionDrafts ?? []), draft],
     events: [
       ...run.events,
       {
@@ -605,7 +674,129 @@ export function startProjectWorkflowNode(
         nodeId: node.id,
         summary: `${node.title} started.`,
       },
+      {
+        type: 'execution_draft_created',
+        occurredAt,
+        nodeId: node.id,
+        summary: `Execution draft created for ${node.title}: ${draft.eligibilityReason}`,
+      },
     ],
+  };
+}
+
+export function setProjectWorkflowExecutionMode(
+  run: ProjectWorkflowRun,
+  executionMode: ProjectWorkflowExecutionMode,
+  changedBy: string,
+  now?: string,
+): ProjectWorkflowRun {
+  const occurredAt = nowIso(now);
+  return {
+    ...run,
+    executionMode,
+    updatedAt: occurredAt,
+    events: [
+      ...run.events,
+      {
+        type: 'execution_mode_changed',
+        occurredAt,
+        summary: `Execution mode changed to ${executionMode} by ${changedBy}.`,
+      },
+    ],
+    nextAction: executionMode === 'paused'
+      ? 'Workflow run is paused. Human lead may inspect drafts but cannot start nodes until resumed.'
+      : executionMode === 'auto_safe_nodes'
+        ? 'Safe low-risk agent/tool nodes may create auto-run eligible drafts; high-risk nodes remain approval-gated.'
+        : 'Human lead reviews ready nodes and starts execution explicitly.',
+  };
+}
+
+export function requestProjectWorkflowDraftRun(
+  run: ProjectWorkflowRun,
+  draftId: string,
+  requestedBy: string,
+  now?: string,
+): ProjectWorkflowRun {
+  const occurredAt = nowIso(now);
+  const draft = (run.executionDrafts ?? []).find((candidate) => candidate.id === draftId);
+  if (!draft) throw new Error(`Unknown project workflow execution draft: ${draftId}`);
+  if (draft.status === 'blocked_needs_approval' || draft.status === 'policy_blocked') {
+    return blockRun({
+      ...run,
+      updatedAt: occurredAt,
+      events: [
+        ...run.events,
+        {
+          type: 'execution_draft_blocked',
+          occurredAt,
+          nodeId: draft.nodeId,
+          summary: `Execution draft ${draftId} cannot run: ${draft.eligibilityReason}`,
+        },
+      ],
+    }, draft.eligibilityReason);
+  }
+
+  return {
+    ...run,
+    updatedAt: occurredAt,
+    executionDrafts: (run.executionDrafts ?? []).map((candidate) =>
+      candidate.id === draftId
+        ? {
+            ...candidate,
+            status: 'run_requested',
+            runRequestedBy: requestedBy,
+            runRequestedAt: occurredAt,
+            executionResult: 'pending_external_executor',
+          }
+        : candidate,
+    ),
+    events: [
+      ...run.events,
+      {
+        type: 'execution_draft_run_requested',
+        occurredAt,
+        nodeId: draft.nodeId,
+        summary: `Execution draft requested by ${requestedBy}; no external actor or tool was executed by Project Manager.`,
+      },
+    ],
+    nextAction: 'Execution draft run request recorded. External executor integration remains pending.',
+  };
+}
+
+export function autoRequestEligibleProjectWorkflowDrafts(
+  run: ProjectWorkflowRun,
+  requestedBy: string,
+  now?: string,
+): ProjectWorkflowRun {
+  const occurredAt = nowIso(now);
+  const eligibleDrafts = (run.executionDrafts ?? []).filter((draft) => draft.status === 'auto_run_allowed');
+  if (eligibleDrafts.length === 0) return run;
+
+  const eligibleDraftIds = new Set(eligibleDrafts.map((draft) => draft.id));
+  return {
+    ...run,
+    updatedAt: occurredAt,
+    executionDrafts: (run.executionDrafts ?? []).map((draft) =>
+      eligibleDraftIds.has(draft.id)
+        ? {
+            ...draft,
+            status: 'run_requested',
+            runRequestedBy: requestedBy,
+            runRequestedAt: occurredAt,
+            executionResult: 'pending_external_executor',
+          }
+        : draft,
+    ),
+    events: [
+      ...run.events,
+      ...eligibleDrafts.map((draft) => ({
+        type: 'execution_draft_run_requested' as const,
+        occurredAt,
+        nodeId: draft.nodeId,
+        summary: `Execution draft auto-requested by ${requestedBy}; no external actor or tool was executed by Project Manager.`,
+      })),
+    ],
+    nextAction: 'Auto-run eligible execution draft request recorded. External executor integration remains pending.',
   };
 }
 
@@ -777,6 +968,90 @@ export function renderProjectWorkflowDecisionPackage(
     '',
     'No actor or command is executed by this package.',
   ].join('\n');
+}
+
+function createExecutionDraft(
+  template: ProjectWorkflowTemplate,
+  run: ProjectWorkflowRun,
+  node: ProjectWorkflowNodeDefinition,
+  executionMode: ProjectWorkflowExecutionMode,
+  attempt: number,
+  createdAt: string,
+): ProjectWorkflowExecutionDraft {
+  const highRisk = node.highRiskAction === true;
+  const riskLevel: ProjectWorkflowRiskLevel = highRisk ? 'high' : node.actorKind === 'tool' ? 'medium' : 'low';
+  const canAutoRunActor = node.actorKind === 'ai_agent' || node.actorKind === 'tool';
+  const autoRunEligible = executionMode === 'auto_safe_nodes' && !highRisk && canAutoRunActor;
+  const status: ProjectWorkflowExecutionDraftStatus =
+    highRisk
+      ? 'blocked_needs_approval'
+      : autoRunEligible
+        ? 'auto_run_allowed'
+        : 'manual_run_required';
+  const eligibilityReason = highRisk
+    ? 'High-risk nodes cannot auto-run and require explicit approval/manual execution.'
+    : executionMode === 'manual_only'
+      ? 'Run is manual-only; human must run the draft explicitly.'
+      : executionMode === 'auto_safe_nodes' && canAutoRunActor
+        ? 'Run allows safe auto-run and node is low-risk with an agent/tool actor.'
+        : 'Node actor is not eligible for auto-run; human must run the draft explicitly.';
+  const capabilityId = node.actorKind === 'tool'
+    ? `${template.discipline}:${node.id}:tool`
+    : node.actorKind === 'ai_agent'
+      ? `${template.discipline}:${node.id}:agent`
+      : undefined;
+
+  return {
+    id: `${run.id}:${node.id}:draft-${attempt}`,
+    workflowRunId: run.id,
+    nodeId: node.id,
+    nodeTitle: node.title,
+    actorKind: node.actorKind,
+    status,
+    riskLevel,
+    runModeAtCreation: executionMode,
+    systemPromptLabel: systemPromptLabel(node),
+    taskPromptLabel: `${node.title} task prompt for ${run.workItemId}`,
+    memoryFiles: memoryFilesForRun(run),
+    allowedTools: toolsForNode(node),
+    expectedHandoffArtifactId: node.handoffContract.artifactId,
+    expectedEvidenceIds: node.evidenceRequirements.filter((evidence) => evidence.required).map((evidence) => evidence.evidenceId),
+    autoRunEligible,
+    eligibilityReason,
+    integrationPolicy: {
+      requiresRegisteredCapability: node.actorKind === 'tool' || node.actorKind === 'ai_agent',
+      capabilityId,
+      policyState: node.actorKind === 'tool' ? 'pending_integration_hub' : capabilityId ? 'ready' : 'not_required',
+    },
+    createdAt,
+  };
+}
+
+function systemPromptLabel(node: ProjectWorkflowNodeDefinition): string {
+  const discipline = capitalize(node.discipline);
+  if (node.actorKind === 'ai_agent') return `${discipline} PM workflow AI agent`;
+  if (node.actorKind === 'tool') return `${discipline} PM workflow tool runner`;
+  if (node.actorKind === 'review_queue') return `${discipline} PM review queue`;
+  return `${discipline} PM workflow ${node.actorKind}`;
+}
+
+function toolsForNode(node: ProjectWorkflowNodeDefinition): string[] {
+  if (node.actorKind === 'tool') return ['approved command runner', 'verification logs', 'evidence capture'];
+  if (node.actorKind === 'ai_agent') return ['project files', 'feature docs', 'workflow memory'];
+  if (node.actorKind === 'review_queue') return ['evidence ledger', 'scorecards', 'approval records'];
+  return ['handoff form', 'evidence upload'];
+}
+
+function memoryFilesForRun(run: ProjectWorkflowRun): string[] {
+  return [
+    `.project-manager/features/${run.workItemId}/`,
+    '.project-manager/project-workflow-runs/',
+    'AGENTS.md',
+  ];
+}
+
+function capitalize(value: string): string {
+  return value.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function requireTemplate(templateId: string): ProjectWorkflowTemplate {

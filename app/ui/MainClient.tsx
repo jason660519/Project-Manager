@@ -46,6 +46,7 @@ import {
 import { formatStandardsGateRunError } from '../../lib/companyStandards/formatGatePolicyMessage';
 import { spawnStandardsGateRun, StandardsGateRunError } from '../../lib/companyStandards/spawnStandardsGate';
 import { I18nProvider, useI18n } from '../../lib/i18n';
+import type { UnlistenFn } from '../../lib/bridge';
 
 function RouteViewLoading() {
   return (
@@ -538,10 +539,13 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
   // Listen for config-changed events and hot-reload the matching project.
   useEffect(() => {
     if (!isTauri) return;
-    let unlisten: (() => void) | undefined;
+    let unlisten: UnlistenFn | undefined;
+    let safeUnlisten: ((fn: UnlistenFn | undefined) => void) | undefined;
+    let cancelled = false;
     (async () => {
-      const { onConfigChanged } = await import('../../lib/bridge');
-      unlisten = await onConfigChanged(({ path, config }) => {
+      const bridge = await import('../../lib/bridge');
+      safeUnlisten = bridge.safeUnlisten;
+      const cleanup = await bridge.onConfigChanged(({ path, config }) => {
         setProjects((prev) =>
           prev.map((p) =>
             p.configPath === path
@@ -550,8 +554,17 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
           ),
         );
       });
+      if (cancelled) {
+        bridge.safeUnlisten(cleanup);
+        return;
+      }
+      unlisten = cleanup;
     })();
-    return () => unlisten?.();
+    return () => {
+      cancelled = true;
+      safeUnlisten?.(unlisten);
+      unlisten = undefined;
+    };
   }, [isTauri]);
 
   // Tauri boot: hydrate local projects from disk immediately (don't wait for
@@ -799,10 +812,13 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
   // Subscribe to github-updated events and refresh matching project features.
   useEffect(() => {
     if (!isTauri) return;
-    let unlisten: (() => void) | undefined;
+    let unlisten: UnlistenFn | undefined;
+    let safeUnlisten: ((fn: UnlistenFn | undefined) => void) | undefined;
+    let cancelled = false;
     (async () => {
-      const { onGithubUpdated } = await import('../../lib/bridge');
-      unlisten = await onGithubUpdated(({ repoUrl, features: ghFeatures }) => {
+      const bridge = await import('../../lib/bridge');
+      safeUnlisten = bridge.safeUnlisten;
+      const cleanup = await bridge.onGithubUpdated(({ repoUrl, features: ghFeatures }) => {
         const refreshedFeatures: Feature[] = ghFeatures.map((f) => ({
           id: f.id,
           name: f.name,
@@ -819,8 +835,17 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
           }),
         );
       });
+      if (cancelled) {
+        bridge.safeUnlisten(cleanup);
+        return;
+      }
+      unlisten = cleanup;
     })();
-    return () => unlisten?.();
+    return () => {
+      cancelled = true;
+      safeUnlisten?.(unlisten);
+      unlisten = undefined;
+    };
   }, [isTauri]);
 
   const handleRunStart = useCallback(
@@ -889,14 +914,16 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
   useEffect(() => {
     if (!isTauri) return;
     let cancelled = false;
-    let unlistenAll: (() => void) | undefined;
+    let unlistenAll: UnlistenFn | undefined;
+    let safeUnlisten: ((fn: UnlistenFn | undefined) => void) | undefined;
     void (async () => {
-      const { subscribeAgentProcessEvents, safeUnlisten } = await import('../../lib/bridge');
+      const bridge = await import('../../lib/bridge');
+      safeUnlisten = bridge.safeUnlisten;
       // This MainClient-level listener exists to capture standards-gate process
       // events (gates have no mounted modal to forward them). Dispatch modals
       // already subscribe and forward their own PIDs, so route logs/exits for
       // gate-owned PIDs only — otherwise dispatch events would be handled twice.
-      const unlisten = await subscribeAgentProcessEvents({
+      const unlisten = await bridge.subscribeAgentProcessEvents({
         onStdout: ({ pid, spawnToken, line }) => {
           if (gateProcessTokensRef.current.has(spawnToken)) handleRunLogRef.current(pid, line);
         },
@@ -939,14 +966,14 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
         },
       });
       if (cancelled) {
-        safeUnlisten(unlisten);
+        bridge.safeUnlisten(unlisten);
         return;
       }
       unlistenAll = unlisten;
     })();
     return () => {
       cancelled = true;
-      unlistenAll?.();
+      safeUnlisten?.(unlistenAll);
       unlistenAll = undefined;
     };
   }, [isTauri]);
@@ -1720,7 +1747,7 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
         assistantSheet ? (
           <AIAssistantsConsoleClient
             activeSheet={assistantSheet}
-            projectRoot={selectedProject?.config.project.root}
+            projectRoot={projectManagerRoot}
             engineersPanel={
               selectedProject ? (
                 <EngineersView

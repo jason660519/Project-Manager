@@ -106,6 +106,60 @@
 - PASS: `npm run verify:dev-issues -- --routes /ai_assistants/workflow-runs`
   - Result: `Next dev Issues: 0`.
 
+## 2026-06-16 - Bugfix: Workflow Run Save Root Resolution
+
+- Symptom:
+  - PM clicked `Save workflow run` in AI Assistants > Workflow Runs and saw
+    `Unable to save workflow run.`
+  - The empty-state path showed `/Users/Project-Manager/.project-manager/project-workflow-runs`
+    instead of the real repo root.
+- Root cause:
+  - The Workflow Runs save button trusted the raw `projectRoot` prop.
+  - `MainClient` passed the selected project root into AI Assistants, so the
+    route could receive either a stale persisted sample root (`/Users/Project-Manager`)
+    or the first bundled sample project root.
+  - Browser dev write-file protection correctly rejected `/Users/Project-Manager`
+    because it is outside `process.cwd()`.
+- Test gap acknowledged:
+  - Previous TDD covered a mocked save path and browser smoke only checked that
+    the button rendered with console error count 0.
+  - It did not perform a real click-to-file save against the dev route.
+- RED:
+  - Added `__tests__/ai-assistants.console.test.tsx` coverage proving a stale
+    `/Users/Project-Manager` root must resolve through `getProjectManagerRoot()`
+    before saving.
+  - Added `__tests__/MainClient.lazy-routes.test.tsx` coverage proving AI
+    Assistants receives the detected Project Manager repo root rather than the
+    default bundled sample root.
+- GREEN:
+  - `AIAssistantsConsoleClient` now rewrites persisted sample Project Manager
+    roots to the detected repo root before loading, displaying, or saving
+    Project Workflow run sidecars.
+  - `MainClient` now passes `projectManagerRoot` into AI Assistants, matching
+    Keys and AI SDKs root handling.
+- Manual E2E smoke:
+  - Reloaded `http://localhost:43187/ai_assistants/workflow-runs`.
+  - Confirmed the path displayed as
+    `/Users/jasonmacbbookpro/Project/Project-Manager/.project-manager/project-workflow-runs`.
+  - Entered `F53`, clicked `Save workflow run`, and confirmed success message:
+    `/Users/jasonmacbbookpro/Project/Project-Manager/.project-manager/project-workflow-runs/project-workflow-run-F53-software-engineering-loop-20260615195241.json`.
+  - Confirmed the sidecar JSON exists on disk and browser console error count is 0.
+- PASS: `npm run verify:baseline`
+  - typecheck PASS
+  - agents:check PASS
+  - docs:check PASS
+  - docs:site:check PASS
+  - table sheet audit PASS
+  - static export hygiene PASS
+  - native dialog guard PASS
+  - UI i18n PASS
+  - vitest PASS: 174 files / 1185 tests
+  - cargo check PASS
+  - build PASS
+  - Existing Turbopack warnings remain in `app/api/integrations/scan-applications/route.ts`
+    broad `/Applications` tracing and `next.config.mjs` NFT trace; baseline still
+    completed with `== verify:baseline: PASS ==`.
+
 ## Verification - UI Save Action Baseline
 
 - PASS: `npm run verify:baseline`
@@ -126,6 +180,44 @@
 - Final dashboard update:
   - F53 status: `done`
   - F53 progress: `100`
+
+## 2026-06-16 - Runtime Listener Cleanup Fix
+
+- Symptom:
+  - PM reported the Next.js lower-left Issues badge on
+    `/ai_assistants/workflow-runs` showed:
+    `Runtime TypeError: undefined is not an object (evaluating 'listeners[eventId].handlerId')`.
+- Root cause:
+  - Tauri event `unlisten` functions are async. `safeUnlisten` only caught
+    synchronous throws, so async double-unregister rejections could still surface
+    as a runtime overlay.
+  - Several React effects still used direct `unlisten?.()` or did not clean up
+    listener promises that resolved after unmount/HMR cleanup.
+- Fix:
+  - Expanded `UnlistenFn` to allow `Promise<void>`.
+  - Updated `safeUnlisten` to catch both synchronous throws and async rejection.
+  - Updated MainClient, dispatch modals, font zoom shortcuts, GitHub issues,
+    plugin status, MCP logs, and Telegram listener cleanup paths to use
+    `safeUnlisten` and cancelled guards where needed.
+- Regression coverage:
+  - Added MainClient Tauri listener cleanup race coverage for a listener promise
+    resolving after unmount.
+  - Added async `safeUnlisten` bridge coverage.
+
+## Verification - Runtime Listener Cleanup Fix
+
+- PASS: `npm run test -- __tests__/MainClient.sync.test.tsx -t "safe-unlistens listeners"`
+- PASS: `npm run typecheck`
+- PASS: `npm run test -- __tests__/bridgeEventListeners.test.ts __tests__/MainClient.sync.test.tsx __tests__/useFontZoomShortcuts.test.tsx __tests__/ai-assistants.console.test.tsx`
+  - 4 files / 31 tests.
+- PASS: Browser reload smoke on
+  `http://localhost:43187/ai_assistants/workflow-runs`.
+  - `Save workflow run` still rendered.
+  - `Runtime TypeError` not visible.
+  - `listeners[eventId].handlerId` not visible.
+  - Browser console error count: 0.
+- PASS: `npm run verify:dev-issues -- --routes /ai_assistants/workflow-runs`
+  - Result: `Next dev Issues: 0`.
 
 ## Verification - Baseline
 

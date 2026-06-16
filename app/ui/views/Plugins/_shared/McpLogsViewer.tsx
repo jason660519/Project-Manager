@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { FolderOpen } from 'lucide-react';
-import { mcpLogs, mcpLogsDir, onMcpLog, openPath, type UnlistenFn } from '../../../../../lib/bridge';
+import { mcpLogs, mcpLogsDir, onMcpLog, openPath, safeUnlisten, type UnlistenFn } from '../../../../../lib/bridge';
 import { useI18n } from '../../../../../lib/i18n';
 
 export function McpLogsViewer({ pluginId, onClose }: { pluginId: string; onClose: () => void }) {
@@ -26,13 +26,18 @@ export function McpLogsViewer({ pluginId, onClose }: { pluginId: string; onClose
       setLines((prev) => (prev.length >= 2000 ? [...prev.slice(-1999), formatted] : [...prev, formatted]));
     })
       .then((fn) => {
+        if (cancelled) {
+          safeUnlisten(fn);
+          return;
+        }
         unlisten = fn;
       })
       .catch(() => {});
 
     return () => {
       cancelled = true;
-      unlisten?.();
+      safeUnlisten(unlisten);
+      unlisten = undefined;
     };
   }, [pluginId]);
 

@@ -29,6 +29,7 @@ vi.mock('../lib/bridge', () => ({
     return vi.fn();
   }),
   readFile: vi.fn().mockResolvedValue('mock spec content'),
+  safeUnlisten: vi.fn((fn: (() => void) | undefined) => fn?.()),
   spawnAgent: spawnAgentMock,
   spawnTerminal: vi.fn().mockResolvedValue(undefined),
 }));

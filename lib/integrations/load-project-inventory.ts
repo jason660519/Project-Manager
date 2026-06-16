@@ -1,9 +1,65 @@
-import { readFile, skillList } from '../bridge';
+import { listProjectFiles, readFile, skillList, type FileNode } from '../bridge';
 import { MEMORY_ARTIFACT_DEFS } from './memory-catalog';
 import { mapMemoryRow, type MemoryScanResult } from './mappers/memory';
 import { mapSlashCommandRow, type SlashCommandFile } from './mappers/commands';
 import type { IntegrationRow } from './types';
 import { parseFrontmatter } from '../skills/utils';
+
+interface WorkflowExecutionRequestFile {
+  id: string;
+  workflowRunId: string;
+  workItemId: string;
+  nodeId: string;
+  nodeTitle: string;
+  actorKind: string;
+  status: string;
+  executionState: string;
+  reviewStatus?: string;
+  policyGate?: {
+    state?: string;
+    reason?: string;
+  };
+  requestedBy: string;
+  requestedAt: string;
+  capabilityId: string;
+  executorResolution?: {
+    state?: string;
+    integrationSheet?: string;
+    sourceKind?: string;
+    sourceId?: string;
+    commandPreview?: string;
+  };
+  memoryFiles?: string[];
+  allowedTools?: string[];
+  expectedHandoffArtifactId?: string;
+  expectedEvidenceIds?: string[];
+  safetyNotice?: string;
+}
+
+interface WorkflowExecutionRecordFile {
+  id: string;
+  requestId: string;
+  workflowRunId: string;
+  workItemId: string;
+  nodeId: string;
+  nodeTitle: string;
+  draftId: string;
+  status: string;
+  consumedBy: string;
+  consumedAt: string;
+  executionState: string;
+  capabilityId: string;
+  workingDir?: string;
+  commandPreview?: string;
+  policyDecision?: {
+    state?: string;
+    reason?: string;
+  };
+  runnerResult?: {
+    state?: string;
+  };
+  safetyNotice?: string;
+}
 
 async function probeMemoryFile(absPath: string): Promise<MemoryScanResult> {
   try {
@@ -68,4 +124,158 @@ export async function loadSlashCommandRows(projectRoot: string): Promise<Integra
   } catch {
     return [];
   }
+}
+
+export async function loadWorkflowExecutionRequestRows(projectRoot: string): Promise<IntegrationRow[]> {
+  if (!projectRoot) return [];
+  const root = projectRoot.replace(/\/+$/, '');
+  const requestsDir = `${root}/.project-manager/project-workflow-execution-requests`;
+  let files: FileNode[];
+  try {
+    files = await listProjectFiles(requestsDir, 1);
+  } catch {
+    return [];
+  }
+  const jsonFiles = flattenFileNodes(files).filter((file) => !file.isDir && file.name.endsWith('.json'));
+  const rows = await Promise.all(
+    jsonFiles.map(async (file) => {
+      try {
+        const parsed = JSON.parse(await readFile(file.path)) as Partial<WorkflowExecutionRequestFile>;
+        if (!parsed.id || !parsed.workflowRunId || !parsed.workItemId || !parsed.nodeId) return null;
+        return mapWorkflowExecutionRequestRow(parsed as WorkflowExecutionRequestFile, file.path);
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return rows
+    .filter((row): row is IntegrationRow => row !== null)
+    .sort((a, b) => b.lastUpdated.localeCompare(a.lastUpdated));
+}
+
+export async function loadWorkflowExecutionRecordRows(projectRoot: string): Promise<IntegrationRow[]> {
+  if (!projectRoot) return [];
+  const root = projectRoot.replace(/\/+$/, '');
+  const recordsDir = `${root}/.project-manager/project-workflow-execution-records`;
+  let files: FileNode[];
+  try {
+    files = await listProjectFiles(recordsDir, 1);
+  } catch {
+    return [];
+  }
+  const jsonFiles = flattenFileNodes(files).filter((file) => !file.isDir && file.name.endsWith('.json'));
+  const rows = await Promise.all(
+    jsonFiles.map(async (file) => {
+      try {
+        const parsed = JSON.parse(await readFile(file.path)) as Partial<WorkflowExecutionRecordFile>;
+        if (!parsed.id || !parsed.requestId || !parsed.workflowRunId || !parsed.workItemId || !parsed.nodeId) {
+          return null;
+        }
+        return mapWorkflowExecutionRecordRow(parsed as WorkflowExecutionRecordFile, file.path);
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return rows
+    .filter((row): row is IntegrationRow => row !== null)
+    .sort((a, b) => b.lastUpdated.localeCompare(a.lastUpdated));
+}
+
+function mapWorkflowExecutionRequestRow(
+  request: WorkflowExecutionRequestFile,
+  absPath: string,
+): IntegrationRow {
+  const commandPreview = request.executorResolution?.commandPreview;
+  const integrationSheet = request.executorResolution?.integrationSheet;
+  const reviewStatus = request.reviewStatus || request.policyGate?.state || 'review_required';
+  const badges = [
+    reviewStatus,
+    request.executionState,
+    integrationSheet,
+    request.capabilityId,
+  ].filter((value): value is string => typeof value === 'string' && value.length > 0);
+  return {
+    rowKey: `workflow-execution-request:${request.id}`,
+    sheet: 'workflow-execution-requests',
+    sourceKind: 'workflow-execution-request',
+    sourceId: request.id,
+    enabled: false,
+    category1: 'Workflow Execution',
+    category2: reviewStatus,
+    githubUrl: '',
+    company: 'Project Manager',
+    name: `${request.workItemId} · ${request.nodeTitle || request.nodeId}`,
+    version: 'schema v1',
+    license: '',
+    scope: 'project',
+    port: '',
+    installPath: absPath,
+    installMethod: request.requestedBy,
+    status: 'idle',
+    statusLabel: request.status,
+    lastUpdated: request.requestedAt,
+    notes: [
+      commandPreview ? `Command preview: ${commandPreview}` : 'No executor command registered.',
+      request.safetyNotice,
+    ].filter(Boolean).join(' '),
+    lv: null,
+    badges,
+    payload: {
+      ...request,
+      absPath,
+      commandPreview,
+    },
+  };
+}
+
+function mapWorkflowExecutionRecordRow(
+  record: WorkflowExecutionRecordFile,
+  absPath: string,
+): IntegrationRow {
+  const policyState = record.policyDecision?.state;
+  const runnerState = record.runnerResult?.state;
+  const badges = [
+    record.status,
+    record.executionState,
+    policyState,
+    runnerState,
+    record.capabilityId,
+  ].filter((value): value is string => typeof value === 'string' && value.length > 0);
+  return {
+    rowKey: `workflow-execution-record:${record.id}`,
+    sheet: 'workflow-execution-records',
+    sourceKind: 'workflow-execution-record',
+    sourceId: record.id,
+    enabled: false,
+    category1: 'Workflow Execution Audit',
+    category2: record.status,
+    githubUrl: '',
+    company: 'Project Manager',
+    name: `${record.workItemId} · ${record.nodeTitle || record.nodeId}`,
+    version: 'schema v1',
+    license: '',
+    scope: 'project',
+    port: '',
+    installPath: absPath,
+    installMethod: record.consumedBy,
+    status: 'idle',
+    statusLabel: record.status,
+    lastUpdated: record.consumedAt,
+    notes: [
+      record.commandPreview ? `Command preview: ${record.commandPreview}` : 'No executor command recorded.',
+      record.policyDecision?.reason,
+      record.safetyNotice,
+    ].filter(Boolean).join(' '),
+    lv: null,
+    badges,
+    payload: {
+      ...record,
+      absPath,
+    },
+  };
+}
+
+function flattenFileNodes(nodes: FileNode[]): FileNode[] {
+  return nodes.flatMap((node) => [node, ...flattenFileNodes(node.children ?? [])]);
 }
