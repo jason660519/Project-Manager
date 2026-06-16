@@ -30,9 +30,31 @@
     - event channels `agent-stdout, agent-stderr, agent-exit` rendered;
     - no runtime overlay text was present.
   - Note: the temporary smoke sidecar was removed after verification.
+- Tauri desktop smoke:
+  - Initial `npm run tauri:dev` failed because an older dev app still owned
+    `/tmp/tauri-pilot-io.projectmanager.app.sock`; `tauri-pilot ping` hung
+    against that stale instance.
+  - Root cause: stale local dev process/socket collision, not an F54 runtime
+    regression. Stopped the stale `npm run tauri:dev` process chain, removed
+    the orphan socket after confirming no owner, and relaunched Tauri.
+  - PASS: fresh `npm run tauri:dev` compiled and launched the desktop app.
+  - PASS: `tauri-pilot ping` returned `✓ ok`; `tauri-pilot windows` listed the
+    main Project Manager window.
+  - PASS: `bash e2e/tauri-pilot/smoke.project-dashboard.sh`.
+  - PASS: created a temporary approved live request for `/bin/echo
+    f54-live-smoke`, opened it in the Tauri app, clicked `Run live executor`,
+    and confirmed Project Manager wrote a `live_spawned` record with `pid:
+    19480`, `spawnToken: 1`, command preview `/bin/echo f54-live-smoke`, and
+    working directory `/Users/jasonmacbbookpro/Project/Project-Manager`.
+  - Cleaned up temporary request/record sidecars after the smoke.
+  - Cleanup note: `tauri-pilot storage clear` was used while removing the
+    temporary `echo` CLI exposure preference, so Tauri localStorage UI
+    preferences may have reset. Project files were not affected.
 - Remaining risk:
-  - Full Tauri desktop click-through for `Run live executor` spawning an actual
-    process remains a manual shell-runtime gate before marking F54 100%.
+  - Tauri confirmed the live button can spawn and persist a live record. The
+    generated record detail was verified by component test and Chrome route
+    smoke; a pilot-driven record-detail click-through hit Integration Hub tab
+    routing state and was not counted as passed.
 
 ## 2026-06-16 - TDD Round 17: Live Spawn Working Directory Evidence
 
