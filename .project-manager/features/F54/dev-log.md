@@ -1,5 +1,39 @@
 # F54 Dev Log
 
+## 2026-06-16 - TDD Round 18: Live Spawn Event Channel Evidence
+
+- Decision:
+  - Treat the `spawnToken` record as the correlation handle for Tauri live
+    process streams, and make the expected event channels visible in the
+    Execution Record detail inspector.
+  - This remains read-only audit evidence. Execution record details still do
+    not expose any run/terminal control.
+- RED:
+  - Extended the live spawn evidence detail test to require
+    `agent-stdout, agent-stderr, agent-exit` in a `live_spawned` record.
+  - Confirmed expected failure: the detail inspector showed pid and
+    `spawnToken`, but not the stream channel names.
+- GREEN:
+  - Added an `event channels` metadata row for live records with a
+    `runnerSpawnToken`.
+- Verification:
+  - PASS: `npm test -- --run __tests__/integrations.executionRequestDetailSheet.test.tsx -t "shows live executor spawn evidence"`
+  - PASS: `npm run typecheck`
+  - PASS: `npm run verify:dev-issues -- --routes /integrations-hub/workflow-execution-records,/integrations-hub/workflow-execution-requests`
+    - `/integrations-hub/workflow-execution-records`: Next dev Issues 0.
+    - `/integrations-hub/workflow-execution-requests`: Next dev Issues 0.
+  - PASS: Chrome smoke against
+    `http://127.0.0.1:43187/integrations-hub/workflow-execution-records?recordId=f54-smoke-live-event-record`
+    with a temporary live record sidecar:
+    - record `F54 · Verification` rendered;
+    - `spawnToken` `5678` rendered;
+    - event channels `agent-stdout, agent-stderr, agent-exit` rendered;
+    - no runtime overlay text was present.
+  - Note: the temporary smoke sidecar was removed after verification.
+- Remaining risk:
+  - Full Tauri desktop click-through for `Run live executor` spawning an actual
+    process remains a manual shell-runtime gate before marking F54 100%.
+
 ## 2026-06-16 - TDD Round 17: Live Spawn Working Directory Evidence
 
 - Decision:

@@ -775,6 +775,10 @@ export function IntegrationsDetailSheet({
                 <MetaRow label="exit code" value={executionRecord.runnerExitCode ?? ''} />
                 <MetaRow label="pid" value={executionRecord.runnerPid ?? ''} />
                 <MetaRow label="spawn token" value={executionRecord.runnerSpawnToken ?? ''} />
+                <MetaRow
+                  label="event channels"
+                  value={executionRecord.runnerSpawnToken ? 'agent-stdout, agent-stderr, agent-exit' : ''}
+                />
               </div>
               {executionNavigationTarget && onOpenWorkflowRun && (
                 <button

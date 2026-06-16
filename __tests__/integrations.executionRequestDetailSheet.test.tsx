@@ -811,6 +811,7 @@ describe('IntegrationsDetailSheet workflow execution request inspector', () => {
     expect(screen.getByText('spawned')).toBeInTheDocument();
     expect(screen.getByText('1234')).toBeInTheDocument();
     expect(screen.getByText('5678')).toBeInTheDocument();
+    expect(screen.getByText('agent-stdout, agent-stderr, agent-exit')).toBeInTheDocument();
     expect(screen.getByText('/repo/Project-Manager')).toBeInTheDocument();
     expect(screen.getByText('Approved live command request is ready for a guarded executor spawn.')).toBeInTheDocument();
     expect(
