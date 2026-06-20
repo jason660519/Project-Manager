@@ -3,6 +3,31 @@ import { outboundGet, outboundPost } from '../../../../lib/server/outboundHttp.s
 
 type ProviderApiKind = 'anthropic' | 'openai-compatible' | 'gemini' | 'github';
 
+// #region debug-point C:validate-route
+const DEBUG_KEYS_URL = 'http://127.0.0.1:7777/event';
+const DEBUG_KEYS_SESSION_ID = 'api-key-validation-fail';
+
+function reportValidateRouteDebug(
+  hypothesisId: 'B' | 'C' | 'E',
+  msg: string,
+  data: Record<string, unknown>,
+): void {
+  fetch(DEBUG_KEYS_URL, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      sessionId: DEBUG_KEYS_SESSION_ID,
+      runId: 'pre-fix',
+      hypothesisId,
+      location: 'app/api/keys/validate/route.ts',
+      msg: `[DEBUG] ${msg}`,
+      data,
+      ts: Date.now(),
+    }),
+  }).catch(() => {});
+}
+// #endregion
+
 interface ValidateRequestBody {
   apiKind?: unknown;
   apiKey?: unknown;
@@ -50,9 +75,25 @@ async function validateOpenAiCompatible(
     return validatePerplexity(apiKey);
   }
 
+  // #region debug-point C:openai-compatible-request
+  reportValidateRouteDebug('C', 'validateOpenAiCompatible request prepared', {
+    baseUrl,
+    normalizedBaseUrl,
+    allowMoonshotAlternate,
+    keyLength: apiKey.trim().length,
+  });
+  // #endregion
+
   const res = await outboundGet(`${normalizedBaseUrl}/models`, {
     authorization: `Bearer ${apiKey}`,
   });
+  // #region debug-point C:openai-compatible-response
+  reportValidateRouteDebug('C', 'validateOpenAiCompatible response received', {
+    normalizedBaseUrl,
+    status: res.status,
+    allowMoonshotAlternate,
+  });
+  // #endregion
   if ((res.status < 200 || res.status >= 300) && allowMoonshotAlternate && isMoonshotBaseUrl(normalizedBaseUrl)) {
     const alternateBaseUrl = getAlternateMoonshotBaseUrl(normalizedBaseUrl);
     if (alternateBaseUrl) {
@@ -137,6 +178,15 @@ export async function POST(request: NextRequest) {
     const apiKey = typeof body?.apiKey === 'string' ? body.apiKey : '';
     const baseUrl = typeof body?.baseUrl === 'string' ? body.baseUrl : undefined;
 
+    // #region debug-point B:route-entry
+    reportValidateRouteDebug('B', 'validate route entry', {
+      apiKind: typeof apiKind === 'string' ? apiKind : String(apiKind),
+      baseUrl: baseUrl ?? null,
+      keyLength: apiKey.trim().length,
+      keyPresent: apiKey.trim().length > 0,
+    });
+    // #endregion
+
     if (!apiKey) return NextResponse.json(validationResult(false, [], 'API key is empty'));
     if (
       apiKind !== 'anthropic' &&
@@ -169,8 +219,21 @@ export async function POST(request: NextRequest) {
         break;
     }
 
+    // #region debug-point E:route-success
+    reportValidateRouteDebug('E', 'validate route success', {
+      apiKind,
+      baseUrl: baseUrl ?? null,
+      modelCount: models.length,
+    });
+    // #endregion
+
     return NextResponse.json(validationResult(true, models));
   } catch (error) {
+    // #region debug-point E:route-catch
+    reportValidateRouteDebug('E', 'validate route catch', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    // #endregion
     return NextResponse.json(
       validationResult(false, [], error instanceof Error ? error.message : String(error)),
     );

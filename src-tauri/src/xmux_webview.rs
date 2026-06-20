@@ -94,13 +94,28 @@ pub async fn xmux_webview_create(
     width: f64,
     height: f64,
 ) -> Result<(), String> {
-    let _ = xmux_webview_destroy(app.clone(), state.clone(), label.clone()).await;
-
-    let window = host_window(&app)?;
     let target = parse_url(&url)?;
     let w = width.max(1.0);
     let h = height.max(1.0);
 
+    if let Ok(webview) = get_child(&app, &label) {
+        webview.navigate(target.clone()).map_err(|e| e.to_string())?;
+        webview
+            .set_bounds(Rect {
+                position: LogicalPosition::new(x, y).into(),
+                size: LogicalSize::new(w, h).into(),
+            })
+            .map_err(|e| e.to_string())?;
+        webview.show().map_err(|e| e.to_string())?;
+        if let Ok(mut guard) = state.0.lock() {
+            guard.labels.insert(label);
+        }
+        return Ok(());
+    }
+
+    let _ = xmux_webview_destroy(app.clone(), state.clone(), label.clone()).await;
+
+    let window = host_window(&app)?;
     let builder = WebviewBuilder::new(&label, WebviewUrl::External(target))
         .initialization_script(console_capture_script());
     window
@@ -376,24 +391,29 @@ fn console_capture_script() -> String {
     .to_string()
 }
 
+fn console_entries_script() -> &'static str {
+    r#"
+new Promise((resolve) => {
+  const capture = window.__pmXmuxConsoleCapture;
+  resolve(JSON.stringify(capture && Array.isArray(capture.buffer) ? capture.buffer : []));
+})
+"#
+}
+
+fn console_clear_script() -> &'static str {
+    r#"
+window.__pmXmuxConsoleCapture?.clear?.();
+"#
+}
+
 #[tauri::command]
 pub async fn xmux_webview_console_entries(app: AppHandle, label: String) -> Result<String, String> {
     let webview = get_child(&app, &label)?;
     let (tx, rx) = oneshot::channel::<String>();
     let sender = Arc::new(Mutex::new(Some(tx)));
     let sender_clone = sender.clone();
-    let script = format!(
-        r#"
-new Promise((resolve) => {{
-  {}
-  const capture = window.__pmXmuxConsoleCapture;
-  resolve(JSON.stringify(capture && Array.isArray(capture.buffer) ? capture.buffer : []));
-}})
-"#,
-        console_capture_script()
-    );
     webview
-        .eval_with_callback(script, move |value| {
+        .eval_with_callback(console_entries_script(), move |value| {
             if let Ok(mut guard) = sender_clone.lock() {
                 if let Some(tx) = guard.take() {
                     let _ = tx.send(value);
@@ -412,13 +432,7 @@ new Promise((resolve) => {{
 pub async fn xmux_webview_clear_console(app: AppHandle, label: String) -> Result<(), String> {
     let webview = get_child(&app, &label)?;
     webview
-        .eval(format!(
-            r#"
-{}
-window.__pmXmuxConsoleCapture?.clear?.();
-"#,
-            console_capture_script()
-        ))
+        .eval(console_clear_script())
         .map_err(|e| e.to_string())
 }
 
@@ -686,6 +700,63 @@ new Promise((resolve) => {
 "#
     .replace("__LABEL_JSON__", &label_json)
     .replace("__NONCE_JSON__", &nonce_json))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn console_entries_poll_script_does_not_reinstall_capture_hook() {
+        let script = console_entries_script();
+
+        assert!(script.contains("window.__pmXmuxConsoleCapture"));
+        assert!(script.contains("JSON.stringify"));
+        assert!(!script.contains("wrapConsole"));
+        assert!(!script.contains("window.fetch = function"));
+        assert!(script.len() < console_capture_script().len() / 4);
+    }
+
+    #[test]
+    fn console_clear_script_does_not_reinstall_capture_hook() {
+        let script = console_clear_script();
+
+        assert!(script.contains("window.__pmXmuxConsoleCapture?.clear?.();"));
+        assert!(!script.contains("wrapConsole"));
+        assert!(!script.contains("window.XMLHttpRequest = function"));
+        assert!(script.len() < console_capture_script().len() / 4);
+    }
+
+    #[test]
+    fn create_webview_uses_existing_child_fast_path_before_destroy() {
+        let source = include_str!("xmux_webview.rs");
+        let start = source
+            .find("pub async fn xmux_webview_create")
+            .expect("xmux_webview_create should exist");
+        let end = source[start..]
+            .find("#[tauri::command]\npub async fn xmux_webview_set_bounds")
+            .expect("xmux_webview_set_bounds should follow create");
+        let body = &source[start..start + end];
+        let fast_path = body
+            .find("if let Ok(webview) = get_child(&app, &label)")
+            .expect("create should try to reuse an existing child webview first");
+        let destroy = body
+            .find("xmux_webview_destroy")
+            .expect("create should retain destroy fallback for stale registry cleanup");
+
+        assert!(
+            fast_path < destroy,
+            "existing-child fast path must run before destroy fallback"
+        );
+        assert!(
+            body.contains("webview.navigate(target.clone())"),
+            "fast path should navigate the existing webview"
+        );
+        assert!(
+            body.contains(".set_bounds(Rect"),
+            "fast path should update existing webview bounds"
+        );
+    }
 }
 
 #[tauri::command]

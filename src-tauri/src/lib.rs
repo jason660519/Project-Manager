@@ -5674,7 +5674,7 @@ async fn skill_move_files(
 mod browser_tests {
     use super::*;
 
-    fn load_dev_provider_key(provider: &str) -> Option<String> {
+    fn load_debug_bundle_key(provider: &str) -> Option<String> {
         let raw = dev_secrets::get_dev_secret("projectmanager", "llm-provider-keys")
             .ok()
             .flatten()?;
@@ -5709,7 +5709,7 @@ mod browser_tests {
 
     #[tokio::test]
     async fn run_validation_accepts_real_openai_key_when_available() {
-        let Some(api_key) = load_dev_provider_key("openai") else {
+        let Some(api_key) = load_debug_bundle_key("openai") else {
             return;
         };
 

@@ -45,9 +45,22 @@ import {
   loadPersistedXmuxLayout,
   savePersistedXmuxLayout,
 } from '../../../lib/xmux/layoutPersistence';
+import {
+  runNativePtyBenchmark,
+  type NativePtyBenchmarkResult,
+} from '../../../lib/xmux/nativePtyBenchmark';
 import type { EngineerRole, ProjectEntry } from '../../../lib/types';
 import type { ChatContext } from '../../../lib/chat/types';
 import { waitForTauriRuntime } from '../../../lib/runtime/tauri-ready';
+
+declare global {
+  interface Window {
+    __xmuxRunNativePtyBenchmark?: (options?: {
+      bytes?: number;
+      timeoutMs?: number;
+    }) => Promise<NativePtyBenchmarkResult>;
+  }
+}
 
 interface WorkspaceRow {
   id: string;
@@ -60,6 +73,7 @@ interface WorkspaceRow {
 }
 
 const DEFAULT_HOMEPAGE = 'http://localhost:43187/project-progress-dashboard';
+const XMUX_LAYOUT_PERSIST_DEBOUNCE_MS = 200;
 
 function deriveHomepage(project: ProjectEntry): string {
   const github = project.config.project.githubUrl;
@@ -445,6 +459,8 @@ function InteropConsole({
   // ADR-017: per-workspace engineer "browser owner". Empty = ungoverned (you).
   const [browserOwnerByWorkspace, setBrowserOwnerByWorkspace] = useState<Record<string, string>>({});
   const pendingLayoutsRef = useRef<Record<string, LayoutNode>>({});
+  const latestLayoutsRef = useRef<Record<string, LayoutNode>>({});
+  const layoutPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nativeResizeSuspendedRef = useRef(false);
 
   const activeWorkspace =
@@ -536,11 +552,39 @@ function InteropConsole({
     });
   }, [activeWorkspace, createWorkspaceLayout]);
 
-  useEffect(() => {
-    for (const [workspaceId, layout] of Object.entries(layouts)) {
+  const persistLayouts = useCallback((layoutsToPersist: Record<string, LayoutNode>) => {
+    for (const [workspaceId, layout] of Object.entries(layoutsToPersist)) {
       savePersistedXmuxLayout(workspaceId, layout);
     }
-  }, [layouts]);
+  }, []);
+
+  useEffect(() => {
+    latestLayoutsRef.current = layouts;
+    if (layoutPersistTimerRef.current) {
+      clearTimeout(layoutPersistTimerRef.current);
+    }
+    if (Object.keys(layouts).length === 0) return;
+    layoutPersistTimerRef.current = setTimeout(() => {
+      layoutPersistTimerRef.current = null;
+      persistLayouts(latestLayoutsRef.current);
+    }, XMUX_LAYOUT_PERSIST_DEBOUNCE_MS);
+    return () => {
+      if (layoutPersistTimerRef.current) {
+        clearTimeout(layoutPersistTimerRef.current);
+        layoutPersistTimerRef.current = null;
+      }
+    };
+  }, [layouts, persistLayouts]);
+
+  useEffect(() => {
+    return () => {
+      if (layoutPersistTimerRef.current) {
+        clearTimeout(layoutPersistTimerRef.current);
+        layoutPersistTimerRef.current = null;
+      }
+      persistLayouts(latestLayoutsRef.current);
+    };
+  }, [persistLayouts]);
 
   const mutateLayout = useCallback(
     (
@@ -692,6 +736,18 @@ function InteropConsole({
     window.addEventListener('pm:xmux-selected-element', handleSelectedElement);
     return () => window.removeEventListener('pm:xmux-selected-element', handleSelectedElement);
   }, []);
+
+  useEffect(() => {
+    window.__xmuxRunNativePtyBenchmark = (options) =>
+      runNativePtyBenchmark({
+        cwd: activeWorkspace?.cwd || '/tmp',
+        bytes: options?.bytes ?? 64 * 1024,
+        timeoutMs: options?.timeoutMs ?? 5000,
+      });
+    return () => {
+      delete window.__xmuxRunNativePtyBenchmark;
+    };
+  }, [activeWorkspace?.cwd]);
 
   return (
     <BrowserAccessGateProvider value={browserGate}>

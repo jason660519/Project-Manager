@@ -15,6 +15,7 @@
 //   destroy(itemId)            → kill PTY, dispose xterm, drop session
 
 import { FitAddon } from '@xterm/addon-fit';
+import { WebglAddon } from '@xterm/addon-webgl';
 import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import { isTauriRuntime } from '../../lib/runtime/tauri-ready';
@@ -23,12 +24,15 @@ import { EDITOR_BG, XTERM_THEME } from '../../lib/tokens/editor-colors';
 const SHELL = '/bin/zsh';
 const MIN_DIM = 20; // hostDiv must be at least this large in both axes before we trust fit()
 const MAX_OPEN_ATTEMPTS = 180; // ~3s at 60fps
+const MAX_UNEXPECTED_RESTARTS = 3;
+const RESTART_BACKOFF_MS = [500, 1000, 2000] as const;
 
 type PtyHandle = {
   write: (data: string) => void;
   resize: (cols: number, rows: number) => void;
   kill: (signal?: string) => void;
   onData: (listener: (data: Uint8Array) => void) => { dispose: () => void };
+  onExit: (listener: (event: { exitCode: number; signal?: number }) => void) => { dispose: () => void };
 };
 
 interface Session {
@@ -38,8 +42,13 @@ interface Session {
   pty: PtyHandle | null;
   inputDisposable: { dispose: () => void };
   dataDisposable: { dispose: () => void } | null;
+  exitDisposable: { dispose: () => void } | null;
   resizeObserver: ResizeObserver | null;
   resizeTimer: ReturnType<typeof setTimeout> | null;
+  restartTimer: ReturnType<typeof setTimeout> | null;
+  unexpectedRestartAttempts: number;
+  outputRafId: number | null;
+  pendingOutputChunks: Uint8Array[];
   openRafId: number | null;
   openAttempts: number;
   cwd: string;
@@ -100,6 +109,11 @@ function createSession(itemId: string, cwd: string): Session {
 
   const fitAddon = new FitAddon();
   term.loadAddon(fitAddon);
+  try {
+    term.loadAddon(new WebglAddon());
+  } catch (err) {
+    console.warn('[TerminalRegistry] WebGL renderer unavailable; falling back to xterm default renderer', err);
+  }
 
   const session: Session = {
     hostDiv,
@@ -108,8 +122,13 @@ function createSession(itemId: string, cwd: string): Session {
     pty: null,
     inputDisposable: { dispose: () => {} },
     dataDisposable: null,
+    exitDisposable: null,
     resizeObserver: null,
     resizeTimer: null,
+    restartTimer: null,
+    unexpectedRestartAttempts: 0,
+    outputRafId: null,
+    pendingOutputChunks: [],
     openRafId: null,
     openAttempts: 0,
     cwd,
@@ -193,6 +212,73 @@ function scheduleFitAndSpawn(session: Session): void {
   }, 32);
 }
 
+function mergeOutputChunks(chunks: Uint8Array[]): Uint8Array {
+  if (chunks.length === 1) return chunks[0];
+  const byteLength = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+  const merged = new Uint8Array(byteLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return merged;
+}
+
+function scheduleTerminalOutput(session: Session, chunk: Uint8Array): void {
+  if (session.destroyed) return;
+  session.pendingOutputChunks.push(chunk);
+  if (session.outputRafId !== null) return;
+  session.outputRafId = requestAnimationFrame(() => {
+    session.outputRafId = null;
+    if (session.destroyed || session.pendingOutputChunks.length === 0) return;
+    const chunks = session.pendingOutputChunks;
+    session.pendingOutputChunks = [];
+    session.term.write(mergeOutputChunks(chunks));
+  });
+}
+
+function disposePtyListeners(session: Session): void {
+  session.dataDisposable?.dispose();
+  session.dataDisposable = null;
+  session.exitDisposable?.dispose();
+  session.exitDisposable = null;
+}
+
+function formatPtyExit(event: { exitCode: number; signal?: number }): string {
+  if (event.signal !== undefined) {
+    return `signal ${event.signal}`;
+  }
+  return `code ${event.exitCode}`;
+}
+
+function handlePtyExit(session: Session, event: { exitCode: number; signal?: number }): void {
+  if (session.destroyed) return;
+  session.pty = null;
+  disposePtyListeners(session);
+  const exitLabel = formatPtyExit(event);
+  const unexpected = event.exitCode !== 0 || event.signal !== undefined;
+  session.term.writeln(`\r\n\x1b[33mShell exited with ${exitLabel}.\x1b[0m`);
+  if (!unexpected) {
+    session.unexpectedRestartAttempts = 0;
+    return;
+  }
+  if (session.unexpectedRestartAttempts >= MAX_UNEXPECTED_RESTARTS) {
+    session.term.writeln(
+      `\x1b[31mShell crashed ${MAX_UNEXPECTED_RESTARTS} times; restart stopped.\x1b[0m`,
+    );
+    return;
+  }
+  const delay = RESTART_BACKOFF_MS[session.unexpectedRestartAttempts] ?? RESTART_BACKOFF_MS.at(-1)!;
+  session.unexpectedRestartAttempts += 1;
+  session.term.writeln(`\x1b[33mRestarting shell in ${delay}ms...\x1b[0m`);
+  if (session.restartTimer) clearTimeout(session.restartTimer);
+  session.restartTimer = setTimeout(() => {
+    session.restartTimer = null;
+    if (session.destroyed || session.pty || session.pendingSpawn) return;
+    scheduleFitAndSpawn(session);
+  }, delay);
+}
+
 function ensureResizeObserver(session: Session): void {
   if (session.resizeObserver) return;
   const ro = new ResizeObserver(() => {
@@ -219,7 +305,10 @@ async function startPty(session: Session): Promise<void> {
     }
     session.pty = pty;
     session.dataDisposable = pty.onData((chunk) => {
-      session.term.write(chunk);
+      scheduleTerminalOutput(session, chunk);
+    });
+    session.exitDisposable = pty.onExit((event) => {
+      handlePtyExit(session, event);
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -289,9 +378,15 @@ export function destroy(itemId: string): void {
     session.openRafId = null;
   }
   if (session.resizeTimer) clearTimeout(session.resizeTimer);
+  if (session.restartTimer) clearTimeout(session.restartTimer);
+  if (session.outputRafId !== null) {
+    cancelAnimationFrame(session.outputRafId);
+    session.outputRafId = null;
+  }
+  session.pendingOutputChunks = [];
   session.resizeObserver?.disconnect();
   session.inputDisposable.dispose();
-  session.dataDisposable?.dispose();
+  disposePtyListeners(session);
   session.pty?.kill();
   session.term.dispose();
   session.hostDiv.remove();

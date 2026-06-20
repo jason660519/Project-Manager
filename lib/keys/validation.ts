@@ -25,6 +25,31 @@ import {
 } from './providerMetadata';
 import type { ProviderSpec } from './registry';
 
+// #region debug-point B:validation-orchestration
+const DEBUG_KEYS_URL = 'http://127.0.0.1:7777/event';
+const DEBUG_KEYS_SESSION_ID = 'api-key-validation-fail';
+
+function reportValidationDebug(
+  hypothesisId: 'A' | 'B' | 'C' | 'E',
+  msg: string,
+  data: Record<string, unknown>,
+): void {
+  fetch(DEBUG_KEYS_URL, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      sessionId: DEBUG_KEYS_SESSION_ID,
+      runId: 'pre-fix',
+      hypothesisId,
+      location: 'lib/keys/validation.ts',
+      msg: `[DEBUG] ${msg}`,
+      data,
+      ts: Date.now(),
+    }),
+  }).catch(() => {});
+}
+// #endregion
+
 export interface ProviderApiContract {
   apiKind: ProviderApiKind;
   baseUrl?: string;
@@ -70,11 +95,31 @@ export async function saveAndValidateKey(
     throw new Error(`No validation contract for provider: ${provider.id}`);
   }
 
+  // #region debug-point B:save-and-validate-entry
+  reportValidationDebug('B', 'saveAndValidateKey before bridge call', {
+    providerId: provider.id,
+    providerCategory: provider.category,
+    apiKind: contract.apiKind,
+    baseUrl: contract.baseUrl ?? null,
+    keyLength: apiKey.trim().length,
+    keyPresent: apiKey.trim().length > 0,
+  });
+  // #endregion
+
   const result = await bridgeValidate({
     apiKind: contract.apiKind,
     baseUrl: contract.baseUrl,
     apiKey,
   });
+  // #region debug-point E:save-and-validate-result
+  reportValidationDebug('E', 'saveAndValidateKey bridge result', {
+    providerId: provider.id,
+    ok: result.ok,
+    modelCount: result.models.length,
+    errorReason: result.errorReason,
+  });
+  // #endregion
+
   const now = new Date().toISOString();
 
   if (result.ok) {
@@ -118,6 +163,16 @@ export async function revalidateStoredKey(
       : await loadProviderSecret(provider);
 
   const trimmedKey = apiKey.trim();
+  // #region debug-point A:revalidate-entry
+  reportValidationDebug('A', 'revalidateStoredKey loaded key', {
+    providerId: provider.id,
+    providerCategory: provider.category,
+    keyLength: trimmedKey.length,
+    keyPresent: trimmedKey.length > 0,
+    apiKind: contract.apiKind,
+    baseUrl: contract.baseUrl ?? null,
+  });
+  // #endregion
   const result = trimmedKey
     ? await bridgeValidate({
         apiKind: contract.apiKind,
@@ -129,6 +184,15 @@ export async function revalidateStoredKey(
         models: [],
         errorReason: 'No key configured',
       };
+  // #region debug-point E:revalidate-result
+  reportValidationDebug('E', 'revalidateStoredKey final result', {
+    providerId: provider.id,
+    ok: result.ok,
+    modelCount: result.models.length,
+    errorReason: result.errorReason,
+  });
+  // #endregion
+
   const now = new Date().toISOString();
   if (result.ok) {
     saveProviderMetadata(provider.id, {

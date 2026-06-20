@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -291,5 +291,56 @@ describe('xmux registry integration', () => {
 
     const restoredSeparator = screen.getAllByRole('separator', { name: 'Resize split' })[0];
     expect((restoredSeparator.previousElementSibling as HTMLElement).style.width).toBe('62%');
+  });
+
+  it('debounces layout persistence during continuous resize', async () => {
+    vi.useFakeTimers();
+    try {
+      const setItemSpy = vi.spyOn(window.localStorage, 'setItem');
+      const project = createProjectEntry('project-layout-debounce', 'Project Layout Debounce');
+      const props = {
+        projects: [project],
+        selectedDashboardProjectIds: ['project-layout-debounce'],
+        selectedProjectId: 'project-layout-debounce',
+      };
+
+      render(<XmuxView {...props} />);
+      const rootSeparator = screen.getAllByRole('separator', { name: 'Resize split' })[0];
+      const rootSplit = rootSeparator.parentElement as HTMLElement;
+      rootSplit.getBoundingClientRect = () =>
+        ({
+          x: 0,
+          y: 0,
+          left: 0,
+          top: 0,
+          right: 1000,
+          bottom: 600,
+          width: 1000,
+          height: 600,
+          toJSON: () => {},
+        }) as DOMRect;
+
+      setItemSpy.mockClear();
+
+      fireEvent.mouseDown(rootSeparator, { clientX: 280, clientY: 10 });
+      fireEvent.mouseMove(document, { clientX: 580, clientY: 10 });
+      fireEvent.mouseMove(document, { clientX: 620, clientY: 10 });
+      fireEvent.mouseUp(document);
+
+      expect(setItemSpy).not.toHaveBeenCalledWith(
+        XMUX_LAYOUT_STORAGE_KEY,
+        expect.any(String),
+      );
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
+
+      expect(setItemSpy).toHaveBeenCalledTimes(1);
+      const saved = JSON.parse(window.localStorage.getItem(XMUX_LAYOUT_STORAGE_KEY) ?? '{}');
+      expect(saved.workspaces['project-layout-debounce'].layout.ratio).toBe(0.62);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
