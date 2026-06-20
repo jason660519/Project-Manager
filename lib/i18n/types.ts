@@ -12,6 +12,7 @@ export interface Translations {
   };
   navItems: {
     projects: string;
+    progressTemplatesSetting: string;
     dashboard: string;
     engineers: string;
     integrationsHub: string;
@@ -273,6 +274,50 @@ export interface Translations {
   dashboard: {
     title: string;
     projectName: string;
+    progressTemplatesSetting: {
+      sheetLabel: string;
+      title: string;
+      subtitle: string;
+      catalogTitle: string;
+      builtInBadge: string;
+      columns: {
+        label: string;
+        sheetTitle: string;
+        discipline: string;
+        version: string;
+        fields: string;
+        statuses: string;
+        fieldPreview: string;
+      };
+      templateEditor: {
+        title: string;
+        subtitle: string;
+        appliesTo: string;
+        activeTemplate: string;
+        emptyColumns: string;
+        addFieldLabel: string;
+        addFieldPlaceholder: string;
+        addField: string;
+        fieldType: string;
+        resetDefaults: string;
+        moveUp: string;
+        moveDown: string;
+        protected: string;
+        supabaseUuidReserved: string;
+        visibleLabel: string;
+        requiredLabel: string;
+        removeField: string;
+        columns: {
+          order: string;
+          label: string;
+          fieldId: string;
+          type: string;
+          visible: string;
+          required: string;
+          actions: string;
+        };
+      };
+    };
   };
   sessions: {
     title: string;

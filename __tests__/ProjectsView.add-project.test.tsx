@@ -63,6 +63,7 @@ vi.mock('../lib/storage', async () => {
 });
 
 import { ProjectsView } from '../app/ui/views/ProjectsView';
+import { I18nProvider } from '../lib/i18n';
 
 // Flag the renderer as Tauri so handleAddLocal takes the readConfig branch.
 beforeEach(() => {
@@ -81,18 +82,20 @@ beforeEach(() => {
 describe('Projects list — GitHub repository URL editing', () => {
   it('keeps the first Tauri render identical to server output for hydration', () => {
     const html = renderToString(
-      <ProjectsView
-        projects={[]}
-        selectedProjectId=""
-        selectedDashboardProjectIds={[]}
-        onSelectProject={() => {}}
-        onToggleDashboardProject={() => {}}
-        onAddProject={() => {}}
-        onUpdateProject={() => {}}
-        onRemoveProject={() => {}}
-        onSyncFromDesktop={async () => {}}
-        runHistory={[]}
-      />,
+      <I18nProvider>
+        <ProjectsView
+          projects={[]}
+          selectedProjectId=""
+          selectedDashboardProjectIds={[]}
+          onSelectProject={() => {}}
+          onToggleDashboardProject={() => {}}
+          onAddProject={() => {}}
+          onUpdateProject={() => {}}
+          onRemoveProject={() => {}}
+          onSyncFromDesktop={async () => {}}
+          runHistory={[]}
+        />
+      </I18nProvider>,
     );
 
     expect(html).toContain('Sync from Desktop');
@@ -149,18 +152,20 @@ describe('Projects list — GitHub repository URL editing', () => {
 function renderModal(overrides: Partial<Parameters<typeof ProjectsView>[0]> = {}) {
   const onAddProject = vi.fn();
   render(
-    <ProjectsView
-      projects={[]}
-      selectedProjectId=""
-      selectedDashboardProjectIds={[]}
-      onSelectProject={() => {}}
-      onToggleDashboardProject={() => {}}
-      onAddProject={onAddProject}
-      onUpdateProject={overrides.onUpdateProject ?? vi.fn()}
-      onRemoveProject={() => {}}
-      runHistory={[]}
-      {...overrides}
-    />,
+    <I18nProvider>
+      <ProjectsView
+        projects={[]}
+        selectedProjectId=""
+        selectedDashboardProjectIds={[]}
+        onSelectProject={() => {}}
+        onToggleDashboardProject={() => {}}
+        onAddProject={onAddProject}
+        onUpdateProject={overrides.onUpdateProject ?? vi.fn()}
+        onRemoveProject={() => {}}
+        runHistory={[]}
+        {...overrides}
+      />
+    </I18nProvider>,
   );
   return { onAddProject };
 }
@@ -172,26 +177,28 @@ function renderStatefulProjectsView() {
     const [selectedDashboardProjectIds, setSelectedDashboardProjectIds] = React.useState<string[]>([]);
 
     return (
-      <ProjectsView
-        projects={projects}
-        selectedProjectId={selectedProjectId}
-        selectedDashboardProjectIds={selectedDashboardProjectIds}
-        onSelectProject={setSelectedProjectId}
-        onToggleDashboardProject={(id, selected) =>
-          setSelectedDashboardProjectIds((prev) =>
-            selected ? [...prev, id] : prev.filter((projectId) => projectId !== id),
-          )
-        }
-        onAddProject={(entry) => {
-          setProjects((prev) => [...prev, entry]);
-          setSelectedProjectId((prev) => prev || entry.id);
-        }}
-        onUpdateProject={(entry) =>
-          setProjects((prev) => prev.map((project) => (project.id === entry.id ? entry : project)))
-        }
-        onRemoveProject={() => {}}
-        runHistory={[]}
-      />
+      <I18nProvider>
+        <ProjectsView
+          projects={projects}
+          selectedProjectId={selectedProjectId}
+          selectedDashboardProjectIds={selectedDashboardProjectIds}
+          onSelectProject={setSelectedProjectId}
+          onToggleDashboardProject={(id, selected) =>
+            setSelectedDashboardProjectIds((prev) =>
+              selected ? [...prev, id] : prev.filter((projectId) => projectId !== id),
+            )
+          }
+          onAddProject={(entry) => {
+            setProjects((prev) => [...prev, entry]);
+            setSelectedProjectId((prev) => prev || entry.id);
+          }}
+          onUpdateProject={(entry) =>
+            setProjects((prev) => prev.map((project) => (project.id === entry.id ? entry : project)))
+          }
+          onRemoveProject={() => {}}
+          runHistory={[]}
+        />
+      </I18nProvider>
     );
   }
 

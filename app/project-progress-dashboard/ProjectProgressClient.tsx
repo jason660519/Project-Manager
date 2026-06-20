@@ -13,6 +13,14 @@ import { buildFeatureDependencyGraph, dispatchReadinessForFeature } from './_lib
 import { usePhasePreferences, useProgressSheetPreferences } from './_lib/usePhasePreferences';
 import { computePhaseCounts, type PhaseRow } from './_lib/phaseRows';
 import { columnsForProgressSheet, progressSheetRowsToPhaseRows } from './_lib/progressSheetColumns';
+import { useTemplateFieldPreferences } from '../ui/views/ProgressTemplates/useTemplateFieldPreferences';
+import {
+  applyTemplateFieldColumns,
+  DEVELOPMENT_TEMPLATE_ID,
+  hasStoredTemplateFieldColumns,
+  isBuiltInProgressSheet,
+  resolveProgressSheetTemplateId,
+} from '../../lib/progress-sheets/templateFieldPreferences';
 import { SheetTabs } from './_components/SheetTabs';
 import { SharedStatsCards } from './_components/SharedStatsCards';
 import { ExportProgressDialog } from './_components/ExportProgressDialog';
@@ -261,21 +269,38 @@ export function ProjectProgressClient({
   }, [features, activePhase]);
 
   const activePhasePrefs = prefsByPhase[activePhase];
+  const templateIdForPrefs = useMemo(() => {
+    if (progressSheetConfig && isBuiltInProgressSheet(progressSheetConfig)) {
+      return resolveProgressSheetTemplateId(progressSheetConfig) ?? DEVELOPMENT_TEMPLATE_ID;
+    }
+    return DEVELOPMENT_TEMPLATE_ID;
+  }, [progressSheetConfig]);
+  const { columns: templateFieldColumns } = useTemplateFieldPreferences(templateIdForPrefs);
+  const effectiveProgressSheetConfig = useMemo(() => {
+    if (!progressSheetConfig || !isBuiltInProgressSheet(progressSheetConfig)) {
+      return progressSheetConfig;
+    }
+    const templateId = resolveProgressSheetTemplateId(progressSheetConfig);
+    if (!templateId || !hasStoredTemplateFieldColumns(templateId)) {
+      return progressSheetConfig;
+    }
+    return applyTemplateFieldColumns(progressSheetConfig, templateFieldColumns);
+  }, [progressSheetConfig, templateFieldColumns]);
   const progressSheetColumns = useMemo(
-    () => (progressSheetConfig ? columnsForProgressSheet(progressSheetConfig) : []),
-    [progressSheetConfig],
+    () => (effectiveProgressSheetConfig ? columnsForProgressSheet(effectiveProgressSheetConfig) : []),
+    [effectiveProgressSheetConfig],
   );
   const progressSheetPrefs = useProgressSheetPreferences(
-    progressSheetConfig?.id ?? activeProgressSheetRef?.id,
+    effectiveProgressSheetConfig?.id ?? activeProgressSheetRef?.id,
     progressSheetColumns.length || 1,
   );
   const progressSheetRows = useMemo(
     () => (
-      progressSheetConfig
-        ? progressSheetRowsToPhaseRows(progressSheetConfig, dashboardProjectNames[0] ?? project.name)
+      effectiveProgressSheetConfig
+        ? progressSheetRowsToPhaseRows(effectiveProgressSheetConfig, dashboardProjectNames[0] ?? project.name)
         : []
     ),
-    [dashboardProjectNames, progressSheetConfig, project.name],
+    [dashboardProjectNames, effectiveProgressSheetConfig, project.name],
   );
 
   // Header summary uses features (for development, weighted by SP) of the current phase.
@@ -295,7 +320,7 @@ export function ProjectProgressClient({
             <div className="min-w-0">
               <h1 className="flex items-center gap-2 text-xl font-semibold text-stone-50">
                 <Activity className="h-5 w-5 text-emerald-300" />
-                Project Progress Dashboard
+                Projects Dashboard
               </h1>
               {activeProgressSheetRef && (
                 <p className="mt-1 text-sm font-medium text-stone-100">
@@ -360,7 +385,7 @@ export function ProjectProgressClient({
                 runHistory={runHistory}
               />
             ) : isPhaseTab ? (
-              progressSheetConfig ? (
+              effectiveProgressSheetConfig ? (
                 <PhaseTabContent
                   phase={activePhase}
                   projectName={project.name}
@@ -408,7 +433,7 @@ export function ProjectProgressClient({
                   onDispatchRow={(row) => row.source === 'feature' && setDispatchRow(row)}
                 />
               )
-            ) : (
+            ) : activeTab === 'issues' ? (
               <IssuesTab
                 projectName={project.name}
                 selectedProjectNames={dashboardProjectNames}
@@ -421,7 +446,7 @@ export function ProjectProgressClient({
                 defaultIDE={project.defaultIDE}
                 onDispatchIssue={(issue) => setDispatchIssue(issue)}
               />
-            )}
+            ) : null}
           </div>
         </div>
       </WorkstationFrame>

@@ -12,7 +12,7 @@
 #   ./start_project_manager.sh stop      stop all services
 #   ./start_project_manager.sh restart   clean old PM tabs/processes, then start fresh in background
 #   ./start_project_manager.sh hermes    start Hermes Agent dashboard only
-#   ./start_project_manager.sh openclaw  start OpenClaw gateway and open dashboard
+#   ./start_project_manager.sh supabase start local Supabase Docker stack only
 #
 # Flags (any command):
 #   --open, --force-open   open browser even when the service is already running
@@ -922,6 +922,8 @@ export PLATFORM
 source "$SCRIPT_DIR/scripts/dependency-resolver.sh"
 # shellcheck source=scripts/pm-launcher/aux-pages.sh
 source "$SCRIPT_DIR/scripts/pm-launcher/aux-pages.sh"
+# shellcheck source=scripts/pm-launcher/supabase-stack.sh
+source "$SCRIPT_DIR/scripts/pm-launcher/supabase-stack.sh"
 
 # ── Prerequisite checks ───────────────────────────────────────────────────────
 
@@ -1142,6 +1144,8 @@ start_project_manager() {
   cd "$SCRIPT_DIR"
   configure_tauri_dev_secret_backend
 
+  ensure_supabase_for_pm || warn "Local Supabase is unavailable; PM will run in local-files mode until the stack is healthy."
+
   if [[ "${PROJECT_MANAGER_REUSE_EXISTING:-0}" != "1" && "${PROJECT_MANAGER_START_CLEANED:-0}" != "1" ]]; then
     clean_project_manager_test_environment
     export PROJECT_MANAGER_START_CLEANED=1
@@ -1338,19 +1342,23 @@ cmd_all() {
     cmd_install
   fi
 
+  ensure_supabase_for_pm || warn "Local Supabase is unavailable; continuing without cloud backend."
+
   cmd_start_background
   maybe_autostart_sidecar "openclaw" "OpenClaw" cmd_openclaw
   maybe_autostart_sidecar "hermes-agent" "Hermes Agent" cmd_hermes
   cmd_aux
 
   header "Launch Summary"
-  success "Project-scoped apps are ready (PM + optional sidecars + reachable aux pages)"
+  supabase_load_ports
+  success "Project-scoped apps are ready (PM + Supabase + optional sidecars + reachable aux pages)"
   echo "  Project Manager Desktop: started"
   echo "  Project Manager URL:      http://localhost:${DEV_PORT}/project-progress-dashboard"
+  echo "  Local Supabase API/Studio: ${SUPABASE_STUDIO_URL} (Dashboard login: supabase / supabase-local-dev)"
   echo "  Hermes Agent Dashboard:  http://127.0.0.1:${HERMES_PORT} (when running + configured)"
   echo "  OpenClaw Dashboard:      http://127.0.0.1:${OPENCLAW_PORT}/ (when running + configured)"
   echo "  Launcher profile:        ${PM_LAUNCHER_PROFILE} (aux pages from config/samples/launcher.*.json)"
-  echo "  Logs:                    .project-manager/dev-logs/"
+  echo "  Logs:                    .project-manager/dev-logs/ + docker/supabase (docker compose logs)"
 }
 
 cmd_core() {
@@ -1365,18 +1373,22 @@ cmd_core() {
     cmd_install
   fi
 
+  ensure_supabase_for_pm || warn "Local Supabase is unavailable; continuing without cloud backend."
+
   cmd_start_background
   maybe_autostart_sidecar "openclaw" "OpenClaw" cmd_openclaw
   maybe_autostart_sidecar "hermes-agent" "Hermes Agent" cmd_hermes
 
   header "Launch Summary"
-  success "Core apps are ready (PM + optional sidecars)"
+  supabase_load_ports
+  success "Core apps are ready (PM + Supabase + optional sidecars)"
   echo "  Project Manager Desktop: started"
   echo "  Project Manager URL:      http://localhost:${DEV_PORT}/project-progress-dashboard"
   echo "  Project Manager Web App: http://localhost:${DEV_PORT}/"
+  echo "  Local Supabase API/Studio: ${SUPABASE_STUDIO_URL} (Dashboard login: supabase / supabase-local-dev)"
   echo "  Hermes Agent Dashboard:  http://127.0.0.1:${HERMES_PORT} (when autostart enabled + installed)"
   echo "  OpenClaw Dashboard:      http://127.0.0.1:${OPENCLAW_PORT}/ (when autostart enabled + installed)"
-  echo "  Logs:                    .project-manager/dev-logs/"
+  echo "  Logs:                    .project-manager/dev-logs/ + docker/supabase (docker compose logs)"
 }
 
 cmd_stop() {
@@ -1396,6 +1408,7 @@ cmd_stop() {
       success "Port ${port} cleared"
     fi
   done
+  cmd_supabase_stop || true
   success "All services stopped."
 }
 
@@ -1411,8 +1424,9 @@ cmd_restart() {
 
 show_menu() {
   local menu_all menu_core
-  menu_all="$(launcher_profile_query menu.all 2>/dev/null || echo '啟動 PM + 已啟用 sidecar + 可連線的輔助頁面')"
-  menu_core="$(launcher_profile_query menu.core 2>/dev/null || echo '啟動 PM + 依 plugin 設定自動啟動 sidecar')"
+  supabase_load_ports
+  menu_all="$(launcher_profile_query menu.all 2>/dev/null || echo '啟動 PM + Supabase + 已啟用 sidecar + 可連線的輔助頁面')"
+  menu_core="$(launcher_profile_query menu.core 2>/dev/null || echo '啟動 PM + Supabase + 依 plugin 設定自動啟動 sidecar')"
   clear
   echo -e "${BLUE}══════════════════════════════════════════════════════════════${RESET}"
   echo -e "${BLUE}   Project Manager - 統一啟動選單 (Project Manager Menu) ${RESET}"
@@ -1423,12 +1437,13 @@ show_menu() {
   echo -e " 4) 🌐 啟動 PM 網頁端 (Next.js Only)"
   echo -e " 5) 🤖 啟動 Hermes Agent Dashboard (Port: $HERMES_PORT)"
   echo -e " 6) 🕹️  啟動 OpenClaw Dashboard (Port: $OPENCLAW_PORT)"
-  echo -e " 7) 🧩 開啟已配置且可連線的輔助頁面 (profile: ${PM_LAUNCHER_PROFILE})"
+  echo -e " 7) 🗄️  啟動 Local Supabase Docker Stack (Port: ${SUPABASE_KONG_PORT:-54329})"
+  echo -e " 8) 🧩 開啟已配置且可連線的輔助頁面 (profile: ${PM_LAUNCHER_PROFILE})"
   echo -e " ─── 管理功能 ───"
-  echo -e " 8) 📥 執行完整安裝 (Full Install)"
-  echo -e " 9) 🔄 更新相依性與 Rust 編譯 (Update)"
-  echo -e "10) 🛑 停止所有相關服務"
-  echo -e "11) ♻️  清理舊測試環境並重啟 PM"
+  echo -e " 9) 📥 執行完整安裝 (Full Install)"
+  echo -e "10) 🔄 更新相依性與 Rust 編譯 (Update)"
+  echo -e "11) 🛑 停止所有相關服務"
+  echo -e "12) ♻️  清理舊測試環境並重啟 PM"
   echo -e " 0) 🚪 離開 (Exit)"
   echo ""
   read -p "請輸入選項 (Enter choice): " choice
@@ -1440,11 +1455,12 @@ show_menu() {
     4) cmd_web ;;
     5) cmd_hermes ;;
     6) cmd_openclaw ;;
-    7) cmd_aux ;;
-    8) cmd_install ;;
-    9) cmd_update ;;
-    10) cmd_stop ;;
-    11) cmd_restart ;;
+    7) cmd_supabase ;;
+    8) cmd_aux ;;
+    9) cmd_install ;;
+    10) cmd_update ;;
+    11) cmd_stop ;;
+    12) cmd_restart ;;
     0) exit 0 ;;
     *) warn "無效選項 (Invalid choice)"; sleep 1; show_menu ;;
   esac
@@ -1523,11 +1539,12 @@ case "$COMMAND" in
   restart)  cmd_restart ;;
   hermes)   cmd_hermes  ;;
   openclaw) cmd_openclaw ;;
+  supabase) cmd_supabase ;;
   menu)     show_menu   ;;
   auto)     cmd_auto    ;;
   *)
     error "Unknown command: $COMMAND"
-    echo "Usage: $0 [--force-open|--open] [--restart] [install|update|start|web|all|core|aux|stop|restart|hermes|openclaw|menu]"
+    echo "Usage: $0 [--force-open|--open] [--restart] [install|update|start|web|all|core|aux|stop|restart|hermes|openclaw|supabase|menu]"
     exit 1
     ;;
 esac

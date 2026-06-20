@@ -2,6 +2,10 @@
 
 import type { ProgressColumn, ProgressRow, ProgressSheetConfig } from '../../../lib/types';
 import { COL_ID_COLUMN_HEADER } from '../../../components/table/colId';
+import {
+  progressRowColumnValue,
+  readProgressRowSupabaseUuid,
+} from '../../../lib/progress-sheets/progressRowUuidSync';
 import type { ColumnDef } from './columns';
 import type { PhaseRow } from './phaseRows';
 
@@ -23,23 +27,7 @@ function formatProgressValue(value: unknown, column?: ProgressColumn): string {
 }
 
 function progressColumnValue(row: ProgressRow, column: ProgressColumn): unknown {
-  if (Object.prototype.hasOwnProperty.call(row.values, column.id)) {
-    return row.values[column.id];
-  }
-  switch (column.id) {
-    case 'id':
-      return row.id;
-    case 'title':
-      return row.title;
-    case 'status':
-      return row.status;
-    case 'owner':
-      return row.owner;
-    case 'progress':
-      return row.progress;
-    default:
-      return undefined;
-  }
+  return progressRowColumnValue(row, column.id);
 }
 
 function renderReadOnlyValue(value: unknown, column?: ProgressColumn) {
@@ -63,7 +51,7 @@ export function progressSheetRowsToPhaseRows(
     source: 'custom',
     customRowId: row.id,
     projectName,
-    uuid: row.id,
+    uuid: readProgressRowSupabaseUuid(row) ?? row.id,
     id: row.id,
     name: row.title,
     category: sheetConfig.discipline,

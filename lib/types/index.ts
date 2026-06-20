@@ -169,6 +169,7 @@ export type ProgressDiscipline =
   | 'custom';
 
 export type ProgressFieldType =
+  | 'uuid'
   | 'text'
   | 'number'
   | 'date'
@@ -536,7 +537,7 @@ export interface EngineerRole {
   capabilities?: RoleCapability[];
 }
 
-export type ViewId = 'dashboard' | 'features' | 'integrations-hub' | 'xmux' | 'settings' | 'engineers' | 'channels' | 'sessions' | 'cron-jobs' | 'logs' | 'keys' | 'ai-sdks' | 'documentation' | 'company-standards' | 'chat' | 'keyboard-shortcuts';
+export type ViewId = 'progress-templates-setting' | 'dashboard' | 'features' | 'integrations-hub' | 'xmux' | 'settings' | 'engineers' | 'channels' | 'sessions' | 'cron-jobs' | 'logs' | 'keys' | 'ai-sdks' | 'documentation' | 'company-standards' | 'chat' | 'keyboard-shortcuts';
 
 export type IssueState = 'open' | 'closed';
 

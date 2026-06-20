@@ -100,6 +100,10 @@ const SettingsView = dynamic(
   () => import('./views/SettingsView').then((mod) => mod.SettingsView),
   { loading: RouteViewLoading },
 );
+const ProgressTemplatesSettingView = dynamic(
+  () => import('./views/ProgressTemplatesSettingView').then((mod) => mod.ProgressTemplatesSettingView),
+  { loading: RouteViewLoading },
+);
 const DocumentationView = dynamic(
   () => import('./views/DocumentationView').then((mod) => mod.DocumentationView),
   { loading: RouteViewLoading },
@@ -1644,6 +1648,7 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
         dashboardProjects: effectiveDashboardProjects.map((p) => p.config.project.name),
       }}
     >
+      {currentView === 'progress-templates-setting' && <ProgressTemplatesSettingView />}
       {currentView === 'dashboard' && selectedProject && (
         <ProjectProgressClient
           project={selectedProject.config.project}

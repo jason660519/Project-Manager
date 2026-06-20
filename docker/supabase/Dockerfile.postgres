@@ -1,0 +1,13 @@
+# Optional: build pg_jieba from source on supabase/postgres (Alpine/Nix).
+#
+# Status: pg_jieba compiles but fails at CREATE EXTENSION on this stack
+# (musl/Nix ABI). Use pgroonga (bundled + enabled in init SQL) for Chinese FTS.
+#
+# To retry later:
+#   docker compose build db
+#   docker compose up -d db
+
+ARG SUPABASE_POSTGRES_TAG=17.6.1.136
+FROM supabase/postgres:${SUPABASE_POSTGRES_TAG}
+
+# Intentionally no extra layers — see comment above.

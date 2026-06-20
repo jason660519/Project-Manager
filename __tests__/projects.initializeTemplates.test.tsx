@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProjectsView } from '../app/ui/views/ProjectsView';
+import { I18nProvider } from '../lib/i18n';
 import type { Feature, ProjectEntry, ProjectManagerConfig } from '../lib/types';
 import type { ScanResult } from '../lib/scanner/shared';
 import type { RunProjectScanOptions } from '../lib/scanner/runProjectScan';
@@ -68,19 +69,31 @@ function renderView(
   props: Partial<React.ComponentProps<typeof ProjectsView>> = {},
 ) {
   render(
-    <ProjectsView
-      projects={projects}
-      selectedProjectId={projects[0]?.id ?? ''}
-      selectedDashboardProjectIds={projects.map((p) => p.id)}
-      onSelectProject={() => {}}
-      onToggleDashboardProject={() => {}}
-      onAddProject={() => {}}
-      onUpdateProject={() => {}}
-      onRemoveProject={() => {}}
-      runHistory={[]}
-      {...props}
-    />,
+    <I18nProvider>
+      <ProjectsView
+        projects={projects}
+        selectedProjectId={projects[0]?.id ?? ''}
+        selectedDashboardProjectIds={projects.map((p) => p.id)}
+        onSelectProject={() => {}}
+        onToggleDashboardProject={() => {}}
+        onAddProject={() => {}}
+        onUpdateProject={() => {}}
+        onRemoveProject={() => {}}
+        runHistory={[]}
+        {...props}
+      />
+    </I18nProvider>,
   );
+}
+
+async function toggleProgressSheetInRow(
+  row: HTMLElement,
+  sheetName: RegExp,
+  user: ReturnType<typeof userEvent.setup>,
+) {
+  await user.click(within(row).getByRole('button', { name: /desktop app development|select progress sheets/i }));
+  const listbox = screen.getByRole('listbox');
+  await user.click(within(listbox).getByRole('checkbox', { name: sheetName }));
 }
 
 describe('Projects initialization template picker', () => {
@@ -95,7 +108,7 @@ describe('Projects initialization template picker', () => {
     renderView([entry('p1', 'alpha')]);
 
     const row = screen.getByRole('row', { name: /alpha/i });
-    await user.click(within(row).getByRole('checkbox', { name: /desktop app development/i }));
+    await toggleProgressSheetInRow(row, /desktop app development progress sheet/i, user);
     await user.click(within(row).getByRole('button', { name: /^initialize$/i }));
 
     expect(await screen.findByText(/select at least one progress sheet/i)).toBeInTheDocument();
@@ -117,7 +130,7 @@ describe('Projects initialization template picker', () => {
     renderView([project]);
 
     const row = screen.getByRole('row', { name: /bravo/i });
-    await user.click(within(row).getByRole('checkbox', { name: /qa validation/i }));
+    await toggleProgressSheetInRow(row, /qa validation progress sheet/i, user);
     await user.click(within(row).getByRole('button', { name: /^initialize$/i }));
 
     await waitFor(() => expect(applyScanConfigToProjectMock).toHaveBeenCalled());
@@ -140,7 +153,7 @@ describe('Projects initialization template picker', () => {
     renderView([project], { onInitializeProject });
 
     const row = screen.getByRole('row', { name: /charlie/i });
-    await user.click(within(row).getByRole('checkbox', { name: /hardware r&d/i }));
+    await toggleProgressSheetInRow(row, /hardware r&d progress sheet/i, user);
     await user.click(within(row).getByRole('button', { name: /create scaffold/i }));
     await user.click(within(row).getByRole('button', { name: /merge scaffold/i }));
     await user.click(within(row).getByRole('button', { name: /overwrite scaffold/i }));

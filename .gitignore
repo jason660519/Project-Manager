@@ -22,6 +22,13 @@ test-results/
 .env.*
 !.env.example
 
+# Local Supabase Docker data (generated at runtime)
+docker/supabase/.env
+docker/supabase/volumes/db/data/
+docker/supabase/volumes/timescaledb/data/
+docker/supabase/volumes/storage/*
+!docker/supabase/volumes/storage/.gitkeep
+
 # Tauri / Rust
 src-tauri/target/
 src-tauri/.cargo/

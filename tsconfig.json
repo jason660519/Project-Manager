@@ -39,6 +39,7 @@
     "vendor/openclaw",
     "vendor/hermes-agent",
     "hermes-agent",
+    "docker/supabase",
     ".next/types/validator.ts",
     ".next/dev/types/validator.ts",
     ".project-manager"

@@ -4,6 +4,7 @@ import { createProgressSheetConfigFromTemplate } from '../lib/progress-sheets/sh
 import { BUILT_IN_PROGRESS_TEMPLATES } from '../lib/progress-sheets/templates';
 
 const SUPPORTED_FIELD_TYPES = new Set<ProgressFieldType>([
+  'uuid',
   'text',
   'number',
   'date',

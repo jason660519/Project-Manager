@@ -70,6 +70,7 @@ import { COL_ID_COLUMN_HEADER } from '../../../components/table/colId';
 import { BUILT_IN_PROGRESS_TEMPLATES } from '../../../lib/progress-sheets/templates';
 import { CompletedRun, ProjectManagerConfig, Feature, ProjectEntry } from '../../../lib/types';
 import { PostImportScanDialog } from './_components/PostImportScanDialog';
+import { ProgressSheetTemplatePicker } from './_components/ProgressSheetTemplatePicker';
 
 interface ProjectsViewProps {
   projects: ProjectEntry[];
@@ -696,20 +697,33 @@ export function ProjectsView({
     return null;
   };
 
-  const toggleTemplateSelection = (project: ProjectEntry, templateId: string) => {
-    setTemplateSelections((prev) => {
-      const current = prev[project.id] ?? getSelectedTemplateIds(project);
-      const next = current.includes(templateId)
-        ? current.filter((id) => id !== templateId)
-        : [...current, templateId];
-      return { ...prev, [project.id]: next };
-    });
+  const setTemplateSelection = (project: ProjectEntry, nextIds: string[]) => {
+    setTemplateSelections((prev) => ({ ...prev, [project.id]: nextIds }));
     setTemplateSelectionErrors((prev) => {
       if (!(project.id in prev)) return prev;
       const next = { ...prev };
       delete next[project.id];
       return next;
     });
+  };
+
+  const toggleTemplateSelection = (project: ProjectEntry, templateId: string) => {
+    const current = templateSelections[project.id] ?? getSelectedTemplateIds(project);
+    const next = current.includes(templateId)
+      ? current.filter((id) => id !== templateId)
+      : [...current, templateId];
+    setTemplateSelection(project, next);
+  };
+
+  const selectAllTemplateSelections = (project: ProjectEntry) => {
+    const current = templateSelections[project.id] ?? getSelectedTemplateIds(project);
+    const allIds = BUILT_IN_PROGRESS_TEMPLATES.map((template) => template.id);
+    const next = current.length === allIds.length ? [] : allIds;
+    setTemplateSelection(project, next);
+  };
+
+  const clearTemplateSelection = (project: ProjectEntry) => {
+    setTemplateSelection(project, []);
   };
 
   const runScanForProject = async (
@@ -1241,7 +1255,7 @@ export function ProjectsView({
       columnHelper.display({
         id: 'col-progress-templates',
         header: 'Progress Sheets',
-        size: 420,
+        size: 280,
         enableSorting: false,
         cell: ({ row }) => {
           const project = row.original;
@@ -1252,28 +1266,15 @@ export function ProjectsView({
           const templateError = templateSelectionErrors[project.id];
           const isScaffoldInitializing = scaffoldInitializingIds.has(project.id);
           return (
-            <div className="min-w-[390px] space-y-2" onClick={(e) => e.stopPropagation()}>
-              <div className="grid grid-cols-2 gap-1">
-                {BUILT_IN_PROGRESS_TEMPLATES.map((template) => (
-                  <label
-                    key={template.id}
-                    className={`flex cursor-pointer items-center gap-1.5 border px-2 py-1 text-[10px] ${
-                      selectedTemplateIds.includes(template.id)
-                        ? 'border-emerald-300/35 bg-emerald-500/15 text-emerald-100'
-                        : 'border-stone-200/15 bg-white/[0.025] text-stone-300 hover:bg-white/[0.055]'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedTemplateIds.includes(template.id)}
-                      onChange={() => toggleTemplateSelection(project, template.id)}
-                      className="h-3 w-3 accent-emerald-400"
-                      aria-label={`${template.label} progress sheet`}
-                    />
-                    <span className="truncate">{template.label}</span>
-                  </label>
-                ))}
-              </div>
+            <div className="min-w-[240px] space-y-2" onClick={(e) => e.stopPropagation()}>
+              <ProgressSheetTemplatePicker
+                templates={BUILT_IN_PROGRESS_TEMPLATES}
+                selectedIds={selectedTemplateIds}
+                onToggle={(templateId) => toggleTemplateSelection(project, templateId)}
+                onSelectAll={() => selectAllTemplateSelections(project)}
+                onClear={() => clearTemplateSelection(project)}
+                disabled={isScaffoldInitializing}
+              />
               <div className="flex flex-wrap items-center gap-1">
                 {selectedTemplates.length === 0 ? (
                   <span className="text-[10px] text-amber-200">

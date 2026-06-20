@@ -36,8 +36,8 @@
     ]
   },
   "menu": {
-    "all": "啟動 PM + 已啟用 sidecar + 可連線的輔助頁面（含 dev LAN）",
-    "core": "啟動 PM + 依 plugin 設定自動啟動 sidecar",
+    "all": "啟動 PM + Supabase + 已啟用 sidecar + 可連線的輔助頁面（含 dev LAN）",
+    "core": "啟動 PM + Supabase + 依 plugin 設定自動啟動 sidecar",
     "aux": "開啟已配置且可連線的輔助頁面（含 dev LAN）"
   }
 }

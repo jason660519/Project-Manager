@@ -17,7 +17,8 @@ import { openExternalUrl } from '../../lib/bridge';
 import { docsUrlForView } from '../../lib/docsRegistry';
 
 const VIEW_LABELS: Record<ViewId, string> = {
-  dashboard:           'Project Progress Dashboard',
+  'progress-templates-setting': 'Progress Templates Setting',
+  dashboard:           'Projects Dashboard',
   'integrations-hub':  'Integrations Hub',
   xmux:                'xmux',
   engineers:           'AI Engineers',

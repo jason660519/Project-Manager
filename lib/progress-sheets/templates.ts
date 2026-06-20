@@ -3,6 +3,7 @@ import type {
   ProgressDiscipline,
   ProgressOption,
 } from '../types';
+import { ensureProgressUuidFirstColumn } from './supabaseUuidField';
 
 export interface BuiltInProgressTemplate {
   id: string;
@@ -23,6 +24,14 @@ const DEFAULT_STATUS_OPTIONS: ProgressOption[] = [
   { id: 'complete', label: 'Complete', color: 'green' },
 ];
 
+/** Matches the legacy Development Progress dashboard status palette. */
+const SOFTWARE_DEVELOPMENT_STATUS_OPTIONS: ProgressOption[] = [
+  { id: 'todo', label: 'To Do', color: 'neutral' },
+  { id: 'in_progress', label: 'In Progress', color: 'blue' },
+  { id: 'done', label: 'Done', color: 'green' },
+  { id: 'on_hold', label: 'On Hold', color: 'red' },
+];
+
 function column(
   id: string,
   label: string,
@@ -40,43 +49,39 @@ function column(
   };
 }
 
-export const BUILT_IN_PROGRESS_TEMPLATES: BuiltInProgressTemplate[] = [
+const RAW_BUILT_IN_PROGRESS_TEMPLATES: BuiltInProgressTemplate[] = [
   {
     id: 'software-desktop-app',
     label: 'Desktop App Development',
     sheetTitle: 'Desktop App Development Progress',
     discipline: 'software',
-    version: 1,
+    version: 2,
     fields: [
-      column('feature', 'Feature', 'text', 0, { required: true }),
-      column('phase', 'Phase', 'select', 1, {
-        options: [
-          { id: 'development', label: 'Development' },
-          { id: 'e2e-testing', label: 'E2E Testing' },
-          { id: 'deployment', label: 'Deployment' },
-          { id: 'operations', label: 'Operations' },
-        ],
+      column('projectName', 'Project Name', 'text', 0),
+      column('featureId', 'Feature ID', 'text', 1, { required: true }),
+      column('points', 'SP', 'number', 2),
+      column('category', 'Category', 'tag', 3),
+      column('progress', 'Progress', 'percent', 4),
+      column('status', 'Status', 'select', 5, {
+        required: true,
+        options: SOFTWARE_DEVELOPMENT_STATUS_OPTIONS,
       }),
-      column('status', 'Status', 'select', 2, { required: true, options: DEFAULT_STATUS_OPTIONS }),
-      column('owner', 'Owner', 'person', 3),
-      column('priority', 'Priority', 'select', 4, {
-        options: [
-          { id: 'low', label: 'Low' },
-          { id: 'medium', label: 'Medium' },
-          { id: 'high', label: 'High' },
-        ],
-      }),
-      column('spec', 'Spec', 'link', 5),
-      column('testCoverage', 'Test Coverage', 'percent', 6),
-      column('releaseChannel', 'Release Channel', 'select', 7, {
-        options: [
-          { id: 'dev', label: 'Dev' },
-          { id: 'beta', label: 'Beta' },
-          { id: 'stable', label: 'Stable' },
-        ],
-      }),
+      column('checklist', 'Checklist', 'text', 6),
+      column('upstreamDependencies', 'Upstream Dependencies', 'tag', 7),
+      column('downstreamDependencies', 'Downstream Dependencies', 'tag', 8),
+      column('locatedSection', 'Located Section', 'text', 9),
+      column('specPath', 'Feature Spec', 'file', 10),
+      column('tddPath', 'TDD Spec', 'file', 11),
+      column('unitIntegrationTestPath', 'Unit/Integ Test', 'file', 12),
+      column('e2eAcceptanceTestScriptFolder', 'E2E Folder', 'file', 13),
+      column('tddProgress', 'TDD Progress', 'percent', 14),
+      column('tddReportPath', 'TDD Report', 'file', 15),
+      column('debugRetroPath', 'Debug Retro', 'file', 16),
+      column('testScenariosPath', 'Test Scenarios', 'file', 17),
+      column('devLogFolder', 'Dev Logs', 'file', 18),
+      column('readmePath', 'README', 'file', 19),
     ],
-    statusOptions: DEFAULT_STATUS_OPTIONS,
+    statusOptions: SOFTWARE_DEVELOPMENT_STATUS_OPTIONS,
   },
   {
     id: 'software-backend-api',
@@ -289,3 +294,10 @@ export const BUILT_IN_PROGRESS_TEMPLATES: BuiltInProgressTemplate[] = [
     statusOptions: DEFAULT_STATUS_OPTIONS,
   },
 ];
+
+export const BUILT_IN_PROGRESS_TEMPLATES: BuiltInProgressTemplate[] = RAW_BUILT_IN_PROGRESS_TEMPLATES.map(
+  (template) => ({
+    ...template,
+    fields: ensureProgressUuidFirstColumn(template.fields),
+  }),
+);

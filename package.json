@@ -26,6 +26,7 @@
     "xmux:perf:matrix": "node scripts/xmux-perf-matrix.mjs",
     "pm:restart": "bash start_project_manager.sh restart",
     "pm-system": "node scripts/pm-system.mjs",
+    "supabase:sync-env": "node scripts/sync-local-supabase-env.mjs",
     "table:sheet:audit": "node scripts/audit-table-sheets.mjs",
     "verify:static-export": "node scripts/check-static-export-hygiene.mjs",
     "githooks:install": "bash scripts/install-githooks.sh",
