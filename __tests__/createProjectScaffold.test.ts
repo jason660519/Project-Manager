@@ -31,7 +31,7 @@ describe('buildProjectScaffold', () => {
         discipline: 'software',
         configPath: '.project-manager/progress-sheets/software-desktop-app/config.json',
         templateId: 'software-desktop-app',
-        templateVersion: 2,
+        templateVersion: 3,
         active: true,
         createdAt: expect.any(String),
         updatedAt: expect.any(String),

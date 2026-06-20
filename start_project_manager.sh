@@ -202,6 +202,160 @@ remember_session_opened_url() {
   fi
 }
 
+refresh_browser_tab_for_url() {
+  local url="$1"
+
+  if [[ "${PROJECT_MANAGER_BROWSER_REFRESH:-1}" == "0" ]]; then
+    return 1
+  fi
+  if [[ "$PLATFORM" != "macOS" ]] || ! command -v osascript >/dev/null 2>&1; then
+    return 1
+  fi
+
+  local local_origin_dedup="${PROJECT_MANAGER_LOCAL_ORIGIN_DEDUP:-1}"
+  local result
+  result="$(osascript -l JavaScript - "$url" "$local_origin_dedup" 2>/dev/null <<'JXA' || true
+function run(argv) {
+  const targetUrl = String(argv[0] || "");
+  const localOriginDedup = String(argv[1] || "1") === "1";
+  const browserNames = ["Google Chrome", "Microsoft Edge", "Brave Browser", "Safari"];
+
+  function normalizeUrl(rawUrl) {
+    let value = String(rawUrl || "");
+    const hashIndex = value.indexOf("#");
+    if (hashIndex >= 0) value = value.slice(0, hashIndex);
+    const queryIndex = value.indexOf("?");
+    if (queryIndex >= 0) value = value.slice(0, queryIndex);
+    while (value.length > 8 && value.endsWith("/")) {
+      value = value.slice(0, -1);
+    }
+    return value;
+  }
+
+  function canonicalHost(host) {
+    const lowered = String(host || "").replace(/^\[|\]$/g, "").toLowerCase();
+    if (lowered === "localhost" || lowered === "127.0.0.1" || lowered === "::1") {
+      return "localhost";
+    }
+    return lowered;
+  }
+
+  function parseAuthority(url) {
+    const match = String(url || "").match(/^([a-zA-Z][a-zA-Z0-9+.-]*):\/\/([^/]+)/);
+    if (!match) return null;
+    const scheme = match[1].toLowerCase();
+    const authority = match[2];
+    let host = "";
+    let port = "";
+
+    if (authority.startsWith("[")) {
+      host = authority.slice(1, authority.indexOf("]"));
+      const remainder = authority.slice(authority.indexOf("]") + 1);
+      if (remainder.startsWith(":")) port = remainder.slice(1);
+    } else if (authority.includes(":")) {
+      host = authority.slice(0, authority.indexOf(":"));
+      port = authority.slice(authority.indexOf(":") + 1);
+    } else {
+      host = authority;
+    }
+
+    if (!port) {
+      if (scheme === "http") port = "80";
+      else if (scheme === "https") port = "443";
+    }
+
+    return { scheme, host: canonicalHost(host), port };
+  }
+
+  function isLocalUrl(url) {
+    const parsed = parseAuthority(normalizeUrl(url));
+    return parsed !== null && parsed.host === "localhost";
+  }
+
+  function originKey(url) {
+    const parsed = parseAuthority(normalizeUrl(url));
+    if (!parsed) return normalizeUrl(url);
+    return parsed.scheme + "://" + parsed.host + ":" + parsed.port;
+  }
+
+  function tabMatches(tabUrl) {
+    const normalizedTab = normalizeUrl(tabUrl);
+    const normalizedTarget = normalizeUrl(targetUrl);
+    if (normalizedTab === normalizedTarget) return true;
+    if (localOriginDedup && isLocalUrl(tabUrl) && isLocalUrl(targetUrl)) {
+      return originKey(tabUrl) === originKey(targetUrl);
+    }
+    return false;
+  }
+
+  function activateTab(browser, browserWindow, tabIndex) {
+    try {
+      browserWindow.activeTabIndex = tabIndex;
+    } catch (error) {
+      /* Safari versions differ; activating the window is still useful. */
+    }
+    try {
+      browserWindow.index = 1;
+    } catch (error) {
+      /* ignore */
+    }
+    browser.activate();
+  }
+
+  function refreshTab(browserName, browser, browserWindow, browserTab, tabIndex) {
+    const currentUrl = String(browserTab.url() || "");
+    if (normalizeUrl(currentUrl) !== normalizeUrl(targetUrl)) {
+      browserTab.url = targetUrl;
+    } else if (browserName !== "Safari") {
+      try {
+        browserTab.reload();
+      } catch (error) {
+        browserTab.url = targetUrl;
+      }
+    } else {
+      browserTab.url = targetUrl;
+    }
+    activateTab(browser, browserWindow, tabIndex);
+    return "refreshed";
+  }
+
+  const normalizedTarget = normalizeUrl(targetUrl);
+
+  for (const browserName of browserNames) {
+    let browser;
+    try {
+      browser = Application(browserName);
+    } catch (error) {
+      continue;
+    }
+    if (!browser.running()) continue;
+
+    try {
+      for (const browserWindow of browser.windows()) {
+        const tabs = browserWindow.tabs();
+        for (let tabIndex = 1; tabIndex <= tabs.length; tabIndex += 1) {
+          const browserTab = tabs[tabIndex - 1];
+          try {
+            const tabUrl = String(browserTab.url() || "");
+            if (!tabMatches(tabUrl)) continue;
+            return refreshTab(browserName, browser, browserWindow, browserTab, tabIndex);
+          } catch (error) {
+            /* try next tab */
+          }
+        }
+      }
+    } catch (error) {
+      /* try next browser */
+    }
+  }
+
+  return "not_found";
+}
+JXA
+)"
+  [[ "$result" == "refreshed" ]]
+}
+
 open_local_url() {
   local url="$1"
   local target_url
@@ -212,6 +366,12 @@ open_local_url() {
     return 0
   fi
 
+  if [[ "$PLATFORM" == "macOS" ]] && refresh_browser_tab_for_url "$url"; then
+    remember_session_opened_url "$target_url"
+    success "Browser tab refreshed: $(safe_url_for_display "$url")"
+    return 0
+  fi
+
   if ! should_force_open_browser && session_has_url_opened "$target_url"; then
     success "Browser tab already handled in this run: $(safe_url_for_display "$url")"
     return 0
@@ -219,7 +379,7 @@ open_local_url() {
 
   if ! should_force_open_browser && browser_has_url_open "$url"; then
     remember_session_opened_url "$target_url"
-    success "Browser tab already open: $(safe_url_for_display "$url")"
+    success "Browser tab already open (refresh unavailable): $(safe_url_for_display "$url")"
     return 0
   fi
 
@@ -1317,8 +1477,8 @@ cmd_openclaw() {
   approved_count="$(approve_openclaw_pending_pairings)"
   if [[ "$approved_count" =~ ^[0-9]+$ ]] && (( approved_count > 0 )); then
     success "Approved $approved_count OpenClaw local pairing request(s)"
-    info "Opening OpenClaw Dashboard after pairing approval"
-    open_local_url "$url"
+    info "Refreshing OpenClaw Dashboard after pairing approval"
+    refresh_browser_tab_for_url "$url" || open_local_url "$url"
   else
     success "No pending OpenClaw local pairing requests found"
   fi

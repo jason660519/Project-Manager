@@ -54,6 +54,7 @@
     "discovery:install-nmap": "bash scripts/install-nmap.sh",
     "discovery:doctor": "bash scripts/discovery-doctor.sh",
     "test": "vitest run",
+    "test:supabase-rls": "node scripts/test-supabase-rls.mjs",
     "test:restart-pm": "bash scripts/restart-project-manager-after-tests.sh npm test",
     "test:watch": "vitest",
     "e2e:tauri:f34-select": "node scripts/run-f34-tauri-select-e2e.mjs",

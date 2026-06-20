@@ -76,6 +76,10 @@ Renderer-safe profile data may include profile ID, label, mode, URL, and anon
 key reference/value. Service-role keys, JWT secrets, and database passwords are
 ops-only secrets and must not enter renderer code.
 
+Postgres schema, RLS, migrations, and naming rules for Supabase-compatible
+backend modes are defined in
+[supabase-db-design-standard.md](./supabase-db-design-standard.md).
+
 ## 4. Schema Version
 
 Current schema version: `11`.
@@ -240,6 +244,9 @@ Project Manager 支援以下 backend modes：
 Renderer-safe profile data 可以包含 profile ID、label、mode、URL，以及 anon
 key reference/value。Service-role keys、JWT secrets、database passwords 屬於
 ops-only secrets，不可進入 renderer code。
+
+Supabase-compatible backend modes 的 Postgres schema、RLS、migration 與命名規則
+定義於 [supabase-db-design-standard.md](./supabase-db-design-standard.md)。
 
 ## 4. Schema Version
 

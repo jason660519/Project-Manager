@@ -19,6 +19,13 @@ export const DEVELOPMENT_FIELD_PREFS_CHANGED_EVENT = TEMPLATE_FIELD_PREFS_CHANGE
 
 export const DEVELOPMENT_TEMPLATE_ID = 'software-desktop-app';
 
+/** Built-in sheets whose Development tab is backed by manifest `features[]`, not sidecar rows. */
+export const FEATURE_BACKED_PROGRESS_SHEET_IDS = new Set<string>([DEVELOPMENT_TEMPLATE_ID]);
+
+export function isFeatureBackedProgressSheet(templateId: string | null | undefined): boolean {
+  return templateId != null && FEATURE_BACKED_PROGRESS_SHEET_IDS.has(templateId);
+}
+
 export const PROGRESS_FIELD_TYPE_OPTIONS: ReadonlyArray<{ value: ProgressFieldType; label: string }> = [
   { value: 'uuid', label: 'UUID' },
   { value: 'text', label: 'Text' },

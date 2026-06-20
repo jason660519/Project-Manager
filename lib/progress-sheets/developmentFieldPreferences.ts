@@ -15,6 +15,7 @@ export {
   isBuiltInProgressSheet,
   isBuiltInTemplateId,
   isDevelopmentProgressSheet,
+  isFeatureBackedProgressSheet,
   moveDevelopmentField,
   moveTemplateField,
   normalizeDevelopmentFieldColumns,

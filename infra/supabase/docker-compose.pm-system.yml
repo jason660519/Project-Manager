@@ -39,7 +39,12 @@ services:
       # first-init only — `upgrade` against an existing volume needs a real
       # migration runner (see docs/engineering/pm-system-installer.md).
       - ./migrations/0001_pm_core.sql:/docker-entrypoint-initdb.d/01_pm_core.sql:ro
-      - ./seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+      - ./migrations/0002_features_audit_logs.sql:/docker-entrypoint-initdb.d/02_features_audit_logs.sql:ro
+      - ./migrations/0003_runner_devices.sql:/docker-entrypoint-initdb.d/03_runner_devices.sql:ro
+      - ./migrations/0004_agent_runs_runner_device_fk.sql:/docker-entrypoint-initdb.d/04_agent_runs_runner_device_fk.sql:ro
+      - ./migrations/0005_report_metadata.sql:/docker-entrypoint-initdb.d/05_report_metadata.sql:ro
+      - ./migrations/0006_sync_cursors.sql:/docker-entrypoint-initdb.d/06_sync_cursors.sql:ro
+      - ./seed.sql:/docker-entrypoint-initdb.d/07_seed.sql:ro
 
   auth:
     image: supabase/gotrue:latest

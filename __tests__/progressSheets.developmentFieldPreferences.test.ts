@@ -10,6 +10,7 @@ import {
   normalizeDevelopmentFieldColumns,
   removeDevelopmentField,
   updateDevelopmentField,
+  isFeatureBackedProgressSheet,
 } from '../lib/progress-sheets/developmentFieldPreferences';
 
 describe('development field preferences', () => {
@@ -21,6 +22,7 @@ describe('development field preferences', () => {
       'featureId',
       'points',
       'category',
+      'name',
       'progress',
       'status',
       'checklist',
@@ -70,6 +72,11 @@ describe('development field preferences', () => {
   it('creates unique field ids from labels', () => {
     const ids = new Set<string>(['release-notes']);
     expect(createUniqueFieldId('Release Notes', ids)).toBe('release-notes-2');
+  });
+
+  it('marks the software desktop template as feature-backed', () => {
+    expect(isFeatureBackedProgressSheet('software-desktop-app')).toBe(true);
+    expect(isFeatureBackedProgressSheet('marketing-campaign')).toBe(false);
   });
 
   it('applies customized columns to built-in progress sheet configs', () => {

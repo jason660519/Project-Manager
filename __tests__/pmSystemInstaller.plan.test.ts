@@ -495,6 +495,11 @@ describe('PM System Installer planning', () => {
       'infra/supabase/docker-compose.pm-system.yml',
       'infra/supabase/pm-system.env.example',
       'infra/supabase/migrations/0001_pm_core.sql',
+      'infra/supabase/migrations/0002_features_audit_logs.sql',
+      'infra/supabase/migrations/0003_runner_devices.sql',
+      'infra/supabase/migrations/0004_agent_runs_runner_device_fk.sql',
+      'infra/supabase/migrations/0005_report_metadata.sql',
+      'infra/supabase/migrations/0006_sync_cursors.sql',
       'infra/supabase/seed.sql',
       'infra/supabase/templates/kong.yml',
     ]);
@@ -555,6 +560,94 @@ describe('PM System Installer planning', () => {
     // RLS is only enabled when auth is present; otherwise a loud notice, not a
     // silent deny-all.
     expect(migration).toContain("to_regprocedure('auth.uid()')");
+  });
+
+  it('adds features and audit_logs with admin-scoped audit RLS in migration 0002', () => {
+    const migration = readScaffold('infra/supabase/migrations/0002_features_audit_logs.sql');
+
+    expect(migration).toContain('create table if not exists public.features');
+    expect(migration).toContain('create table if not exists public.audit_logs');
+    expect(migration).toContain('create policy pm_features_read_member');
+    expect(migration).toContain('create policy pm_audit_logs_read_admin');
+    expect(migration).toContain("values ('0002_features_audit_logs')");
+  });
+
+  it('adds runner_devices with developer-scoped RLS in migration 0003', () => {
+    const migration = readScaffold('infra/supabase/migrations/0003_runner_devices.sql');
+
+    expect(migration).toContain('create table if not exists public.runner_devices');
+    expect(migration).toContain('create policy pm_runner_devices_read_developer');
+    expect(migration).toContain("values ('0003_runner_devices')");
+  });
+
+  it('links agent_runs to runner_devices with a same-workspace trigger in migration 0004', () => {
+    const migration = readScaffold('infra/supabase/migrations/0004_agent_runs_runner_device_fk.sql');
+
+    expect(migration).toContain('runner_device_id uuid references public.runner_devices(id)');
+    expect(migration).toContain('pm_enforce_agent_run_runner_workspace');
+    expect(migration).toContain("values ('0004_agent_runs_runner_device_fk')");
+  });
+
+  it('adds report_metadata with portal RLS in migration 0005', () => {
+    const migration = readScaffold('infra/supabase/migrations/0005_report_metadata.sql');
+
+    expect(migration).toContain('create table if not exists public.report_metadata');
+    expect(migration).toContain('create policy pm_report_metadata_read_member');
+    expect(migration).toContain("values ('0005_report_metadata')");
+  });
+
+  it('adds sync_cursors in migration 0006', () => {
+    const migration = readScaffold('infra/supabase/migrations/0006_sync_cursors.sql');
+
+    expect(migration).toContain('create table if not exists public.sync_cursors');
+    expect(migration).toContain('create policy pm_sync_cursors_read_developer');
+    expect(migration).toContain("values ('0006_sync_cursors')");
+  });
+
+  it('adds admin-scoped membership reads in migration 0007', () => {
+    const migration = readScaffold('infra/supabase/migrations/0007_workspace_memberships_admin_read.sql');
+
+    expect(migration).toContain('create policy pm_memberships_read_admin');
+    expect(migration).toContain('pm_is_workspace_admin');
+    expect(migration).toContain("values ('0007_workspace_memberships_admin_read')");
+  });
+
+  it('adds audited membership role updates in migration 0008', () => {
+    const migration = readScaffold('infra/supabase/migrations/0008_workspace_membership_role_update.sql');
+
+    expect(migration).toContain('pm_update_workspace_member_role');
+    expect(migration).toContain("values ('0008_workspace_membership_role_update')");
+  });
+
+  it('adds audited membership adds in migration 0009', () => {
+    const migration = readScaffold('infra/supabase/migrations/0009_workspace_membership_add.sql');
+
+    expect(migration).toContain('pm_add_workspace_member');
+    expect(migration).toContain("'membership.added'");
+    expect(migration).toContain("values ('0009_workspace_membership_add')");
+  });
+
+  it('adds audited membership removals in migration 0010', () => {
+    const migration = readScaffold('infra/supabase/migrations/0010_workspace_membership_remove.sql');
+
+    expect(migration).toContain('pm_remove_workspace_member');
+    expect(migration).toContain("'membership.removed'");
+    expect(migration).toContain("values ('0010_workspace_membership_remove')");
+  });
+
+  it('adds workspace creation in migration 0011', () => {
+    const migration = readScaffold('infra/supabase/migrations/0011_workspace_create.sql');
+
+    expect(migration).toContain('pm_create_workspace');
+    expect(migration).toContain("values ('0011_workspace_create')");
+  });
+
+  it('adds workspace email invites in migration 0012', () => {
+    const migration = readScaffold('infra/supabase/migrations/0012_workspace_invites.sql');
+
+    expect(migration).toContain('workspace_invites');
+    expect(migration).toContain('pm_accept_workspace_invite');
+    expect(migration).toContain("values ('0012_workspace_invites')");
   });
 
   it('flags a real secret even when the same file also contains an allowed placeholder', () => {

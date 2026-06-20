@@ -192,24 +192,68 @@ describe('Project progress dashboard progress sheets', () => {
     expect(screen.getByText('35%')).toBeInTheDocument();
   });
 
-  it('shows a progress sheet loading state instead of the legacy editable table while sidecar read is pending', async () => {
-    bridgeMock.readJsonFile.mockImplementation(() => new Promise(() => {}));
-
-    renderDashboard(projectConfig([
+  it('keeps the editable feature table for the software desktop sheet even when the sidecar is missing', async () => {
+    bridgeMock.readJsonFile.mockRejectedValue(new Error('missing sidecar'));
+    const config = projectConfig([
       sheetRef(
-        'marketing-campaign',
-        'Marketing Campaign',
-        '.project-manager/progress-sheets/marketing-campaign/config.json',
+        'software-desktop-app',
+        'Desktop App Development Progress',
+        '.project-manager/progress-sheets/software-desktop-app/config.json',
       ),
-    ]));
+    ]);
+    config.features = [{
+      id: 'F01',
+      name: 'Restore dashboard columns',
+      category: 'Core',
+      status: 'in_progress',
+      progress: 42,
+      points: 3,
+      paths: {},
+    }];
+
+    render(
+      <I18nProvider>
+        <ProjectProgressClient
+          project={config.project}
+          projectRoot={config.project.root}
+          features={config.features}
+          adapters={[]}
+          engineerRoles={[]}
+          cronJobs={[]}
+          activeRuns={[]}
+          projects={[{ id: 'project-1', config, configPath: '/workspace/launch/.project-manager/config.json' }]}
+          selectedProjectId="project-1"
+          selectedDashboardProjectIds={['project-1']}
+          dashboardProjectNames={[config.project.name]}
+          dashboardProjects={[{ id: 'project-1', name: config.project.name }]}
+          dashboardProjectConfigs={[{
+            id: 'project-1',
+            root: config.project.root,
+            configPath: '/workspace/launch/.project-manager/config.json',
+            progressSheets: config.progressSheets,
+          }]}
+          onSelectProject={() => {}}
+          onToggleDashboardProject={() => {}}
+          onAddProject={() => {}}
+          onUpdateProject={() => {}}
+          onRemoveProject={() => {}}
+          onCronJobsChange={() => {}}
+          onFeaturePatch={() => {}}
+          onFeaturePromptSave={() => {}}
+        />
+      </I18nProvider>,
+    );
 
     await userEvent.click(screen.getByRole('button', { name: /development progress sheet/i }));
 
-    expect(await screen.findByText('Loading progress sheet config...')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /add row/i })).not.toBeInTheDocument();
+    expect(await screen.findByText('Restore dashboard columns')).toBeInTheDocument();
+    expect(screen.getByText('Feature Spec')).toBeInTheDocument();
+    expect(screen.getByText('TDD Spec')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /add row/i })).toBeInTheDocument();
+    expect(screen.queryByText(/Could not load progress sheet config/)).not.toBeInTheDocument();
   });
 
-  it('falls back to the manifest sheet label when the sidecar config cannot be read', async () => {
+  it('shows a progress sheet loading state instead of the legacy editable table while sidecar read is pending', async () => {
     bridgeMock.readJsonFile.mockRejectedValue(new Error('missing sidecar'));
 
     renderDashboard(projectConfig([

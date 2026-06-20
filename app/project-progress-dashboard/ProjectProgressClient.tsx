@@ -13,12 +13,14 @@ import { buildFeatureDependencyGraph, dispatchReadinessForFeature } from './_lib
 import { usePhasePreferences, useProgressSheetPreferences } from './_lib/usePhasePreferences';
 import { computePhaseCounts, type PhaseRow } from './_lib/phaseRows';
 import { columnsForProgressSheet, progressSheetRowsToPhaseRows } from './_lib/progressSheetColumns';
+import { developmentColumnsFromTemplatePrefs } from './_lib/developmentTemplateColumns';
 import { useTemplateFieldPreferences } from '../ui/views/ProgressTemplates/useTemplateFieldPreferences';
 import {
   applyTemplateFieldColumns,
   DEVELOPMENT_TEMPLATE_ID,
   hasStoredTemplateFieldColumns,
   isBuiltInProgressSheet,
+  isFeatureBackedProgressSheet,
   resolveProgressSheetTemplateId,
 } from '../../lib/progress-sheets/templateFieldPreferences';
 import { SheetTabs } from './_components/SheetTabs';
@@ -303,6 +305,44 @@ export function ProjectProgressClient({
     [dashboardProjectNames, effectiveProgressSheetConfig, project.name],
   );
 
+  const activeSheetTemplateId = useMemo(() => {
+    if (progressSheetConfig) {
+      return resolveProgressSheetTemplateId(progressSheetConfig);
+    }
+    return activeProgressSheetRef?.templateId ?? null;
+  }, [activeProgressSheetRef?.templateId, progressSheetConfig]);
+
+  const featureBackedDevelopmentSheet = isFeatureBackedProgressSheet(activeSheetTemplateId);
+
+  const showDynamicProgressSheet = Boolean(
+    isPhaseTab
+    && activePhase === 'development'
+    && effectiveProgressSheetConfig
+    && !featureBackedDevelopmentSheet,
+  );
+
+  const showProgressSheetLoading = Boolean(
+    isPhaseTab
+    && activePhase === 'development'
+    && activeProgressSheetRef
+    && !progressSheetError
+    && !effectiveProgressSheetConfig
+    && !featureBackedDevelopmentSheet,
+  );
+
+  const showProgressSheetError = Boolean(
+    isPhaseTab
+    && activePhase === 'development'
+    && progressSheetError
+    && activeProgressSheetRef
+    && !featureBackedDevelopmentSheet,
+  );
+
+  const developmentColumnsOverride = useMemo(() => {
+    if (activePhase !== 'development' || !featureBackedDevelopmentSheet) return undefined;
+    return developmentColumnsFromTemplatePrefs(templateFieldColumns);
+  }, [activePhase, featureBackedDevelopmentSheet, templateFieldColumns]);
+
   // Header summary uses features (for development, weighted by SP) of the current phase.
   const headerFeatures = activePhase === 'development' ? features : phaseFeatures;
 
@@ -327,7 +367,7 @@ export function ProjectProgressClient({
                   {progressSheetConfig?.sheetTitle ?? activeProgressSheetRef.label}
                 </p>
               )}
-              {progressSheetError && (
+              {progressSheetError && !featureBackedDevelopmentSheet && (
                 <p className="mt-1 text-xs text-amber-100/85">
                   {progressSheetError}
                 </p>
@@ -385,7 +425,7 @@ export function ProjectProgressClient({
                 runHistory={runHistory}
               />
             ) : isPhaseTab ? (
-              effectiveProgressSheetConfig ? (
+              showDynamicProgressSheet ? (
                 <PhaseTabContent
                   phase={activePhase}
                   projectName={project.name}
@@ -405,14 +445,14 @@ export function ProjectProgressClient({
                   overrideRows={progressSheetRows}
                   readOnly
                 />
-              ) : activeProgressSheetRef && !progressSheetError ? (
+              ) : showProgressSheetLoading ? (
                 <div className="border border-stone-200/15 bg-[rgb(var(--pm-card))]/45 px-4 py-3 text-sm text-stone-200">
-                  <p className="font-medium">{activeProgressSheetRef.label}</p>
+                  <p className="font-medium">{activeProgressSheetRef!.label}</p>
                   <p className="mt-1 text-xs text-stone-400">Loading progress sheet config...</p>
                 </div>
-              ) : progressSheetError && activeProgressSheetRef ? (
+              ) : showProgressSheetError ? (
                 <div className="border border-amber-300/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                  <p className="font-medium">{activeProgressSheetRef.label}</p>
+                  <p className="font-medium">{activeProgressSheetRef!.label}</p>
                   <p className="mt-1 text-xs text-amber-100/80">{progressSheetError}</p>
                 </div>
               ) : (
@@ -421,7 +461,7 @@ export function ProjectProgressClient({
                   projectName={project.name}
                   projectNames={dashboardProjectNames}
                   projectRoot={projectRoot}
-                  features={phaseFeatures}
+                  features={activePhase === 'development' ? features : phaseFeatures}
                   dependencyFeatures={features}
                   engineerRoles={engineerRoles}
                   prefs={activePhasePrefs.prefs}
@@ -431,6 +471,7 @@ export function ProjectProgressClient({
                   onFeaturePatch={onFeaturePatch}
                   activeRuns={activeRuns}
                   onDispatchRow={(row) => row.source === 'feature' && setDispatchRow(row)}
+                  overrideColumns={developmentColumnsOverride}
                 />
               )
             ) : activeTab === 'issues' ? (

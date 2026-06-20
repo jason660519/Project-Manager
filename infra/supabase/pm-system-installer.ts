@@ -263,6 +263,26 @@ export const PM_SUPABASE_SCAFFOLD_FILES: readonly ScaffoldFile[] = [
     purpose: 'Initial PM workspace/auth schema migration scaffold.',
   },
   {
+    path: 'infra/supabase/migrations/0002_features_audit_logs.sql',
+    purpose: 'Cloud feature metadata and workspace-scoped audit_logs with RLS.',
+  },
+  {
+    path: 'infra/supabase/migrations/0003_runner_devices.sql',
+    purpose: 'Developer Runner pairing metadata with developer-scoped RLS.',
+  },
+  {
+    path: 'infra/supabase/migrations/0004_agent_runs_runner_device_fk.sql',
+    purpose: 'Canonical agent_runs.runner_device_id FK with same-workspace trigger guard.',
+  },
+  {
+    path: 'infra/supabase/migrations/0005_report_metadata.sql',
+    purpose: 'User Portal report index metadata with published-vs-draft RLS.',
+  },
+  {
+    path: 'infra/supabase/migrations/0006_sync_cursors.sql',
+    purpose: 'Local/cloud sync cursor bookkeeping for future writeback.',
+  },
+  {
     path: 'infra/supabase/seed.sql',
     purpose: 'Development-only seed placeholder without real users or secrets.',
   },

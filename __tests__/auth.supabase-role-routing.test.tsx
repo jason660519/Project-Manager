@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { LoginEntry } from '../app/login/LoginEntry';
 import {
   evaluateWorkspaceAccess,
@@ -8,6 +8,22 @@ import {
   resolveWorkspaceDestination,
   roleHasCapability,
 } from '../lib/auth/permissions';
+
+vi.mock('../lib/auth/workspaceSession', () => ({
+  useWorkspaceSession: () => ({
+    signedIn: false,
+    userEmail: null,
+    role: null,
+    loading: false,
+    error: null,
+    workspaceId: null,
+    workspaceName: null,
+    memberships: [],
+    setActiveWorkspaceId: vi.fn(),
+    refreshSession: vi.fn(),
+    signOut: vi.fn(),
+  }),
+}));
 
 describe('Supabase role routing and permission scaffolding', () => {
   it('routes workspace roles to the correct product surfaces', () => {
@@ -41,6 +57,16 @@ describe('Supabase role routing and permission scaffolding', () => {
     expect(
       evaluateWorkspaceAccess({
         supabaseConfigured: true,
+        signedIn: false,
+        role: null,
+        requiredCapability: 'view:portal',
+      }).status,
+    ).toBe('sign_in_required');
+
+    expect(
+      evaluateWorkspaceAccess({
+        supabaseConfigured: true,
+        signedIn: true,
         role: null,
         requiredCapability: 'view:portal',
       }).status,
