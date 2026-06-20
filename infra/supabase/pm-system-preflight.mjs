@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import net from 'node:net';
 
 export const DEFAULT_PREFLIGHT_TIMEOUT_MS = 2500;
+export const REQUIRED_KONG_ROUTES = ['/auth/v1', '/rest/v1', '/storage/v1', '/realtime/v1'];
 
 export function defaultCommandRunner(command, args, options = {}) {
   try {
@@ -79,6 +80,10 @@ export async function collectInstallerPreflight(options = {}) {
       { port: 8000, available: true, service: 'Supabase API gateway' },
       { port: 5432, available: true, service: 'Postgres' },
       { port: 54323, available: true, service: 'Supabase Studio' },
+      { port: 9999, available: true, service: 'Supabase Auth' },
+      { port: 3000, available: true, service: 'PostgREST' },
+      { port: 5000, available: true, service: 'Supabase Storage' },
+      { port: 4000, available: true, service: 'Supabase Realtime' },
     ]);
 
   const runtime = detectDockerRuntime({ runCommand: options.runCommand });
@@ -86,10 +91,24 @@ export async function collectInstallerPreflight(options = {}) {
     isPortAvailable: options.isPortAvailable,
     host: options.host,
   });
+  const kongRoutes =
+    typeof options.kongConfigText === 'string'
+      ? validateKongRoutes(options.kongConfigText)
+      : options.kongRoutes;
 
   return {
     runtime,
     ports,
+    ...(kongRoutes ? { kongRoutes } : {}),
     dryRun: Boolean(options.dryRun),
+  };
+}
+
+export function validateKongRoutes(kongConfigText, requiredRoutes = REQUIRED_KONG_ROUTES) {
+  const missingRoutes = requiredRoutes.filter((route) => !kongConfigText.includes(route));
+
+  return {
+    valid: missingRoutes.length === 0,
+    missingRoutes,
   };
 }

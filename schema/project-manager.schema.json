@@ -5,7 +5,7 @@
   "properties": {
     "schemaVersion": {
       "type": "integer",
-      "description": "Schema version. Increment when making breaking changes to the config structure. Current: 10.",
+      "description": "Schema version. Increment when making breaking changes to the config structure. Current: 11.",
       "minimum": 1
     },
     "id": {
@@ -125,10 +125,233 @@
       "type": "array",
       "description": "Qualification candidates surfaced in Integrations Hub VLA/TTS/STT/Hands/Tools sheets (schema v7).",
       "items": { "$ref": "#/definitions/capabilityCandidate" }
+    },
+    "progressSheets": {
+      "type": "array",
+      "description": "Project progress sheet manifest refs (schema v11). Sheet configs live under .project-manager/progress-sheets/<sheetId>/config.json.",
+      "items": { "$ref": "#/definitions/projectProgressSheetRef" }
+    },
+    "backendProfiles": {
+      "type": "array",
+      "description": "Renderer-safe backend connector profiles (schema v11). Never include service-role keys, JWT secrets, or database passwords.",
+      "items": { "$ref": "#/definitions/backendProfile" }
+    },
+    "activeBackendProfileMode": {
+      "type": "string",
+      "enum": ["local-files", "local-docker-supabase", "self-hosted-supabase", "supabase-cloud"],
+      "description": "Currently selected backend profile mode (schema v11)."
     }
   },
   "required": ["schemaVersion", "id", "project", "features", "adapters"],
   "definitions": {
+    "progressDiscipline": {
+      "type": "string",
+      "enum": [
+        "software",
+        "hardware-rd",
+        "industrial-design",
+        "project-operations",
+        "marketing-campaign",
+        "content-production",
+        "qa-validation",
+        "construction-field",
+        "procurement-vendor",
+        "custom"
+      ]
+    },
+    "progressFieldType": {
+      "type": "string",
+      "enum": ["text", "number", "date", "select", "multiSelect", "tag", "person", "percent", "link", "file"]
+    },
+    "progressOption": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "color": { "type": "string" }
+      },
+      "required": ["id", "label"]
+    },
+    "progressColumn": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "fieldType": { "$ref": "#/definitions/progressFieldType" },
+        "required": { "type": "boolean" },
+        "visible": { "type": "boolean" },
+        "order": { "type": "number" },
+        "defaultValue": {},
+        "options": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/progressOption" }
+        }
+      },
+      "required": ["id", "label", "fieldType", "order"]
+    },
+    "progressTemplateSnapshot": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "discipline": { "$ref": "#/definitions/progressDiscipline" },
+        "version": { "type": "integer", "minimum": 1 },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/progressColumn" }
+        },
+        "statusOptions": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/progressOption" }
+        },
+        "phaseOptions": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/progressOption" }
+        },
+        "capturedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "label", "discipline", "version", "fields", "statusOptions", "capturedAt"]
+    },
+    "archivedProgressField": {
+      "type": "object",
+      "properties": {
+        "fieldId": { "type": "string" },
+        "label": { "type": "string" },
+        "fieldType": { "$ref": "#/definitions/progressFieldType" },
+        "archivedAt": { "type": "string", "format": "date-time" },
+        "reason": { "type": "string" }
+      },
+      "required": ["fieldId", "archivedAt"]
+    },
+    "progressRow": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "status": { "type": "string" },
+        "progress": { "type": "number", "minimum": 0, "maximum": 100 },
+        "owner": { "type": "string" },
+        "values": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "status", "values", "createdAt", "updatedAt"]
+    },
+    "progressSheetConfig": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "type": "integer", "minimum": 1 },
+        "id": { "type": "string" },
+        "sheetTitle": { "type": "string" },
+        "discipline": { "$ref": "#/definitions/progressDiscipline" },
+        "templateSnapshot": { "$ref": "#/definitions/progressTemplateSnapshot" },
+        "columns": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/progressColumn" }
+        },
+        "statusOptions": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/progressOption" }
+        },
+        "phaseOptions": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/progressOption" }
+        },
+        "rows": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/progressRow" }
+        },
+        "archivedFields": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/archivedProgressField" }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "sheetTitle",
+        "discipline",
+        "templateSnapshot",
+        "columns",
+        "statusOptions",
+        "rows",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "projectProgressSheetRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$" },
+        "label": { "type": "string", "minLength": 1 },
+        "discipline": { "$ref": "#/definitions/progressDiscipline" },
+        "configPath": {
+          "type": "string",
+          "pattern": "^\\.project-manager/progress-sheets/[A-Za-z0-9][A-Za-z0-9_-]*/config\\.json$"
+        },
+        "templateId": { "type": "string", "minLength": 1 },
+        "templateVersion": { "type": "integer", "minimum": 1 },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "label", "discipline", "configPath", "templateId", "templateVersion", "createdAt", "updatedAt"]
+    },
+    "backendProfile": {
+      "description": "Renderer-safe backend profile. Service-role key, JWT secret, and database password are intentionally excluded.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "label": { "type": "string" },
+            "mode": { "const": "local-files" },
+            "enabled": { "const": false }
+          },
+          "required": ["mode", "enabled"]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "label": { "type": "string" },
+            "mode": { "const": "local-docker-supabase" },
+            "url": { "type": "string" },
+            "anonKeyRef": { "type": "string" }
+          },
+          "required": ["mode", "url", "anonKeyRef"]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "label": { "type": "string" },
+            "mode": { "const": "self-hosted-supabase" },
+            "url": { "type": "string" },
+            "anonKeyRef": { "type": "string" }
+          },
+          "required": ["mode", "url", "anonKeyRef"]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "label": { "type": "string" },
+            "mode": { "const": "supabase-cloud" },
+            "url": { "type": "string" },
+            "anonKeyRef": { "type": "string" }
+          },
+          "required": ["mode", "url", "anonKeyRef"]
+        }
+      ]
+    },
     "cronJob": {
       "type": "object",
       "properties": {

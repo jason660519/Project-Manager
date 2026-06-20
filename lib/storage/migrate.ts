@@ -21,10 +21,13 @@ interface RawConfig {
   updatedAt?: string;
   updatedBy?: string;
   features?: unknown;
+  progressSheets?: unknown;
+  backendProfiles?: unknown;
+  activeBackendProfileMode?: unknown;
   [key: string]: unknown;
 }
 
-export const CURRENT_SCHEMA_VERSION = 10;
+export const CURRENT_SCHEMA_VERSION = 11;
 
 export function migrateConfig(raw: unknown): ProjectManagerConfig {
   const cfg = (raw && typeof raw === 'object' ? (raw as RawConfig) : {}) as RawConfig;
@@ -39,6 +42,7 @@ export function migrateConfig(raw: unknown): ProjectManagerConfig {
   if (version < 8) next = migrate_7_to_8(next);
   if (version < 9) next = migrate_8_to_9(next);
   if (version < 10) next = migrate_9_to_10(next);
+  if (version < 11) next = migrate_10_to_11(next);
   // Cast through unknown: `RawConfig` is intentionally a permissive bag,
   // and the migration steps above are responsible for ensuring the result
   // matches `ProjectManagerConfig`.
@@ -266,6 +270,53 @@ function migrate_8_to_9(cfg: RawConfig): RawConfig {
  */
 function migrate_9_to_10(cfg: RawConfig): RawConfig {
   return { ...cfg, schemaVersion: 10 };
+}
+
+/**
+ * v10 -> v11 (F55 Multi-Discipline Progress Sheets): add the manifest-level
+ * software desktop sheet ref. The existing `features[]` array remains the
+ * legacy software progress data until follow-up tasks create sidecar sheet
+ * configs, so this migration must not rewrite or synthesize rows.
+ */
+function migrate_10_to_11(cfg: RawConfig): RawConfig {
+  const timestamp =
+    typeof cfg.updatedAt === 'string'
+      ? cfg.updatedAt
+      : typeof cfg.createdAt === 'string'
+        ? cfg.createdAt
+        : new Date().toISOString();
+
+  const softwareDesktopSheet = {
+    id: 'software-desktop-app',
+    label: 'Desktop App Development Progress',
+    discipline: 'software',
+    configPath: '.project-manager/progress-sheets/software-desktop-app/config.json',
+    templateId: 'software-desktop-app',
+    templateVersion: 1,
+    active: true,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+
+  const existingSheets = Array.isArray(cfg.progressSheets) ? cfg.progressSheets : [];
+  const progressSheets = existingSheets.some(
+    (sheet) => sheet && typeof sheet === 'object' && (sheet as { id?: unknown }).id === softwareDesktopSheet.id,
+  )
+    ? existingSheets
+    : [...existingSheets, softwareDesktopSheet];
+  const backendProfiles = Array.isArray(cfg.backendProfiles) && cfg.backendProfiles.length > 0
+    ? cfg.backendProfiles
+    : [{ mode: 'local-files', enabled: false, label: 'Local files' }];
+  const activeBackendProfileMode =
+    typeof cfg.activeBackendProfileMode === 'string' ? cfg.activeBackendProfileMode : 'local-files';
+
+  return {
+    ...cfg,
+    schemaVersion: 11,
+    progressSheets,
+    backendProfiles,
+    activeBackendProfileMode,
+  };
 }
 
 function annotateAdapterSupports(rows: unknown): unknown {

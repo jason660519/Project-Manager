@@ -2,9 +2,9 @@
 
 > **Created Date**: 2026-05-12
 > **Created By**: GitHub Copilot
-> **Last Modified**: 2026-05-28
+> **Last Modified**: 2026-06-21
 > **Modified By**: Codex
-> **Version**: 1.4
+> **Version**: 1.5
 > **Document Type**: Architecture / ADR Index
 
 ---
@@ -39,7 +39,7 @@ ADR 記錄重要的技術決策、背景和決策理由，作為專案架構演�
 | [012](./ADR-012-schema-v8-engineer-cron.md) | Schema v8 Engineer Cron Dispatch | Accepted | 2026-05-24 | Add scheduled engineer dispatch action type and cron observability fields |
 | [013](./ADR-013-agent-workflow-dag-control-plane.md) | Agent Workflow DAG Control Plane | Accepted | 2026-05-28 | Define multi-agent workflow DAG templates, runtime adapter boundary, and per-agent session isolation |
 | [015](./ADR-015-mobile-voice-remote-control.md) | Mobile Voice Remote Control | Proposed | 2026-06-04 | Treat the mobile app as a desktop-owned voice remote control with canonical intents, guarded execution, and channel-first validation |
-| [016](./ADR-016-supabase-cloud-control-plane-and-developer-runner.md) | Supabase Cloud Control Plane and Developer Runner | Proposed | 2026-06-04 | Use Supabase Auth/Postgres for cloud workspace state and reposition Rust/Tauri as the local Developer Runner |
+| [016](./ADR-016-supabase-cloud-control-plane-and-developer-runner.md) | Supabase-compatible Control Plane and Developer Runner | Proposed | 2026-06-04 | Support local-files, local Docker Supabase, self-hosted Supabase, and Supabase Cloud profiles while keeping Rust/Tauri as the local Developer Runner |
 
 ## Architecture Sources
 

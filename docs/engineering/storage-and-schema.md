@@ -19,9 +19,66 @@ Project Manager uses project-scoped `.project-manager/config.json` documents as 
 
 Any schema change must update all four.
 
-## 2. Schema Version
+## 2. Project Manifest and Progress Sheets
 
-Current schema version: `6`.
+F55 keeps `.project-manager/config.json` as the project manifest and index. The
+manifest owns project identity, metadata, adapters, roles, cron jobs, backend
+profile selection, and references to one or more progress sheets. It must not
+become the single container for every discipline-specific progress column.
+
+Progress sheet contracts live in per-sheet config files:
+
+```text
+.project-manager/
+├── config.json
+└── progress-sheets/
+    ├── software-desktop-app/
+    │   └── config.json
+    ├── hardware-rd/
+    │   └── config.json
+    └── qa-validation/
+        └── config.json
+```
+
+Planned manifest sheet references use relative paths:
+
+```ts
+interface ProjectProgressSheetRef {
+  id: string;
+  label: string;
+  discipline: string;
+  configPath: string; // ".project-manager/progress-sheets/<sheetId>/config.json"
+  templateId: string;
+  templateVersion: number;
+  active?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+Each sheet config owns its own template snapshot, column definitions,
+status/phase options, rows or row sidecar pointers, archived fields, and
+migration metadata. System templates are copied into a sheet as snapshots;
+template updates must not silently mutate existing project data.
+
+## 3. Backend Profiles
+
+Project Manager supports these backend modes:
+
+| Mode | Storage / control plane | Requirements |
+| --- | --- | --- |
+| `local-files` | `.project-manager/` files through the Tauri bridge | No Docker, sign-in, or network backend required. |
+| `local-docker-supabase` | Local Supabase-compatible Docker stack | Used for personal, PoC, restricted-network, or local team collaboration. |
+| `self-hosted-supabase` | Company-owned Supabase-compatible backend | Uses organization-managed infrastructure and policies. |
+| `supabase-cloud` | Managed Supabase Cloud project | Used for SaaS collaboration when teams do not operate the backend. |
+
+Renderer-safe profile data may include profile ID, label, mode, URL, and anon
+key reference/value. Service-role keys, JWT secrets, and database passwords are
+ops-only secrets and must not enter renderer code.
+
+## 4. Schema Version
+
+Current schema version: `11`.
 
 Schema v2 adds:
 
@@ -46,7 +103,19 @@ Schema v5 separates README file pointers from free-form notes:
 
 Migration v5 moves legacy README paths out of `notes` and removes README paths that were incorrectly stored in `paths.spec`.
 
-## 3. Migration Pipeline
+Schema v11 adds project-manifest progress sheet references and renderer-safe
+backend profiles:
+
+| Scope | Field | Purpose |
+| --- | --- | --- |
+| Root | `progressSheets` | Index of per-discipline progress sheet configs under `.project-manager/progress-sheets/<sheetId>/config.json`. |
+| Root | `backendProfiles` | Renderer-safe backend connector profiles. |
+| Root | `activeBackendProfileMode` | Selected backend mode: `local-files`, `local-docker-supabase`, `self-hosted-supabase`, or `supabase-cloud`. |
+
+Migration v11 adds a `software-desktop-app` sheet ref for existing software
+projects without deleting or rewriting `features[]`.
+
+## 5. Migration Pipeline
 
 `migrateConfig(raw)` is the only supported migration entry point. It is pure and idempotent.
 
@@ -66,7 +135,7 @@ Migration rules:
 4. Do not rewrite unrelated fields.
 5. Do not create fake product data.
 
-## 4. Storage Namespaces
+## 6. Storage Namespaces
 
 Local browser storage is split by future sync intent:
 
@@ -77,7 +146,7 @@ Local browser storage is split by future sync intent:
 
 The current project repository implementation is `LocalStorageProjectsRepository`. It implements the async `ProjectsRepository` interface so SQLite, Tauri storage, or cloud sync can replace it without changing consumers.
 
-## 5. Session Storage
+## 7. Session Storage
 
 Tauri sessions are stored under the project root:
 
@@ -89,7 +158,7 @@ Tauri sessions are stored under the project root:
 
 `call_anthropic` can auto-save a completed session when `sessionId` and `sessionsDir` are provided. Browser mode does not persist sessions through the bridge.
 
-## 6. Change Checklist
+## 8. Change Checklist
 
 Before changing schema or storage:
 
@@ -115,9 +184,66 @@ Project Manager 以專案內的 `.project-manager/config.json` 作為長期 sour
 
 任何 schema change 都必須同步更新四處。
 
-## 2. Schema Version
+## 2. Project Manifest and Progress Sheets
 
-目前 schema version：`5`。
+F55 會保留 `.project-manager/config.json` 作為 project manifest 與 index。
+Manifest 負責 project identity、metadata、adapters、roles、cron jobs、
+backend profile selection，以及一個或多個 progress sheets 的 references。
+它不應該變成所有 discipline-specific progress columns 的唯一容器。
+
+Progress sheet contracts 會放在每個 sheet 自己的 config file：
+
+```text
+.project-manager/
+├── config.json
+└── progress-sheets/
+    ├── software-desktop-app/
+    │   └── config.json
+    ├── hardware-rd/
+    │   └── config.json
+    └── qa-validation/
+        └── config.json
+```
+
+Planned manifest sheet references 使用 relative paths：
+
+```ts
+interface ProjectProgressSheetRef {
+  id: string;
+  label: string;
+  discipline: string;
+  configPath: string; // ".project-manager/progress-sheets/<sheetId>/config.json"
+  templateId: string;
+  templateVersion: number;
+  active?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+每個 sheet config 擁有自己的 template snapshot、column definitions、
+status/phase options、rows 或 row sidecar pointers、archived fields，以及
+migration metadata。System templates 會以 snapshot 形式複製到 sheet；template
+更新不可默默改動既有 project data。
+
+## 3. Backend Profiles
+
+Project Manager 支援以下 backend modes：
+
+| Mode | Storage / control plane | Requirements |
+| --- | --- | --- |
+| `local-files` | 透過 Tauri bridge 寫入 `.project-manager/` files | 不需要 Docker、sign-in 或 network backend。 |
+| `local-docker-supabase` | 本機 Supabase-compatible Docker stack | 用於 personal、PoC、restricted-network 或 local team collaboration。 |
+| `self-hosted-supabase` | 公司自管 Supabase-compatible backend | 使用組織管理的 infrastructure 與 policies。 |
+| `supabase-cloud` | Managed Supabase Cloud project | 團隊不自行營運 backend 時用於 SaaS collaboration。 |
+
+Renderer-safe profile data 可以包含 profile ID、label、mode、URL，以及 anon
+key reference/value。Service-role keys、JWT secrets、database passwords 屬於
+ops-only secrets，不可進入 renderer code。
+
+## 4. Schema Version
+
+目前 schema version：`11`。
 
 Schema v2 新增：
 
@@ -142,7 +268,19 @@ Schema v5 將 README 檔案指標與自由文字 notes 拆開：
 
 v5 migration 會把舊 `notes` 內的 README path 搬到 `readmePath`，並移除誤放在 `paths.spec` 的 README path。
 
-## 3. Migration Pipeline
+Schema v11 新增 project-manifest progress sheet references 與 renderer-safe
+backend profiles：
+
+| 範圍 | 欄位 | 用途 |
+| --- | --- | --- |
+| Root | `progressSheets` | 指向 `.project-manager/progress-sheets/<sheetId>/config.json` 的多工種 progress sheet index。 |
+| Root | `backendProfiles` | Renderer-safe backend connector profiles。 |
+| Root | `activeBackendProfileMode` | 目前選擇的 backend mode：`local-files`、`local-docker-supabase`、`self-hosted-supabase` 或 `supabase-cloud`。 |
+
+v11 migration 會為既有 software project 加上 `software-desktop-app` sheet ref，
+但不刪除或重寫 `features[]`。
+
+## 5. Migration Pipeline
 
 `migrateConfig(raw)` 是唯一支援的 migration entry point。它是 pure 且 idempotent。
 
@@ -162,7 +300,7 @@ Migration rules：
 4. 不重寫無關欄位。
 5. 不產生假的產品資料。
 
-## 4. Storage Namespaces
+## 6. Storage Namespaces
 
 Local browser storage 依未來 sync 意圖拆分：
 
@@ -173,7 +311,7 @@ Local browser storage 依未來 sync 意圖拆分：
 
 目前 project repository implementation 是 `LocalStorageProjectsRepository`。它實作 async `ProjectsRepository` interface，讓未來 SQLite、Tauri storage 或 cloud sync 可以替換，不用改 consumers。
 
-## 5. Session Storage
+## 7. Session Storage
 
 Tauri sessions 存在 project root 底下：
 
@@ -185,7 +323,7 @@ Tauri sessions 存在 project root 底下：
 
 當 caller 提供 `sessionId` 與 `sessionsDir` 時，`call_anthropic` 可以自動保存 completed session。Browser mode 不透過 bridge persist sessions。
 
-## 6. Change Checklist
+## 8. Change Checklist
 
 變更 schema 或 storage 前：
 

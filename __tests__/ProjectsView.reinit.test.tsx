@@ -139,10 +139,19 @@ describe('ProjectsView initialize actions', () => {
         expect.objectContaining({ onProgress: expect.any(Function) }),
       );
     });
-    expect(applyScanConfigToProjectMock).toHaveBeenCalledWith(readyProject, scanned, {
-      sectionCandidates: undefined,
-      inventoryPaths: undefined,
-    });
+    expect(applyScanConfigToProjectMock).toHaveBeenCalledWith(
+      readyProject,
+      expect.objectContaining({
+        ...scanned,
+        progressSheets: expect.arrayContaining([
+          expect.objectContaining({ id: 'software-desktop-app' }),
+        ]),
+      }),
+      {
+        sectionCandidates: undefined,
+        inventoryPaths: undefined,
+      },
+    );
     expect(onUpdateProject).toHaveBeenCalledWith(updatedEntry);
   });
 

@@ -36,14 +36,21 @@ interface PhaseTabContentProps {
   activeRuns?: ActiveRun[];
   /** Quick dispatch — opens a modal owned by the parent. Undefined disables the button. */
   onDispatchRow?: (row: PhaseRow) => void;
+  /** Optional read-only sheet data for F55 dynamic progress sheets. */
+  overrideColumns?: ReturnType<typeof columnsForPhase>;
+  overrideRows?: PhaseRow[];
+  readOnly?: boolean;
 }
 
 export function PhaseTabContent({
   phase, projectName, projectNames, projectRoot, features, dependencyFeatures, engineerRoles, prefs, patch, reset,
-  onFeaturePromptSave, onFeaturePatch, activeRuns, onDispatchRow,
+  onFeaturePromptSave, onFeaturePatch, activeRuns, onDispatchRow, overrideColumns, overrideRows, readOnly = false,
 }: PhaseTabContentProps) {
   const { t } = useI18n();
-  const columns = useMemo(() => columnsForPhase(phase, t.dashboard.projectName), [phase, t]);
+  const columns = useMemo(
+    () => overrideColumns ?? columnsForPhase(phase, t.dashboard.projectName),
+    [overrideColumns, phase, t],
+  );
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
@@ -57,8 +64,8 @@ export function PhaseTabContent({
 
   // All rows for this phase (features + custom rows).
   const allRows = useMemo(
-    () => buildPhaseRows(features, phase, prefs.customRows, { defaultProjectName: projectName }),
-    [features, phase, prefs.customRows, projectName],
+    () => overrideRows ?? buildPhaseRows(features, phase, prefs.customRows, { defaultProjectName: projectName }),
+    [features, overrideRows, phase, prefs.customRows, projectName],
   );
 
   const categoryList = useMemo(() => {
@@ -225,7 +232,10 @@ export function PhaseTabContent({
         hiddenRowItems={hiddenRowItems}
         onRestoreHiddenRow={onRestoreHiddenRow}
         onRestoreAllHiddenRows={onRestoreAllHiddenRows}
-        onAddRow={() => setAddRowOpen(true)}
+        onAddRow={() => {
+          if (!readOnly) setAddRowOpen(true);
+        }}
+        addRowDisabled={readOnly}
       />
 
       <PhaseTable
@@ -242,15 +252,17 @@ export function PhaseTabContent({
         }}
       />
 
-      <AddRowModal
-        open={addRowOpen}
-        onClose={() => setAddRowOpen(false)}
-        phase={phase}
-        defaultProjectName={projectName}
-        projectNames={projectNames}
-        existingIds={existingIds}
-        onAdd={onAdd}
-      />
+      {!readOnly && (
+        <AddRowModal
+          open={addRowOpen}
+          onClose={() => setAddRowOpen(false)}
+          phase={phase}
+          defaultProjectName={projectName}
+          projectNames={projectNames}
+          existingIds={existingIds}
+          onAdd={onAdd}
+        />
+      )}
       <FeatureDocPanel
         absPath={notesPanelPath}
         onClose={() => setNotesPanelPath(null)}

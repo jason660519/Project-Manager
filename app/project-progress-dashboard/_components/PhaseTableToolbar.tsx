@@ -20,12 +20,13 @@ interface PhaseTableToolbarProps {
   onRestoreHiddenRow: (rowKey: string) => void;
   onRestoreAllHiddenRows: () => void;
   onAddRow: () => void;
+  addRowDisabled?: boolean;
 }
 
 export function PhaseTableToolbar({
   prefs, patch, reset, columns, searchQuery, onSearchChange,
   showHiddenRows, onShowHiddenRowsChange, hiddenRowsCount, hiddenRowItems,
-  onRestoreHiddenRow, onRestoreAllHiddenRows, onAddRow,
+  onRestoreHiddenRow, onRestoreAllHiddenRows, onAddRow, addRowDisabled = false,
 }: PhaseTableToolbarProps) {
   const [presetName, setPresetName] = useState('');
   const [showAlignMenu, setShowAlignMenu] = useState(false);
@@ -312,7 +313,14 @@ export function PhaseTableToolbar({
 
       <button
         onClick={onAddRow}
-        className="flex h-7 items-center gap-1 rounded bg-emerald-500/30 px-2 text-xs text-emerald-100 hover:bg-emerald-500/40"
+        disabled={addRowDisabled}
+        className={clsx(
+          'flex h-7 items-center gap-1 rounded px-2 text-xs',
+          addRowDisabled
+            ? 'cursor-not-allowed border border-stone-200/10 text-stone-500'
+            : 'bg-emerald-500/30 text-emerald-100 hover:bg-emerald-500/40',
+        )}
+        title={addRowDisabled ? 'Rows are managed by the progress sheet config' : 'Add row'}
       >
         <Plus size={12} /> Add Row
       </button>

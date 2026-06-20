@@ -5,7 +5,7 @@ mod xmux_webview;
 use terminal_boundaries::{default_terminal_boundaries, evaluate_terminal_command_internal};
 
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -65,6 +65,8 @@ const FONT_ZOOM_ACTUAL_SIZE_MENU_ID: &str = "font-zoom-actual-size";
 const DASHBOARD_DIR_NAME: &str = ".project-manager";
 const CONFIG_FILENAME: &str = "config.json";
 const LEGACY_CONFIG_FILENAME: &str = ".project-manager.json";
+const PROGRESS_SHEETS_DIR_NAME: &str = "progress-sheets";
+const INIT_PROGRESS_SHEET_CONFIGS_KEY: &str = "progressSheetConfigs";
 
 fn looks_like_project_manager_root(path: &Path) -> bool {
     path.join("package.json").is_file() && path.join("src-tauri").join("tauri.conf.json").is_file()
@@ -390,6 +392,116 @@ fn config_has_no_features(config: &serde_json::Value) -> bool {
         .unwrap_or(true)
 }
 
+#[derive(Clone)]
+struct ProgressSheetInitRef {
+    id: String,
+    config_path: String,
+}
+
+fn is_safe_sheet_id(id: &str) -> bool {
+    !id.is_empty()
+        && id != "."
+        && id != ".."
+        && !id.contains('/')
+        && !id.contains('\\')
+        && id
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_'))
+}
+
+fn expected_progress_sheet_config_path(sheet_id: &str) -> String {
+    format!("{DASHBOARD_DIR_NAME}/{PROGRESS_SHEETS_DIR_NAME}/{sheet_id}/{CONFIG_FILENAME}")
+}
+
+fn take_progress_sheet_configs(
+    config: &mut serde_json::Value,
+) -> Result<Vec<serde_json::Value>, String> {
+    let Some(object) = config.as_object_mut() else {
+        return Ok(Vec::new());
+    };
+    match object.remove(INIT_PROGRESS_SHEET_CONFIGS_KEY) {
+        Some(serde_json::Value::Array(configs)) => Ok(configs),
+        Some(_) => Err(format!(
+            "{INIT_PROGRESS_SHEET_CONFIGS_KEY} must be an array when provided"
+        )),
+        None => Ok(Vec::new()),
+    }
+}
+
+fn progress_sheet_refs_from_config(
+    config: &serde_json::Value,
+) -> Result<Vec<ProgressSheetInitRef>, String> {
+    let Some(progress_sheets) = config.get("progressSheets") else {
+        return Ok(Vec::new());
+    };
+    let refs = progress_sheets
+        .as_array()
+        .ok_or_else(|| "progressSheets must be an array when provided".to_string())?;
+    let mut seen = HashSet::new();
+    let mut out = Vec::new();
+    for sheet in refs {
+        let id = sheet
+            .get("id")
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| "Progress sheet ref is missing string id".to_string())?;
+        if !is_safe_sheet_id(id) {
+            return Err(format!(
+                "INVALID_PROGRESS_SHEET_ID: {id} must be a single safe path segment"
+            ));
+        }
+        if !seen.insert(id.to_string()) {
+            return Err(format!("DUPLICATE_PROGRESS_SHEET_ID: {id}"));
+        }
+        let config_path = sheet
+            .get("configPath")
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| format!("Progress sheet ref {id} is missing string configPath"))?;
+        let expected = expected_progress_sheet_config_path(id);
+        if Path::new(config_path).is_absolute()
+            || config_path.contains("..")
+            || config_path != expected
+        {
+            return Err(format!(
+                "INVALID_PROGRESS_SHEET_CONFIG_PATH: {id} configPath must equal {expected}"
+            ));
+        }
+        out.push(ProgressSheetInitRef {
+            id: id.to_string(),
+            config_path: config_path.to_string(),
+        });
+    }
+    Ok(out)
+}
+
+fn progress_sheet_configs_by_id(
+    configs: Vec<serde_json::Value>,
+    refs: &[ProgressSheetInitRef],
+) -> Result<HashMap<String, serde_json::Value>, String> {
+    let ref_ids: HashSet<&str> = refs.iter().map(|sheet_ref| sheet_ref.id.as_str()).collect();
+    let mut out = HashMap::new();
+    for config in configs {
+        let id = config
+            .get("id")
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| "Progress sheet config is missing string id".to_string())?
+            .to_string();
+        if !is_safe_sheet_id(&id) {
+            return Err(format!(
+                "INVALID_PROGRESS_SHEET_ID: {id} must be a single safe path segment"
+            ));
+        }
+        if !ref_ids.contains(id.as_str()) {
+            return Err(format!(
+                "UNKNOWN_PROGRESS_SHEET_CONFIG: {id} has no matching manifest ref"
+            ));
+        }
+        if out.insert(id.clone(), config).is_some() {
+            return Err(format!("DUPLICATE_PROGRESS_SHEET_ID: {id}"));
+        }
+    }
+    Ok(out)
+}
+
 /// Create the consolidated `.project-manager/` folder (ADR-008) and write
 /// `config.json` for a local project.
 /// `mode` is one of `create` | `merge` | `overwrite`. Caller supplies the
@@ -398,7 +510,7 @@ fn config_has_no_features(config: &serde_json::Value) -> bool {
 #[tauri::command]
 async fn initialize_project(
     project_root: String,
-    config: serde_json::Value,
+    mut config: serde_json::Value,
     mode: String,
 ) -> Result<InitializeProjectResult, String> {
     let root = std::path::Path::new(&project_root);
@@ -423,6 +535,11 @@ async fn initialize_project(
         "create" | "merge" | "overwrite" => {}
         other => return Err(format!("Invalid initialize mode: {other}")),
     }
+
+    let progress_sheet_configs = take_progress_sheet_configs(&mut config)?;
+    let progress_sheet_refs = progress_sheet_refs_from_config(&config)?;
+    let progress_sheet_configs =
+        progress_sheet_configs_by_id(progress_sheet_configs, &progress_sheet_refs)?;
 
     if mode == "create"
         && !exists
@@ -462,6 +579,23 @@ async fn initialize_project(
         }
     }
 
+    let mut sheet_writes: Vec<(PathBuf, String)> = Vec::new();
+    for sheet_ref in &progress_sheet_refs {
+        let sheet_path = root.join(&sheet_ref.config_path);
+        if sheet_path.is_file() && mode != "overwrite" {
+            continue;
+        }
+        let sheet_config = progress_sheet_configs.get(&sheet_ref.id).ok_or_else(|| {
+            format!(
+                "MISSING_PROGRESS_SHEET_CONFIG: {} needs config data for {}",
+                sheet_ref.id, sheet_ref.config_path
+            )
+        })?;
+        let content = serde_json::to_string_pretty(sheet_config)
+            .map_err(|e| format!("Serialize error: {e}"))?;
+        sheet_writes.push((sheet_path, content));
+    }
+
     if exists && matches!(mode.as_str(), "merge" | "overwrite") {
         let backup_path = init_backup_path(&config_path);
         tokio::fs::copy(&config_path, &backup_path)
@@ -473,6 +607,26 @@ async fn initialize_project(
                     backup_path.display()
                 )
             })?;
+    }
+
+    for (sheet_path, content) in &sheet_writes {
+        let parent = sheet_path.parent().ok_or_else(|| {
+            format!(
+                "Cannot resolve progress sheet directory for {}",
+                sheet_path.display()
+            )
+        })?;
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| format!("Cannot create directory {}: {e}", parent.display()))?;
+        if let Some(s) = parent.to_str() {
+            if !created_dirs.iter().any(|dir| dir == s) {
+                created_dirs.push(s.to_string());
+            }
+        }
+        tokio::fs::write(sheet_path, content)
+            .await
+            .map_err(|e| format!("Cannot write {}: {e}", sheet_path.display()))?;
     }
 
     let content =
@@ -5967,6 +6121,255 @@ mod skill_tests {
         assert!(
             !dir.join(".project-manager/config.json").exists(),
             "must not write a config when recoverable feature docs exist"
+        );
+
+        cleanup(&dir).await;
+    }
+
+    #[tokio::test]
+    async fn initialize_project_writes_progress_sheet_configs_from_manifest_refs() {
+        let dir = unique_test_dir("initialize_progress_sheets");
+        cleanup(&dir).await;
+        tokio::fs::create_dir_all(&dir).await.unwrap();
+
+        let sheet_ref = serde_json::json!({
+            "id": "hardware-rd",
+            "label": "Hardware R&D Progress",
+            "discipline": "hardware-rd",
+            "configPath": ".project-manager/progress-sheets/hardware-rd/config.json",
+            "templateId": "hardware-rd",
+            "templateVersion": 1,
+            "active": true,
+            "createdAt": "2026-06-01T00:00:00.000Z",
+            "updatedAt": "2026-06-01T00:00:00.000Z"
+        });
+        let sheet_config = serde_json::json!({
+            "schemaVersion": 1,
+            "id": "hardware-rd",
+            "sheetTitle": "Hardware R&D Progress",
+            "discipline": "hardware-rd",
+            "templateSnapshot": {
+                "id": "hardware-rd",
+                "label": "Hardware R&D",
+                "discipline": "hardware-rd",
+                "version": 1,
+                "fields": [],
+                "statusOptions": [],
+                "capturedAt": "2026-06-01T00:00:00.000Z"
+            },
+            "columns": [],
+            "statusOptions": [],
+            "rows": [],
+            "createdAt": "2026-06-01T00:00:00.000Z",
+            "updatedAt": "2026-06-01T00:00:00.000Z"
+        });
+
+        initialize_project(
+            dir.to_string_lossy().to_string(),
+            serde_json::json!({
+                "schemaVersion": 11,
+                "features": [],
+                "progressSheets": [sheet_ref],
+                "progressSheetConfigs": [sheet_config]
+            }),
+            "create".to_string(),
+        )
+        .await
+        .expect("initialize with progress sheet config");
+
+        let sheet_path = dir.join(".project-manager/progress-sheets/hardware-rd/config.json");
+        let sheet_content = tokio::fs::read_to_string(&sheet_path).await.unwrap();
+        assert!(
+            sheet_content.contains("\"sheetTitle\": \"Hardware R&D Progress\""),
+            "expected sheet config content, got {sheet_content}"
+        );
+
+        let manifest_content = tokio::fs::read_to_string(dir.join(".project-manager/config.json"))
+            .await
+            .unwrap();
+        assert!(
+            !manifest_content.contains("progressSheetConfigs"),
+            "initialization-only sheet payload must not be persisted in manifest: {manifest_content}"
+        );
+
+        cleanup(&dir).await;
+    }
+
+    #[tokio::test]
+    async fn initialize_project_rejects_unsafe_progress_sheet_refs_before_writing_manifest() {
+        let cases = [
+            (
+                "duplicate",
+                serde_json::json!([
+                    {
+                        "id": "hardware-rd",
+                        "configPath": ".project-manager/progress-sheets/hardware-rd/config.json"
+                    },
+                    {
+                        "id": "hardware-rd",
+                        "configPath": ".project-manager/progress-sheets/hardware-rd/config.json"
+                    }
+                ]),
+                "DUPLICATE_PROGRESS_SHEET_ID",
+            ),
+            (
+                "traversal_id",
+                serde_json::json!([
+                    {
+                        "id": "../escape",
+                        "configPath": ".project-manager/progress-sheets/../escape/config.json"
+                    }
+                ]),
+                "INVALID_PROGRESS_SHEET_ID",
+            ),
+            (
+                "absolute_path",
+                serde_json::json!([
+                    {
+                        "id": "hardware-rd",
+                        "configPath": "/tmp/hardware-rd/config.json"
+                    }
+                ]),
+                "INVALID_PROGRESS_SHEET_CONFIG_PATH",
+            ),
+            (
+                "wrong_config_path",
+                serde_json::json!([
+                    {
+                        "id": "hardware-rd",
+                        "configPath": ".project-manager/progress-sheets/other/config.json"
+                    }
+                ]),
+                "INVALID_PROGRESS_SHEET_CONFIG_PATH",
+            ),
+        ];
+
+        for (name, progress_sheets, expected_error) in cases {
+            let dir = unique_test_dir(&format!("initialize_progress_sheet_{name}"));
+            cleanup(&dir).await;
+            tokio::fs::create_dir_all(&dir).await.unwrap();
+
+            let result = initialize_project(
+                dir.to_string_lossy().to_string(),
+                serde_json::json!({
+                    "schemaVersion": 11,
+                    "features": [],
+                    "progressSheets": progress_sheets
+                }),
+                "create".to_string(),
+            )
+            .await;
+
+            let err = match result {
+                Ok(_) => panic!("{name} should be rejected"),
+                Err(err) => err,
+            };
+            assert!(
+                err.contains(expected_error),
+                "expected {expected_error}, got {err}"
+            );
+            assert!(
+                !dir.join(".project-manager/config.json").exists(),
+                "{name} must not write manifest after invalid sheet refs"
+            );
+
+            cleanup(&dir).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn initialize_project_preserves_existing_progress_sheet_config_on_merge() {
+        let dir = unique_test_dir("initialize_progress_sheet_preserve_merge");
+        cleanup(&dir).await;
+        let sheet_dir = dir.join(".project-manager/progress-sheets/hardware-rd");
+        tokio::fs::create_dir_all(&sheet_dir).await.unwrap();
+        tokio::fs::create_dir_all(dir.join(".project-manager"))
+            .await
+            .unwrap();
+        tokio::fs::write(dir.join(".project-manager/config.json"), br#"{"features":[]}"#)
+            .await
+            .unwrap();
+        let sheet_path = sheet_dir.join("config.json");
+        tokio::fs::write(&sheet_path, br#"{"id":"hardware-rd","rows":[{"id":"keep"}]}"#)
+            .await
+            .unwrap();
+
+        initialize_project(
+            dir.to_string_lossy().to_string(),
+            serde_json::json!({
+                "schemaVersion": 11,
+                "features": [],
+                "progressSheets": [{
+                    "id": "hardware-rd",
+                    "configPath": ".project-manager/progress-sheets/hardware-rd/config.json"
+                }],
+                "progressSheetConfigs": [{
+                    "id": "hardware-rd",
+                    "rows": [{"id": "replace"}]
+                }]
+            }),
+            "merge".to_string(),
+        )
+        .await
+        .expect("initialize merge");
+
+        let sheet_content = tokio::fs::read_to_string(&sheet_path).await.unwrap();
+        assert!(
+            sheet_content.contains("\"keep\""),
+            "merge must preserve existing sheet data, got {sheet_content}"
+        );
+        assert!(
+            !sheet_content.contains("\"replace\""),
+            "merge must not overwrite existing sheet data, got {sheet_content}"
+        );
+
+        cleanup(&dir).await;
+    }
+
+    #[tokio::test]
+    async fn initialize_project_overwrite_replaces_existing_progress_sheet_config() {
+        let dir = unique_test_dir("initialize_progress_sheet_overwrite");
+        cleanup(&dir).await;
+        let sheet_dir = dir.join(".project-manager/progress-sheets/hardware-rd");
+        tokio::fs::create_dir_all(&sheet_dir).await.unwrap();
+        tokio::fs::create_dir_all(dir.join(".project-manager"))
+            .await
+            .unwrap();
+        tokio::fs::write(dir.join(".project-manager/config.json"), br#"{"features":[]}"#)
+            .await
+            .unwrap();
+        let sheet_path = sheet_dir.join("config.json");
+        tokio::fs::write(&sheet_path, br#"{"id":"hardware-rd","rows":[{"id":"old"}]}"#)
+            .await
+            .unwrap();
+
+        initialize_project(
+            dir.to_string_lossy().to_string(),
+            serde_json::json!({
+                "schemaVersion": 11,
+                "features": [],
+                "progressSheets": [{
+                    "id": "hardware-rd",
+                    "configPath": ".project-manager/progress-sheets/hardware-rd/config.json"
+                }],
+                "progressSheetConfigs": [{
+                    "id": "hardware-rd",
+                    "rows": [{"id": "new"}]
+                }]
+            }),
+            "overwrite".to_string(),
+        )
+        .await
+        .expect("initialize overwrite");
+
+        let sheet_content = tokio::fs::read_to_string(&sheet_path).await.unwrap();
+        assert!(
+            sheet_content.contains("\"new\""),
+            "overwrite must replace existing sheet data, got {sheet_content}"
+        );
+        assert!(
+            !sheet_content.contains("\"old\""),
+            "overwrite must not keep old sheet data, got {sheet_content}"
         );
 
         cleanup(&dir).await;

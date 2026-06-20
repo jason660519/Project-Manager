@@ -8,11 +8,13 @@
 
 import { defaultDiscoveryPlan } from '../integrations/discovery/presets';
 import type { DiscoveryPlan } from '../integrations/discovery/types';
+import { createProgressSheetConfigFromTemplate } from '../progress-sheets/sheetConfig';
 import { migrateConfig } from '../storage';
 import type {
   BrowserAccessPolicy,
   ExternalFileAccessPolicy,
   InstalledBrowser,
+  ProgressSheetConfig,
   ProjectManagerConfig,
 } from '../types';
 import { KEY_PERSONAL_SYSTEM_CLI_EXPOSURE } from '../storage/keys';
@@ -134,6 +136,40 @@ export interface InitializeProjectResult {
 
 export type InitializeProjectMode = 'create' | 'merge' | 'overwrite';
 
+function initializeProgressSheetConfigs(
+  config: ProjectManagerConfig,
+  progressSheetConfigs: ProgressSheetConfig[],
+): ProgressSheetConfig[] {
+  const sheetRefs = config.progressSheets ?? [];
+  const refIds = new Set(sheetRefs.map((sheetRef) => sheetRef.id));
+  const suppliedById = new Map<string, ProgressSheetConfig>();
+  for (const sheetConfig of progressSheetConfigs) {
+    if (suppliedById.has(sheetConfig.id)) {
+      throw new Error(`DUPLICATE_PROGRESS_SHEET_ID: ${sheetConfig.id}`);
+    }
+    if (!refIds.has(sheetConfig.id)) {
+      throw new Error(`UNKNOWN_PROGRESS_SHEET_CONFIG: ${sheetConfig.id} has no matching manifest ref`);
+    }
+    suppliedById.set(sheetConfig.id, sheetConfig);
+  }
+  const generated: ProgressSheetConfig[] = [];
+  for (const sheetRef of sheetRefs) {
+    const supplied = suppliedById.get(sheetRef.id);
+    if (supplied) {
+      generated.push(supplied);
+      continue;
+    }
+    generated.push(
+      createProgressSheetConfigFromTemplate(sheetRef.templateId, {
+        id: sheetRef.id,
+        title: sheetRef.label,
+        now: sheetRef.createdAt,
+      }),
+    );
+  }
+  return generated;
+}
+
 /**
  * Create the `.project-manager/` dashboard folder with `config.json`,
  * `features/`, and `dev-logs/` (ADR-008). See
@@ -143,11 +179,17 @@ export async function initializeProject(
   projectRoot: string,
   config: ProjectManagerConfig,
   mode: InitializeProjectMode,
+  progressSheetConfigs: ProgressSheetConfig[] = [],
 ): Promise<InitializeProjectResult> {
   if (!isTauri()) throw new Error('initializeProject requires Tauri runtime');
+  const sheetConfigs = initializeProgressSheetConfigs(config, progressSheetConfigs);
+  const initializeConfig =
+    sheetConfigs.length > 0
+      ? { ...config, progressSheetConfigs: sheetConfigs }
+      : config;
   const raw = await invoke<{ config_path: string; created_dirs: string[] }>('initialize_project', {
     projectRoot,
-    config,
+    config: initializeConfig,
     mode,
   });
   return { configPath: raw.config_path, createdDirs: raw.created_dirs };

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { readFileSync } from 'node:fs';
 import {
   PM_SYSTEM_COMMANDS,
   INSTALL_ACTIONS,
@@ -100,7 +101,23 @@ async function buildDryRunResponse(commandName, commandFlags) {
 }
 
 async function buildPreflightLines() {
-  const preflight = await collectInstallerPreflight({ dryRun: true });
+  const kongConfigText = readFileSync(
+    new URL('../infra/supabase/templates/kong.yml', import.meta.url),
+    'utf8',
+  );
+  const preflight = await collectInstallerPreflight({
+    dryRun: true,
+    kongConfigText,
+    getRequiredPortChecks: () => [
+      { port: 8000, available: true, service: 'Supabase API gateway' },
+      { port: 5432, available: true, service: 'Postgres' },
+      { port: 54323, available: true, service: 'Supabase Studio' },
+      { port: 9999, available: true, service: 'Supabase Auth' },
+      { port: 3000, available: true, service: 'PostgREST' },
+      { port: 5000, available: true, service: 'Supabase Storage' },
+      { port: 4000, available: true, service: 'Supabase Realtime' },
+    ],
+  });
   const lines = [];
 
   if (preflight.runtime) {
@@ -113,6 +130,12 @@ async function buildPreflightLines() {
     lines.push(
       `${port.available ? 'PASS' : 'BLOCKED'} port ${port.port}: ${port.service}`,
     );
+  }
+
+  if (preflight.kongRoutes?.valid) {
+    lines.push('PASS kong-routes: Auth, REST, Storage, and Realtime routes declared');
+  } else if (preflight.kongRoutes) {
+    lines.push(`BLOCKED kong-routes: missing ${preflight.kongRoutes.missingRoutes.join(', ')}`);
   }
 
   return lines;

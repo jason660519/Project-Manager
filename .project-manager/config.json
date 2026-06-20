@@ -2082,6 +2082,61 @@
       "status": "in_progress",
       "updatedAt": "2026-06-16T09:05:00.000Z",
       "updatedBy": "Codex"
+    },
+    {
+      "category": "PM Orchestration",
+      "createdAt": "2026-06-21T00:00:00.000Z",
+      "id": "F55",
+      "locatedSection": "Project Dashboard > Projects > Initialize",
+      "metadata": {
+        "evidencePaths": [
+          ".project-manager/features/F55/README.md",
+          ".project-manager/features/F55/feature-spec.md",
+          ".project-manager/features/F55/tdd-spec.md",
+          ".project-manager/features/F55/test-scenarios.md",
+          ".project-manager/features/F55/implementation-plan.md",
+          ".project-manager/features/F55/dev-log.md",
+          "docs/architecture/ADR-007-schema-v3-project-progress-fields.md",
+          "docs/architecture/ADR-016-supabase-cloud-control-plane-and-developer-runner.md",
+          "docs/engineering/pm-system-installer.md",
+          "infra/supabase/docker-compose.pm-system.yml"
+        ],
+        "kickoffAt": "2026-06-21T00:00:00.000Z",
+        "plannedTestScope": [
+          "migration: schema v10 projects preserve feature data while adding progress sheet refs",
+          "unit: built-in progress sheet template registry",
+          "unit: sheet config creation from immutable template snapshots",
+          "unit: template switching preserves unmapped row values",
+          "component: project initialization template picker and preview",
+          "component: Project Progress renders dynamic sheet title and columns",
+          "unit: backend connector profile normalization and secret redaction",
+          "infrastructure: local Docker Supabase doctor/install dry-run safety"
+        ],
+        "risks": [
+          "Progress sheet migration can lose existing software feature data if the manifest split is too aggressive.",
+          "Supabase work can accidentally make local project usage require Docker or cloud sign-in.",
+          "Template switching can silently hide or delete row data without an explicit archived-field contract."
+        ],
+        "scope": "Plan and implement a local-first multi-discipline progress sheet model with Supabase-compatible backend profiles."
+      },
+      "name": "Multi-Discipline Progress Sheets and Backend Profiles",
+      "notes": "F55 establishes the requirements, storage contract, TDD plan, and implementation breakdown for replacing hard-coded software-only Development Progress with multiple discipline-specific progress sheets and local/self-hosted/cloud Supabase-compatible backend profiles.",
+      "paths": {
+        "developmentLogSummaryFolder": ".project-manager/features/F55/",
+        "featureFolder": ".project-manager/features/F55/",
+        "implementation": "lib/progress-sheets",
+        "spec": ".project-manager/features/F55/feature-spec.md",
+        "tdd": ".project-manager/features/F55/tdd-spec.md",
+        "test": "__tests__/progressSheets.templates.test.ts",
+        "testScenarios": ".project-manager/features/F55/test-scenarios.md"
+      },
+      "phase": "development",
+      "points": 13,
+      "progress": 5,
+      "readmePath": ".project-manager/features/F55/README.md",
+      "status": "in_progress",
+      "updatedAt": "2026-06-21T00:00:00.000Z",
+      "updatedBy": "Codex"
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",
@@ -2091,7 +2146,28 @@
     "name": "@project-manager/app",
     "root": "/Users/Project-Manager"
   },
-  "schemaVersion": 10,
-  "updatedAt": "2026-06-16T09:05:00.000Z",
+  "progressSheets": [
+    {
+      "active": true,
+      "configPath": ".project-manager/progress-sheets/software-desktop-app/config.json",
+      "createdAt": "2026-06-21T00:00:00.000Z",
+      "discipline": "software",
+      "id": "software-desktop-app",
+      "label": "Desktop App Development Progress",
+      "templateId": "software-desktop-app",
+      "templateVersion": 1,
+      "updatedAt": "2026-06-21T00:00:00.000Z"
+    }
+  ],
+  "backendProfiles": [
+    {
+      "enabled": false,
+      "label": "Local files",
+      "mode": "local-files"
+    }
+  ],
+  "activeBackendProfileMode": "local-files",
+  "schemaVersion": 11,
+  "updatedAt": "2026-06-21T00:00:00.000Z",
   "updatedBy": "Codex"
 }

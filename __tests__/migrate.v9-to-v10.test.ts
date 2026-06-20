@@ -18,13 +18,13 @@ describe('migrate v9 → v10 (ADR-017 engineer access policies)', () => {
     ],
   };
 
-  it('exposes 10 as the current schema version', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(10);
+  it('exposes 11 as the current schema version', () => {
+    expect(CURRENT_SCHEMA_VERSION).toBe(11);
   });
 
-  it('bumps a v9 config to v10 without rewriting rows', () => {
+  it('bumps a v9 config to the current schema without rewriting rows', () => {
     const out = migrateConfig(baseV9);
-    expect(out.schemaVersion).toBe(10);
+    expect(out.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(out.engineerRoles).toHaveLength(1);
     expect(out.engineerRoles?.[0].id).toBe('r1');
     // No access fields are invented — absent stays absent (= no access).
@@ -54,7 +54,7 @@ describe('migrate v9 → v10 (ADR-017 engineer access policies)', () => {
         },
       ],
     });
-    expect(out.schemaVersion).toBe(10);
+    expect(out.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(out.engineerRoles?.[0].browserAccess).toEqual({
       enabled: true,
       allowedBrowserIds: ['com.apple.Safari'],
@@ -68,7 +68,7 @@ describe('migrate v9 → v10 (ADR-017 engineer access policies)', () => {
     expect(twice).toEqual(once);
   });
 
-  it('migrates a legacy v1 config all the way to v10', () => {
+  it('migrates a legacy v1 config all the way to the current schema', () => {
     const out = migrateConfig({
       project: { name: 'Legacy', root: '/legacy', defaultIDE: 'Cursor' },
       features: [],

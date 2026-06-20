@@ -28,11 +28,11 @@ const readyPreflight: InstallerPreflight = {
     kind: 'docker-compatible',
     version: '25.0.0',
   },
-  ports: [
-    { port: 8000, available: true, service: 'Supabase API gateway' },
-    { port: 5432, available: true, service: 'Postgres' },
-    { port: 54323, available: true, service: 'Supabase Studio' },
-  ],
+  ports: getRequiredPortChecks(),
+  kongRoutes: {
+    valid: true,
+    missingRoutes: [],
+  },
 };
 
 function readScaffold(path: string): string {
@@ -86,6 +86,37 @@ describe('PM System Installer planning', () => {
     expect(plan.messages[0]).toContain('Port 8000');
   });
 
+  it('blocks install when required Kong routes are missing', () => {
+    const plan = planPmSystemInstall({
+      ...readyPreflight,
+      kongRoutes: {
+        valid: false,
+        missingRoutes: ['/auth/v1', '/rest/v1'],
+      },
+    });
+
+    expect(plan.status).toBe('route_required');
+    expect(plan.blocked).toBe(true);
+    expect(plan.actions).toEqual(['validate-kong-routes']);
+    expect(plan.messages[0]).toContain('/auth/v1, /rest/v1');
+  });
+
+  it('blocks install when authenticated-client service ports are not fully checked', () => {
+    const plan = planPmSystemInstall({
+      ...readyPreflight,
+      ports: [
+        { port: 8000, available: true, service: 'Supabase API gateway' },
+        { port: 5432, available: true, service: 'Postgres' },
+        { port: 54323, available: true, service: 'Supabase Studio' },
+      ],
+    });
+
+    expect(plan.status).toBe('service_checks_required');
+    expect(plan.blocked).toBe(true);
+    expect(plan.actions).toEqual(['run-health-checks']);
+    expect(plan.messages[0]).toContain('Supabase Auth');
+  });
+
   it('does not reinstall over an existing backend stack', () => {
     expect(
       planPmSystemInstall({
@@ -119,7 +150,7 @@ describe('PM System Installer planning', () => {
       toRendererSafeBackendProfile({
         id: 'local-pm',
         label: 'Local PM Backend',
-        mode: 'local-self-hosted',
+        mode: 'local-docker-supabase',
         supabaseUrl: 'http://127.0.0.1:8000',
         supabaseAnonKey: 'anon-test-key',
         serviceRoleKey: 'service-role-secret',
@@ -128,7 +159,7 @@ describe('PM System Installer planning', () => {
     ).toEqual({
       id: 'local-pm',
       label: 'Local PM Backend',
-      mode: 'local-self-hosted',
+      mode: 'local-docker-supabase',
       supabaseUrl: 'http://127.0.0.1:8000',
       supabaseAnonKey: 'anon-test-key',
     });
@@ -164,14 +195,15 @@ describe('PM System Installer planning', () => {
     });
   });
 
-  it('requires only the ports the compose scaffold actually provisions', () => {
-    // Storage (5000) and Realtime (4000) are reserved for a future slice and are
-    // NOT started by docker-compose.pm-system.yml, so they must not be claimed
-    // as required/checked or doctor/install would report false success.
+  it('requires ports for authenticated client Supabase services provisioned by the compose scaffold', () => {
     expect(getRequiredPortChecks()).toEqual([
       { port: 8000, available: true, service: 'Supabase API gateway' },
       { port: 5432, available: true, service: 'Postgres' },
       { port: 54323, available: true, service: 'Supabase Studio' },
+      { port: 9999, available: true, service: 'Supabase Auth' },
+      { port: 3000, available: true, service: 'PostgREST' },
+      { port: 5000, available: true, service: 'Supabase Storage' },
+      { port: 4000, available: true, service: 'Supabase Realtime' },
     ]);
   });
 
@@ -179,7 +211,7 @@ describe('PM System Installer planning', () => {
     const pair = createPmBackendProfilePair({
       id: 'local-pm',
       label: 'Local PM Backend',
-      mode: 'local-self-hosted',
+      mode: 'local-docker-supabase',
       host: 'http://127.0.0.1',
       ports: DEFAULT_PM_BACKEND_PORTS,
       composeProjectName: 'pm-system',
@@ -195,7 +227,7 @@ describe('PM System Installer planning', () => {
     expect(pair.renderer).toEqual({
       id: 'local-pm',
       label: 'Local PM Backend',
-      mode: 'local-self-hosted',
+      mode: 'local-docker-supabase',
       supabaseUrl: 'http://127.0.0.1:8000',
       supabaseAnonKey: 'anon-test-key',
     });
@@ -215,7 +247,7 @@ describe('PM System Installer planning', () => {
       createPmBackendProfilePair({
         id: 'local-pm',
         label: 'Local PM Backend',
-        mode: 'local-self-hosted',
+        mode: 'local-docker-supabase',
         host: 'localhost',
         ports: DEFAULT_PM_BACKEND_PORTS,
         composeProjectName: 'pm-system',
@@ -234,7 +266,7 @@ describe('PM System Installer planning', () => {
     const { ops } = createPmBackendProfilePair({
       id: 'vm-pm',
       label: 'VM PM Backend',
-      mode: 'vm-self-hosted',
+      mode: 'self-hosted-supabase',
       host: 'https://pm.example.test',
       ports: {
         api: 443,
@@ -263,6 +295,26 @@ describe('PM System Installer planning', () => {
     expect(redacted).not.toContain('service-role-vm-secret');
     expect(redacted).not.toContain('jwt-vm-secret');
     expect(redacted).not.toContain('db-vm-password');
+  });
+
+  it('uses F55 backend profile modes in installer-facing profile helpers', () => {
+    expect(
+      toRendererSafeBackendProfile({
+        id: 'cloud',
+        label: 'Cloud',
+        mode: 'supabase-cloud',
+        supabaseUrl: 'https://pm.example.test',
+        supabaseAnonKey: 'anon',
+        serviceRoleKey: 'service-secret',
+        databasePassword: 'db-secret',
+      }),
+    ).toEqual({
+      id: 'cloud',
+      label: 'Cloud',
+      mode: 'supabase-cloud',
+      supabaseUrl: 'https://pm.example.test',
+      supabaseAnonKey: 'anon',
+    });
   });
 
   it('marks doctor report healthy only when every check passes', () => {
@@ -448,6 +500,26 @@ describe('PM System Installer planning', () => {
     ]);
   });
 
+  it('compose scaffold provisions authenticated client services and explicitly gates Kong routes', () => {
+    const compose = readScaffold('infra/supabase/docker-compose.pm-system.yml');
+    const kong = readScaffold('infra/supabase/templates/kong.yml');
+
+    expect(compose).toContain('auth:');
+    expect(compose).toContain('rest:');
+    expect(compose).toContain('storage:');
+    expect(compose).toContain('realtime:');
+    expect(kong).toContain('services: []');
+    expect(kong).toContain('routes: []');
+  });
+
+  it('defines a migration runner plan for existing volumes', () => {
+    const compose = readScaffold('infra/supabase/docker-compose.pm-system.yml');
+
+    expect(compose).toContain('migrations:');
+    expect(compose).toContain('profiles:');
+    expect(compose).toContain('PM backend migrations for existing volumes');
+  });
+
   it('keeps scaffold files free of real secret-like values', () => {
     const files = PM_SUPABASE_SCAFFOLD_FILES.map((file) => ({
       path: file.path,
@@ -513,6 +585,23 @@ describe('PM System Installer planning', () => {
     // clean bill of health.
     expect(response.title).not.toBe('PM System doctor: healthy');
     expect(response.lines.join('\n')).toContain('ports were not verified');
+  });
+
+  it('blocks doctor when required Kong routes are missing', () => {
+    const response = buildPmSystemCliResponse({
+      command: 'doctor',
+      preflight: {
+        runtime: { kind: 'docker-compatible', version: '25.0.0' },
+        ports: getRequiredPortChecks(),
+        kongRoutes: {
+          valid: false,
+          missingRoutes: ['/auth/v1', '/rest/v1'],
+        },
+      },
+    });
+
+    expect(response.blocked).toBe(true);
+    expect(response.lines.join('\n')).toContain('Kong routes missing: /auth/v1, /rest/v1.');
   });
 
   it('builds a dry-run install CLI response without host mutation', () => {
