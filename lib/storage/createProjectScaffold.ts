@@ -1,6 +1,10 @@
 import { AGENT_TEAM_DIR } from '../defaults/agentTeamProtocol';
 import { DEFAULT_ENGINEER_ROLES } from '../defaults/engineerRoles';
-import { BUILT_IN_PROGRESS_TEMPLATES } from '../progress-sheets/templates';
+import {
+  listProgressTemplates,
+  resolveProgressTemplate,
+  type ProgressTemplateDefinition,
+} from '../progress-sheets/catalog';
 import type {
   Feature,
   FeatureStatus,
@@ -39,8 +43,10 @@ export interface InitializeProjectOptions {
   /** Folder name used when `projectRoot` has no trailing segment. */
   projectName?: string;
   defaultIDE?: IDEId;
-  /** Built-in progress sheet templates to initialize. Defaults to the software desktop sheet. */
+  /** Progress sheet templates to initialize. Defaults to the software desktop sheet. */
   progressSheetTemplateIds?: string[];
+  /** Optional template catalog used to resolve custom sheet ids during scaffold generation. */
+  progressSheetTemplates?: ProgressTemplateDefinition[];
 }
 
 /** Default feature spec path under the consolidated dashboard feature folder. */
@@ -78,6 +84,7 @@ function inferProjectName(projectRoot: string, override?: string): string {
 function buildProgressSheetRefs(
   templateIds: string[] | undefined,
   timestamp: string,
+  templateCatalog: ReadonlyArray<ProgressTemplateDefinition>,
 ): ProjectProgressSheetRef[] {
   const selectedTemplateIds = templateIds ?? ['software-desktop-app'];
   if (selectedTemplateIds.length === 0) {
@@ -91,7 +98,7 @@ function buildProgressSheetRefs(
     }
     seen.add(templateId);
 
-    const template = BUILT_IN_PROGRESS_TEMPLATES.find((candidate) => candidate.id === templateId);
+    const template = resolveProgressTemplate(templateId, templateCatalog);
     if (!template) {
       throw new Error(`Unknown progress sheet template: ${templateId}`);
     }
@@ -188,6 +195,7 @@ export function buildRecoveredProjectConfig(
 ): ProjectManagerConfig {
   const root = projectRoot.replace(/\/+$/, '');
   const now = new Date().toISOString();
+  const progressTemplateCatalog = options.progressSheetTemplates ?? listProgressTemplates();
   const features = [...snapshot.featureReadmes]
     .sort((a, b) => a.featureId.localeCompare(b.featureId, undefined, { numeric: true }))
     .map((doc): Feature => {
@@ -272,7 +280,7 @@ export function buildRecoveredProjectConfig(
   });
   return {
     ...recovered,
-    progressSheets: buildProgressSheetRefs(options.progressSheetTemplateIds, now),
+    progressSheets: buildProgressSheetRefs(options.progressSheetTemplateIds, now, progressTemplateCatalog),
   };
 }
 
@@ -286,6 +294,7 @@ export function buildProjectScaffold(
 ): ProjectManagerConfig {
   const root = projectRoot.replace(/\/+$/, '');
   const now = new Date().toISOString();
+  const progressTemplateCatalog = options.progressSheetTemplates ?? listProgressTemplates();
   const raw = {
     schemaVersion: 1,
     createdAt: now,
@@ -303,7 +312,7 @@ export function buildProjectScaffold(
   const scaffold = migrateConfig(raw);
   return {
     ...scaffold,
-    progressSheets: buildProgressSheetRefs(options.progressSheetTemplateIds, now),
+    progressSheets: buildProgressSheetRefs(options.progressSheetTemplateIds, now, progressTemplateCatalog),
   };
 }
 

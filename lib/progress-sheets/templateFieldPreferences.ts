@@ -130,9 +130,9 @@ export function normalizeTemplateFieldColumns(
   templateId: string,
   input: unknown,
 ): ProgressColumn[] {
-  if (!isBuiltInTemplateId(templateId)) return [];
-
-  if (!Array.isArray(input)) return defaultTemplateFieldColumns(templateId);
+  if (!Array.isArray(input)) {
+    return isBuiltInTemplateId(templateId) ? defaultTemplateFieldColumns(templateId) : [];
+  }
 
   const seen = new Set<string>();
   const normalized: ProgressColumn[] = [];
@@ -143,7 +143,9 @@ export function normalizeTemplateFieldColumns(
     normalized.push(column);
   });
 
-  if (normalized.length === 0) return defaultTemplateFieldColumns(templateId);
+  if (normalized.length === 0) {
+    return isBuiltInTemplateId(templateId) ? defaultTemplateFieldColumns(templateId) : [];
+  }
 
   return ensureProgressUuidFirstColumn(
     normalized

@@ -8,6 +8,7 @@ import {
   hasRecoverableDashboardArtifacts,
   mergeProjectConfig,
 } from '../lib/storage/createProjectScaffold';
+import type { ProgressTemplateDefinition } from '../lib/progress-sheets/catalog';
 import { CURRENT_SCHEMA_VERSION } from '../lib/storage/migrate';
 
 describe('buildProjectScaffold', () => {
@@ -41,7 +42,7 @@ describe('buildProjectScaffold', () => {
 
   it('builds manifest refs for selected built-in progress sheet templates', () => {
     const cfg = buildProjectScaffold('/Volumes/dev/MyApp', {
-      progressSheetTemplateIds: ['hardware-rd', 'qa-validation'],
+      progressSheetTemplateIds: ['hardware-rd', 'marketing-campaign'],
     });
 
     expect(cfg.progressSheets).toEqual([
@@ -57,15 +58,46 @@ describe('buildProjectScaffold', () => {
         updatedAt: expect.any(String),
       }),
       expect.objectContaining({
-        id: 'qa-validation',
-        label: 'QA Validation Progress',
-        discipline: 'qa-validation',
-        configPath: '.project-manager/progress-sheets/qa-validation/config.json',
-        templateId: 'qa-validation',
+        id: 'marketing-campaign',
+        label: 'Marketing Campaign Progress',
+        discipline: 'marketing-campaign',
+        configPath: '.project-manager/progress-sheets/marketing-campaign/config.json',
+        templateId: 'marketing-campaign',
         templateVersion: 1,
         active: false,
         createdAt: expect.any(String),
         updatedAt: expect.any(String),
+      }),
+    ]);
+  });
+
+  it('resolves custom progress sheet templates when an explicit catalog is provided', () => {
+    const customTemplate: ProgressTemplateDefinition = {
+      id: 'mobile-app-qa',
+      label: 'Mobile App QA',
+      sheetTitle: 'Mobile App QA Progress',
+      discipline: 'custom',
+      version: 1,
+      fields: [
+        { id: 'uuid', label: 'UUID', fieldType: 'uuid', order: 0, visible: true, required: true },
+        { id: 'scenario', label: 'Scenario', fieldType: 'text', order: 1, visible: true },
+      ],
+      statusOptions: [{ id: 'todo', label: 'To Do' }],
+    };
+
+    const cfg = buildProjectScaffold('/Volumes/dev/MyApp', {
+      progressSheetTemplateIds: ['mobile-app-qa'],
+      progressSheetTemplates: [customTemplate],
+    });
+
+    expect(cfg.progressSheets).toEqual([
+      expect.objectContaining({
+        id: 'mobile-app-qa',
+        label: 'Mobile App QA Progress',
+        discipline: 'custom',
+        templateId: 'mobile-app-qa',
+        templateVersion: 1,
+        active: true,
       }),
     ]);
   });
@@ -206,16 +238,16 @@ describe('dashboard artifact recovery', () => {
       ],
       relativePaths: [],
     }, {
-      progressSheetTemplateIds: ['hardware-rd', 'qa-validation'],
+      progressSheetTemplateIds: ['hardware-rd', 'marketing-campaign'],
     });
 
-    expect(cfg.progressSheets?.map((sheet) => sheet.id)).toEqual(['hardware-rd', 'qa-validation']);
+    expect(cfg.progressSheets?.map((sheet) => sheet.id)).toEqual(['hardware-rd', 'marketing-campaign']);
     expect(cfg.progressSheets?.[0]).toMatchObject({
       id: 'hardware-rd',
       active: true,
     });
     expect(cfg.progressSheets?.[1]).toMatchObject({
-      id: 'qa-validation',
+      id: 'marketing-campaign',
       active: false,
     });
   });
@@ -249,7 +281,7 @@ describe('mergeProjectConfig', () => {
       progressSheetTemplateIds: ['hardware-rd'],
     });
     const scaffold = buildProjectScaffold('/app', {
-      progressSheetTemplateIds: ['software-desktop-app', 'qa-validation'],
+      progressSheetTemplateIds: ['software-desktop-app', 'marketing-campaign'],
     });
 
     const merged = mergeProjectConfig(existing, scaffold);
@@ -257,7 +289,7 @@ describe('mergeProjectConfig', () => {
     expect(merged.progressSheets?.map((sheet) => sheet.id)).toEqual([
       'hardware-rd',
       'software-desktop-app',
-      'qa-validation',
+      'marketing-campaign',
     ]);
     expect(merged.progressSheets?.[0]).toMatchObject({
       templateId: 'hardware-rd',
@@ -268,7 +300,7 @@ describe('mergeProjectConfig', () => {
       active: false,
     });
     expect(merged.progressSheets?.[2]).toMatchObject({
-      templateId: 'qa-validation',
+      templateId: 'marketing-campaign',
       active: false,
     });
   });

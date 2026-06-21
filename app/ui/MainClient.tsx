@@ -47,6 +47,8 @@ import { formatStandardsGateRunError } from '../../lib/companyStandards/formatGa
 import { spawnStandardsGateRun, StandardsGateRunError } from '../../lib/companyStandards/spawnStandardsGate';
 import { I18nProvider, useI18n } from '../../lib/i18n';
 import type { UnlistenFn } from '../../lib/bridge';
+import { listProgressTemplates } from '../../lib/progress-sheets/catalog';
+import { createProgressSheetConfigFromTemplate } from '../../lib/progress-sheets/sheetConfig';
 
 function RouteViewLoading() {
   return (
@@ -1332,9 +1334,11 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
       const root =
         target.config.project.root ||
         target.configPath.replace(/\/\.project-manager\.json$/, '');
+      const progressTemplateCatalog = listProgressTemplates();
       const scaffoldOptions = {
         projectName: target.config.project.name,
         progressSheetTemplateIds,
+        progressSheetTemplates: progressTemplateCatalog,
       };
       let config = buildProjectScaffold(root, scaffoldOptions);
       let invokeMode: 'create' | 'merge' | 'overwrite' = mode;
@@ -1348,6 +1352,7 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
               ? mergeProjectConfig(existing, config)
               : buildOverwriteScaffold(root, existing.project.name, {
                   progressSheetTemplateIds,
+                  progressSheetTemplates: progressTemplateCatalog,
                 });
         } catch {
           invokeMode = 'create';
@@ -1361,6 +1366,7 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
           config = buildRecoveredProjectConfig(root, snapshot, {
             projectName: target.config.project.name,
             progressSheetTemplateIds,
+            progressSheetTemplates: progressTemplateCatalog,
           });
         }
       }
@@ -1369,7 +1375,15 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
         ...config,
         features: normalizeFeaturesLocatedSection(ensureFeaturePaths(config.features)),
       };
-      const result = await initializeProject(root, config, invokeMode);
+      const progressSheetConfigs = (config.progressSheets ?? []).map((sheetRef) =>
+        createProgressSheetConfigFromTemplate(sheetRef.templateId, {
+          id: sheetRef.id,
+          title: sheetRef.label,
+          now: sheetRef.createdAt,
+          templateCatalog: progressTemplateCatalog,
+        }),
+      );
+      const result = await initializeProject(root, config, invokeMode, progressSheetConfigs);
       let mergedConfig = await readConfig(result.configPath);
       mergedConfig = {
         ...mergedConfig,

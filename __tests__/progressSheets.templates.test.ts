@@ -25,13 +25,7 @@ describe('F55 built-in progress sheet templates', () => {
       'software-desktop-app',
       'software-backend-api',
       'hardware-rd',
-      'industrial-design',
-      'project-operations',
       'marketing-campaign',
-      'content-production',
-      'qa-validation',
-      'construction-field',
-      'procurement-vendor',
     ]);
     expect(new Set(ids).size).toBe(ids.length);
   });

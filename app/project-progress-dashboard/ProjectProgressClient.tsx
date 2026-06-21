@@ -23,6 +23,7 @@ import {
   isFeatureBackedProgressSheet,
   resolveProgressSheetTemplateId,
 } from '../../lib/progress-sheets/templateFieldPreferences';
+import { listProgressTemplates } from '../../lib/progress-sheets/catalog';
 import { SheetTabs } from './_components/SheetTabs';
 import { SharedStatsCards } from './_components/SharedStatsCards';
 import { ExportProgressDialog } from './_components/ExportProgressDialog';
@@ -312,6 +313,19 @@ export function ProjectProgressClient({
     return activeProgressSheetRef?.templateId ?? null;
   }, [activeProgressSheetRef?.templateId, progressSheetConfig]);
 
+  const developmentSheetLabel = useMemo(() => {
+    const snapshotLabel = progressSheetConfig?.templateSnapshot.label?.trim();
+    if (snapshotLabel) return snapshotLabel;
+    if (activeSheetTemplateId) {
+      const templateLabel = listProgressTemplates()
+        .find((template) => template.id === activeSheetTemplateId)
+        ?.label
+        ?.trim();
+      if (templateLabel) return templateLabel;
+    }
+    return 'Desktop App Development';
+  }, [activeSheetTemplateId, progressSheetConfig]);
+
   const featureBackedDevelopmentSheet = isFeatureBackedProgressSheet(activeSheetTemplateId);
 
   const showDynamicProgressSheet = Boolean(
@@ -405,6 +419,7 @@ export function ProjectProgressClient({
             onTabChange={onChangeTab}
             phaseCounts={phaseCounts}
             projectCount={projects.length}
+            developmentLabel={developmentSheetLabel}
           />
         }
       >

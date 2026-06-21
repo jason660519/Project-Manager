@@ -3,6 +3,10 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProjectProgressClient } from '../app/project-progress-dashboard/ProjectProgressClient';
 import { createProgressSheetConfigFromTemplate } from '../lib/progress-sheets/sheetConfig';
+import {
+  defaultTemplateFieldColumns,
+  TEMPLATE_FIELD_PREFS_STORAGE_KEY,
+} from '../lib/progress-sheets/templateFieldPreferences';
 import { I18nProvider } from '../lib/i18n';
 import type {
   ProgressSheetConfig,
@@ -135,7 +139,7 @@ describe('Project progress dashboard progress sheets', () => {
     ]));
 
     await waitFor(() => expect(screen.getByText('Marketing Campaign Progress')).toBeInTheDocument());
-    await userEvent.click(screen.getByRole('button', { name: /development progress sheet/i }));
+    await userEvent.click(screen.getByRole('button', { name: /marketing campaign sheet/i }));
 
     expect(await screen.findByText('Campaign Asset')).toBeInTheDocument();
     expect(screen.getByText('Funnel Stage')).toBeInTheDocument();
@@ -185,7 +189,7 @@ describe('Project progress dashboard progress sheets', () => {
       ),
     ]));
 
-    await userEvent.click(screen.getByRole('button', { name: /development progress sheet/i }));
+    await userEvent.click(screen.getByRole('button', { name: /marketing campaign sheet/i }));
 
     expect((await screen.findAllByText('In Progress')).length).toBeGreaterThan(0);
     expect(screen.getByText('Maya')).toBeInTheDocument();
@@ -244,13 +248,56 @@ describe('Project progress dashboard progress sheets', () => {
       </I18nProvider>,
     );
 
-    await userEvent.click(screen.getByRole('button', { name: /development progress sheet/i }));
+    await userEvent.click(screen.getByRole('button', { name: /desktop app development sheet/i }));
 
     expect(await screen.findByText('Restore dashboard columns')).toBeInTheDocument();
     expect(screen.getByText('Feature Spec')).toBeInTheDocument();
     expect(screen.getByText('TDD Spec')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /add row/i })).toBeInTheDocument();
     expect(screen.queryByText(/Could not load progress sheet config/)).not.toBeInTheDocument();
+  });
+
+  it('renders custom template fields on the feature-backed desktop app sheet', async () => {
+    bridgeMock.readJsonFile.mockRejectedValue(new Error('missing sidecar'));
+    window.localStorage.setItem(
+      TEMPLATE_FIELD_PREFS_STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        templates: {
+          'software-desktop-app': [
+            ...defaultTemplateFieldColumns('software-desktop-app'),
+            {
+              id: 'releaseNotes',
+              label: 'Release Notes',
+              fieldType: 'text',
+              order: 999,
+              visible: true,
+            },
+          ],
+        },
+      }),
+    );
+    const config = projectConfig([
+      sheetRef(
+        'software-desktop-app',
+        'Desktop App Development Progress',
+        '.project-manager/progress-sheets/software-desktop-app/config.json',
+      ),
+    ]);
+    config.features = [{
+      id: 'F01',
+      name: 'Dynamic template column',
+      category: 'Core',
+      status: 'todo',
+      progress: 0,
+      points: 1,
+      paths: {},
+    }];
+
+    renderDashboard(config);
+    await userEvent.click(screen.getByRole('button', { name: /desktop app development sheet/i }));
+
+    expect(await screen.findByText('Release Notes')).toBeInTheDocument();
   });
 
   it('shows a progress sheet loading state instead of the legacy editable table while sidecar read is pending', async () => {
@@ -277,7 +324,7 @@ describe('Project progress dashboard progress sheets', () => {
       ),
     ]));
 
-    await userEvent.click(screen.getByRole('button', { name: /development progress sheet/i }));
+    await userEvent.click(screen.getByRole('button', { name: /marketing campaign sheet/i }));
 
     expect((await screen.findAllByText(/must be project-relative/)).length).toBeGreaterThan(0);
     expect(bridgeMock.readJsonFile).not.toHaveBeenCalled();
@@ -330,7 +377,7 @@ describe('Project progress dashboard progress sheets', () => {
     ]));
 
     await waitFor(() => expect(screen.getByText('Marketing Campaign Progress')).toBeInTheDocument());
-    await userEvent.click(screen.getByRole('button', { name: /development progress sheet/i }));
+    await userEvent.click(screen.getByRole('button', { name: /marketing campaign sheet/i }));
 
     await waitFor(() => {
       const updated = JSON.parse(

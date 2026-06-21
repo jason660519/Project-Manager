@@ -130,7 +130,7 @@ describe('Projects initialization template picker', () => {
     renderView([project]);
 
     const row = screen.getByRole('row', { name: /bravo/i });
-    await toggleProgressSheetInRow(row, /qa validation progress sheet/i, user);
+    await toggleProgressSheetInRow(row, /marketing campaign progress sheet/i, user);
     await user.click(within(row).getByRole('button', { name: /^initialize$/i }));
 
     await waitFor(() => expect(applyScanConfigToProjectMock).toHaveBeenCalled());
@@ -139,7 +139,7 @@ describe('Projects initialization template picker', () => {
       expect.objectContaining({
         progressSheets: expect.arrayContaining([
           expect.objectContaining({ id: 'software-desktop-app' }),
-          expect.objectContaining({ id: 'qa-validation' }),
+          expect.objectContaining({ id: 'marketing-campaign' }),
         ]),
       }),
       expect.objectContaining({ sectionCandidates: undefined, inventoryPaths: undefined }),

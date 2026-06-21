@@ -39,6 +39,8 @@ export interface BottomSheetTabsProps<Key extends string> {
   activeKey: Key;
   onSelect: (key: Key) => void;
   className?: string;
+  /** Optional fixed action shown before all sheet tabs, e.g. a Google Sheets-style add button. */
+  leadingAction?: React.ReactNode;
   /**
    * Enables pointer-driven tab reordering. The order is a display preference
    * only; callers should keep routing/types/domain state tied to canonical ids.
@@ -56,6 +58,7 @@ export function BottomSheetTabs<Key extends string>({
   activeKey,
   onSelect,
   className,
+  leadingAction,
   reorderable = false,
   orderStorageKey,
   onOrderChange,
@@ -165,6 +168,7 @@ export function BottomSheetTabs<Key extends string>({
           className,
         )}
       >
+        {leadingAction}
         {orderedTabs.map((tab) => {
           const active = tab.key === activeKey;
           const isDragging = draggingKey === tab.key;

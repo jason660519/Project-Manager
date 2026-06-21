@@ -77,13 +77,20 @@ interface SheetTabsProps {
   onTabChange: (tab: TabId) => void;
   phaseCounts?: Record<FeaturePhase, number>;
   projectCount?: number;
+  developmentLabel?: string;
 }
 
 export function normalizeSheetOrder(input: unknown): TabId[] {
   return normalizeStoredSheetOrder(input, DEFAULT_SHEET_ORDER);
 }
 
-export function SheetTabs({ activeTab, onTabChange, phaseCounts, projectCount = 0 }: SheetTabsProps) {
+export function SheetTabs({
+  activeTab,
+  onTabChange,
+  phaseCounts,
+  projectCount = 0,
+  developmentLabel,
+}: SheetTabsProps) {
   const { t } = useI18n();
 
   const getSheetCount = (sheet: SheetTabMeta): number => {
@@ -95,6 +102,9 @@ export function SheetTabs({ activeTab, onTabChange, phaseCounts, projectCount = 
   };
 
   const getSheetLabel = (sheet: SheetTabMeta): string => {
+    if (sheet.id === 'development' && developmentLabel?.trim()) {
+      return developmentLabel.trim();
+    }
     return sheet.isPhase
       ? t.phases[PHASE_LABEL_KEY[sheet.id as FeaturePhase]]
       : sheet.id === 'projects'

@@ -4,19 +4,23 @@ import type {
   ProgressSheetConfig,
   ProgressTemplateSnapshot,
 } from '../types';
-import { BUILT_IN_PROGRESS_TEMPLATES, type BuiltInProgressTemplate } from './templates';
+import {
+  resolveProgressTemplate,
+  type ProgressTemplateDefinition,
+} from './catalog';
 
 interface CreateProgressSheetConfigOptions {
   id?: string;
   title?: string;
   now?: string;
+  templateCatalog?: ReadonlyArray<ProgressTemplateDefinition>;
 }
 
 export function createProgressSheetConfigFromTemplate(
   templateId: string,
   options: CreateProgressSheetConfigOptions = {},
 ): ProgressSheetConfig {
-  const template = BUILT_IN_PROGRESS_TEMPLATES.find((candidate) => candidate.id === templateId);
+  const template = resolveProgressTemplate(templateId, options.templateCatalog);
   if (!template) {
     throw new Error(`Unknown progress sheet template: ${templateId}`);
   }
@@ -40,7 +44,7 @@ export function createProgressSheetConfigFromTemplate(
 }
 
 function createTemplateSnapshot(
-  template: BuiltInProgressTemplate,
+  template: ProgressTemplateDefinition,
   capturedAt: string,
 ): ProgressTemplateSnapshot {
   return {

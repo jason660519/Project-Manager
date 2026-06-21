@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, LayoutTemplate } from 'lucide-react';
 import { clsx } from 'clsx';
-import type { BuiltInProgressTemplate } from '../../../../lib/progress-sheets/templates';
+import type { ProgressTemplateDefinition } from '../../../../lib/progress-sheets/catalog';
 import { en } from '../../../../lib/i18n';
 
 interface DropdownPosition {
@@ -15,7 +15,7 @@ interface DropdownPosition {
 }
 
 export interface ProgressSheetTemplatePickerProps {
-  templates: ReadonlyArray<BuiltInProgressTemplate>;
+  templates: ReadonlyArray<ProgressTemplateDefinition>;
   selectedIds: string[];
   onToggle: (templateId: string) => void;
   onSelectAll: () => void;
@@ -24,7 +24,7 @@ export interface ProgressSheetTemplatePickerProps {
 }
 
 function summarizeSelection(
-  templates: ReadonlyArray<BuiltInProgressTemplate>,
+  templates: ReadonlyArray<ProgressTemplateDefinition>,
   selectedIds: string[],
 ): string {
   if (selectedIds.length === 0) return 'Select progress sheets…';

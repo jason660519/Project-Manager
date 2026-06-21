@@ -36,6 +36,8 @@ export interface CustomProjectProgressRow {
   assignedIDE?: IDEId;
   notes?: string;
   readmePath?: string;
+  /** Extra values for template-driven development columns not mapped to first-class Feature fields yet. */
+  templateValues?: Record<string, unknown>;
 }
 
 /** Generic per-table preference bag — what the toolbar persists. */

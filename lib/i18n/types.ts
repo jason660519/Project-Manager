@@ -319,6 +319,9 @@ export interface Translations {
         addField: string;
         fieldType: string;
         resetDefaults: string;
+        saveUserDefault: string;
+        resetUserDefault: string;
+        resetSystemDefault: string;
         moveUp: string;
         moveDown: string;
         protected: string;

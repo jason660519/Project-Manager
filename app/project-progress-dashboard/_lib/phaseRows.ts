@@ -41,6 +41,7 @@ export interface PhaseRow extends PhaseRowMeta {
   assignedTo?: string;
   assignedAt?: string;
   lastDispatchModel?: string;
+  templateValues?: Record<string, unknown>;
   /** Absolute project root for this row's source project (may differ from the dashboard's selected project). */
   sourceProjectRoot?: string;
   /** Underlying feature, when source==='feature'. */
@@ -105,6 +106,7 @@ export function featureToPhaseRow(feature: Feature, defaultProjectName?: string)
     assignedTo: feature.assignedTo,
     assignedAt: feature.assignedAt,
     lastDispatchModel: feature.promptConfig?.lastDispatchModel,
+    templateValues: (feature.metadata?.progressTemplateValues as Record<string, unknown> | undefined) ?? {},
     feature,
   };
 }
@@ -150,6 +152,7 @@ export function customRowToPhaseRow(row: CustomProjectProgressRow, defaultProjec
     assignedIDE: row.assignedIDE,
     notes: row.notes,
     readmePath: row.readmePath,
+    templateValues: row.templateValues ?? {},
     custom: row,
   };
 }

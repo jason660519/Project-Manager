@@ -25,4 +25,19 @@ describe('developmentColumnsFromTemplatePrefs', () => {
     expect(columns.map((column) => column.header)).toContain('Feature Spec');
     expect(columns.map((column) => column.header)).toContain('Dispatch');
   });
+
+  it('keeps custom template fields instead of dropping them from the development sheet', () => {
+    const columns = developmentColumnsFromTemplatePrefs([
+      ...defaultTemplateFieldColumns('software-desktop-app'),
+      {
+        id: 'releaseNotes',
+        label: 'Release Notes',
+        fieldType: 'text',
+        order: 999,
+        visible: true,
+      },
+    ]);
+
+    expect(columns.map((column) => column.header)).toContain('Release Notes');
+  });
 });

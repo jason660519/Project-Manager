@@ -8,7 +8,7 @@ import {
 } from '../app/project-progress-dashboard/_components/SheetTabs';
 import { I18nProvider } from '../lib/i18n';
 
-function renderSheetTabs(onTabChange = vi.fn()) {
+function renderSheetTabs(onTabChange = vi.fn(), developmentLabel?: string) {
   render(
     <I18nProvider>
       <SheetTabs
@@ -21,6 +21,7 @@ function renderSheetTabs(onTabChange = vi.fn()) {
           operations: 0,
         }}
         projectCount={2}
+        developmentLabel={developmentLabel}
       />
     </I18nProvider>,
   );
@@ -48,6 +49,11 @@ describe('Project progress sheet tabs', () => {
     await user.click(screen.getByRole('button', { name: /projects/i }));
 
     expect(onTabChange).toHaveBeenCalledWith('projects');
+  });
+
+  it('prefers the active development sheet label when provided', () => {
+    renderSheetTabs(vi.fn(), 'Desktop App Development');
+    expect(screen.getByRole('button', { name: /desktop app development sheet/i })).toBeInTheDocument();
   });
 
   it('persists user-reordered sheets after pointer drag', () => {

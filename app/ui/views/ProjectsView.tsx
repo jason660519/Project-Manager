@@ -67,10 +67,10 @@ import {
   type InitializeMode,
 } from '../../../lib/storage';
 import { COL_ID_COLUMN_HEADER } from '../../../components/table/colId';
-import { BUILT_IN_PROGRESS_TEMPLATES } from '../../../lib/progress-sheets/templates';
 import { CompletedRun, ProjectManagerConfig, Feature, ProjectEntry } from '../../../lib/types';
 import { PostImportScanDialog } from './_components/PostImportScanDialog';
 import { ProgressSheetTemplatePicker } from './_components/ProgressSheetTemplatePicker';
+import { useProgressTemplatesCatalog } from './ProgressTemplates/useProgressTemplatesCatalog';
 
 interface ProjectsViewProps {
   projects: ProjectEntry[];
@@ -217,6 +217,7 @@ export function ProjectsView({
   onInitializeProject,
   runHistory,
 }: ProjectsViewProps) {
+  const { templates: progressTemplates } = useProgressTemplatesCatalog();
   const resizePrompt = useInAppPrompt();
   const [showAddModal, setShowAddModal] = useState(false);
   const [addMode, setAddMode] = useState<'local' | 'github'>('local');
@@ -717,7 +718,7 @@ export function ProjectsView({
 
   const selectAllTemplateSelections = (project: ProjectEntry) => {
     const current = templateSelections[project.id] ?? getSelectedTemplateIds(project);
-    const allIds = BUILT_IN_PROGRESS_TEMPLATES.map((template) => template.id);
+    const allIds = progressTemplates.map((template) => template.id);
     const next = current.length === allIds.length ? [] : allIds;
     setTemplateSelection(project, next);
   };
@@ -759,6 +760,7 @@ export function ProjectsView({
     const scaffoldSheets = buildProjectScaffold(root, {
       projectName: project.config.project.name,
       progressSheetTemplateIds,
+      progressSheetTemplates: progressTemplates,
     }).progressSheets;
     const scannedWithSheets: ProjectManagerConfig = {
       ...result.config,
@@ -1260,7 +1262,7 @@ export function ProjectsView({
         cell: ({ row }) => {
           const project = row.original;
           const selectedTemplateIds = getSelectedTemplateIds(project);
-          const selectedTemplates = BUILT_IN_PROGRESS_TEMPLATES.filter((template) =>
+          const selectedTemplates = progressTemplates.filter((template) =>
             selectedTemplateIds.includes(template.id),
           );
           const templateError = templateSelectionErrors[project.id];
@@ -1268,7 +1270,7 @@ export function ProjectsView({
           return (
             <div className="min-w-[240px] space-y-2" onClick={(e) => e.stopPropagation()}>
               <ProgressSheetTemplatePicker
-                templates={BUILT_IN_PROGRESS_TEMPLATES}
+                templates={progressTemplates}
                 selectedIds={selectedTemplateIds}
                 onToggle={(templateId) => toggleTemplateSelection(project, templateId)}
                 onSelectAll={() => selectAllTemplateSelections(project)}

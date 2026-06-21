@@ -1,5 +1,5 @@
 import type { ProgressColumn } from '../../../lib/types';
-import { createDevelopmentColumns, type ColumnDef } from './columns';
+import { createDevelopmentColumns, createTemplateFieldColumn, type ColumnDef } from './columns';
 
 /** Maps Desktop App Development template field ids to legacy development table column ids. */
 const TEMPLATE_FIELD_TO_COLUMN_ID: Record<string, string> = {
@@ -30,8 +30,9 @@ const TEMPLATE_FIELD_TO_COLUMN_ID: Record<string, string> = {
 const ACTIONS_COLUMN_ID = 'col-actions';
 
 /**
- * Applies Project Templates Setting column order/visibility to the editable
- * Development Progress table while keeping rich cell editors (paths, dispatch, etc.).
+ * Applies Progress Templates Setting column order/visibility to the editable
+ * Desktop App Development table while keeping rich cell editors for known fields
+ * and surfacing custom template fields as metadata-backed dynamic columns.
  */
 export function developmentColumnsFromTemplatePrefs(
   templateColumns: ProgressColumn[],
@@ -50,11 +51,15 @@ export function developmentColumnsFromTemplatePrefs(
 
   for (const field of ordered) {
     const columnId = TEMPLATE_FIELD_TO_COLUMN_ID[field.id];
-    if (!columnId || seen.has(columnId)) continue;
-    const column = byId.get(columnId);
-    if (!column) continue;
-    seen.add(columnId);
-    result.push(column);
+    if (columnId) {
+      if (seen.has(columnId)) continue;
+      const column = byId.get(columnId);
+      if (!column) continue;
+      seen.add(columnId);
+      result.push(column);
+      continue;
+    }
+    result.push(createTemplateFieldColumn(field));
   }
 
   if (actionsColumn && !seen.has(ACTIONS_COLUMN_ID)) {

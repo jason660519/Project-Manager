@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Bot, Eye, EyeOff, FileText, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import type {
-  ActiveRun, DeployStatus, EngineerRole, Feature, FeaturePhase, FeatureStatus,
+  ActiveRun, DeployStatus, EngineerRole, Feature, FeaturePhase, FeatureStatus, ProgressColumn,
   HarnessRoleStatus, HarnessTaskRole, TestStatus,
 } from '../../../lib/types';
 import type { CustomProjectProgressRow } from '../types';
@@ -153,6 +153,105 @@ function EditableSelect<T extends string>({
       ))}
     </select>
   );
+}
+
+function stringifyTemplateValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item)).join(', ');
+  }
+  if (value == null) return '';
+  return String(value);
+}
+
+function normalizeTemplateFieldValue(field: ProgressColumn, raw: string): unknown {
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  switch (field.fieldType) {
+    case 'number':
+    case 'percent': {
+      const parsed = Number(trimmed);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+    case 'tag':
+    case 'multiSelect':
+      return trimmed.split(',').map((token) => token.trim()).filter(Boolean);
+    default:
+      return trimmed;
+  }
+}
+
+function patchTemplateValue(row: PhaseRow, fieldId: string, value: unknown, h: ColumnHandlers) {
+  const nextTemplateValues = { ...(row.templateValues ?? {}) } as Record<string, unknown>;
+  if (value === undefined || value === null || value === '') {
+    delete nextTemplateValues[fieldId];
+  } else {
+    nextTemplateValues[fieldId] = value;
+  }
+  if (row.source === 'feature' && row.feature) {
+    patchRow(row, {
+      metadata: {
+        ...(row.feature.metadata ?? {}),
+        progressTemplateValues: nextTemplateValues,
+      },
+    } as Partial<Feature>, h);
+    return;
+  }
+  if (row.source === 'custom') {
+    patchRow(row, { templateValues: nextTemplateValues }, h);
+  }
+}
+
+export function createTemplateFieldColumn(field: ProgressColumn): ColumnDef {
+  const columnId = `col-template-${field.id}`;
+  const accessor = (row: PhaseRow) => {
+    const value = row.templateValues?.[field.id];
+    if (typeof value === 'number') return value;
+    return stringifyTemplateValue(value);
+  };
+
+  if (field.fieldType === 'select' && field.options && field.options.length > 0) {
+    return {
+      id: columnId,
+      header: field.label,
+      accessor,
+      cell: (row, handlers) => (
+        <EditableSelect<string>
+          value={typeof row.templateValues?.[field.id] === 'string' ? row.templateValues?.[field.id] as string : undefined}
+          options={field.options!.map((option) => ({ value: option.id, label: option.label }))}
+          onCommit={(next) => patchTemplateValue(row, field.id, next || undefined, handlers)}
+        />
+      ),
+    };
+  }
+
+  if (field.fieldType === 'percent') {
+    return {
+      id: columnId,
+      header: field.label,
+      accessor,
+      cell: (row, handlers) => (
+        <EditableProgressBar
+          percent={typeof row.templateValues?.[field.id] === 'number' ? row.templateValues?.[field.id] as number : undefined}
+          allowEmpty
+          onCommit={(next) => patchTemplateValue(row, field.id, next, handlers)}
+        />
+      ),
+    };
+  }
+
+  return {
+    id: columnId,
+    header: field.label,
+    accessor,
+    cell: (row, handlers) => (
+      <EditableText
+        value={stringifyTemplateValue(row.templateValues?.[field.id])}
+        kind={field.fieldType === 'number' ? 'number' : field.fieldType === 'date' ? 'date' : 'text'}
+        placeholder={field.fieldType === 'tag' || field.fieldType === 'multiSelect' ? 'Comma separated' : undefined}
+        onCommit={(next) => patchTemplateValue(row, field.id, normalizeTemplateFieldValue(field, next), handlers)}
+      />
+    ),
+  };
 }
 
 function DependencyBadge({
