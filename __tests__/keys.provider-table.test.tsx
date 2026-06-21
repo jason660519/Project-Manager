@@ -33,6 +33,7 @@ function rowFixture(overrides: Partial<KeysRowData> = {}, providerPatch: Partial
     canRefreshModels: false,
     lastValidatedAt: null,
     errorReason: null,
+    probeSummary: null,
     ...overrides,
     rowId: overrides.rowId ?? `00000000-0000-5000-8000-${provider.id.padEnd(12, '0').slice(0, 12)}`,
     active: overrides.active ?? true,

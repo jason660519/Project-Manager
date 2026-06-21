@@ -22,8 +22,32 @@ import { loadProviderSecret, saveProviderSecret } from './keychain';
 import {
   clearProviderMetadata,
   saveProviderMetadata,
+  type ProviderMetadata,
 } from './providerMetadata';
+import {
+  mergeValidationMetadata,
+  runInferenceProbeAfterValidation,
+} from './validationProbe';
 import type { ProviderSpec } from './registry';
+
+async function persistValidationOutcome(args: {
+  provider: ProviderSpec;
+  apiKey: string;
+  listModelsOk: boolean;
+  dynamicModels: string[];
+  baseMeta: ProviderMetadata;
+}): Promise<void> {
+  let meta = args.baseMeta;
+  if (args.listModelsOk) {
+    const probeOutcome = await runInferenceProbeAfterValidation({
+      provider: args.provider,
+      apiKey: args.apiKey,
+      dynamicModels: args.dynamicModels,
+    });
+    meta = mergeValidationMetadata({ base: meta, probePatch: probeOutcome.metadataPatch });
+  }
+  saveProviderMetadata(args.provider.id, meta);
+}
 
 // #region debug-point B:validation-orchestration
 const DEBUG_KEYS_URL = 'http://127.0.0.1:7777/event';
@@ -123,13 +147,17 @@ export async function saveAndValidateKey(
   const now = new Date().toISOString();
 
   if (result.ok) {
-    // Persist secret first; if that fails we still want metadata to reflect
-    // the validation outcome rather than silently rolling back.
     await saveProviderSecret(provider, apiKey);
-    saveProviderMetadata(provider.id, {
-      lastValidatedAt: now,
-      status: 'ok',
+    await persistValidationOutcome({
+      provider,
+      apiKey,
+      listModelsOk: true,
       dynamicModels: result.models,
+      baseMeta: {
+        lastValidatedAt: now,
+        status: 'ok',
+        dynamicModels: result.models,
+      },
     });
   } else {
     saveProviderMetadata(provider.id, {
@@ -195,10 +223,16 @@ export async function revalidateStoredKey(
 
   const now = new Date().toISOString();
   if (result.ok) {
-    saveProviderMetadata(provider.id, {
-      lastValidatedAt: now,
-      status: 'ok',
+    await persistValidationOutcome({
+      provider,
+      apiKey: trimmedKey,
+      listModelsOk: true,
       dynamicModels: result.models,
+      baseMeta: {
+        lastValidatedAt: now,
+        status: 'ok',
+        dynamicModels: result.models,
+      },
     });
   } else {
     saveProviderMetadata(provider.id, {

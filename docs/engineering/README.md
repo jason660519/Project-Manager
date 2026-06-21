@@ -1,7 +1,7 @@
 # Project Manager Engineering Documentation
 
 > Status: Active  
-> Last updated: 2026-06-07  
+> Last updated: 2026-06-21  
 > Audience: AI engineers and maintainers
 
 ---
@@ -17,18 +17,19 @@ This folder contains operational engineering documentation for Project Manager. 
 1. [../file-naming-standards.md](../file-naming-standards.md)
 2. [runtime-bridge.md](./runtime-bridge.md)
 3. [storage-and-schema.md](./storage-and-schema.md)
-4. [supabase-db-design-standard.md](./supabase-db-design-standard.md) — when backend mode is not `local-files`
-5. [supabase-cloud-auth.md](./supabase-cloud-auth.md) — browser auth, workspace session, cloud read query contracts
-6. [ingestion-pipeline.md](./ingestion-pipeline.md)
-7. [security-and-secrets.md](./security-and-secrets.md)
-8. [table-standards.md](./table-standards.md)
-9. [document-classification-standard.md](./document-classification-standard.md)
-10. [documentation-site-sync.md](./documentation-site-sync.md)
-11. [hermes-agent-plugin.md](./hermes-agent-plugin.md)
-12. [openclaw-plugin.md](./openclaw-plugin.md)
-13. [verification-runbook.md](./verification-runbook.md)
-14. [ai-sdks-store.md](./ai-sdks-store.md)
-15. [multi-ai-config.md](./multi-ai-config.md)
+4. [domain-glossary.md](./domain-glossary.md) — product/engineering vocabulary and SSOT pointers
+5. [supabase-db-design-standard.md](./supabase-db-design-standard.md) — when backend mode is not `local-files`
+6. [supabase-cloud-auth.md](./supabase-cloud-auth.md) — browser auth, workspace session, cloud read query contracts
+7. [ingestion-pipeline.md](./ingestion-pipeline.md)
+8. [security-and-secrets.md](./security-and-secrets.md)
+9. [table-standards.md](./table-standards.md)
+10. [document-classification-standard.md](./document-classification-standard.md)
+11. [documentation-site-sync.md](./documentation-site-sync.md)
+12. [hermes-agent-plugin.md](./hermes-agent-plugin.md)
+13. [openclaw-plugin.md](./openclaw-plugin.md)
+14. [verification-runbook.md](./verification-runbook.md)
+15. [ai-sdks-store.md](./ai-sdks-store.md)
+16. [multi-ai-config.md](./multi-ai-config.md)
 
 ## 3. Ownership Map
 
@@ -36,6 +37,7 @@ This folder contains operational engineering documentation for Project Manager. 
 | --- | --- | --- |
 | Tauri commands, browser fallbacks, event contracts | `src-tauri/src/lib.rs`, `lib/bridge/index.ts`, `app/api/*` | [runtime-bridge.md](./runtime-bridge.md) |
 | Project list, selected project, schema migration | `lib/storage/*`, `schema/project-manager.schema.json`, `config/samples/*` | [storage-and-schema.md](./storage-and-schema.md) |
+| Product/engineering vocabulary (workspace, project, roles, runners) | `lib/auth/permissions.ts`, `lib/types/index.ts`, ADR-016 | [domain-glossary.md](./domain-glossary.md) |
 | Supabase Postgres schema, RLS, migrations | `infra/supabase/migrations/*`, `docker/supabase/*` | [supabase-db-design-standard.md](./supabase-db-design-standard.md) |
 | Supabase browser auth, workspace session, cloud read helpers | `lib/auth/supabaseAuthSession.ts`, `lib/auth/workspaceSession.ts`, `lib/auth/*`, `app/login/*`, `app/auth/*` | [supabase-cloud-auth.md](./supabase-cloud-auth.md) |
 | Markdown import and AI-assisted spec import | `lib/ingestion/*`, `app/ui/views/IngestionView.tsx` | [ingestion-pipeline.md](./ingestion-pipeline.md) |
@@ -66,18 +68,19 @@ Update the relevant document whenever an implementation change changes a command
 1. [../file-naming-standards.md](../file-naming-standards.md)
 2. [runtime-bridge.md](./runtime-bridge.md)
 3. [storage-and-schema.md](./storage-and-schema.md)
-4. [supabase-db-design-standard.md](./supabase-db-design-standard.md) — backend mode 不是 `local-files` 時
-5. [supabase-cloud-auth.md](./supabase-cloud-auth.md) — 瀏覽器 auth、工作區 session、雲端唯讀查詢契約
-6. [ingestion-pipeline.md](./ingestion-pipeline.md)
-7. [security-and-secrets.md](./security-and-secrets.md)
-8. [table-standards.md](./table-standards.md)
-9. [document-classification-standard.md](./document-classification-standard.md)
-10. [documentation-site-sync.md](./documentation-site-sync.md)
-11. [hermes-agent-plugin.md](./hermes-agent-plugin.md)
-12. [openclaw-plugin.md](./openclaw-plugin.md)
-13. [verification-runbook.md](./verification-runbook.md)
-14. [ai-sdks-store.md](./ai-sdks-store.md)
-15. [multi-ai-config.md](./multi-ai-config.md)
+4. [domain-glossary.md](./domain-glossary.md) — 產品/工程詞彙與 SSOT 指標
+5. [supabase-db-design-standard.md](./supabase-db-design-standard.md) — backend mode 不是 `local-files` 時
+6. [supabase-cloud-auth.md](./supabase-cloud-auth.md) — 瀏覽器 auth、工作區 session、雲端唯讀查詢契約
+7. [ingestion-pipeline.md](./ingestion-pipeline.md)
+8. [security-and-secrets.md](./security-and-secrets.md)
+9. [table-standards.md](./table-standards.md)
+10. [document-classification-standard.md](./document-classification-standard.md)
+11. [documentation-site-sync.md](./documentation-site-sync.md)
+12. [hermes-agent-plugin.md](./hermes-agent-plugin.md)
+13. [openclaw-plugin.md](./openclaw-plugin.md)
+14. [verification-runbook.md](./verification-runbook.md)
+15. [ai-sdks-store.md](./ai-sdks-store.md)
+16. [multi-ai-config.md](./multi-ai-config.md)
 
 ## 3. 責任對照
 
@@ -85,6 +88,7 @@ Update the relevant document whenever an implementation change changes a command
 | --- | --- | --- |
 | Tauri commands、browser fallbacks、event contracts | `src-tauri/src/lib.rs`, `lib/bridge/index.ts`, `app/api/*` | [runtime-bridge.md](./runtime-bridge.md) |
 | Project list、selected project、schema migration | `lib/storage/*`, `schema/project-manager.schema.json`, `config/samples/*` | [storage-and-schema.md](./storage-and-schema.md) |
+| 產品/工程詞彙（workspace、project、roles、runners） | `lib/auth/permissions.ts`, `lib/types/index.ts`, ADR-016 | [domain-glossary.md](./domain-glossary.md) |
 | Supabase Postgres schema、RLS、migrations | `infra/supabase/migrations/*`, `docker/supabase/*` | [supabase-db-design-standard.md](./supabase-db-design-standard.md) |
 | Supabase 瀏覽器 auth、工作區 session、雲端唯讀 helper | `lib/auth/supabaseAuthSession.ts`, `lib/auth/workspaceSession.ts`, `lib/auth/*`, `app/login/*`, `app/auth/*` | [supabase-cloud-auth.md](./supabase-cloud-auth.md) |
 | Markdown import 與 AI-assisted spec import | `lib/ingestion/*`, `app/ui/views/IngestionView.tsx` | [ingestion-pipeline.md](./ingestion-pipeline.md) |

@@ -27,6 +27,19 @@ export interface ProviderMetadata {
   errorReason?: string;
   /** Present when `status === 'ok'`. Models returned by list-models endpoint. */
   dynamicModels?: string[];
+  /** F56 Slice 2 — lightweight inference probe after list-models succeeds. */
+  probeResult?: ProviderProbeResult;
+}
+
+export interface ProviderProbeResult {
+  status: 'ok' | 'fail' | 'skipped';
+  model?: string;
+  latencyMs?: number;
+  /** TTFT when streaming probe succeeded; otherwise E2E proxy. */
+  ttftMs?: number;
+  probedAt: string;
+  errorReason?: string;
+  reason?: string;
 }
 
 export type ProviderMetadataMap = Record<string, ProviderMetadata>;
@@ -497,4 +510,17 @@ export function classifyValidationFailure(reason: string | null | undefined): Va
 export function formatValidationFailure(reason: string | null | undefined): string {
   const summary = classifyValidationFailure(reason);
   return `${summary.label}: ${summary.hint}`;
+}
+
+export function formatProbeSummary(
+  probe: ProviderProbeResult | null | undefined,
+): string | null {
+  if (!probe || probe.status === 'skipped') return null;
+  if (probe.status === 'ok') {
+    const ttft = probe.ttftMs ?? probe.latencyMs;
+    if (typeof ttft === 'number') return `Probe ${ttft}ms TTFT`;
+    return 'Probe OK';
+  }
+  if (probe.errorReason) return `Probe failed: ${probe.errorReason}`;
+  return 'Probe failed';
 }
