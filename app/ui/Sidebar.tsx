@@ -8,6 +8,7 @@ import {
   CircleGauge,
   FileText,
   KeyRound,
+  LayoutTemplate,
   MessageSquareText,
   Plug,
   RefreshCw,
@@ -43,6 +44,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     groupKey: 'workspace',
     items: [
+      { id: 'progress-templates-setting', itemKey: 'progressTemplatesSetting', href: '/progress-templates-setting', icon: LayoutTemplate },
       { id: 'dashboard',     itemKey: 'dashboard', href: '/project-progress-dashboard', icon: CircleGauge },
     ],
   },

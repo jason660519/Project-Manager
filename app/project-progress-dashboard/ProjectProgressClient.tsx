@@ -4,13 +4,25 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, Upload } from 'lucide-react';
 import type {
   ActiveRun, AnyAdapterConfig, CompletedRun, CronJob, EngineerRole,
-  Feature, FeaturePhase, FeaturePromptConfig, ProjectConfig, ProjectEntry,
+  Feature, FeaturePhase, FeaturePromptConfig, ProgressSheetConfig, ProjectConfig, ProjectEntry,
+  ProjectProgressSheetRef,
 } from '../../lib/types';
 import { PHASE_IDS, SHEET_IDS, type TabId } from './types';
 import type { CustomProjectProgressRow } from './types';
 import { buildFeatureDependencyGraph, dispatchReadinessForFeature } from './_lib/dependencies';
-import { usePhasePreferences } from './_lib/usePhasePreferences';
+import { usePhasePreferences, useProgressSheetPreferences } from './_lib/usePhasePreferences';
 import { computePhaseCounts, type PhaseRow } from './_lib/phaseRows';
+import { columnsForProgressSheet, progressSheetRowsToPhaseRows } from './_lib/progressSheetColumns';
+import { developmentColumnsFromTemplatePrefs } from './_lib/developmentTemplateColumns';
+import { useTemplateFieldPreferences } from '../ui/views/ProgressTemplates/useTemplateFieldPreferences';
+import {
+  applyTemplateFieldColumns,
+  DEVELOPMENT_TEMPLATE_ID,
+  hasStoredTemplateFieldColumns,
+  isBuiltInProgressSheet,
+  isFeatureBackedProgressSheet,
+  resolveProgressSheetTemplateId,
+} from '../../lib/progress-sheets/templateFieldPreferences';
 import { SheetTabs } from './_components/SheetTabs';
 import { SharedStatsCards } from './_components/SharedStatsCards';
 import { ExportProgressDialog } from './_components/ExportProgressDialog';
@@ -40,11 +52,22 @@ interface ProjectProgressClientProps {
     name: string;
     repoUrl?: string;
   }>;
+  dashboardProjectConfigs?: Array<{
+    id: string;
+    root: string;
+    configPath?: string;
+    progressSheets?: ProjectProgressSheetRef[];
+  }>;
   onSelectProject: (id: string) => void;
   onToggleDashboardProject: (id: string, selected: boolean) => void;
   onAddProject: (entry: ProjectEntry) => void;
   onUpdateProject: (entry: ProjectEntry) => void;
   onRemoveProject: (id: string, deleteConfigFile: boolean) => Promise<void> | void;
+  onInitializeProject?: (
+    id: string,
+    mode: 'create' | 'merge' | 'overwrite',
+    progressSheetTemplateIds: string[],
+  ) => Promise<void> | void;
   onSyncFromDesktop?: () => Promise<void>;
   onCronJobsChange: (jobs: CronJob[]) => void;
   onFeaturePatch: (namespacedFeatureId: string, patch: Partial<Feature>) => void;
@@ -69,6 +92,13 @@ const LEGACY_PHASE_HASH: Record<string, FeaturePhase> = {
   testing: 'e2e_testing',
 };
 
+interface ActiveProgressSheetDescriptor {
+  projectId: string;
+  projectRoot: string;
+  configPath?: string;
+  ref: ProjectProgressSheetRef;
+}
+
 function resolveHashToTab(hash: string): TabId | null {
   const lowered = hash.toLowerCase();
   const resolved = LEGACY_PHASE_HASH[lowered] ?? lowered;
@@ -92,11 +122,59 @@ function readHashTab(): TabId | null {
   return tab;
 }
 
+function resolveProgressSheetConfigPath(
+  projectRoot: string,
+  sheetConfigPath: string,
+  sheetId: string,
+): string {
+  if (sheetConfigPath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(sheetConfigPath)) {
+    throw new Error('Progress sheet configPath must be project-relative');
+  }
+  if (!projectRoot.trim()) {
+    throw new Error('Project root is required to resolve progress sheet configPath');
+  }
+  if (sheetConfigPath.includes('\\')) {
+    throw new Error('Progress sheet configPath must use forward slashes');
+  }
+  const normalized = sheetConfigPath.replace(/^\.\//, '');
+  const segments = normalized.split('/');
+  if (segments.some((segment) => segment === '..' || segment === '')) {
+    throw new Error('Progress sheet configPath must not contain empty or parent segments');
+  }
+  const expected = `.project-manager/progress-sheets/${sheetId}/config.json`;
+  if (normalized !== expected) {
+    throw new Error(`Progress sheet configPath must be ${expected}`);
+  }
+  const root = projectRoot.replace(/\/+$/, '');
+  return `${root}/${normalized}`;
+}
+
+function pickActiveProgressSheet(
+  configs: ProjectProgressClientProps['dashboardProjectConfigs'],
+): ActiveProgressSheetDescriptor | null {
+  for (const config of configs ?? []) {
+    const refs = config.progressSheets ?? [];
+    const ref =
+      refs.find((candidate) => candidate.active) ??
+      refs.find((candidate) => candidate.id === 'software-desktop-app') ??
+      refs[0];
+    if (ref) {
+      return {
+        projectId: config.id,
+        projectRoot: config.root,
+        configPath: config.configPath,
+        ref,
+      };
+    }
+  }
+  return null;
+}
+
 export function ProjectProgressClient({
   project, projectRoot, features, adapters, engineerRoles, activeRuns,
   runHistory = [], projects, selectedProjectId, selectedDashboardProjectIds,
-  dashboardProjectNames, dashboardProjects, onSelectProject, onToggleDashboardProject,
-  onAddProject, onUpdateProject, onRemoveProject, onSyncFromDesktop,
+  dashboardProjectNames, dashboardProjects, dashboardProjectConfigs, onSelectProject, onToggleDashboardProject,
+  onAddProject, onUpdateProject, onRemoveProject, onInitializeProject, onSyncFromDesktop,
   onFeaturePatch, onFeaturePromptSave,
   onRunStart, onRunLog, onRunEnd,
 }: ProjectProgressClientProps) {
@@ -104,6 +182,13 @@ export function ProjectProgressClient({
   const [exportOpen, setExportOpen] = useState(false);
   const [dispatchRow, setDispatchRow] = useState<PhaseRow | null>(null);
   const [dispatchIssue, setDispatchIssue] = useState<{ title: string } | null>(null);
+  const activeProgressSheetDescriptor = useMemo(
+    () => pickActiveProgressSheet(dashboardProjectConfigs),
+    [dashboardProjectConfigs],
+  );
+  const activeProgressSheetRef = activeProgressSheetDescriptor?.ref;
+  const [progressSheetConfig, setProgressSheetConfig] = useState<ProgressSheetConfig | null>(null);
+  const [progressSheetError, setProgressSheetError] = useState<string | null>(null);
   const dependencyGraph = useMemo(() => buildFeatureDependencyGraph(features), [features]);
 
   const isPhaseTab = isFeaturePhaseTab(activeTab);
@@ -121,6 +206,43 @@ export function ProjectProgressClient({
     window.addEventListener('hashchange', syncHashTab);
     return () => window.removeEventListener('hashchange', syncHashTab);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setProgressSheetConfig(null);
+    setProgressSheetError(null);
+    if (!activeProgressSheetDescriptor) return () => {
+      cancelled = true;
+    };
+
+    void (async () => {
+      try {
+        const { readJsonFile } = await import('../../lib/bridge');
+        const path = resolveProgressSheetConfigPath(
+          activeProgressSheetDescriptor.projectRoot,
+          activeProgressSheetDescriptor.ref.configPath,
+          activeProgressSheetDescriptor.ref.id,
+        );
+        const config = await readJsonFile<ProgressSheetConfig>(path);
+        if (!cancelled) {
+          setProgressSheetConfig(config);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!cancelled) {
+          setProgressSheetError(`Could not load progress sheet config: ${message}`);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeProgressSheetDescriptor?.projectRoot,
+    activeProgressSheetDescriptor?.ref.configPath,
+    activeProgressSheetDescriptor?.ref.id,
+  ]);
 
   // Per-phase preferences (custom rows, widths, etc).
   const dev = usePhasePreferences('development');
@@ -149,6 +271,77 @@ export function ProjectProgressClient({
   }, [features, activePhase]);
 
   const activePhasePrefs = prefsByPhase[activePhase];
+  const templateIdForPrefs = useMemo(() => {
+    if (progressSheetConfig && isBuiltInProgressSheet(progressSheetConfig)) {
+      return resolveProgressSheetTemplateId(progressSheetConfig) ?? DEVELOPMENT_TEMPLATE_ID;
+    }
+    return DEVELOPMENT_TEMPLATE_ID;
+  }, [progressSheetConfig]);
+  const { columns: templateFieldColumns } = useTemplateFieldPreferences(templateIdForPrefs);
+  const effectiveProgressSheetConfig = useMemo(() => {
+    if (!progressSheetConfig || !isBuiltInProgressSheet(progressSheetConfig)) {
+      return progressSheetConfig;
+    }
+    const templateId = resolveProgressSheetTemplateId(progressSheetConfig);
+    if (!templateId || !hasStoredTemplateFieldColumns(templateId)) {
+      return progressSheetConfig;
+    }
+    return applyTemplateFieldColumns(progressSheetConfig, templateFieldColumns);
+  }, [progressSheetConfig, templateFieldColumns]);
+  const progressSheetColumns = useMemo(
+    () => (effectiveProgressSheetConfig ? columnsForProgressSheet(effectiveProgressSheetConfig) : []),
+    [effectiveProgressSheetConfig],
+  );
+  const progressSheetPrefs = useProgressSheetPreferences(
+    effectiveProgressSheetConfig?.id ?? activeProgressSheetRef?.id,
+    progressSheetColumns.length || 1,
+  );
+  const progressSheetRows = useMemo(
+    () => (
+      effectiveProgressSheetConfig
+        ? progressSheetRowsToPhaseRows(effectiveProgressSheetConfig, dashboardProjectNames[0] ?? project.name)
+        : []
+    ),
+    [dashboardProjectNames, effectiveProgressSheetConfig, project.name],
+  );
+
+  const activeSheetTemplateId = useMemo(() => {
+    if (progressSheetConfig) {
+      return resolveProgressSheetTemplateId(progressSheetConfig);
+    }
+    return activeProgressSheetRef?.templateId ?? null;
+  }, [activeProgressSheetRef?.templateId, progressSheetConfig]);
+
+  const featureBackedDevelopmentSheet = isFeatureBackedProgressSheet(activeSheetTemplateId);
+
+  const showDynamicProgressSheet = Boolean(
+    isPhaseTab
+    && activePhase === 'development'
+    && effectiveProgressSheetConfig
+    && !featureBackedDevelopmentSheet,
+  );
+
+  const showProgressSheetLoading = Boolean(
+    isPhaseTab
+    && activePhase === 'development'
+    && activeProgressSheetRef
+    && !progressSheetError
+    && !effectiveProgressSheetConfig
+    && !featureBackedDevelopmentSheet,
+  );
+
+  const showProgressSheetError = Boolean(
+    isPhaseTab
+    && activePhase === 'development'
+    && progressSheetError
+    && activeProgressSheetRef
+    && !featureBackedDevelopmentSheet,
+  );
+
+  const developmentColumnsOverride = useMemo(() => {
+    if (activePhase !== 'development' || !featureBackedDevelopmentSheet) return undefined;
+    return developmentColumnsFromTemplatePrefs(templateFieldColumns);
+  }, [activePhase, featureBackedDevelopmentSheet, templateFieldColumns]);
 
   // Header summary uses features (for development, weighted by SP) of the current phase.
   const headerFeatures = activePhase === 'development' ? features : phaseFeatures;
@@ -167,8 +360,18 @@ export function ProjectProgressClient({
             <div className="min-w-0">
               <h1 className="flex items-center gap-2 text-xl font-semibold text-stone-50">
                 <Activity className="h-5 w-5 text-emerald-300" />
-                Project Progress Dashboard
+                Projects Dashboard
               </h1>
+              {activeProgressSheetRef && (
+                <p className="mt-1 text-sm font-medium text-stone-100">
+                  {progressSheetConfig?.sheetTitle ?? activeProgressSheetRef.label}
+                </p>
+              )}
+              {progressSheetError && !featureBackedDevelopmentSheet && (
+                <p className="mt-1 text-xs text-amber-100/85">
+                  {progressSheetError}
+                </p>
+              )}
               {selectedDashboardProjectIds.length > 0 && dashboardProjectNames.length > 0 && (
                 <p className="mt-1 text-xs text-cyan-200/85">
                   Showing {dashboardProjectNames.length} selected project{dashboardProjectNames.length > 1 ? 's' : ''}:{' '}
@@ -217,27 +420,61 @@ export function ProjectProgressClient({
                 onAddProject={onAddProject}
                 onUpdateProject={onUpdateProject}
                 onRemoveProject={onRemoveProject}
+                onInitializeProject={onInitializeProject}
                 onSyncFromDesktop={onSyncFromDesktop}
                 runHistory={runHistory}
               />
             ) : isPhaseTab ? (
-              <PhaseTabContent
-                phase={activePhase}
-                projectName={project.name}
-                projectNames={dashboardProjectNames}
-                projectRoot={projectRoot}
-                features={phaseFeatures}
-                dependencyFeatures={features}
-                engineerRoles={engineerRoles}
-                prefs={activePhasePrefs.prefs}
-                patch={activePhasePrefs.patch}
-                reset={activePhasePrefs.reset}
-                onFeaturePromptSave={onFeaturePromptSave}
-                onFeaturePatch={onFeaturePatch}
-                activeRuns={activeRuns}
-                onDispatchRow={(row) => row.source === 'feature' && setDispatchRow(row)}
-              />
-            ) : (
+              showDynamicProgressSheet ? (
+                <PhaseTabContent
+                  phase={activePhase}
+                  projectName={project.name}
+                  projectNames={dashboardProjectNames}
+                  projectRoot={projectRoot}
+                  features={[]}
+                  dependencyFeatures={[]}
+                  engineerRoles={engineerRoles}
+                  prefs={progressSheetPrefs.prefs}
+                  patch={progressSheetPrefs.patch}
+                  reset={progressSheetPrefs.reset}
+                  onFeaturePromptSave={onFeaturePromptSave}
+                  onFeaturePatch={onFeaturePatch}
+                  activeRuns={activeRuns}
+                  onDispatchRow={undefined}
+                  overrideColumns={progressSheetColumns}
+                  overrideRows={progressSheetRows}
+                  readOnly
+                />
+              ) : showProgressSheetLoading ? (
+                <div className="border border-stone-200/15 bg-[rgb(var(--pm-card))]/45 px-4 py-3 text-sm text-stone-200">
+                  <p className="font-medium">{activeProgressSheetRef!.label}</p>
+                  <p className="mt-1 text-xs text-stone-400">Loading progress sheet config...</p>
+                </div>
+              ) : showProgressSheetError ? (
+                <div className="border border-amber-300/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                  <p className="font-medium">{activeProgressSheetRef!.label}</p>
+                  <p className="mt-1 text-xs text-amber-100/80">{progressSheetError}</p>
+                </div>
+              ) : (
+                <PhaseTabContent
+                  phase={activePhase}
+                  projectName={project.name}
+                  projectNames={dashboardProjectNames}
+                  projectRoot={projectRoot}
+                  features={activePhase === 'development' ? features : phaseFeatures}
+                  dependencyFeatures={features}
+                  engineerRoles={engineerRoles}
+                  prefs={activePhasePrefs.prefs}
+                  patch={activePhasePrefs.patch}
+                  reset={activePhasePrefs.reset}
+                  onFeaturePromptSave={onFeaturePromptSave}
+                  onFeaturePatch={onFeaturePatch}
+                  activeRuns={activeRuns}
+                  onDispatchRow={(row) => row.source === 'feature' && setDispatchRow(row)}
+                  overrideColumns={developmentColumnsOverride}
+                />
+              )
+            ) : activeTab === 'issues' ? (
               <IssuesTab
                 projectName={project.name}
                 selectedProjectNames={dashboardProjectNames}
@@ -250,7 +487,7 @@ export function ProjectProgressClient({
                 defaultIDE={project.defaultIDE}
                 onDispatchIssue={(issue) => setDispatchIssue(issue)}
               />
-            )}
+            ) : null}
           </div>
         </div>
       </WorkstationFrame>

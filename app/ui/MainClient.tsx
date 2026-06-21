@@ -100,6 +100,10 @@ const SettingsView = dynamic(
   () => import('./views/SettingsView').then((mod) => mod.SettingsView),
   { loading: RouteViewLoading },
 );
+const ProgressTemplatesSettingView = dynamic(
+  () => import('./views/ProgressTemplatesSettingView').then((mod) => mod.ProgressTemplatesSettingView),
+  { loading: RouteViewLoading },
+);
 const DocumentationView = dynamic(
   () => import('./views/DocumentationView').then((mod) => mod.DocumentationView),
   { loading: RouteViewLoading },
@@ -1301,7 +1305,11 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
    * Stamps `lastSyncedAt` so the card can show "Synced X ago".
    */
   const handleInitializeProject = useCallback(
-    async (id: string, mode: 'create' | 'merge' | 'overwrite') => {
+    async (
+      id: string,
+      mode: 'create' | 'merge' | 'overwrite',
+      progressSheetTemplateIds: string[] = ['software-desktop-app'],
+    ) => {
       const target = projects.find((p) => p.id === id);
       if (!target) throw new Error('Project not found');
       if (target.configPath.startsWith('https://')) {
@@ -1324,7 +1332,11 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
       const root =
         target.config.project.root ||
         target.configPath.replace(/\/\.project-manager\.json$/, '');
-      let config = buildProjectScaffold(root, { projectName: target.config.project.name });
+      const scaffoldOptions = {
+        projectName: target.config.project.name,
+        progressSheetTemplateIds,
+      };
+      let config = buildProjectScaffold(root, scaffoldOptions);
       let invokeMode: 'create' | 'merge' | 'overwrite' = mode;
       let shouldTryRecovery = mode === 'create';
 
@@ -1334,7 +1346,9 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
           config =
             mode === 'merge'
               ? mergeProjectConfig(existing, config)
-              : buildOverwriteScaffold(root, existing.project.name);
+              : buildOverwriteScaffold(root, existing.project.name, {
+                  progressSheetTemplateIds,
+                });
         } catch {
           invokeMode = 'create';
           shouldTryRecovery = true;
@@ -1346,6 +1360,7 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
         if (hasRecoverableDashboardArtifacts(snapshot)) {
           config = buildRecoveredProjectConfig(root, snapshot, {
             projectName: target.config.project.name,
+            progressSheetTemplateIds,
           });
         }
       }
@@ -1633,6 +1648,7 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
         dashboardProjects: effectiveDashboardProjects.map((p) => p.config.project.name),
       }}
     >
+      {currentView === 'progress-templates-setting' && <ProgressTemplatesSettingView />}
       {currentView === 'dashboard' && selectedProject && (
         <ProjectProgressClient
           project={selectedProject.config.project}
@@ -1651,6 +1667,12 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
             id: p.id,
             name: p.config.project.name,
             repoUrl: p.config.project.githubUrl,
+          }))}
+          dashboardProjectConfigs={effectiveDashboardProjects.map((p) => ({
+            id: p.id,
+            root: p.config.project.root,
+            configPath: p.configPath,
+            progressSheets: p.config.progressSheets,
           }))}
           onSelectProject={setSelectedProjectId}
           onToggleDashboardProject={handleToggleDashboardProject}
@@ -1678,6 +1700,7 @@ function MainClientInner({ currentView, initialProjectId, integrationsSheet, key
           onUpdateProject={handleUpdateProject}
           onRemoveProject={handleRemoveProject}
           onSyncFromDesktop={syncFromDesktop}
+          onInitializeProject={handleInitializeProject}
           runHistory={runHistory}
         />
       )}

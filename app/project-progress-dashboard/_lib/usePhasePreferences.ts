@@ -5,6 +5,7 @@ import type { FeaturePhase } from '../../../lib/types';
 import type { PhaseTablePrefs } from '../types';
 
 const STORAGE_PREFIX = 'projectManager.progressDashboard.phase.';
+const SHEET_STORAGE_PREFIX = 'projectManager.progressDashboard.sheet.';
 /** localStorage key suffix before the testing tab was renamed to E2E. */
 const LEGACY_E2E_PHASE_KEY = 'testing';
 
@@ -108,6 +109,28 @@ function storageKey(phase: FeaturePhase): string {
   return `${STORAGE_PREFIX}${phase}`;
 }
 
+function buildSheetDefaults(columnCount: number): PhaseTablePrefs {
+  const safeColumnCount = Math.max(1, columnCount);
+  const widths = Array.from({ length: safeColumnCount }, (_, index) => (index === 0 ? 144 : 140));
+  return {
+    colWidths: widths,
+    columnAlignments: widths.map(() => 'left'),
+    headerHeight: DEFAULT_HEADER_HEIGHT,
+    rowHeight: DEFAULT_ROW_HEIGHT,
+    freezeRowCount: 0,
+    frozenDataColCount: 0,
+    hiddenColumnIds: [],
+    hiddenRowKeys: [],
+    sorting: [],
+    widthPresets: [],
+    customRows: [],
+  };
+}
+
+function sheetStorageKey(sheetId: string): string {
+  return `${SHEET_STORAGE_PREFIX}${sheetId}`;
+}
+
 function migrateLegacyPrefsJson(raw: string): string {
   const parsed = JSON.parse(raw) as Partial<PhaseTablePrefs>;
   if (!Array.isArray(parsed.customRows)) return raw;
@@ -177,6 +200,42 @@ function readPrefs(phase: FeaturePhase): PhaseTablePrefs {
   }
 }
 
+function readSheetPrefs(sheetId: string, columnCount: number): PhaseTablePrefs {
+  if (typeof window === 'undefined') return buildSheetDefaults(columnCount);
+  try {
+    const raw = window.localStorage.getItem(sheetStorageKey(sheetId));
+    const defaults = buildSheetDefaults(columnCount);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw) as Partial<PhaseTablePrefs>;
+    const normalized: PhaseTablePrefs = {
+      ...defaults,
+      ...parsed,
+      colWidths: normalizeWidths(parsed.colWidths, defaults.colWidths),
+      columnAlignments: normalizeAlignments(parsed.columnAlignments, defaults.columnAlignments),
+      rowHeight: clampNumber(parsed.rowHeight, MIN_ROW_HEIGHT, MAX_ROW_HEIGHT, DEFAULT_ROW_HEIGHT),
+      freezeRowCount: clampNumber(parsed.freezeRowCount, 0, 5, 0),
+      frozenDataColCount: clampNumber(parsed.frozenDataColCount, 0, 5, 0),
+      hiddenColumnIds: normalizeStringArray(parsed.hiddenColumnIds)
+        .map(migrateColumnId)
+        .filter((id) => id !== 'col-id'),
+      hiddenRowKeys: normalizeStringArray(parsed.hiddenRowKeys),
+      sorting: Array.isArray(parsed.sorting)
+        ? parsed.sorting.filter((item): item is PhaseTablePrefs['sorting'][number] => (
+          item
+          && typeof item.columnId === 'string'
+          && (item.direction === 'asc' || item.direction === 'desc')
+        )).map((item) => ({ ...item, columnId: migrateColumnId(item.columnId) }))
+        : [],
+      widthPresets: Array.isArray(parsed.widthPresets) ? parsed.widthPresets : [],
+      customRows: [],
+    };
+    window.localStorage.setItem(sheetStorageKey(sheetId), JSON.stringify(normalized));
+    return normalized;
+  } catch {
+    return buildSheetDefaults(columnCount);
+  }
+}
+
 /**
  * Persisted per-phase table preferences. `patch` merges shallow updates and
  * writes them back to localStorage in the same tick — no debounce, since the
@@ -218,6 +277,45 @@ export function usePhasePreferences(phase: FeaturePhase) {
       /* ignore */
     }
   }, [phase]);
+
+  return { prefs, patch, reset };
+}
+
+export function useProgressSheetPreferences(sheetId: string | undefined, columnCount: number) {
+  const [prefs, setPrefs] = useState<PhaseTablePrefs>(() => buildSheetDefaults(columnCount));
+
+  useEffect(() => {
+    setPrefs(sheetId ? readSheetPrefs(sheetId, columnCount) : buildSheetDefaults(columnCount));
+  }, [sheetId, columnCount]);
+
+  const patch = useCallback(
+    (next: Partial<PhaseTablePrefs>) => {
+      setPrefs((prev) => {
+        const merged: PhaseTablePrefs = { ...prev, ...next, customRows: [] };
+        try {
+          if (typeof window !== 'undefined' && sheetId) {
+            window.localStorage.setItem(sheetStorageKey(sheetId), JSON.stringify(merged));
+          }
+        } catch {
+          /* quota or disabled — drop silently */
+        }
+        return merged;
+      });
+    },
+    [sheetId],
+  );
+
+  const reset = useCallback(() => {
+    const defaults = buildSheetDefaults(columnCount);
+    setPrefs(defaults);
+    try {
+      if (typeof window !== 'undefined' && sheetId) {
+        window.localStorage.removeItem(sheetStorageKey(sheetId));
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [columnCount, sheetId]);
 
   return { prefs, patch, reset };
 }

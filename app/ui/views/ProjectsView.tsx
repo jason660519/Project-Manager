@@ -60,13 +60,17 @@ import {
 } from '../../../lib/scanner/errorSummary';
 import {
   applyScanConfigToProject,
+  buildProjectScaffold,
   buildProjectEntryFromPath,
   migrateConfig,
   resolveConfigPath,
+  type InitializeMode,
 } from '../../../lib/storage';
 import { COL_ID_COLUMN_HEADER } from '../../../components/table/colId';
+import { BUILT_IN_PROGRESS_TEMPLATES } from '../../../lib/progress-sheets/templates';
 import { CompletedRun, ProjectManagerConfig, Feature, ProjectEntry } from '../../../lib/types';
 import { PostImportScanDialog } from './_components/PostImportScanDialog';
+import { ProgressSheetTemplatePicker } from './_components/ProgressSheetTemplatePicker';
 
 interface ProjectsViewProps {
   projects: ProjectEntry[];
@@ -78,10 +82,16 @@ interface ProjectsViewProps {
   onUpdateProject: (entry: ProjectEntry) => void;
   onRemoveProject: (id: string, deleteConfigFile: boolean) => Promise<void> | void;
   onSyncFromDesktop?: () => Promise<void>;
+  onInitializeProject?: (
+    id: string,
+    mode: InitializeMode,
+    progressSheetTemplateIds: string[],
+  ) => Promise<void> | void;
   runHistory: CompletedRun[];
 }
 
 const PROJECTS_TABLE_PREFS_KEY = 'projectManager.progressDashboard.projectsTable.v2';
+const DEFAULT_PROGRESS_TEMPLATE_IDS = ['software-desktop-app'] as const;
 
 interface ProjectsTablePrefs {
   columnSizing?: ColumnSizingState;
@@ -204,6 +214,7 @@ export function ProjectsView({
   onUpdateProject,
   onRemoveProject,
   onSyncFromDesktop,
+  onInitializeProject,
   runHistory,
 }: ProjectsViewProps) {
   const resizePrompt = useInAppPrompt();
@@ -239,6 +250,9 @@ export function ProjectsView({
   const [initializingIds, setInitializingIds] = useState<Set<string>>(new Set());
   const [initErrors, setInitErrors] = useState<Record<string, string>>({});
   const [initTrace, setInitTrace] = useState<Record<string, InitTraceEntry[]>>({});
+  const [templateSelections, setTemplateSelections] = useState<Record<string, string[]>>({});
+  const [templateSelectionErrors, setTemplateSelectionErrors] = useState<Record<string, string>>({});
+  const [scaffoldInitializingIds, setScaffoldInitializingIds] = useState<Set<string>>(new Set());
   /**
    * Three-colour notice (success / warning / error) replacing the old single
    * emerald string. Same slot in the UI, but the kind decides the colour so
@@ -660,7 +674,62 @@ export function ProjectsView({
     }
   };
 
-  const runScanForProject = async (project: ProjectEntry): Promise<InitializeOutcome> => {
+  const getSelectedTemplateIds = (project: ProjectEntry): string[] =>
+    templateSelections[project.id] ??
+    project.config.progressSheets?.map((sheet) => sheet.templateId) ??
+    [...DEFAULT_PROGRESS_TEMPLATE_IDS];
+
+  const validateSelectedTemplateIds = (project: ProjectEntry): string[] | null => {
+    const selected = getSelectedTemplateIds(project);
+    if (selected.length > 0) {
+      setTemplateSelectionErrors((prev) => {
+        if (!(project.id in prev)) return prev;
+        const next = { ...prev };
+        delete next[project.id];
+        return next;
+      });
+      return selected;
+    }
+    setTemplateSelectionErrors((prev) => ({
+      ...prev,
+      [project.id]: 'Select at least one progress sheet before initializing.',
+    }));
+    return null;
+  };
+
+  const setTemplateSelection = (project: ProjectEntry, nextIds: string[]) => {
+    setTemplateSelections((prev) => ({ ...prev, [project.id]: nextIds }));
+    setTemplateSelectionErrors((prev) => {
+      if (!(project.id in prev)) return prev;
+      const next = { ...prev };
+      delete next[project.id];
+      return next;
+    });
+  };
+
+  const toggleTemplateSelection = (project: ProjectEntry, templateId: string) => {
+    const current = templateSelections[project.id] ?? getSelectedTemplateIds(project);
+    const next = current.includes(templateId)
+      ? current.filter((id) => id !== templateId)
+      : [...current, templateId];
+    setTemplateSelection(project, next);
+  };
+
+  const selectAllTemplateSelections = (project: ProjectEntry) => {
+    const current = templateSelections[project.id] ?? getSelectedTemplateIds(project);
+    const allIds = BUILT_IN_PROGRESS_TEMPLATES.map((template) => template.id);
+    const next = current.length === allIds.length ? [] : allIds;
+    setTemplateSelection(project, next);
+  };
+
+  const clearTemplateSelection = (project: ProjectEntry) => {
+    setTemplateSelection(project, []);
+  };
+
+  const runScanForProject = async (
+    project: ProjectEntry,
+    progressSheetTemplateIds: string[],
+  ): Promise<InitializeOutcome> => {
     const root = project.config.project.root;
     if (!root?.trim()) throw new Error('Project root is missing');
     const trace: InitTraceEntry[] = [];
@@ -687,7 +756,15 @@ export function ProjectsView({
       label: 'Validating located sections and evidence paths',
       timestamp: new Date().toISOString(),
     });
-    const entry = await applyScanConfigToProject(project, result.config, {
+    const scaffoldSheets = buildProjectScaffold(root, {
+      projectName: project.config.project.name,
+      progressSheetTemplateIds,
+    }).progressSheets;
+    const scannedWithSheets: ProjectManagerConfig = {
+      ...result.config,
+      progressSheets: scaffoldSheets,
+    };
+    const entry = await applyScanConfigToProject(project, scannedWithSheets, {
       sectionCandidates: result.context?.sectionCandidates,
       inventoryPaths: result.context?.inventoryPaths,
     });
@@ -723,6 +800,8 @@ export function ProjectsView({
    * besides Delete after the row simplification.
    */
   const handleInitializeOne = async (project: ProjectEntry) => {
+    const progressSheetTemplateIds = validateSelectedTemplateIds(project);
+    if (!progressSheetTemplateIds) return;
     if (anyProviderKeyPresentRef.current === false) {
       setInitErrors((prev) => ({ ...prev, [project.id]: 'NO_PROVIDER_CONFIGURED' }));
       return;
@@ -742,7 +821,7 @@ export function ProjectsView({
       return next;
     });
     try {
-      const outcome = await runScanForProject(project);
+      const outcome = await runScanForProject(project, progressSheetTemplateIds);
       onUpdateProject(outcome.entry);
       const fallbackNotice = buildFallbackNotice(project.config.project.name, outcome);
       if (fallbackNotice) {
@@ -763,6 +842,37 @@ export function ProjectsView({
       }));
     } finally {
       setInitializingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(project.id);
+        return next;
+      });
+    }
+  };
+
+  const handleScaffoldInitialize = async (project: ProjectEntry, mode: InitializeMode) => {
+    if (!onInitializeProject) return;
+    const progressSheetTemplateIds = validateSelectedTemplateIds(project);
+    if (!progressSheetTemplateIds) return;
+    setScaffoldInitializingIds((prev) => new Set(prev).add(project.id));
+    setInitErrors((prev) => {
+      if (!(project.id in prev)) return prev;
+      const next = { ...prev };
+      delete next[project.id];
+      return next;
+    });
+    try {
+      await onInitializeProject(project.id, mode, progressSheetTemplateIds);
+      setNotice({
+        kind: 'success',
+        text: `${project.config.project.name}: ${mode} scaffold initialized with ${progressSheetTemplateIds.length} progress sheet${progressSheetTemplateIds.length === 1 ? '' : 's'}.`,
+      });
+    } catch (e) {
+      setInitErrors((prev) => ({
+        ...prev,
+        [project.id]: e instanceof Error ? e.message : String(e),
+      }));
+    } finally {
+      setScaffoldInitializingIds((prev) => {
         const next = new Set(prev);
         next.delete(project.id);
         return next;
@@ -798,7 +908,7 @@ export function ProjectsView({
           label: 'Queued by batch AI Scan',
           timestamp: new Date().toISOString(),
         });
-        const outcome = await runScanForProject(project);
+        const outcome = await runScanForProject(project, getSelectedTemplateIds(project));
         onUpdateProject(outcome.entry);
         succeeded++;
       } catch (e) {
@@ -1143,6 +1253,90 @@ export function ProjectsView({
         ),
       }),
       columnHelper.display({
+        id: 'col-progress-templates',
+        header: 'Progress Sheets',
+        size: 280,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const project = row.original;
+          const selectedTemplateIds = getSelectedTemplateIds(project);
+          const selectedTemplates = BUILT_IN_PROGRESS_TEMPLATES.filter((template) =>
+            selectedTemplateIds.includes(template.id),
+          );
+          const templateError = templateSelectionErrors[project.id];
+          const isScaffoldInitializing = scaffoldInitializingIds.has(project.id);
+          return (
+            <div className="min-w-[240px] space-y-2" onClick={(e) => e.stopPropagation()}>
+              <ProgressSheetTemplatePicker
+                templates={BUILT_IN_PROGRESS_TEMPLATES}
+                selectedIds={selectedTemplateIds}
+                onToggle={(templateId) => toggleTemplateSelection(project, templateId)}
+                onSelectAll={() => selectAllTemplateSelections(project)}
+                onClear={() => clearTemplateSelection(project)}
+                disabled={isScaffoldInitializing}
+              />
+              <div className="flex flex-wrap items-center gap-1">
+                {selectedTemplates.length === 0 ? (
+                  <span className="text-[10px] text-amber-200">
+                    No sheets selected.
+                  </span>
+                ) : (
+                  selectedTemplates.map((template) => (
+                    <span
+                      key={template.id}
+                      title={template.fields.map((field) => field.label).join(', ')}
+                      className="border border-blue-200/25 bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-100"
+                    >
+                      {template.sheetTitle} · {template.fields.slice(0, 3).map((field) => field.label).join(', ')}
+                      {template.fields.length > 3 ? ` +${template.fields.length - 3}` : ''}
+                      {' · '}
+                      {template.statusOptions.length} statuses
+                    </span>
+                  ))
+                )}
+              </div>
+              {templateError && (
+                <div className="flex items-center gap-1 text-[10px] text-amber-100">
+                  <AlertTriangle size={11} />
+                  {templateError}
+                </div>
+              )}
+              {onInitializeProject && (
+                <div className="flex flex-wrap items-center gap-1 pt-1">
+                  {(['create', 'merge', 'overwrite'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      disabled={isScaffoldInitializing || !isTauri}
+                      onClick={() => void handleScaffoldInitialize(project, mode)}
+                      title={
+                        mode === 'overwrite'
+                          ? 'Overwrite replaces existing scaffold data through the Tauri initializer.'
+                          : `${mode[0].toUpperCase()}${mode.slice(1)} uses existing scaffold merge behavior.`
+                      }
+                      className={`inline-flex h-6 items-center gap-1 border px-2 text-[10px] font-medium uppercase tracking-[0.08em] disabled:cursor-not-allowed disabled:opacity-40 ${
+                        mode === 'overwrite'
+                          ? 'border-red-300/30 bg-red-500/10 text-red-100 hover:bg-red-500/20'
+                          : mode === 'merge'
+                            ? 'border-blue-300/30 bg-blue-500/10 text-blue-100 hover:bg-blue-500/20'
+                            : 'border-stone-200/20 bg-white/[0.035] text-stone-200 hover:bg-white/[0.07]'
+                      }`}
+                    >
+                      {isScaffoldInitializing ? <Loader2 size={11} className="animate-spin" /> : null}
+                      {mode === 'create'
+                        ? 'Create scaffold'
+                        : mode === 'merge'
+                          ? 'Merge scaffold'
+                          : 'Overwrite scaffold'}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        },
+      }),
+      columnHelper.display({
         id: 'col-initialized',
         header: 'Init Status',
         size: 132,
@@ -1252,6 +1446,9 @@ export function ProjectsView({
       initializingIds,
       isTauri,
       onToggleDashboardProject,
+      scaffoldInitializingIds,
+      templateSelectionErrors,
+      templateSelections,
       repoEditProjectId,
       repoUrlBusyId,
       selectedDashboardProjectIds,

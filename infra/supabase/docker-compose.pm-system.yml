@@ -8,6 +8,11 @@ services:
   kong:
     image: supabase/kong:latest
     restart: unless-stopped
+    depends_on:
+      - auth
+      - rest
+      - storage
+      - realtime
     ports:
       - "${PM_BACKEND_API_PORT:-8000}:8000"
     environment:
@@ -34,17 +39,113 @@ services:
       # first-init only — `upgrade` against an existing volume needs a real
       # migration runner (see docs/engineering/pm-system-installer.md).
       - ./migrations/0001_pm_core.sql:/docker-entrypoint-initdb.d/01_pm_core.sql:ro
-      - ./seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+      - ./migrations/0002_features_audit_logs.sql:/docker-entrypoint-initdb.d/02_features_audit_logs.sql:ro
+      - ./migrations/0003_runner_devices.sql:/docker-entrypoint-initdb.d/03_runner_devices.sql:ro
+      - ./migrations/0004_agent_runs_runner_device_fk.sql:/docker-entrypoint-initdb.d/04_agent_runs_runner_device_fk.sql:ro
+      - ./migrations/0005_report_metadata.sql:/docker-entrypoint-initdb.d/05_report_metadata.sql:ro
+      - ./migrations/0006_sync_cursors.sql:/docker-entrypoint-initdb.d/06_sync_cursors.sql:ro
+      - ./seed.sql:/docker-entrypoint-initdb.d/07_seed.sql:ro
 
-  # NOTE: this scaffold only runs kong + postgres + studio. Auth (GoTrue),
-  # REST (PostgREST), Storage, and Realtime are NOT provisioned yet, and
-  # templates/kong.yml routes nothing — so data-plane API calls through
-  # http://kong:8000 will fail until those services and routes are added.
-  # The installer reflects this: getRequiredPortChecks() only requires the
-  # api/postgres/studio ports.
+  auth:
+    image: supabase/gotrue:latest
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    ports:
+      - "9999:9999"
+    environment:
+      GOTRUE_API_HOST: "0.0.0.0"
+      GOTRUE_API_PORT: "9999"
+      API_EXTERNAL_URL: "http://localhost:${PM_BACKEND_API_PORT:-8000}"
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: "postgres://supabase_auth_admin:${PM_BACKEND_DATABASE_PASSWORD:?set in local ops env}@postgres:5432/postgres"
+      GOTRUE_SITE_URL: "http://localhost:${PM_BACKEND_API_PORT:-8000}"
+      GOTRUE_URI_ALLOW_LIST: "http://localhost:${PM_BACKEND_API_PORT:-8000}"
+      GOTRUE_JWT_SECRET: "${PM_BACKEND_JWT_SECRET:-change-me-jwt-secret}"
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "false"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+
+  rest:
+    image: postgrest/postgrest:latest
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    ports:
+      - "3000:3000"
+    environment:
+      PGRST_DB_URI: "postgres://authenticator:${PM_BACKEND_DATABASE_PASSWORD:?set in local ops env}@postgres:5432/postgres"
+      PGRST_DB_SCHEMAS: "public,storage,graphql_public"
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: "${PM_BACKEND_JWT_SECRET:-change-me-jwt-secret}"
+
+  storage:
+    image: supabase/storage-api:latest
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - rest
+    ports:
+      - "${PM_BACKEND_STORAGE_PORT:-5000}:5000"
+    environment:
+      ANON_KEY: "${PM_BACKEND_SUPABASE_ANON_KEY:?set in local ops env}"
+      SERVICE_KEY: "${PM_BACKEND_SUPABASE_SERVICE_ROLE_KEY:-change-me-service-role-key}"
+      POSTGREST_URL: "http://rest:3000"
+      PGRST_JWT_SECRET: "${PM_BACKEND_JWT_SECRET:-change-me-jwt-secret}"
+      DATABASE_URL: "postgres://supabase_storage_admin:${PM_BACKEND_DATABASE_PASSWORD:?set in local ops env}@postgres:5432/postgres"
+      FILE_SIZE_LIMIT: "52428800"
+      STORAGE_BACKEND: "file"
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: stub
+      REGION: local
+      GLOBAL_S3_BUCKET: stub
+    volumes:
+      - pm-storage-data:/var/lib/storage
+
+  realtime:
+    image: supabase/realtime:latest
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    ports:
+      - "${PM_BACKEND_REALTIME_PORT:-4000}:4000"
+    environment:
+      PORT: "4000"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: postgres
+      DB_USER: supabase_admin
+      DB_PASSWORD: "${PM_BACKEND_DATABASE_PASSWORD:-change-me-database-password}"
+      DB_SSL: "false"
+      JWT_SECRET: "${PM_BACKEND_JWT_SECRET:-change-me-jwt-secret}"
+      SECRET_KEY_BASE: "${PM_BACKEND_JWT_SECRET:-change-me-jwt-secret}"
+      ERL_AFLAGS: "-proto_dist inet_tcp"
+
+  migrations:
+    image: supabase/postgres:latest
+    profiles:
+      - migrations
+    depends_on:
+      - postgres
+    environment:
+      PGPASSWORD: "${PM_BACKEND_DATABASE_PASSWORD:?set in local ops env}"
+    volumes:
+      - ./migrations:/pm-system/migrations:ro
+    command:
+      - bash
+      - -lc
+      - |
+        echo "PM backend migrations for existing volumes"
+        for migration in /pm-system/migrations/*.sql; do
+          psql -h postgres -U postgres -d postgres -v ON_ERROR_STOP=1 -f "$migration"
+        done
+
   studio:
     image: supabase/studio:latest
     restart: unless-stopped
+    depends_on:
+      - kong
     ports:
       - "${PM_BACKEND_STUDIO_PORT:-54323}:3000"
     environment:
@@ -54,3 +155,4 @@ services:
 
 volumes:
   pm-postgres-data:
+  pm-storage-data:

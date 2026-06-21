@@ -1,6 +1,13 @@
 import { AGENT_TEAM_DIR } from '../defaults/agentTeamProtocol';
 import { DEFAULT_ENGINEER_ROLES } from '../defaults/engineerRoles';
-import type { Feature, FeatureStatus, IDEId, ProjectManagerConfig } from '../types';
+import { BUILT_IN_PROGRESS_TEMPLATES } from '../progress-sheets/templates';
+import type {
+  Feature,
+  FeatureStatus,
+  IDEId,
+  ProjectManagerConfig,
+  ProjectProgressSheetRef,
+} from '../types';
 import { CURRENT_SCHEMA_VERSION, migrateConfig } from './migrate';
 import { mergeEngineerRolesById } from './mergeEngineerRoles';
 
@@ -32,6 +39,8 @@ export interface InitializeProjectOptions {
   /** Folder name used when `projectRoot` has no trailing segment. */
   projectName?: string;
   defaultIDE?: IDEId;
+  /** Built-in progress sheet templates to initialize. Defaults to the software desktop sheet. */
+  progressSheetTemplateIds?: string[];
 }
 
 /** Default feature spec path under the consolidated dashboard feature folder. */
@@ -64,6 +73,62 @@ function inferProjectName(projectRoot: string, override?: string): string {
   const trimmed = projectRoot.replace(/\/+$/, '');
   const segment = trimmed.split('/').pop();
   return segment || 'Project';
+}
+
+function buildProgressSheetRefs(
+  templateIds: string[] | undefined,
+  timestamp: string,
+): ProjectProgressSheetRef[] {
+  const selectedTemplateIds = templateIds ?? ['software-desktop-app'];
+  if (selectedTemplateIds.length === 0) {
+    throw new Error('At least one progress sheet template must be selected');
+  }
+
+  const seen = new Set<string>();
+  return selectedTemplateIds.map((templateId, index) => {
+    if (seen.has(templateId)) {
+      throw new Error(`Duplicate progress sheet template selected: ${templateId}`);
+    }
+    seen.add(templateId);
+
+    const template = BUILT_IN_PROGRESS_TEMPLATES.find((candidate) => candidate.id === templateId);
+    if (!template) {
+      throw new Error(`Unknown progress sheet template: ${templateId}`);
+    }
+
+    return {
+      id: template.id,
+      label: template.sheetTitle,
+      discipline: template.discipline,
+      configPath: `.project-manager/progress-sheets/${template.id}/config.json`,
+      templateId: template.id,
+      templateVersion: template.version,
+      active: index === 0,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+  });
+}
+
+function mergeProgressSheetRefs(
+  existingRefs: ProjectProgressSheetRef[] | undefined,
+  scaffoldRefs: ProjectProgressSheetRef[] | undefined,
+): ProjectProgressSheetRef[] | undefined {
+  const existing = existingRefs ?? [];
+  const scaffold = scaffoldRefs ?? [];
+  if (existing.length === 0) return scaffoldRefs;
+  if (scaffold.length === 0) return existingRefs;
+
+  const seen = new Set(existing.map((sheet) => sheet.id));
+  const additions = scaffold
+    .filter((sheet) => {
+      if (seen.has(sheet.id)) return false;
+      seen.add(sheet.id);
+      return true;
+    })
+    .map((sheet) => ({ ...sheet, active: false }));
+
+  return [...existing, ...additions];
 }
 
 function extractLineValue(markdown: string, label: string): string | undefined {
@@ -170,7 +235,7 @@ export function buildRecoveredProjectConfig(
       };
     });
 
-  return migrateConfig({
+  const recovered = migrateConfig({
     schemaVersion: CURRENT_SCHEMA_VERSION,
     createdAt: features[0]?.createdAt ?? now,
     updatedAt: now,
@@ -205,6 +270,10 @@ export function buildRecoveredProjectConfig(
       ],
     },
   });
+  return {
+    ...recovered,
+    progressSheets: buildProgressSheetRefs(options.progressSheetTemplateIds, now),
+  };
 }
 
 /**
@@ -231,7 +300,11 @@ export function buildProjectScaffold(
     engineerRoles: DEFAULT_ENGINEER_ROLES,
     adapters: { ides: [], agents: [] },
   };
-  return migrateConfig(raw);
+  const scaffold = migrateConfig(raw);
+  return {
+    ...scaffold,
+    progressSheets: buildProgressSheetRefs(options.progressSheetTemplateIds, now),
+  };
 }
 
 /**
@@ -258,6 +331,7 @@ export function mergeProjectConfig(
     },
     features: ensureFeaturePaths(existing.features ?? []),
     engineerRoles: mergeEngineerRolesById(existing.engineerRoles, scaffold.engineerRoles),
+    progressSheets: mergeProgressSheetRefs(existing.progressSheets, scaffold.progressSheets),
     adapters: {
       ides:
         (existing.adapters?.ides?.length ?? 0) > 0

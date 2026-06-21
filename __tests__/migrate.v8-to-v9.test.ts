@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { CURRENT_SCHEMA_VERSION, migrateConfig } from '../lib/storage/migrate';
 
 describe('migrate v8 → v9 (F49 feature dependencies)', () => {
-  it('exposes 10 as the current schema version', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(10);
+  it('exposes 11 as the current schema version', () => {
+    expect(CURRENT_SCHEMA_VERSION).toBe(11);
   });
 
   it('back-fills empty upstreamDependencies on legacy features', () => {

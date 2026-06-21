@@ -3,7 +3,7 @@ import { CURRENT_SCHEMA_VERSION, migrateConfig } from '../lib/storage/migrate';
 
 describe('migrateConfig v2 → current schema', () => {
   it('exposes the current schema version constant', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(10);
+    expect(CURRENT_SCHEMA_VERSION).toBe(11);
   });
 
   it('bumps schemaVersion to the current version on a v2 document', () => {

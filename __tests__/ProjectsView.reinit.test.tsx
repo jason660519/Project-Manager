@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProjectsView } from '../app/ui/views/ProjectsView';
+import { I18nProvider } from '../lib/i18n';
 import type { Feature, ProjectEntry, ProjectManagerConfig } from '../lib/types';
 import type { ScanResult } from '../lib/scanner/shared';
 import type { RunProjectScanOptions } from '../lib/scanner/runProjectScan';
@@ -69,17 +70,19 @@ function entry(
 
 function renderView(projects: ProjectEntry[], onUpdateProject = vi.fn()) {
   render(
-    <ProjectsView
-      projects={projects}
-      selectedProjectId={projects[0]?.id ?? ''}
-      selectedDashboardProjectIds={projects.map((p) => p.id)}
-      onSelectProject={() => {}}
-      onToggleDashboardProject={() => {}}
-      onAddProject={() => {}}
-      onUpdateProject={onUpdateProject}
-      onRemoveProject={() => {}}
-      runHistory={[]}
-    />,
+    <I18nProvider>
+      <ProjectsView
+        projects={projects}
+        selectedProjectId={projects[0]?.id ?? ''}
+        selectedDashboardProjectIds={projects.map((p) => p.id)}
+        onSelectProject={() => {}}
+        onToggleDashboardProject={() => {}}
+        onAddProject={() => {}}
+        onUpdateProject={onUpdateProject}
+        onRemoveProject={() => {}}
+        runHistory={[]}
+      />
+    </I18nProvider>,
   );
   return { onUpdateProject };
 }
@@ -139,10 +142,19 @@ describe('ProjectsView initialize actions', () => {
         expect.objectContaining({ onProgress: expect.any(Function) }),
       );
     });
-    expect(applyScanConfigToProjectMock).toHaveBeenCalledWith(readyProject, scanned, {
-      sectionCandidates: undefined,
-      inventoryPaths: undefined,
-    });
+    expect(applyScanConfigToProjectMock).toHaveBeenCalledWith(
+      readyProject,
+      expect.objectContaining({
+        ...scanned,
+        progressSheets: expect.arrayContaining([
+          expect.objectContaining({ id: 'software-desktop-app' }),
+        ]),
+      }),
+      {
+        sectionCandidates: undefined,
+        inventoryPaths: undefined,
+      },
+    );
     expect(onUpdateProject).toHaveBeenCalledWith(updatedEntry);
   });
 

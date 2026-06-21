@@ -154,6 +154,120 @@ export interface ProjectConfig {
   githubUrl?: string;
 }
 
+// ── Multi-discipline progress sheets (schema v11, F55) ──────────────────────
+
+export type ProgressDiscipline =
+  | 'software'
+  | 'hardware-rd'
+  | 'industrial-design'
+  | 'project-operations'
+  | 'marketing-campaign'
+  | 'content-production'
+  | 'qa-validation'
+  | 'construction-field'
+  | 'procurement-vendor'
+  | 'custom';
+
+export type ProgressFieldType =
+  | 'uuid'
+  | 'text'
+  | 'number'
+  | 'date'
+  | 'select'
+  | 'multiSelect'
+  | 'tag'
+  | 'person'
+  | 'percent'
+  | 'link'
+  | 'file';
+
+export interface ProgressOption {
+  id: string;
+  label: string;
+  color?: string;
+}
+
+export interface ProgressColumn {
+  id: string;
+  label: string;
+  fieldType: ProgressFieldType;
+  required?: boolean;
+  visible?: boolean;
+  order: number;
+  defaultValue?: unknown;
+  options?: ProgressOption[];
+}
+
+export interface ProgressTemplateField extends ProgressColumn {}
+
+export interface ProgressTemplateSnapshot {
+  id: string;
+  label: string;
+  discipline: ProgressDiscipline;
+  version: number;
+  fields: ProgressTemplateField[];
+  statusOptions: ProgressOption[];
+  phaseOptions?: ProgressOption[];
+  capturedAt: string;
+}
+
+export interface ArchivedProgressField {
+  fieldId: string;
+  label?: string;
+  fieldType?: ProgressFieldType;
+  archivedAt: string;
+  reason?: string;
+}
+
+export interface ProgressRow {
+  id: string;
+  title: string;
+  status: string;
+  progress?: number;
+  owner?: string;
+  values: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProgressSheetConfig {
+  schemaVersion: number;
+  id: string;
+  sheetTitle: string;
+  discipline: ProgressDiscipline;
+  templateSnapshot: ProgressTemplateSnapshot;
+  columns: ProgressColumn[];
+  statusOptions: ProgressOption[];
+  phaseOptions?: ProgressOption[];
+  rows: ProgressRow[];
+  archivedFields?: ArchivedProgressField[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectProgressSheetRef {
+  id: string;
+  label: string;
+  discipline: ProgressDiscipline;
+  configPath: string;
+  templateId: string;
+  templateVersion: number;
+  active?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BackendProfileBase {
+  id?: string;
+  label?: string;
+}
+
+export type BackendProfile =
+  | (BackendProfileBase & { mode: 'local-files'; enabled: false })
+  | (BackendProfileBase & { mode: 'local-docker-supabase'; url: string; anonKeyRef: string })
+  | (BackendProfileBase & { mode: 'self-hosted-supabase'; url: string; anonKeyRef: string })
+  | (BackendProfileBase & { mode: 'supabase-cloud'; url: string; anonKeyRef: string });
+
 export interface AdapterDescriptor {
   id: string;
   name: string;
@@ -215,7 +329,7 @@ export interface ExecutionResult {
 export type AnyAdapterConfig = IDEAdapterConfig | AgentAdapterConfig | AgentAppAdapterConfig;
 
 export interface ProjectManagerConfig {
-  /** Increment when making breaking changes to the config structure. Current: 10 */
+  /** Increment when making breaking changes to the config structure. Current: 11 */
   schemaVersion: number;
   engineerRoles?: EngineerRole[];
   // ── Sync identity + audit fields (schema v2, ADR-006) ──────────────────
@@ -231,6 +345,11 @@ export interface ProjectManagerConfig {
   features: Feature[];
   adapters: AdapterConfig;
   cronJobs?: CronJob[];
+  /** Progress sheet manifest refs (schema v11, F55). Sheet configs live under `.project-manager/progress-sheets/<sheetId>/config.json`. */
+  progressSheets?: ProjectProgressSheetRef[];
+  /** Renderer-safe backend connector profiles. Never include service-role keys, JWT secrets, or database passwords. */
+  backendProfiles?: BackendProfile[];
+  activeBackendProfileMode?: BackendProfile['mode'];
   /** Qualification candidates surfaced in Integrations Hub sheets (schema v7). */
   capabilityCandidates?: CapabilityCandidate[];
 }
@@ -418,7 +537,7 @@ export interface EngineerRole {
   capabilities?: RoleCapability[];
 }
 
-export type ViewId = 'dashboard' | 'features' | 'integrations-hub' | 'xmux' | 'settings' | 'engineers' | 'channels' | 'sessions' | 'cron-jobs' | 'logs' | 'keys' | 'ai-sdks' | 'documentation' | 'company-standards' | 'chat' | 'keyboard-shortcuts';
+export type ViewId = 'progress-templates-setting' | 'dashboard' | 'features' | 'integrations-hub' | 'xmux' | 'settings' | 'engineers' | 'channels' | 'sessions' | 'cron-jobs' | 'logs' | 'keys' | 'ai-sdks' | 'documentation' | 'company-standards' | 'chat' | 'keyboard-shortcuts';
 
 export type IssueState = 'open' | 'closed';
 

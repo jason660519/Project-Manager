@@ -12,7 +12,7 @@
 #   ./start_project_manager.sh stop      stop all services
 #   ./start_project_manager.sh restart   clean old PM tabs/processes, then start fresh in background
 #   ./start_project_manager.sh hermes    start Hermes Agent dashboard only
-#   ./start_project_manager.sh openclaw  start OpenClaw gateway and open dashboard
+#   ./start_project_manager.sh supabase start local Supabase Docker stack only
 #
 # Flags (any command):
 #   --open, --force-open   open browser even when the service is already running
@@ -202,6 +202,160 @@ remember_session_opened_url() {
   fi
 }
 
+refresh_browser_tab_for_url() {
+  local url="$1"
+
+  if [[ "${PROJECT_MANAGER_BROWSER_REFRESH:-1}" == "0" ]]; then
+    return 1
+  fi
+  if [[ "$PLATFORM" != "macOS" ]] || ! command -v osascript >/dev/null 2>&1; then
+    return 1
+  fi
+
+  local local_origin_dedup="${PROJECT_MANAGER_LOCAL_ORIGIN_DEDUP:-1}"
+  local result
+  result="$(osascript -l JavaScript - "$url" "$local_origin_dedup" 2>/dev/null <<'JXA' || true
+function run(argv) {
+  const targetUrl = String(argv[0] || "");
+  const localOriginDedup = String(argv[1] || "1") === "1";
+  const browserNames = ["Google Chrome", "Microsoft Edge", "Brave Browser", "Safari"];
+
+  function normalizeUrl(rawUrl) {
+    let value = String(rawUrl || "");
+    const hashIndex = value.indexOf("#");
+    if (hashIndex >= 0) value = value.slice(0, hashIndex);
+    const queryIndex = value.indexOf("?");
+    if (queryIndex >= 0) value = value.slice(0, queryIndex);
+    while (value.length > 8 && value.endsWith("/")) {
+      value = value.slice(0, -1);
+    }
+    return value;
+  }
+
+  function canonicalHost(host) {
+    const lowered = String(host || "").replace(/^\[|\]$/g, "").toLowerCase();
+    if (lowered === "localhost" || lowered === "127.0.0.1" || lowered === "::1") {
+      return "localhost";
+    }
+    return lowered;
+  }
+
+  function parseAuthority(url) {
+    const match = String(url || "").match(/^([a-zA-Z][a-zA-Z0-9+.-]*):\/\/([^/]+)/);
+    if (!match) return null;
+    const scheme = match[1].toLowerCase();
+    const authority = match[2];
+    let host = "";
+    let port = "";
+
+    if (authority.startsWith("[")) {
+      host = authority.slice(1, authority.indexOf("]"));
+      const remainder = authority.slice(authority.indexOf("]") + 1);
+      if (remainder.startsWith(":")) port = remainder.slice(1);
+    } else if (authority.includes(":")) {
+      host = authority.slice(0, authority.indexOf(":"));
+      port = authority.slice(authority.indexOf(":") + 1);
+    } else {
+      host = authority;
+    }
+
+    if (!port) {
+      if (scheme === "http") port = "80";
+      else if (scheme === "https") port = "443";
+    }
+
+    return { scheme, host: canonicalHost(host), port };
+  }
+
+  function isLocalUrl(url) {
+    const parsed = parseAuthority(normalizeUrl(url));
+    return parsed !== null && parsed.host === "localhost";
+  }
+
+  function originKey(url) {
+    const parsed = parseAuthority(normalizeUrl(url));
+    if (!parsed) return normalizeUrl(url);
+    return parsed.scheme + "://" + parsed.host + ":" + parsed.port;
+  }
+
+  function tabMatches(tabUrl) {
+    const normalizedTab = normalizeUrl(tabUrl);
+    const normalizedTarget = normalizeUrl(targetUrl);
+    if (normalizedTab === normalizedTarget) return true;
+    if (localOriginDedup && isLocalUrl(tabUrl) && isLocalUrl(targetUrl)) {
+      return originKey(tabUrl) === originKey(targetUrl);
+    }
+    return false;
+  }
+
+  function activateTab(browser, browserWindow, tabIndex) {
+    try {
+      browserWindow.activeTabIndex = tabIndex;
+    } catch (error) {
+      /* Safari versions differ; activating the window is still useful. */
+    }
+    try {
+      browserWindow.index = 1;
+    } catch (error) {
+      /* ignore */
+    }
+    browser.activate();
+  }
+
+  function refreshTab(browserName, browser, browserWindow, browserTab, tabIndex) {
+    const currentUrl = String(browserTab.url() || "");
+    if (normalizeUrl(currentUrl) !== normalizeUrl(targetUrl)) {
+      browserTab.url = targetUrl;
+    } else if (browserName !== "Safari") {
+      try {
+        browserTab.reload();
+      } catch (error) {
+        browserTab.url = targetUrl;
+      }
+    } else {
+      browserTab.url = targetUrl;
+    }
+    activateTab(browser, browserWindow, tabIndex);
+    return "refreshed";
+  }
+
+  const normalizedTarget = normalizeUrl(targetUrl);
+
+  for (const browserName of browserNames) {
+    let browser;
+    try {
+      browser = Application(browserName);
+    } catch (error) {
+      continue;
+    }
+    if (!browser.running()) continue;
+
+    try {
+      for (const browserWindow of browser.windows()) {
+        const tabs = browserWindow.tabs();
+        for (let tabIndex = 1; tabIndex <= tabs.length; tabIndex += 1) {
+          const browserTab = tabs[tabIndex - 1];
+          try {
+            const tabUrl = String(browserTab.url() || "");
+            if (!tabMatches(tabUrl)) continue;
+            return refreshTab(browserName, browser, browserWindow, browserTab, tabIndex);
+          } catch (error) {
+            /* try next tab */
+          }
+        }
+      }
+    } catch (error) {
+      /* try next browser */
+    }
+  }
+
+  return "not_found";
+}
+JXA
+)"
+  [[ "$result" == "refreshed" ]]
+}
+
 open_local_url() {
   local url="$1"
   local target_url
@@ -212,6 +366,12 @@ open_local_url() {
     return 0
   fi
 
+  if [[ "$PLATFORM" == "macOS" ]] && refresh_browser_tab_for_url "$url"; then
+    remember_session_opened_url "$target_url"
+    success "Browser tab refreshed: $(safe_url_for_display "$url")"
+    return 0
+  fi
+
   if ! should_force_open_browser && session_has_url_opened "$target_url"; then
     success "Browser tab already handled in this run: $(safe_url_for_display "$url")"
     return 0
@@ -219,7 +379,7 @@ open_local_url() {
 
   if ! should_force_open_browser && browser_has_url_open "$url"; then
     remember_session_opened_url "$target_url"
-    success "Browser tab already open: $(safe_url_for_display "$url")"
+    success "Browser tab already open (refresh unavailable): $(safe_url_for_display "$url")"
     return 0
   fi
 
@@ -922,6 +1082,8 @@ export PLATFORM
 source "$SCRIPT_DIR/scripts/dependency-resolver.sh"
 # shellcheck source=scripts/pm-launcher/aux-pages.sh
 source "$SCRIPT_DIR/scripts/pm-launcher/aux-pages.sh"
+# shellcheck source=scripts/pm-launcher/supabase-stack.sh
+source "$SCRIPT_DIR/scripts/pm-launcher/supabase-stack.sh"
 
 # ── Prerequisite checks ───────────────────────────────────────────────────────
 
@@ -1142,6 +1304,8 @@ start_project_manager() {
   cd "$SCRIPT_DIR"
   configure_tauri_dev_secret_backend
 
+  ensure_supabase_for_pm || warn "Local Supabase is unavailable; PM will run in local-files mode until the stack is healthy."
+
   if [[ "${PROJECT_MANAGER_REUSE_EXISTING:-0}" != "1" && "${PROJECT_MANAGER_START_CLEANED:-0}" != "1" ]]; then
     clean_project_manager_test_environment
     export PROJECT_MANAGER_START_CLEANED=1
@@ -1313,8 +1477,8 @@ cmd_openclaw() {
   approved_count="$(approve_openclaw_pending_pairings)"
   if [[ "$approved_count" =~ ^[0-9]+$ ]] && (( approved_count > 0 )); then
     success "Approved $approved_count OpenClaw local pairing request(s)"
-    info "Opening OpenClaw Dashboard after pairing approval"
-    open_local_url "$url"
+    info "Refreshing OpenClaw Dashboard after pairing approval"
+    refresh_browser_tab_for_url "$url" || open_local_url "$url"
   else
     success "No pending OpenClaw local pairing requests found"
   fi
@@ -1338,19 +1502,23 @@ cmd_all() {
     cmd_install
   fi
 
+  ensure_supabase_for_pm || warn "Local Supabase is unavailable; continuing without cloud backend."
+
   cmd_start_background
   maybe_autostart_sidecar "openclaw" "OpenClaw" cmd_openclaw
   maybe_autostart_sidecar "hermes-agent" "Hermes Agent" cmd_hermes
   cmd_aux
 
   header "Launch Summary"
-  success "Project-scoped apps are ready (PM + optional sidecars + reachable aux pages)"
+  supabase_load_ports
+  success "Project-scoped apps are ready (PM + Supabase + optional sidecars + reachable aux pages)"
   echo "  Project Manager Desktop: started"
   echo "  Project Manager URL:      http://localhost:${DEV_PORT}/project-progress-dashboard"
+  echo "  Local Supabase API/Studio: ${SUPABASE_STUDIO_URL} (Dashboard login: supabase / supabase-local-dev)"
   echo "  Hermes Agent Dashboard:  http://127.0.0.1:${HERMES_PORT} (when running + configured)"
   echo "  OpenClaw Dashboard:      http://127.0.0.1:${OPENCLAW_PORT}/ (when running + configured)"
   echo "  Launcher profile:        ${PM_LAUNCHER_PROFILE} (aux pages from config/samples/launcher.*.json)"
-  echo "  Logs:                    .project-manager/dev-logs/"
+  echo "  Logs:                    .project-manager/dev-logs/ + docker/supabase (docker compose logs)"
 }
 
 cmd_core() {
@@ -1365,18 +1533,22 @@ cmd_core() {
     cmd_install
   fi
 
+  ensure_supabase_for_pm || warn "Local Supabase is unavailable; continuing without cloud backend."
+
   cmd_start_background
   maybe_autostart_sidecar "openclaw" "OpenClaw" cmd_openclaw
   maybe_autostart_sidecar "hermes-agent" "Hermes Agent" cmd_hermes
 
   header "Launch Summary"
-  success "Core apps are ready (PM + optional sidecars)"
+  supabase_load_ports
+  success "Core apps are ready (PM + Supabase + optional sidecars)"
   echo "  Project Manager Desktop: started"
   echo "  Project Manager URL:      http://localhost:${DEV_PORT}/project-progress-dashboard"
   echo "  Project Manager Web App: http://localhost:${DEV_PORT}/"
+  echo "  Local Supabase API/Studio: ${SUPABASE_STUDIO_URL} (Dashboard login: supabase / supabase-local-dev)"
   echo "  Hermes Agent Dashboard:  http://127.0.0.1:${HERMES_PORT} (when autostart enabled + installed)"
   echo "  OpenClaw Dashboard:      http://127.0.0.1:${OPENCLAW_PORT}/ (when autostart enabled + installed)"
-  echo "  Logs:                    .project-manager/dev-logs/"
+  echo "  Logs:                    .project-manager/dev-logs/ + docker/supabase (docker compose logs)"
 }
 
 cmd_stop() {
@@ -1396,6 +1568,7 @@ cmd_stop() {
       success "Port ${port} cleared"
     fi
   done
+  cmd_supabase_stop || true
   success "All services stopped."
 }
 
@@ -1411,8 +1584,9 @@ cmd_restart() {
 
 show_menu() {
   local menu_all menu_core
-  menu_all="$(launcher_profile_query menu.all 2>/dev/null || echo '啟動 PM + 已啟用 sidecar + 可連線的輔助頁面')"
-  menu_core="$(launcher_profile_query menu.core 2>/dev/null || echo '啟動 PM + 依 plugin 設定自動啟動 sidecar')"
+  supabase_load_ports
+  menu_all="$(launcher_profile_query menu.all 2>/dev/null || echo '啟動 PM + Supabase + 已啟用 sidecar + 可連線的輔助頁面')"
+  menu_core="$(launcher_profile_query menu.core 2>/dev/null || echo '啟動 PM + Supabase + 依 plugin 設定自動啟動 sidecar')"
   clear
   echo -e "${BLUE}══════════════════════════════════════════════════════════════${RESET}"
   echo -e "${BLUE}   Project Manager - 統一啟動選單 (Project Manager Menu) ${RESET}"
@@ -1423,12 +1597,13 @@ show_menu() {
   echo -e " 4) 🌐 啟動 PM 網頁端 (Next.js Only)"
   echo -e " 5) 🤖 啟動 Hermes Agent Dashboard (Port: $HERMES_PORT)"
   echo -e " 6) 🕹️  啟動 OpenClaw Dashboard (Port: $OPENCLAW_PORT)"
-  echo -e " 7) 🧩 開啟已配置且可連線的輔助頁面 (profile: ${PM_LAUNCHER_PROFILE})"
+  echo -e " 7) 🗄️  啟動 Local Supabase Docker Stack (Port: ${SUPABASE_KONG_PORT:-54329})"
+  echo -e " 8) 🧩 開啟已配置且可連線的輔助頁面 (profile: ${PM_LAUNCHER_PROFILE})"
   echo -e " ─── 管理功能 ───"
-  echo -e " 8) 📥 執行完整安裝 (Full Install)"
-  echo -e " 9) 🔄 更新相依性與 Rust 編譯 (Update)"
-  echo -e "10) 🛑 停止所有相關服務"
-  echo -e "11) ♻️  清理舊測試環境並重啟 PM"
+  echo -e " 9) 📥 執行完整安裝 (Full Install)"
+  echo -e "10) 🔄 更新相依性與 Rust 編譯 (Update)"
+  echo -e "11) 🛑 停止所有相關服務"
+  echo -e "12) ♻️  清理舊測試環境並重啟 PM"
   echo -e " 0) 🚪 離開 (Exit)"
   echo ""
   read -p "請輸入選項 (Enter choice): " choice
@@ -1440,11 +1615,12 @@ show_menu() {
     4) cmd_web ;;
     5) cmd_hermes ;;
     6) cmd_openclaw ;;
-    7) cmd_aux ;;
-    8) cmd_install ;;
-    9) cmd_update ;;
-    10) cmd_stop ;;
-    11) cmd_restart ;;
+    7) cmd_supabase ;;
+    8) cmd_aux ;;
+    9) cmd_install ;;
+    10) cmd_update ;;
+    11) cmd_stop ;;
+    12) cmd_restart ;;
     0) exit 0 ;;
     *) warn "無效選項 (Invalid choice)"; sleep 1; show_menu ;;
   esac
@@ -1523,11 +1699,12 @@ case "$COMMAND" in
   restart)  cmd_restart ;;
   hermes)   cmd_hermes  ;;
   openclaw) cmd_openclaw ;;
+  supabase) cmd_supabase ;;
   menu)     show_menu   ;;
   auto)     cmd_auto    ;;
   *)
     error "Unknown command: $COMMAND"
-    echo "Usage: $0 [--force-open|--open] [--restart] [install|update|start|web|all|core|aux|stop|restart|hermes|openclaw|menu]"
+    echo "Usage: $0 [--force-open|--open] [--restart] [install|update|start|web|all|core|aux|stop|restart|hermes|openclaw|supabase|menu]"
     exit 1
     ;;
 esac

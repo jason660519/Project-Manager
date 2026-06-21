@@ -2,8 +2,8 @@
 
 > **Created Date**: 2026-05-17
 > **Created By**: Jason (Project Lead)
-> **Last Modified**: 2026-05-17
-> **Modified By**: Jason
+> **Last Modified**: 2026-06-21
+> **Modified By**: Codex
 > **Status**: Accepted
 > **Decision Maker**: Jason
 > **Related**: [ADR-002 — Schema Versioning Strategy](./ADR-002-schema-versioning.md), [ADR-006 — Schema v2 — Sync Identity & Audit Fields](./ADR-006-schema-v2-sync-fields.md)
@@ -17,6 +17,14 @@ The first iteration of the Project Progress Dashboard rendered features through 
 This ADR captures the schema bump (v2 → v3) required to support that dashboard, plus the related `promptConfig` field added so each feature can carry its own auto-loop prompt for the row-level Prompt Engineer page (`/project-progress-dashboard/task?rowId=…`).
 
 The bump is small and additive — every new field is optional, so old documents continue to load without rewriting. v1 documents still migrate through `v1 → v2 → v3` in one read.
+
+F55 narrows the scope of this ADR: these software lifecycle phases are a
+built-in **Desktop App Development Progress** template, not the product
+boundary. Project Manager must also support discipline-specific progress sheets
+for hardware R&D, industrial design, project operations, marketing, QA,
+construction/field work, procurement, and other non-software workflows. Future
+multi-sheet storage keeps this v3 software shape as one template contract rather
+than forcing every project to use software-only columns.
 
 ---
 
@@ -170,6 +178,8 @@ Custom rows added through the dashboard's "Add Row" buttons are inherently *per-
 - The dashboard can now express the full Owner-Property reference UI (four-phase tabs, phase-specific aggregates, per-row prompt).
 - Existing v1 / v2 documents load and migrate in one read — no user action required.
 - The schema is still additive-only, so a v3.x can keep accreting optional fields without another major bump.
+- F55 can preserve this software progress model as one built-in template while
+  adding non-software sheet templates beside it.
 
 **Negative:**
 - `.project-manager.json` size grows by up to ~140 bytes per feature when every phase field is populated. Not material at our scale (typical project: tens of features).
@@ -201,3 +211,4 @@ Custom rows added through the dashboard's "Add Row" buttons are inherently *per-
 | Date       | Version | Modified By | Changes                                                              |
 | ---------- | ------- | ----------- | -------------------------------------------------------------------- |
 | 2026-05-17 | 1.0     | Jason       | Initial ADR creation; schema v2 → v3 phase + prompt-config bump.     |
+| 2026-06-21 | 1.1     | Codex       | Clarified that software phases are one built-in template, not the product boundary. |

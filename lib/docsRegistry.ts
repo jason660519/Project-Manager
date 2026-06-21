@@ -14,6 +14,7 @@ export const DOCS_BASE_URL: string =
   'https://jason660519.github.io/Project-Manager/';
 
 export const VIEW_DOCS_SLUG: Record<ViewId, string | null> = {
+  'progress-templates-setting': null,
   dashboard: 'features/dashboard',
   features: 'features/feature-management',
   'integrations-hub': 'features/integrations-hub',

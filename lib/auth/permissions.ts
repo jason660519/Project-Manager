@@ -124,12 +124,14 @@ export function getDeniedCapabilityMessage(capability: ProjectManagerCapability)
 
 export type WorkspaceAccessStatus =
   | 'setup_required'
+  | 'sign_in_required'
   | 'membership_required'
   | 'allowed'
   | 'denied';
 
 export interface WorkspaceAccessInput {
   supabaseConfigured: boolean;
+  signedIn?: boolean;
   role?: WorkspaceRole | null;
   requiredCapability: ProjectManagerCapability;
 }
@@ -141,6 +143,7 @@ export interface WorkspaceAccessResult {
 
 export function evaluateWorkspaceAccess({
   supabaseConfigured,
+  signedIn = true,
   role,
   requiredCapability,
 }: WorkspaceAccessInput): WorkspaceAccessResult {
@@ -151,10 +154,17 @@ export function evaluateWorkspaceAccess({
     };
   }
 
+  if (!signedIn) {
+    return {
+      status: 'sign_in_required',
+      message: 'Sign in with Supabase before opening this console.',
+    };
+  }
+
   if (!role) {
     return {
       status: 'membership_required',
-      message: 'Sign in and select a workspace before opening this console.',
+      message: 'No workspace membership was found for this signed-in account.',
     };
   }
 

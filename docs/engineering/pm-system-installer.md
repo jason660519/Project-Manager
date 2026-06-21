@@ -6,7 +6,10 @@
 
 ## Purpose
 
-The PM System Installer provisions and operates a self-hosted Project Manager backend stack powered by Supabase. It supports a self-hosted-first, connector-based, cloud-compatible product model.
+The PM System Installer provisions and operates Supabase-compatible Project
+Manager backend stacks. It supports a local-first, connector-based,
+cloud-compatible product model where Supabase Cloud is one supported mode, not
+the product boundary.
 
 The installer is for Workspace Owner/Admin setup and operations. General Users should connect to an existing workspace URL and should not install Docker or manage Supabase containers.
 
@@ -15,12 +18,16 @@ The installer is for Workspace Owner/Admin setup and operations. General Users s
 ```text
 PM Desktop / PM Web
   -> Backend Connector Profile
+      -> local files
+      -> local Docker Supabase-compatible stack
       -> local self-hosted Supabase
       -> LAN/VM self-hosted Supabase
-      -> Supabase Cloud endpoint later
+      -> Supabase Cloud endpoint
 ```
 
-Project Manager should have one active backend connector profile. The app should not know whether that profile points to local Docker, a VM, or Supabase Cloud beyond the profile mode.
+Project Manager should have one active backend connector profile. Product logic
+should key off the profile mode and renderer-safe connection shape, not
+hard-code assumptions that the backend is Supabase Cloud.
 
 ## Roles
 
@@ -35,9 +42,10 @@ Project Manager should have one active backend connector profile. The app should
 
 | Mode | Use |
 | --- | --- |
-| `local-self-hosted` | Single-owner/local team development or personal PM backend. |
-| `vm-self-hosted` | Team backend on a LAN server, Mac mini, NAS, or cloud VM. |
-| `supabase-cloud` | Future managed profile for teams that do not want to operate containers. |
+| `local-files` | Default local-first mode using `.project-manager/` files. No Docker, sign-in, or network backend required. |
+| `local-docker-supabase` | Single-owner, PoC, restricted-network, or local team backend running a Supabase-compatible Docker stack. |
+| `self-hosted-supabase` | Company-owned Supabase-compatible backend on a LAN server, Mac mini, NAS, VM, Kubernetes, or other internal platform. |
+| `supabase-cloud` | Managed Supabase Cloud profile for teams that do not want to operate containers. |
 
 ## Installer Commands
 
@@ -59,7 +67,7 @@ Renderer-safe profile may contain:
 
 - profile ID
 - display label
-- deployment mode
+- deployment mode: `local-files`, `local-docker-supabase`, `self-hosted-supabase`, or `supabase-cloud`
 - Supabase URL
 - Supabase anon key
 
@@ -80,13 +88,17 @@ Rules:
 
 ## Preflight Requirements
 
-Before install:
+Before install for `local-docker-supabase` or `self-hosted-supabase`:
 
 1. Detect Docker-compatible runtime.
 2. If runtime is missing, return guided install state; do not silently install privileged system software.
 3. Check required ports.
 4. Detect existing stack and volumes.
 5. Require explicit owner approval before mutation.
+
+`local-files` mode does not run installer preflight and must remain usable
+without Docker, sign-in, or network access. `supabase-cloud` mode validates the
+renderer-safe connector profile and does not provision local containers.
 
 ## Live-safe Preflight
 
@@ -129,12 +141,44 @@ It models installer plans, backend profiles, doctor reports, backup/restore/upgr
 
 The dry-run step lists are defined once in `infra/supabase/pm-system-plans.mjs` and shared by both the typed planner and the runtime CLI (`scripts/pm-system.mjs`), so the CLI cannot drift from the tested plans.
 
+## Manifest and Progress Sheet Layout
+
+F55 keeps the local project manifest separate from discipline-specific progress
+sheet configs:
+
+```text
+.project-manager/
+├── config.json
+└── progress-sheets/
+    └── <sheetId>/
+        └── config.json
+```
+
+`.project-manager/config.json` remains the project manifest and contains the
+backend profile selection plus progress sheet references. Each progress sheet
+config owns its template snapshot, columns, status/phase options, rows or row
+sidecar pointers, archived fields, and sheet-level migration metadata.
+
+Local Docker, self-hosted, and cloud profiles should sync or mirror this model;
+they must not require every project to use the software-only Development
+Progress columns.
+
 ## Known Gaps (Current Scaffold)
 
-The `infra/supabase` compose scaffold is deliberately partial. Until a later slice closes these, the stack is not functional for authenticated clients:
+The `infra/supabase` compose scaffold is still gated before live authenticated
+client use:
 
-- Only `kong`, `postgres`, and `studio` are started. Auth (GoTrue), REST (PostgREST), Storage, and Realtime are not provisioned, and `templates/kong.yml` routes nothing — so data-plane API calls through `http://kong:8000` fail. `getRequiredPortChecks()` therefore requires only the api/postgres/studio ports; Storage/Realtime ports remain a forward contract only.
-- The Postgres entrypoint runs `/docker-entrypoint-initdb.d` scripts only on the **first** init of an empty volume. `0001_pm_core.sql` and `seed.sql` are mounted as top-level files so they execute on first init, but `upgrade` against an existing volume still needs a dedicated migration runner — `run-pm-migrations` is not yet backed by one.
+- Auth (GoTrue), REST (PostgREST), Storage, and Realtime services are declared
+  in `docker-compose.pm-system.yml`, and `getRequiredPortChecks()` requires
+  their local ports. `templates/kong.yml` still routes nothing, so data-plane
+  API calls through `http://kong:8000` fail until Kong routes for `/auth/v1`,
+  `/rest/v1`, `/storage/v1`, and `/realtime/v1` are added. Doctor and install
+  dry-runs must report this as blocked instead of healthy.
+- The Postgres entrypoint runs `/docker-entrypoint-initdb.d` scripts only on the
+  **first** init of an empty volume. `0001_pm_core.sql` and `seed.sql` are
+  mounted as top-level files so they execute on first init. Existing volumes use
+  the compose `migrations` profile plan and require backup plus owner approval
+  before execution.
 - RLS is enabled together with membership-scoped read policies (never enabled with zero policies). Write paths currently rely on the service-role key until write policies are added.
 
 ## Verification

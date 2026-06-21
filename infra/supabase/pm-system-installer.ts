@@ -9,7 +9,10 @@ import {
 
 export { PM_SYSTEM_COMMANDS };
 
-export type PmBackendDeploymentMode = 'local-self-hosted' | 'vm-self-hosted' | 'supabase-cloud';
+export type PmBackendDeploymentMode =
+  | 'local-docker-supabase'
+  | 'self-hosted-supabase'
+  | 'supabase-cloud';
 
 export type DockerRuntimeKind = 'docker-desktop' | 'orbstack' | 'rancher-desktop' | 'podman' | 'docker-compatible';
 
@@ -36,6 +39,10 @@ export interface InstallerPreflight {
   runtime: DockerRuntimeInfo | null;
   ports: PortCheck[];
   existingStack?: ExistingStackInfo;
+  kongRoutes?: {
+    valid: boolean;
+    missingRoutes: string[];
+  };
   dryRun?: boolean;
 }
 
@@ -43,12 +50,15 @@ export type InstallerPlanStatus =
   | 'ready_to_install'
   | 'runtime_required'
   | 'port_conflict'
+  | 'service_checks_required'
+  | 'route_required'
   | 'existing_stack'
   | 'dry_run';
 
 export type InstallerPlanAction =
   | 'guide-runtime-install'
   | 'resolve-port-conflicts'
+  | 'validate-kong-routes'
   | 'inspect-existing-stack'
   | 'generate-local-secrets'
   | 'write-ops-env'
@@ -145,7 +155,9 @@ export interface MaintenancePolicy {
 export type DoctorCheckId =
   | 'runtime'
   | 'ports'
+  | 'kong-routes'
   | 'auth'
+  | 'rest'
   | 'postgres'
   | 'migrations'
   | 'storage'
@@ -251,6 +263,26 @@ export const PM_SUPABASE_SCAFFOLD_FILES: readonly ScaffoldFile[] = [
     purpose: 'Initial PM workspace/auth schema migration scaffold.',
   },
   {
+    path: 'infra/supabase/migrations/0002_features_audit_logs.sql',
+    purpose: 'Cloud feature metadata and workspace-scoped audit_logs with RLS.',
+  },
+  {
+    path: 'infra/supabase/migrations/0003_runner_devices.sql',
+    purpose: 'Developer Runner pairing metadata with developer-scoped RLS.',
+  },
+  {
+    path: 'infra/supabase/migrations/0004_agent_runs_runner_device_fk.sql',
+    purpose: 'Canonical agent_runs.runner_device_id FK with same-workspace trigger guard.',
+  },
+  {
+    path: 'infra/supabase/migrations/0005_report_metadata.sql',
+    purpose: 'User Portal report index metadata with published-vs-draft RLS.',
+  },
+  {
+    path: 'infra/supabase/migrations/0006_sync_cursors.sql',
+    purpose: 'Local/cloud sync cursor bookkeeping for future writeback.',
+  },
+  {
     path: 'infra/supabase/seed.sql',
     purpose: 'Development-only seed placeholder without real users or secrets.',
   },
@@ -263,16 +295,22 @@ export const PM_SUPABASE_SCAFFOLD_FILES: readonly ScaffoldFile[] = [
 export function getRequiredPortChecks(
   ports: PmBackendPorts = DEFAULT_PM_BACKEND_PORTS,
 ): PortCheck[] {
-  // Only the services the compose scaffold actually starts (kong/postgres/studio)
-  // are required for install. Storage (5000) and Realtime (4000) remain part of
-  // the port contract in DEFAULT_PM_BACKEND_PORTS / env, but they are reserved
-  // for a future slice and must not be claimed as "checked" until the compose
-  // stack provisions them — otherwise doctor/install report false success.
   return [
     { port: ports.api, available: true, service: 'Supabase API gateway' },
     { port: ports.postgres, available: true, service: 'Postgres' },
     { port: ports.studio, available: true, service: 'Supabase Studio' },
+    { port: 9999, available: true, service: 'Supabase Auth' },
+    { port: 3000, available: true, service: 'PostgREST' },
+    { port: ports.storage, available: true, service: 'Supabase Storage' },
+    { port: ports.realtime, available: true, service: 'Supabase Realtime' },
   ];
+}
+
+function missingRequiredServiceChecks(ports: PortCheck[]): string[] {
+  const checkedServices = new Set(ports.map((port) => port.service));
+  return getRequiredPortChecks()
+    .map((port) => port.service)
+    .filter((service) => !checkedServices.has(service));
 }
 
 export function planPmSystemInstall(preflight: InstallerPreflight): InstallerPlan {
@@ -296,6 +334,31 @@ export function planPmSystemInstall(preflight: InstallerPreflight): InstallerPla
       messages: conflictedPorts.map(
         (port) => `Port ${port.port} is already in use; required for ${port.service}.`,
       ),
+    };
+  }
+
+  const missingServices = missingRequiredServiceChecks(preflight.ports);
+  if (missingServices.length > 0) {
+    return {
+      status: 'service_checks_required',
+      actions: ['run-health-checks'],
+      blocked: true,
+      messages: [
+        `Install preflight did not check required services: ${missingServices.join(', ')}.`,
+      ],
+    };
+  }
+
+  if (!preflight.kongRoutes?.valid) {
+    return {
+      status: 'route_required',
+      actions: ['validate-kong-routes'],
+      blocked: true,
+      messages: [
+        preflight.kongRoutes
+          ? `Kong routes missing: ${preflight.kongRoutes.missingRoutes.join(', ')}.`
+          : 'Kong route validation is required before install can proceed.',
+      ],
     };
   }
 
@@ -621,6 +684,63 @@ function buildPortsDoctorCheck(ports: PortCheck[] | undefined): DoctorCheck {
   };
 }
 
+function buildServicePortDoctorCheck(
+  id: DoctorCheckId,
+  ports: PortCheck[] | undefined,
+  serviceName: string,
+): DoctorCheck {
+  const servicePort = ports?.find((port) => port.service === serviceName);
+  if (!servicePort) {
+    return {
+      id,
+      status: 'warn',
+      message: `${serviceName} port was not checked.`,
+      recovery: `Run preflight with the complete local Docker Supabase port contract before trusting ${id} readiness.`,
+    };
+  }
+
+  if (!servicePort.available) {
+    return {
+      id,
+      status: 'fail',
+      message: `${serviceName} port ${servicePort.port} is unavailable.`,
+      recovery: `Free port ${servicePort.port} or change the PM backend ${id} port profile.`,
+    };
+  }
+
+  return {
+    id,
+    status: 'pass',
+    message: `${serviceName} port ${servicePort.port} is available for dry-run readiness.`,
+  };
+}
+
+function buildKongRoutesDoctorCheck(kongRoutes: InstallerPreflight['kongRoutes']): DoctorCheck {
+  if (!kongRoutes) {
+    return {
+      id: 'kong-routes',
+      status: 'warn',
+      message: 'Kong route validation was not provided.',
+      recovery: 'Validate infra/supabase/templates/kong.yml before live local Docker use.',
+    };
+  }
+
+  if (!kongRoutes.valid) {
+    return {
+      id: 'kong-routes',
+      status: 'fail',
+      message: `Kong routes missing: ${kongRoutes.missingRoutes.join(', ')}.`,
+      recovery: 'Add the missing Auth, REST, Storage, and Realtime Kong routes.',
+    };
+  }
+
+  return {
+    id: 'kong-routes',
+    status: 'pass',
+    message: 'Kong routes cover Auth, REST, Storage, and Realtime.',
+  };
+}
+
 export function buildPmSystemCliResponse(request: PmSystemCliRequest): PmSystemCliResponse {
   switch (request.command) {
     case 'install': {
@@ -653,6 +773,23 @@ export function buildPmSystemCliResponse(request: PmSystemCliRequest): PmSystemC
             : 'Install or start a Docker-compatible runtime, then run doctor again.',
         },
         buildPortsDoctorCheck(request.preflight?.ports),
+        buildKongRoutesDoctorCheck(request.preflight?.kongRoutes),
+        buildServicePortDoctorCheck('auth', request.preflight?.ports, 'Supabase Auth'),
+        buildServicePortDoctorCheck('rest', request.preflight?.ports, 'PostgREST'),
+        buildServicePortDoctorCheck('postgres', request.preflight?.ports, 'Postgres'),
+        buildServicePortDoctorCheck('storage', request.preflight?.ports, 'Supabase Storage'),
+        buildServicePortDoctorCheck('realtime', request.preflight?.ports, 'Supabase Realtime'),
+        {
+          id: 'migrations',
+          status: 'warn',
+          message: 'Existing-volume migration runner is planned but not executed by dry-run doctor.',
+          recovery: 'Run the migrations profile only after backup and owner approval.',
+        },
+        {
+          id: 'connector',
+          status: 'pass',
+          message: 'Dry-run doctor keeps connector validation side-effect-free.',
+        },
       ]);
       return {
         command: 'doctor',

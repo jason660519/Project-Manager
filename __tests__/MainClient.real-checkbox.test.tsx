@@ -85,26 +85,30 @@ beforeEach(() => {
 });
 
 describe('real ProjectsView checkbox behavior', () => {
+  function dashboardCheckboxes() {
+    return {
+      ownerProperty: screen.getByRole('checkbox', { name: /include owner-property-management-ai-spa in dashboard/i }),
+      projectManager: screen.getByRole('checkbox', { name: /include project manager in dashboard/i }),
+    };
+  }
+
   it('clicking project-manager checkbox shows DASHBOARD badge and bumps scope to 2', async () => {
     const { MainClient, I18nProvider } = await freshImport();
     const user = userEvent.setup();
     renderMainClient(<MainClient currentView="dashboard" />, I18nProvider);
     await flushEffects();
 
-    // Two project rows should be rendered, both with their own checkbox.
-    const checkboxes = screen.getAllByRole('checkbox');
-    expect(checkboxes).toHaveLength(2);
-
     // Initial state: owner-property checked, project-manager unchecked.
-    expect((checkboxes[0] as HTMLInputElement).checked).toBe(true);
-    expect((checkboxes[1] as HTMLInputElement).checked).toBe(false);
+    const { ownerProperty, projectManager } = dashboardCheckboxes();
+    expect((ownerProperty as HTMLInputElement).checked).toBe(true);
+    expect((projectManager as HTMLInputElement).checked).toBe(false);
 
     // Click project-manager's checkbox.
-    await user.click(checkboxes[1]);
+    await user.click(projectManager);
     await flushEffects();
 
     // Project-Manager's checkbox should now be checked.
-    expect((checkboxes[1] as HTMLInputElement).checked).toBe(true);
+    expect((projectManager as HTMLInputElement).checked).toBe(true);
 
     // Two DASHBOARD badges should now appear (one per project row).
     const badges = screen.getAllByText(/^Dashboard$/);
@@ -120,8 +124,8 @@ describe('real ProjectsView checkbox behavior', () => {
     const { unmount } = renderMainClient(<MainClient currentView="dashboard" />, I18nProvider);
     await flushEffects();
 
-    const checkboxes = screen.getAllByRole('checkbox');
-    await user.click(checkboxes[1]); // toggle project-manager on
+    const { projectManager } = dashboardCheckboxes();
+    await user.click(projectManager); // toggle project-manager on
     await flushEffects();
 
     const stored = await getProjectsRepository().getDashboardProjectIds();
@@ -142,16 +146,16 @@ describe('real ProjectsView checkbox behavior', () => {
     renderMainClient(<MainClient currentView="dashboard" />, I18nProvider);
     await flushEffects();
 
-    const checkboxes = screen.getAllByRole('checkbox');
+    const { projectManager } = dashboardCheckboxes();
     // Check project-manager first
-    await user.click(checkboxes[1]);
+    await user.click(projectManager);
     await flushEffects();
-    expect((checkboxes[1] as HTMLInputElement).checked).toBe(true);
+    expect((projectManager as HTMLInputElement).checked).toBe(true);
 
     // Uncheck project-manager — should actually toggle off (not blocked by guard)
-    await user.click(checkboxes[1]);
+    await user.click(projectManager);
     await flushEffects();
-    expect((checkboxes[1] as HTMLInputElement).checked).toBe(false);
+    expect((projectManager as HTMLInputElement).checked).toBe(false);
   });
 
   it('restores selection from legacy localStorage on first mount', async () => {
@@ -165,8 +169,8 @@ describe('real ProjectsView checkbox behavior', () => {
     renderMainClient(<MainClient currentView="dashboard" />, I18nProvider);
     await flushEffects();
 
-    const checkboxes = screen.getAllByRole('checkbox');
-    expect((checkboxes[0] as HTMLInputElement).checked).toBe(true);
-    expect((checkboxes[1] as HTMLInputElement).checked).toBe(true);
+    const { ownerProperty, projectManager } = dashboardCheckboxes();
+    expect((ownerProperty as HTMLInputElement).checked).toBe(true);
+    expect((projectManager as HTMLInputElement).checked).toBe(true);
   });
 });
