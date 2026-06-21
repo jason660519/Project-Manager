@@ -1262,9 +1262,6 @@ export function ProjectsView({
         cell: ({ row }) => {
           const project = row.original;
           const selectedTemplateIds = getSelectedTemplateIds(project);
-          const selectedTemplates = progressTemplates.filter((template) =>
-            selectedTemplateIds.includes(template.id),
-          );
           const templateError = templateSelectionErrors[project.id];
           const isScaffoldInitializing = scaffoldInitializingIds.has(project.id);
           return (
@@ -1277,26 +1274,6 @@ export function ProjectsView({
                 onClear={() => clearTemplateSelection(project)}
                 disabled={isScaffoldInitializing}
               />
-              <div className="flex flex-wrap items-center gap-1">
-                {selectedTemplates.length === 0 ? (
-                  <span className="text-[10px] text-amber-200">
-                    No sheets selected.
-                  </span>
-                ) : (
-                  selectedTemplates.map((template) => (
-                    <span
-                      key={template.id}
-                      title={template.fields.map((field) => field.label).join(', ')}
-                      className="border border-blue-200/25 bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-100"
-                    >
-                      {template.sheetTitle} · {template.fields.slice(0, 3).map((field) => field.label).join(', ')}
-                      {template.fields.length > 3 ? ` +${template.fields.length - 3}` : ''}
-                      {' · '}
-                      {template.statusOptions.length} statuses
-                    </span>
-                  ))
-                )}
-              </div>
               {templateError && (
                 <div className="flex items-center gap-1 text-[10px] text-amber-100">
                   <AlertTriangle size={11} />

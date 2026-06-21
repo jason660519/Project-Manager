@@ -83,9 +83,7 @@ Full pipeline + data flow: [`docs/architecture/architecture-overview.md`](./docs
 ## 5. Key Conventions (soft rules)
 
 - **UI change** → read [`DESIGN.md`](./DESIGN.md) + [`docs/design/shared-ai-desktop-style.md`](./docs/design/shared-ai-desktop-style.md) first.
-- **Table / sheet / tab view** → any `app/ui/views/` page with a table or tabs MUST use
-  `WorkstationFrame` + `BottomSheetTabs`, tab strip at panel **bottom** (Excel-style).
-  Details: [`docs/engineering/table-standards.md`](./docs/engineering/table-standards.md).
+- **Table / sheet / tab view** → read [`docs/engineering/table-standards.md`](./docs/engineering/table-standards.md) first (hub); use the [`table-and-sheet-layout`](./.agents/skills/table-and-sheet-layout/SKILL.md) skill for implementation.
 - **Bilingual docs** → top-level `docs/*.md` are English block first, then Chinese;
   run `npm run docs:check` after edits.
 - **File naming** → follow [`docs/file-naming-standards.md`](./docs/file-naming-standards.md).

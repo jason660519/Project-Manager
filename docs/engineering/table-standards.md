@@ -1,32 +1,73 @@
 # Project Manager Table Standards
 
 > Status: Active  
-> Last updated: 2026-06-01  
-> Audience: AI engineers and frontend maintainers
+> Last updated: 2026-06-22  
+> Audience: AI engineers and frontend maintainers  
+> Role: **Single entry point (hub)** for all table + sheet work in Project Manager
 
 ## Purpose
 
-This document is the repo-local implementation contract for Project Manager tables.  
-Use it when creating or extending table-heavy views so current and future pages follow the company Table + Sheet baseline while staying consistent with Project Manager workstation behavior.
+This document is the **PM profile** for table + sheet surfaces: mandatory controls,
+layout contract, and verification. Use it when creating or extending table-heavy
+views so pages follow the company Table + Sheet baseline and Project Manager
+workstation behavior.
 
-## Source Of Truth
+Implementation how-to (components, cell patterns, pitfalls) lives in
+[`.agents/skills/table-and-sheet-layout/SKILL.md`](../../.agents/skills/table-and-sheet-layout/SKILL.md)
+— not here.
 
-1. `/Users/Company-AI-App-Standards/docs/patterns/table-governance.md`
-2. `DESIGN.md` and `docs/design/shared-ai-desktop-style.md`
-3. `.claude/skills/table-and-sheet-layout/SKILL.md`
-4. `.agents/skills/table-and-sheet-layout/SKILL.md`
-5. Reusable layout components (use these — do not inline equivalents):
-   - `components/layout/WorkstationFrame.tsx`
-   - `components/sheets/BottomSheetTabs.tsx`
-6. Table implementations:
-   - `app/project-progress-dashboard/_components/PhaseTable.tsx`
-   - `app/project-progress-dashboard/_lib/columns.tsx`
-   - `app/project-progress-dashboard/_lib/pathLinks.tsx`
-   - `components/table/TableCore.tsx`
+## Read Order
 
-When the company table-governance baseline and this repo-local contract appear to conflict, follow the company baseline unless Project Manager documents a deliberate exception in `DESIGN.md`, a feature note, or an ADR.
+| Step | Document | Role |
+| --- | --- | --- |
+| 1 | [Company baseline snapshot](../../internal-resources/company-ai-app-standards/docs/patterns/table-governance.md) | Cross-app pattern (upstream: `Company-AI-App-Standards` repo) |
+| 2 | **This document** §Mandatory Rules | PM profile / policy |
+| 3 | [table-and-sheet-layout skill](../../.agents/skills/table-and-sheet-layout/SKILL.md) | Implementation cookbook |
+| 4 | [table-sheet-inventory.md](./table-sheet-inventory.md) | Generated compliance status (do not hand-edit) |
+| 5 | `npm run table:sheet:audit -- --check` | Static verification gate (part of `verify:baseline`) |
 
-## Mandatory Rules
+Visual tokens: [`DESIGN.md`](../../DESIGN.md), [`docs/design/shared-ai-desktop-style.md`](../design/shared-ai-desktop-style.md).
+
+## Document Layers
+
+```text
+Company baseline (table-governance.md)
+        ↓
+PM profile (this file — policy)
+        ↓
+Implementation skill (how-to)
+        ↓
+Generated inventory + audit script (compliance state)
+```
+
+When the company baseline and this PM profile conflict, follow the company baseline
+unless Project Manager documents a deliberate exception in `DESIGN.md`, a feature
+note, or an ADR.
+
+## Compliance Status
+
+Source-driven inventory (refresh with `npm run table:sheet:audit -- --write`):
+
+- Report: [`table-sheet-inventory.md`](./table-sheet-inventory.md)
+- Current scanned surface counts and blocking findings live in the generated report.
+  Do not duplicate those numbers here; they drift.
+
+## Reference Implementations
+
+Reusable layout (do not inline equivalents):
+
+- `components/layout/WorkstationFrame.tsx`
+- `components/sheets/BottomSheetTabs.tsx`
+
+Table references:
+
+- `components/table/datasheet/` — Basic/Large sheet primitive (preferred)
+- `components/table/TableCore.tsx` — simple table styling
+- `app/project-progress-dashboard/_components/PhaseTable.tsx`
+- `app/project-progress-dashboard/_lib/columns.tsx`
+- `app/project-progress-dashboard/_lib/pathLinks.tsx`
+
+## Mandatory Rules (PM Profile)
 
 ### 1) Classification and Baseline Features
 
@@ -49,7 +90,12 @@ When the company table-governance baseline and this repo-local contract appear t
 
 ### 2) Row identity (`col-id`)
 
-Company baseline (`table-governance.md` §2.2) already requires every Basic/Large table sheet to ship a **first data column** with column id `col-id` whose cell values are **RFC 4122 UUIDs** — the future database primary key. Human-readable codes (`F41`, `anthropic`, GitHub issue numbers, etc.) belong in sibling columns, not in `col-id`.
+Company baseline requires every Basic/Large table sheet to ship a **first data column**
+with column id `col-id` whose cell values are **RFC 4122 UUIDs** — the future database
+primary key. Human-readable codes (`F41`, `anthropic`, GitHub issue numbers, etc.)
+belong in sibling columns, not in `col-id`. (The PM snapshot of
+[`table-governance.md`](../../internal-resources/company-ai-app-standards/docs/patterns/table-governance.md)
+is abbreviated; this rule is enforced here and by `audit-table-sheets.mjs`.)
 
 Project Manager app-local glossary:
 
@@ -198,9 +244,21 @@ When introducing or promoting a table view:
 
 ## 中文版本
 
+### 閱讀順序（Hub）
+
+| 步驟 | 文件 | 用途 |
+| --- | --- | --- |
+| 1 | [`table-governance.md`](../../internal-resources/company-ai-app-standards/docs/patterns/table-governance.md) 快照 | 公司跨 app 基線 |
+| 2 | **本文件** §Mandatory Rules | PM profile / 政策 |
+| 3 | [table-and-sheet-layout skill](../../.agents/skills/table-and-sheet-layout/SKILL.md) | 實作指南 |
+| 4 | [table-sheet-inventory.md](./table-sheet-inventory.md) | 自動生成的合規狀態 |
+| 5 | `npm run table:sheet:audit -- --check` | 靜態驗證（`verify:baseline` 一部分） |
+
+規範以本文件為單一入口；skill 只負責「怎麼做」，不重複寫政策。
+
 ### 行身分欄（`col-id`）
 
-公司基線（`table-governance.md` §2.2）已規定：每個 **Basic / Large** 等級的 table sheet 必須有**第一個資料欄**，欄位 id 為 `col-id`，儲存值為 **RFC 4122 UUID**（未來資料庫主鍵）。人類可讀代碼（`F41`、`anthropic`、GitHub issue 編號等）應放在其他欄，不可佔用 `col-id`。
+公司基線已規定：每個 **Basic / Large** 等級的 table sheet 必須有**第一個資料欄**，欄位 id 為 `col-id`，儲存值為 **RFC 4122 UUID**（未來資料庫主鍵）。人類可讀代碼（`F41`、`anthropic`、GitHub issue 編號等）應放在其他欄，不可佔用 `col-id`。
 
 Project Manager 本地詞彙：
 

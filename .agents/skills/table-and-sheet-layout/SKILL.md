@@ -6,6 +6,10 @@ applyTo: 'components/table/**,components/layout/**,components/sheets/**,app/ui/v
 
 # Table and Sheet Layout — Project-Manager
 
+> **Normative rules live in [`docs/engineering/table-standards.md`](../../docs/engineering/table-standards.md).**
+> This skill is **implementation-only** — components, patterns, checklists, and pitfalls.
+> Read the hub first; do not treat this file as a second policy document.
+
 Build data tables, sheets, and workstation-style views using **raw TanStack Table v8** and the project's reusable layout components. Reference implementations:
 
 - `components/layout/WorkstationFrame.tsx` — viewport-fixed page frame with header / toolbar / content / bottom-tabs slots
@@ -76,16 +80,21 @@ Reference migrations: `app/ui/views/ProjectFilesView.tsx`, `app/ui/views/KeysVie
 
 ---
 
-## Governance Baseline
+## Normative Rules (read the hub)
 
-Read `/Users/Company-AI-App-Standards/docs/patterns/table-governance.md` before designing or changing a table/sheet surface. That company document is the baseline contract for search, ID columns, filters, freeze columns, resize, hidden rows/columns, sorting, sheet reorder, accessibility, localization, recovery, and performance.
+Policy, classification, and mandatory Basic/Large controls are in
+[`docs/engineering/table-standards.md`](../../docs/engineering/table-standards.md).
+Read order:
 
-This skill adds Project Manager-specific implementation rules. When this skill and the company baseline appear to conflict, follow the company baseline unless Project Manager has a documented local override in `docs/engineering/table-standards.md`, `DESIGN.md`, or an ADR.
+1. Company baseline — [`internal-resources/company-ai-app-standards/docs/patterns/table-governance.md`](../../internal-resources/company-ai-app-standards/docs/patterns/table-governance.md)
+2. PM profile — `docs/engineering/table-standards.md` §Mandatory Rules
+3. This skill — how to build
+4. Compliance — `docs/engineering/table-sheet-inventory.md` (generated)
 
-### Enforced — do these or the build goes red
+### Enforced by CI (`scripts/audit-table-sheets.mjs`)
 
-A company gate (`check-table-governance.mjs`, run via `standards:check` → `verify:baseline`)
-blocks any `useReactTable` file that skips the following. Treat them as hard requirements, not advice:
+Run via `npm run table:sheet:audit -- --check` inside `npm run verify:baseline`.
+Full control list: hub §1. Implementation notes for each gate rule:
 
 1. **Classification banner (required).** Top of every table file, after `'use client';`:
    ```ts
@@ -93,7 +102,7 @@ blocks any `useReactTable` file that skips the following. Treat them as hard req
    // @table-reason: <why this classification is correct>
    // @table-waivers: <controls> — <reason>   // only for basic/large with declared debt
    ```
-   Do **not** self-grant `simple` to dodge controls — `simple` requires genuinely meeting §1
+   Do **not** self-grant `simple` to dodge controls — `simple` requires genuinely meeting hub §1
    (under 20 rows, no horizontal overflow, no repeated operational use).
 2. **Reuse the primitive (default).** Build Basic/Large tables on `components/table/datasheet`
    (`getFrozenColumnLayout`, `FreezeColsControl`, `DataTableShell`, `HiddenColsMenu`, `SortMarker`)
@@ -102,8 +111,8 @@ blocks any `useReactTable` file that skips the following. Treat them as hard req
 3. **Numeric Freeze cols only.** Use `<FreezeColsControl>` (a number input freezing the leftmost
    N columns). The per-column checkbox "Freeze cols" dropdown is non-compliant (gate rule R4).
 4. **Provider/Status/Category/Company column ⇒ a filter** (or name it in `@table-waivers`).
-5. **Editable cell inputs must keep focus across keystrokes** (table-governance §8). A
-   `<input>`/`<textarea>` in a cell loses focus per keystroke if the `columns` `useMemo` deps
+5. **Editable cell inputs must keep focus across keystrokes** (hub §Mandatory Rules + below).
+   A `<input>`/`<textarea>` in a cell loses focus per keystroke if the `columns` `useMemo` deps
    include handlers/state that change every render — TanStack `flexRender` renders cells via
    `React.createElement`, so rebuilt columns remount the input. Fix with EITHER: (a) keep
    `columns` deps to keystroke-stable values and read volatile handlers/state inside cells via
@@ -113,45 +122,14 @@ blocks any `useReactTable` file that skips the following. Treat them as hard req
 
 ### Plan-time gate (before ExitPlanMode)
 
-When a plan introduces or rewrites a table, state its classification and list EACH mandatory
-control as **implemented** or **N-A because…**: table-scoped search, `col-id` UUID, category
-filters, numeric freeze, column resize+persist, hidden cols, sort arrows, reset, empty +
+When a plan introduces or rewrites a table, state its classification (hub §1) and list EACH
+mandatory control as **implemented** or **N-A because…**: table-scoped search, `col-id` UUID,
+category filters, numeric freeze, column resize+persist, hidden cols, sort arrows, reset, empty +
 filtered-empty. Skipping this enumeration is how non-compliant tables slip through.
 
-## Table + Sheet Classification
+---
 
-Before building or rewriting a table + sheet page, classify it in feature notes, PR text, or an app-local doc:
-
-| Level | Use when | Project Manager expectation |
-|---|---|---|
-| Simple Table | Fewer than 20 rows, no horizontal overflow, no repeated operational use | Stable `col-id`, meaningful sorting, empty/error states, explicit row actions. |
-| Basic Table Sheet | Default for operational datasets | Full company Basic Table Sheet requirements plus this skill's workstation contract. |
-| Large Data Sheet | 1000+ rows or many wide columns | Basic Table Sheet plus virtualization/performance validation. |
-| Read-only Exception | Static reference table where customization would not help | Document skipped requirements and keep layout accessible. |
-
-Do not copy every Project Progress Dashboard control into every screen. The classification decides the required scope.
-
-## Required Basic Table Sheet Contract
-
-For Project Manager, every Basic Table Sheet and Large Data Sheet must implement or explicitly document a phased exception for the following company-standard controls:
-
-- Table-scoped search in the table toolbar, before filters and view controls.
-- First data column with column id `col-id`, RFC 4122 UUID cell values, visible header **`UUID`** (`COL_ID_COLUMN_HEADER` in `components/table/colId.ts`).
-- Default filters for columns whose header, key, or field name contains `Provider`, `Category`, `Status`, or `Company`.
-- `Freeze cols` numeric control for horizontally scrolling tables, with sticky frozen columns and persisted canonical `col-*` IDs.
-- User-resizable column widths with min/max bounds, persisted by canonical column ID.
-- User-resizable row heights for dense operational sheets, with persisted row height state where row identity is stable.
-- Auto-save for table view preferences: widths, heights, hidden columns, hidden rows, frozen columns, filters, sorting, and sheet order.
-- Column context menu: sort, filter, resize, freeze, hide, restore hidden columns, reset view.
-- Row context menu: open/details, resize row, hide row, restore hidden rows, row-specific actions.
-- Column sort arrows: default double arrow, up arrow ascending, down arrow descending; action/checkbox/menu columns are not sortable.
-- Reorderable sheet tabs for workbook-style multi-sheet views, unless the feature documents why a sheet is structurally locked.
-- Explicit empty, filtered-empty, loading, error, and malformed-preference recovery states.
-- Keyboard access, screen-reader labels, visible focus, locale-independent IDs, and non-color-only state indicators.
-
-Use the company performance target for dense sheets: rendering 1000 rows x 20 columns under 200 ms after data is loaded, or classify and document why the table is smaller.
-
-## Project Manager Workstation Rules
+## Workstation Layout Rules
 
 - Use `WorkstationFrame`; do not inline an equivalent frame.
 - Use `BottomSheetTabs` for multi-sheet pages; tabs sit in the bottom slot.

@@ -3,6 +3,16 @@
 Status: Company baseline v0.1  
 Scope: Any app surface that renders operational tabular data
 
+> **PM profile extension:** Project Manager's stricter operational requirements
+> (Basic Table Sheet controls, `col-id` UUID column, workstation layout, context
+> menus, preference persistence) live in the app repo hub
+> [`docs/engineering/table-standards.md`](../../../../docs/engineering/table-standards.md).
+> Implementation: [`.agents/skills/table-and-sheet-layout/SKILL.md`](../../../../.agents/skills/table-and-sheet-layout/SKILL.md).
+> Compliance inventory: [`docs/engineering/table-sheet-inventory.md`](../../../../docs/engineering/table-sheet-inventory.md) (generated).
+>
+> This snapshot is an **abbreviated cross-app baseline**. Sync from upstream
+> `Company-AI-App-Standards` when updating; PM-specific extensions stay in the hub.
+
 ## Purpose
 
 This pattern standardizes how company apps build and review data tables so users get consistent scanability, interaction safety, and document-link behavior across products.

@@ -22,7 +22,7 @@ This folder contains operational engineering documentation for Project Manager. 
 6. [supabase-cloud-auth.md](./supabase-cloud-auth.md) — browser auth, workspace session, cloud read query contracts
 7. [ingestion-pipeline.md](./ingestion-pipeline.md)
 8. [security-and-secrets.md](./security-and-secrets.md)
-9. [table-standards.md](./table-standards.md)
+9. [table-standards.md](./table-standards.md) — **table + sheet hub** (start here for any table/sheet work)
 10. [document-classification-standard.md](./document-classification-standard.md)
 11. [documentation-site-sync.md](./documentation-site-sync.md)
 12. [hermes-agent-plugin.md](./hermes-agent-plugin.md)
@@ -42,7 +42,7 @@ This folder contains operational engineering documentation for Project Manager. 
 | Supabase browser auth, workspace session, cloud read helpers | `lib/auth/supabaseAuthSession.ts`, `lib/auth/workspaceSession.ts`, `lib/auth/*`, `app/login/*`, `app/auth/*` | [supabase-cloud-auth.md](./supabase-cloud-auth.md) |
 | Markdown import and AI-assisted spec import | `lib/ingestion/*`, `app/ui/views/IngestionView.tsx` | [ingestion-pipeline.md](./ingestion-pipeline.md) |
 | API keys, provider keys, GitHub token, API call boundary | `lib/storage/plugins.ts`, `lib/bridge/index.ts`, `src-tauri/src/lib.rs`, `app/api/anthropic/route.ts` | [security-and-secrets.md](./security-and-secrets.md) |
-| Table interaction, label contracts, sorting behavior, dashboard document-link cells, workstation viewport rules | `app/project-progress-dashboard/_components/PhaseTable.tsx`, `app/project-progress-dashboard/_lib/columns.tsx`, `app/project-progress-dashboard/_lib/pathLinks.tsx`, `app/ui/views/Plugins/PluginsHubView.tsx`, `app/ui/views/Plugins/_shared/IntegrationsTable.tsx`, `components/table/TableCore.tsx` | [table-standards.md](./table-standards.md) |
+| Table + sheet hub, interaction rules, label contracts, sorting, dashboard document-link cells, workstation viewport | `components/table/datasheet/`, `app/project-progress-dashboard/_components/PhaseTable.tsx`, `app/ui/views/Plugins/_shared/IntegrationsTable.tsx`, `components/table/TableCore.tsx` | [table-standards.md](./table-standards.md) (hub) + [table-sheet-inventory.md](./table-sheet-inventory.md) (generated) |
 | Document classification, public/internal/restricted gates, and public publish policy | `scripts/sync-documentation-site.mjs`, `docs/**/*.md` frontmatter | [document-classification-standard.md](./document-classification-standard.md) |
 | Static documentation website sync, generated routes, and publication classification metadata | `scripts/sync-documentation-site.mjs`, `lib/generated/documentation-site-internal.ts`, `lib/generated/documentation-site-public.ts`, `app/documentation/[[...slug]]/page.tsx`, `app/ui/views/DocumentationView.tsx` | [documentation-site-sync.md](./documentation-site-sync.md) |
 | Project-scoped Hermes Agent install and plugin toggle | `scripts/install-hermes-agent.sh`, `scripts/hermes-agent.sh`, `.project-manager/vendor/hermes-agent/`, `lib/storage/plugins.ts` | [hermes-agent-plugin.md](./hermes-agent-plugin.md) |
@@ -73,7 +73,7 @@ Update the relevant document whenever an implementation change changes a command
 6. [supabase-cloud-auth.md](./supabase-cloud-auth.md) — 瀏覽器 auth、工作區 session、雲端唯讀查詢契約
 7. [ingestion-pipeline.md](./ingestion-pipeline.md)
 8. [security-and-secrets.md](./security-and-secrets.md)
-9. [table-standards.md](./table-standards.md)
+9. [table-standards.md](./table-standards.md) — **table + sheet hub** (start here for any table/sheet work)
 10. [document-classification-standard.md](./document-classification-standard.md)
 11. [documentation-site-sync.md](./documentation-site-sync.md)
 12. [hermes-agent-plugin.md](./hermes-agent-plugin.md)
@@ -93,7 +93,7 @@ Update the relevant document whenever an implementation change changes a command
 | Supabase 瀏覽器 auth、工作區 session、雲端唯讀 helper | `lib/auth/supabaseAuthSession.ts`, `lib/auth/workspaceSession.ts`, `lib/auth/*`, `app/login/*`, `app/auth/*` | [supabase-cloud-auth.md](./supabase-cloud-auth.md) |
 | Markdown import 與 AI-assisted spec import | `lib/ingestion/*`, `app/ui/views/IngestionView.tsx` | [ingestion-pipeline.md](./ingestion-pipeline.md) |
 | API keys、provider keys、GitHub token、API call boundary | `lib/storage/plugins.ts`, `lib/bridge/index.ts`, `src-tauri/src/lib.rs`, `app/api/anthropic/route.ts` | [security-and-secrets.md](./security-and-secrets.md) |
-| Table 互動、label contracts、排序行為、dashboard 文件連結欄位與 workstation 視窗版面規則 | `app/project-progress-dashboard/_components/PhaseTable.tsx`, `app/project-progress-dashboard/_lib/columns.tsx`, `app/project-progress-dashboard/_lib/pathLinks.tsx`, `app/ui/views/Plugins/PluginsHubView.tsx`, `app/ui/views/Plugins/_shared/IntegrationsTable.tsx`, `components/table/TableCore.tsx` | [table-standards.md](./table-standards.md) |
+| Table + sheet hub、互動規則、label contracts、排序、dashboard 文件連結欄位、workstation 視窗版面 | `components/table/datasheet/`, `app/project-progress-dashboard/_components/PhaseTable.tsx`, `app/ui/views/Plugins/_shared/IntegrationsTable.tsx`, `components/table/TableCore.tsx` | [table-standards.md](./table-standards.md)（hub）+ [table-sheet-inventory.md](./table-sheet-inventory.md)（自動生成） |
 | 文件分類、public/internal/restricted gates 與 public publish policy | `scripts/sync-documentation-site.mjs`, `docs/**/*.md` frontmatter | [document-classification-standard.md](./document-classification-standard.md) |
 | 靜態 Documentation website sync、generated routes 與 publication classification metadata | `scripts/sync-documentation-site.mjs`, `lib/generated/documentation-site-internal.ts`, `lib/generated/documentation-site-public.ts`, `app/documentation/[[...slug]]/page.tsx`, `app/ui/views/DocumentationView.tsx` | [documentation-site-sync.md](./documentation-site-sync.md) |
 | Project-scoped Hermes Agent 安裝與 plugin toggle | `scripts/install-hermes-agent.sh`, `scripts/hermes-agent.sh`, `.project-manager/vendor/hermes-agent/`, `lib/storage/plugins.ts` | [hermes-agent-plugin.md](./hermes-agent-plugin.md) |

@@ -7,8 +7,8 @@
  * `useArenaTablePrefs` (sizing/visibility/frozen persistence) from
  * `app/ui/views/Keys/ArenaTableViewControls.ts`.
  *
- * The company-wide table-governance gate recognises imports from this module as
- * an approved primitive (see check-table-governance.mjs, rule R2).
+ * The table-governance gate recognises imports from this module as
+ * an approved primitive (see scripts/audit-table-sheets.mjs, rule R2).
  */
 export { getFrozenColumnLayout, applyFreezeColumnCount, type FrozenColumnLayout } from './frozenColumns';
 export { FreezeColsControl } from './FreezeColsControl';

@@ -16,7 +16,7 @@ This section is the public browsing entry for reusable company product and engin
 | --- | --- | --- |
 | AI engineer workflow | `/Users/Company-AI-App-Standards/docs/ai-engineer-workflow.md` | [Company Standards Hub](../features/company-standards.md) |
 | UI design system | `/Users/Company-AI-App-Standards/docs/ui-design-system.md` | [Company Standards Hub](../features/company-standards.md) |
-| Table governance | `/Users/Company-AI-App-Standards/docs/patterns/table-governance.md` | [Company Standards Hub](../features/company-standards.md) |
+| Table governance | Upstream: `Company-AI-App-Standards/docs/patterns/table-governance.md`; PM app profile: `docs/engineering/table-standards.md` | [Company Standards Hub](../features/company-standards.md) |
 | File naming standards | `/Users/Company-AI-App-Standards/docs/file-naming-standards.md` | [Company Standards Hub](../features/company-standards.md) |
 | Multi-app integration | `/Users/Company-AI-App-Standards/docs/multi-app-integration.md` | [Company Standards Hub](../features/company-standards.md) |
 | Multilingual interface architecture | `/Users/Company-AI-App-Standards/docs/patterns/multilingual-interface-architecture.md` | [Multilingual Interface Architecture](./multilingual-interface-architecture.md) |

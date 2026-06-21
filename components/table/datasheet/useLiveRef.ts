@@ -16,7 +16,8 @@ import { useRef, type MutableRefObject } from 'react';
  * after a single keystroke. Reading volatile values through this ref lets the
  * `columns` memo stay referentially stable, so editable cells keep focus.
  *
- * See `/Users/Company-AI-App-Standards/docs/patterns/table-governance.md` §8.
+ * See docs/engineering/table-standards.md (PM hub) and useLiveRef usage in
+ * components/table/datasheet/.
  */
 export function useLiveRef<T>(value: T): MutableRefObject<T> {
   const ref = useRef(value);
