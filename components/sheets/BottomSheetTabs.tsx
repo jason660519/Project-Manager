@@ -207,6 +207,8 @@ export function BottomSheetTabs<Key extends string>({
             </>
           );
 
+          const canClose = Boolean(onClose && tab.closeAriaLabel);
+
           if (onClose) {
             return (
               <div
@@ -242,24 +244,26 @@ export function BottomSheetTabs<Key extends string>({
                 >
                   {tabContents}
                 </button>
-                <button
-                  type="button"
-                  aria-label={tab.closeAriaLabel ?? `Close ${tab.label} sheet`}
-                  title={tab.closeAriaLabel ?? `Close ${tab.label} sheet`}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    onClose(tab.key);
-                  }}
-                  className={clsx(
-                    'mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm transition-colors',
-                    active
-                      ? 'text-white/70 hover:bg-white/15 hover:text-white'
-                      : 'text-stone-500 hover:bg-white/10 hover:text-stone-100',
-                  )}
-                >
-                  <X size={13} />
-                </button>
+                {canClose && (
+                  <button
+                    type="button"
+                    aria-label={tab.closeAriaLabel}
+                    title={tab.closeAriaLabel}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onClose(tab.key);
+                    }}
+                    className={clsx(
+                      'mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm transition-colors',
+                      active
+                        ? 'text-white/70 hover:bg-white/15 hover:text-white'
+                        : 'text-stone-500 hover:bg-white/10 hover:text-stone-100',
+                    )}
+                  >
+                    <X size={13} />
+                  </button>
+                )}
               </div>
             );
           }

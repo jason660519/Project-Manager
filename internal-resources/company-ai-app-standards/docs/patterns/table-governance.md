@@ -28,6 +28,10 @@ This pattern standardizes how company apps build and review data tables so users
 - Buttons, links, dropdowns, and checkboxes inside rows must stop propagation.
 - Keyboard focus should be visible for all interactive controls.
 - Sticky headers and sticky columns must remain readable during scroll.
+- Resizable column and row handles must align with the actual table grid line
+  they control. Column handles belong in the header-cell coordinate space, not
+  inside padded label wrappers. Row handles belong on the row boundary, normally
+  from the first visible or frozen cell.
 
 ## Document Link Rules
 
@@ -41,6 +45,7 @@ This pattern standardizes how company apps build and review data tables so users
 - [ ] Empty/loading/error states exist.
 - [ ] Numeric sorting is correct and not lexicographic.
 - [ ] Row actions do not accidentally trigger row navigation.
+- [ ] Resize handles visually align with the column or row grid line they drag.
 - [ ] Status badges and column placement are consistent with app conventions.
 - [ ] Link cells use stable labels and safe open behavior.
 - [ ] Table styling follows app tokens (no one-off palette).

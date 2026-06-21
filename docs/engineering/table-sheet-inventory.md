@@ -1,14 +1,14 @@
 # Table Sheet Inventory
 
 > Status: Generated from current source
-> Generated at: 2026-06-04T10:53:01.924Z
+> Generated at: 2026-06-21T19:36:55.793Z
 > Source command: `npm run table:sheet:audit -- --write`
 
 This report is source-driven. Do not use old hand-maintained coverage snapshots as completion proof.
 
 ## Summary
 
-- Surfaces scanned: 29
+- Surfaces scanned: 32
 - Basic table sheets: 9
 - Blocking findings: 0
 - Warnings: 0
@@ -35,6 +35,9 @@ This report is source-driven. Do not use old hand-maintained coverage snapshots 
 | `app/ui/views/KeysView.tsx` | Keys | /keys | sheet-wrapper (inferred) | WorkstationFrame + BottomSheetTabs | pass | Current static audit passed |
 | `app/ui/DashboardClient.tsx` | Other | /features | simple-wrapper (inferred) | TableCore | pass | Current static audit passed |
 | `app/ui/views/FeaturesView.tsx` | Other | /features | simple-wrapper (inferred) | TableCore | pass | Current static audit passed |
+| `app/ui/views/ProgressTemplates/TemplateColumnsSheet.tsx` | Other | n/a | simple (comment) | HTML table | pass | Current static audit passed |
+| `app/ui/views/ProgressTemplatesSettingView.tsx` | Other | n/a | simple (comment) | WorkstationFrame + BottomSheetTabs | pass | Current static audit passed |
+| `app/ui/views/Settings/LlmRouterHealthPanel.tsx` | Other | n/a | simple (comment) | HTML table | pass | Current static audit passed |
 | `app/project-progress-dashboard/_components/IssuesTab.tsx` | Project Progress Dashboard | /project-progress-dashboard | basic (comment) | HTML table | pass | Current static audit passed |
 | `app/project-progress-dashboard/_components/PhaseTable.tsx` | Project Progress Dashboard | /project-progress-dashboard | basic (comment) | HTML table | pass | Current static audit passed |
 | `app/project-progress-dashboard/_components/SheetTabs.tsx` | Project Progress Dashboard | /project-progress-dashboard | sheet-tab-primitive (inferred) | BottomSheetTabs | pass | Current static audit passed |
@@ -57,7 +60,7 @@ None.
 
 ## Static Test Report
 
-- Inventory source: 29 source-detected table/sheet surfaces under `app/` and `components/`.
+- Inventory source: 32 source-detected table/sheet surfaces under `app/` and `components/`.
 - Basic sheet checks: col-id, table search/filter state, freeze columns, resizable columns, hidden columns recovery, visible table scrollbar, empty or filtered-empty state.
 - Sheet wrapper checks: WorkstationFrame page frame, bottomTabs slot, bottom sheet tabs, reorderable sheet tabs, table-owned scrolling.
 - Routes requiring UI smoke when changed: /ai-sdks, /ai_assistants, /engineers, /features, /integrations-hub/system_installed_apps, /keys, /project-progress-dashboard, /settings.

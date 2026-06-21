@@ -1,5 +1,10 @@
 'use client';
 
+// @table-classification: simple
+// @table-reason: Workstation wrapper for progress-template settings; the fixed
+//   property-row sheet table is classified in TemplateColumnsSheet, where
+//   .pm-scroll owns horizontal overflow.
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LayoutTemplate, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import {
@@ -19,6 +24,7 @@ import { useI18n } from '../../../lib/i18n';
 import { TemplateColumnsSheet } from './ProgressTemplates/TemplateColumnsSheet';
 import { useTemplateFieldPreferences } from './ProgressTemplates/useTemplateFieldPreferences';
 import { useProgressTemplatesCatalog } from './ProgressTemplates/useProgressTemplatesCatalog';
+import { useInAppConfirm } from '../../../components/ui/InAppDialog';
 
 const SHEET_ORDER_STORAGE_KEY = 'projectManager.progressTemplatesSetting.sheetOrder';
 
@@ -43,6 +49,7 @@ export function ProgressTemplatesSettingView() {
   const [isAddingSheet, setIsAddingSheet] = useState(false);
   const newSheetInputRef = useRef<HTMLInputElement>(null);
   const templateIds = useMemo(() => new Set(templates.map((template) => template.id)), [templates]);
+  const { open: openConfirm, dialog: confirmDialog } = useInAppConfirm();
 
   const activeTemplate = useMemo(
     () => templates.find((template) => template.id === activeTemplateId),
@@ -94,21 +101,66 @@ export function ProgressTemplatesSettingView() {
     }
   }, []);
 
+  const requestDeleteSheet = useCallback(async (templateId: string) => {
+    const templateToDelete = templates.find((template) => template.id === templateId);
+    if (!templateToDelete || isBuiltInTemplateId(templateToDelete.id)) return;
+
+    const confirmed = await openConfirm({
+      title: `Delete "${templateToDelete.label}"?`,
+      message: 'This sheet and all its custom fields will be permanently deleted. This action cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+    });
+
+    if (!confirmed) return;
+
+    const deletedTemplateId = templateToDelete.id;
+    const nextTemplates = templates.filter((template) => template.id !== deletedTemplateId);
+    const fallbackTemplateId =
+      nextTemplates.find((template) => template.id === DEVELOPMENT_TEMPLATE_ID)?.id
+      ?? nextTemplates[0]?.id
+      ?? DEVELOPMENT_TEMPLATE_ID;
+    deleteTemplate(deletedTemplateId);
+    setNewSheetLabel('');
+    persistSheetOrder(
+      SHEET_ORDER_STORAGE_KEY,
+      nextTemplates.map((template) => template.id),
+    );
+    if (activeTemplateId === deletedTemplateId) {
+      setActiveTemplateId(fallbackTemplateId);
+    }
+    if (typeof window !== 'undefined' && window.location.hash === `#${deletedTemplateId}`) {
+      window.location.hash = fallbackTemplateId;
+    }
+  }, [activeTemplateId, deleteTemplate, templates, openConfirm]);
+
   const tabs: ReadonlyArray<SheetTabItem<ProgressTemplateSheetId>> = useMemo(
-    () => templates.map((template) => ({
-      key: template.id,
-      label: template.label,
-      icon: <LayoutTemplate className="h-4 w-4" />,
-      badge: isBuiltInTemplateId(template.id)
-        ? readStoredTemplateFieldColumns(template.id).length
-        : template.fields.length,
-      activeClassName: 'bg-violet-600/85 text-white shadow-sm',
-      iconClassName: 'text-violet-200',
-      ariaLabel: `${template.label} sheet`,
-      title: `${template.label} column template. Drag to reorder.`,
-    })),
+    () => templates.map((template) => {
+      const isBuiltIn = isBuiltInTemplateId(template.id);
+      return {
+        key: template.id,
+        label: template.label,
+        icon: <LayoutTemplate className="h-4 w-4" />,
+        badge: isBuiltIn
+          ? readStoredTemplateFieldColumns(template.id).length
+          : template.fields.length,
+        activeClassName: isBuiltIn
+          ? 'bg-emerald-600/85 text-white shadow-sm'
+          : 'bg-amber-600/85 text-white shadow-sm',
+        iconClassName: isBuiltIn ? 'text-emerald-200' : 'text-amber-200',
+        ariaLabel: `${template.label} sheet`,
+        title: `${template.label} column template. Drag to reorder. ${isBuiltIn ? 'Built-in template - cannot be deleted.' : 'Custom template - can be deleted.'}`,
+        closeAriaLabel: isBuiltIn ? undefined : `Delete ${template.label} sheet`,
+      };
+    }),
     [templates],
   );
+
+  const handleCloseTab = useCallback((templateId: string) => {
+    if (isBuiltInTemplateId(templateId)) return;
+    void requestDeleteSheet(templateId);
+  }, [requestDeleteSheet]);
 
   const handleAddField = () => {
     const label = newFieldLabel.trim();
@@ -132,26 +184,6 @@ export function ProgressTemplatesSettingView() {
     setIsAddingSheet(false);
   };
 
-  const handleDeleteSheet = () => {
-    if (!activeTemplate || isBuiltInTemplateId(activeTemplate.id)) return;
-    const deletedTemplateId = activeTemplate.id;
-    const nextTemplates = templates.filter((template) => template.id !== deletedTemplateId);
-    const fallbackTemplateId =
-      nextTemplates.find((template) => template.id === DEVELOPMENT_TEMPLATE_ID)?.id
-      ?? nextTemplates[0]?.id
-      ?? DEVELOPMENT_TEMPLATE_ID;
-    deleteTemplate(activeTemplate.id);
-    setNewSheetLabel('');
-    persistSheetOrder(
-      SHEET_ORDER_STORAGE_KEY,
-      nextTemplates.map((template) => template.id),
-    );
-    setActiveTemplateId(fallbackTemplateId);
-    if (typeof window !== 'undefined') {
-      window.location.hash = fallbackTemplateId;
-    }
-  };
-
   const activeTemplateIsBuiltIn = activeTemplate ? isBuiltInTemplateId(activeTemplate.id) : false;
 
   return (
@@ -172,7 +204,9 @@ export function ProgressTemplatesSettingView() {
             <>
               <button
                 type="button"
-                onClick={handleDeleteSheet}
+                onClick={() => {
+                  if (activeTemplate) void requestDeleteSheet(activeTemplate.id);
+                }}
                 className="inline-flex h-8 items-center gap-1.5 border border-red-300/25 bg-red-500/10 px-3 text-xs font-medium text-red-100 hover:bg-red-500/20"
               >
                 <Trash2 size={14} />
@@ -293,6 +327,7 @@ export function ProgressTemplatesSettingView() {
             tabs={tabs}
             activeKey={activeTemplateId}
             onSelect={onSelectTemplate}
+            onClose={handleCloseTab}
             leadingAction={
               <button
                 type="button"
@@ -323,6 +358,7 @@ export function ProgressTemplatesSettingView() {
           />
         ) : null}
       </div>
+      {confirmDialog}
     </WorkstationFrame>
   );
 }

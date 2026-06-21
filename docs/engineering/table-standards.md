@@ -124,6 +124,15 @@ Canonical labels for dashboard document columns:
   table layout semantics with `overflow-hidden`/truncate wrappers on headers and cells;
   never allow inputs, badges, buttons, chips, or flex rows to visually spill into
   neighboring columns after a user shrinks a column.
+- Column resize handles MUST be positioned in the header cell's coordinate space:
+  the `<th>` is the positioned parent, and the handle sits on the actual column
+  border/grid line (`right: 0`). Do not place resize handles inside padded or
+  truncated inner header-content wrappers, because the hit target and hover line
+  will drift left of the real column boundary.
+- Row resize handles MUST align with the actual row boundary. Put the horizontal
+  handle in the first visible/frozen cell for that row, positioned against the
+  cell bottom edge (`bottom: 0; left: 0; right: 0`), so the drag affordance
+  matches the row grid line rather than a nested content wrapper.
 - User table preferences MUST be schema-versioned and normalized on read. Drop
   unknown column/row IDs, clamp widths/heights, append newly added columns with
   defaults, and repair malformed sorting/filter/freeze state instead of throwing.

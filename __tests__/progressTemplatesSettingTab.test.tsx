@@ -11,6 +11,8 @@ import { I18nProvider } from '../lib/i18n';
 
 const CUSTOM_TEMPLATES_STORAGE_KEY = 'projectManager.progressDashboard.customTemplates';
 const SHEET_ORDER_STORAGE_KEY = 'projectManager.progressTemplatesSetting.sheetOrder';
+const COLUMN_WIDTH_STORAGE_KEY = 'projectManager.progressTemplatesSetting.columnWidths.v1';
+const ROW_HEIGHT_STORAGE_KEY = 'projectManager.progressTemplatesSetting.rowHeights.v1';
 
 function renderView() {
   return render(
@@ -42,14 +44,14 @@ describe('ProgressTemplatesSettingView', () => {
   it('renders bottom sheet tabs for each built-in template', () => {
     const { container } = renderView();
     const addSheetButton = screen.getByRole('button', { name: /add sheet/i });
-    const firstSheetButton = screen.getByRole('button', { name: /Desktop App Development sheet/i });
+    const firstSheetButton = screen.getByRole('button', { name: /^Desktop App Development sheet$/i });
 
     expect(
       Boolean(addSheetButton.compareDocumentPosition(firstSheetButton) & Node.DOCUMENT_POSITION_FOLLOWING),
     ).toBe(true);
     expect(container.querySelector('button[title="Add sheet"]')).toBe(addSheetButton);
-    expect(screen.getByRole('button', { name: /Desktop App Development sheet/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Hardware R&D sheet/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Desktop App Development sheet$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Hardware R&D sheet$/i })).toBeInTheDocument();
   });
 
   it('lets the user add a custom field to the active template', async () => {
@@ -75,7 +77,7 @@ describe('ProgressTemplatesSettingView', () => {
 
     await addCustomSheet(user, 'Mobile App QA');
 
-    expect(await screen.findByRole('button', { name: /mobile app qa sheet/i })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^mobile app qa sheet$/i })).toBeInTheDocument();
     expect(screen.getByText('Mobile App QA Progress')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Project Name')).toBeInTheDocument();
   });
@@ -85,7 +87,7 @@ describe('ProgressTemplatesSettingView', () => {
     renderView();
 
     await addCustomSheet(user, 'Mobile App QA');
-    expect(await screen.findByRole('button', { name: /mobile app qa sheet/i })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^mobile app qa sheet$/i })).toBeInTheDocument();
 
     await user.type(screen.getByPlaceholderText(/release notes/i), 'Release Notes');
     await user.click(screen.getByRole('button', { name: /add field/i }));
@@ -113,12 +115,12 @@ describe('ProgressTemplatesSettingView', () => {
     });
   });
 
-  it('deletes a custom sheet and removes stale display order and hash state', async () => {
+  it('requires confirmation before deleting a custom sheet from the active toolbar action', async () => {
     const user = userEvent.setup();
     renderView();
 
     await addCustomSheet(user, 'Mobile App QA');
-    expect(await screen.findByRole('button', { name: /mobile app qa sheet/i })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^mobile app qa sheet$/i })).toBeInTheDocument();
     expect(window.location.hash).toBe('#mobile-app-qa');
 
     window.localStorage.setItem(
@@ -126,15 +128,57 @@ describe('ProgressTemplatesSettingView', () => {
       JSON.stringify(['mobile-app-qa', DEVELOPMENT_TEMPLATE_ID, 'mobile-app-qa']),
     );
 
-    await user.click(screen.getByRole('button', { name: /delete sheet/i }));
+    await user.click(screen.getByRole('button', { name: /^delete sheet$/i }));
+
+    const dialog = await screen.findByRole('dialog', { name: /delete "mobile app qa"/i });
+    expect(dialog).toHaveTextContent(/permanently deleted/i);
+
+    await user.click(screen.getByRole('button', { name: /^cancel$/i }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /delete "mobile app qa"/i })).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /^mobile app qa sheet$/i })).toBeInTheDocument();
+    expect(window.localStorage.getItem(CUSTOM_TEMPLATES_STORAGE_KEY)).toContain('mobile-app-qa');
+
+    await user.click(screen.getByRole('button', { name: /^delete sheet$/i }));
+    await user.click(await screen.findByRole('button', { name: /^delete$/i }));
 
     await waitFor(() => {
-      expect(screen.queryByRole('button', { name: /mobile app qa sheet/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^mobile app qa sheet$/i })).not.toBeInTheDocument();
       expect(window.location.hash).toBe(`#${DEVELOPMENT_TEMPLATE_ID}`);
     });
 
     expect(window.localStorage.getItem(CUSTOM_TEMPLATES_STORAGE_KEY)).not.toContain('mobile-app-qa');
     expect(window.localStorage.getItem(SHEET_ORDER_STORAGE_KEY)).not.toContain('mobile-app-qa');
+  });
+
+  it('requires confirmation before deleting a custom sheet from its tab close button', async () => {
+    const user = userEvent.setup();
+    renderView();
+
+    await addCustomSheet(user, 'Mobile App QA');
+    expect(await screen.findByRole('button', { name: /^mobile app qa sheet$/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^desktop app development sheet$/i }));
+    expect(screen.getByRole('button', { name: /delete mobile app qa sheet/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /delete desktop app development sheet/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /delete mobile app qa sheet/i }));
+    expect(await screen.findByRole('dialog', { name: /delete "mobile app qa"/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^cancel$/i }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /delete "mobile app qa"/i })).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /^mobile app qa sheet$/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /delete mobile app qa sheet/i }));
+    await user.click(await screen.findByRole('button', { name: /^delete$/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /^mobile app qa sheet$/i })).not.toBeInTheDocument();
+    });
+    expect(window.localStorage.getItem(CUSTOM_TEMPLATES_STORAGE_KEY)).not.toContain('mobile-app-qa');
   });
 
   it('resets template fields back to the built-in defaults', async () => {
@@ -169,14 +213,19 @@ describe('ProgressTemplatesSettingView', () => {
     expect(readStoredColumns(DEVELOPMENT_TEMPLATE_ID)).toBeUndefined();
   });
 
-  it('toggles field visibility from the editor table', async () => {
+  it('renders fields as columns and toggles visibility from the property row', async () => {
     renderView();
 
-    const projectNameRow = screen.getByDisplayValue('Project Name');
-    const row = projectNameRow.closest('tr');
-    expect(row).toBeTruthy();
+    const projectNameColumnHeader = screen.getByRole('columnheader', { name: /project name/i });
+    expect(projectNameColumnHeader).toBeInTheDocument();
+    expect(screen.getByRole('rowheader', { name: /^visible$/i })).toBeInTheDocument();
 
-    const visibleCheckbox = row!.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    const columnIndex = (projectNameColumnHeader as HTMLTableCellElement).cellIndex;
+    const visibleRow = screen.getByRole('rowheader', { name: /^visible$/i }).closest('tr');
+    expect(visibleRow).toBeTruthy();
+
+    const visibleCell = visibleRow!.children.item(columnIndex);
+    const visibleCheckbox = visibleCell!.querySelector('input[type="checkbox"]') as HTMLInputElement;
     expect(visibleCheckbox.checked).toBe(true);
     fireEvent.click(visibleCheckbox);
 
@@ -185,5 +234,52 @@ describe('ProgressTemplatesSettingView', () => {
       const projectName = stored?.find((column) => column.label === 'Project Name');
       expect(projectName?.visible).toBe(false);
     });
+  });
+
+  it('lets users drag field column widths and persists them per sheet', async () => {
+    renderView();
+
+    const projectNameColumnHeader = screen.getByRole('columnheader', { name: /project name/i });
+    const resizeHandle = screen.getByRole('button', { name: /resize project name/i });
+
+    expect(resizeHandle.parentElement).toBe(projectNameColumnHeader);
+    expect(projectNameColumnHeader).toHaveStyle({ width: '200px' });
+
+    fireEvent.pointerDown(resizeHandle, { clientX: 200, pointerId: 1 });
+    fireEvent.pointerMove(window, { clientX: 260 });
+    fireEvent.pointerUp(window);
+
+    await waitFor(() => {
+      expect(projectNameColumnHeader).toHaveStyle({ width: '260px' });
+    });
+
+    const stored = JSON.parse(window.localStorage.getItem(COLUMN_WIDTH_STORAGE_KEY) ?? '{}') as {
+      templates?: Record<string, Record<string, number>>;
+    };
+    expect(stored.templates?.[DEVELOPMENT_TEMPLATE_ID]?.projectName).toBe(260);
+  });
+
+  it('lets users drag property row heights and persists them per sheet', async () => {
+    renderView();
+
+    const visibleRowHeader = screen.getByRole('rowheader', { name: /^visible$/i });
+    const resizeHandle = screen.getByRole('button', { name: /resize row visible/i });
+    const visibleRow = visibleRowHeader.closest('tr');
+
+    expect(visibleRow).toHaveStyle({ height: '56px' });
+    expect(resizeHandle.parentElement).toBe(visibleRowHeader);
+
+    fireEvent.pointerDown(resizeHandle, { clientY: 120, pointerId: 1 });
+    fireEvent.pointerMove(window, { clientY: 146 });
+    fireEvent.pointerUp(window);
+
+    await waitFor(() => {
+      expect(visibleRow).toHaveStyle({ height: '82px' });
+    });
+
+    const stored = JSON.parse(window.localStorage.getItem(ROW_HEIGHT_STORAGE_KEY) ?? '{}') as {
+      templates?: Record<string, Record<string, number>>;
+    };
+    expect(stored.templates?.[DEVELOPMENT_TEMPLATE_ID]?.visible).toBe(82);
   });
 });
