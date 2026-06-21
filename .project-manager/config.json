@@ -2017,24 +2017,24 @@
           ".project-manager/features/F54/dev-log.md",
           "lib/project-workflows/projectWorkflowEngine.ts",
           "lib/project-workflows/projectWorkflowExecutionPackageStore.ts",
-      "lib/project-workflows/projectWorkflowExecutionResolver.ts",
-      "lib/project-workflows/projectWorkflowGraphView.ts",
-      "lib/integrations/load-project-inventory.ts",
-      "lib/integrations/mappers/channels.ts",
-      "lib/integrations/sheet-actions.ts",
-      "lib/integrations/types.ts",
-      "lib/types/channels.ts",
-      "app/ai_assistants/AIAssistantsConsoleClient.tsx",
-      "app/ui/views/Plugins/PluginsHubView.tsx",
-      "app/ui/views/Plugins/_shared/CommandMappingEditForm.tsx",
-      "app/ui/views/Plugins/_shared/IntegrationsDetailSheet.tsx",
+          "lib/project-workflows/projectWorkflowExecutionResolver.ts",
+          "lib/project-workflows/projectWorkflowGraphView.ts",
+          "lib/integrations/load-project-inventory.ts",
+          "lib/integrations/mappers/channels.ts",
+          "lib/integrations/sheet-actions.ts",
+          "lib/integrations/types.ts",
+          "lib/types/channels.ts",
+          "app/ai_assistants/AIAssistantsConsoleClient.tsx",
+          "app/ui/views/Plugins/PluginsHubView.tsx",
+          "app/ui/views/Plugins/_shared/CommandMappingEditForm.tsx",
+          "app/ui/views/Plugins/_shared/IntegrationsDetailSheet.tsx",
           "__tests__/projectWorkflowEngine.test.ts",
           "__tests__/projectWorkflowExecutionPackageStore.test.ts",
-      "__tests__/projectWorkflowExecutionResolver.test.ts",
-      "__tests__/projectWorkflowGraphView.test.ts",
-      "__tests__/ai-assistants.console.test.tsx",
-      "__tests__/integrations.commandMappingExecutorRegistry.test.ts",
-      "__tests__/integrations.workflowExecutionRequests.test.ts",
+          "__tests__/projectWorkflowExecutionResolver.test.ts",
+          "__tests__/projectWorkflowGraphView.test.ts",
+          "__tests__/ai-assistants.console.test.tsx",
+          "__tests__/integrations.commandMappingExecutorRegistry.test.ts",
+          "__tests__/integrations.workflowExecutionRequests.test.ts",
           "__tests__/integrations.executionRequestDetailSheet.test.tsx",
           "__tests__/integrations.sheetActions.test.ts"
         ],
@@ -2082,6 +2082,63 @@
       "status": "in_progress",
       "updatedAt": "2026-06-16T09:05:00.000Z",
       "updatedBy": "Codex"
+    },
+    {
+      "id": "F56",
+      "name": "SLO-Aware LLM Provider Routing",
+      "category": "PM Orchestration",
+      "status": "completed",
+      "progress": 100,
+      "phase": "development",
+      "points": 8,
+      "locatedSection": "Settings > AI Providers / Rust call_llm_routed",
+      "readmePath": ".project-manager/features/F56/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F56/",
+        "spec": ".project-manager/features/F56/feature-spec.md",
+        "tdd": ".project-manager/features/F56/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F56/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F56/",
+        "implementation": "lib/llm-router",
+        "test": ".project-manager/features/F56/tests/llmRouter.sloRouting.test.ts"
+      },
+      "notes": "Slices 1–3 delivered: SLI/SLO routing, Keys inference probe, Settings LLM Router Health. verify:baseline green 2026-06-21. Scan quorum deferred to future slice.",
+      "createdAt": "2026-06-21T07:47:10.274Z",
+      "updatedAt": "2026-06-21T01:30:00.000Z",
+      "updatedBy": "Cursor",
+      "metadata": {
+        "evidencePaths": [
+          ".project-manager/features/F56/README.md",
+          ".project-manager/features/F56/feature-spec.md",
+          ".project-manager/features/F56/tdd-spec.md",
+          ".project-manager/features/F56/test-scenarios.md",
+          ".project-manager/features/F56/dev-log.md",
+          "lib/llm-router",
+          "lib/keys/validationProbe.ts",
+          "lib/keys/probeModelSelection.ts",
+          "src-tauri/src/llm_router_sli.rs",
+          "lib/llm-router/healthDashboard.ts",
+          "app/ui/views/Settings/LlmRouterHealthPanel.tsx",
+          "src-tauri/src/llm_router_probe.rs"
+        ],
+        "kickoffAt": "2026-06-21T07:47:10.274Z",
+        "plannedTestScope": [
+          "unit: lib/llm-router error taxonomy, SLO config, SLI window, health score, candidate ranking",
+          "unit: lib/keys probeModelSelection, validationProbe",
+          "unit: src-tauri llm_router_sli observation recording, pruning, SLO gate, ranking",
+          "unit: src-tauri llm_router_probe streaming probe + record_probe_sli",
+          "integration: call_llm_routed records deployments and emits skipped_slo attempts",
+          "integration: Keys validation path probes provider and writes probeResult + baseline SLI",
+          "manual: llm-router-state.json persistence after Tauri routed call and key validation"
+        ],
+        "risks": [
+          "Cold-start providers may be over-used before SLI samples accumulate.",
+          "Gemini probe uses E2E as TTFT proxy (no streaming TTFT yet).",
+          "Over-aggressive SLO gates could skip all candidates; must fall through with clear errors.",
+          "Router state file growth; observation cap per deployment required."
+        ],
+        "scope": "Slice 1–3: SLI collection, SLO gates, health ranking in call_llm_routed; Keys inference probe; Settings LLM Router Health UI. Future: scan quorum."
+      }
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",
@@ -2092,6 +2149,6 @@
     "root": "/Users/Project-Manager"
   },
   "schemaVersion": 10,
-  "updatedAt": "2026-06-16T09:05:00.000Z",
-  "updatedBy": "Codex"
+  "updatedAt": "2026-06-21T01:30:00.000Z",
+  "updatedBy": "Cursor"
 }

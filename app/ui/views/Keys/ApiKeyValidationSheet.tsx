@@ -22,6 +22,7 @@ import {
   loadAllProviderMetadata,
   mergeCuratedAndDynamicModels,
   maskKey,
+  formatProbeSummary,
   type ProviderMetadataMap,
 } from '../../../../lib/keys/providerMetadata';
 import { setProviderActiveInOrder, loadProviderOrder, type ProviderOrderEntry } from '../../../../lib/keys/providerOrder';
@@ -513,6 +514,7 @@ export function ApiKeyValidationSheet({
         canRefreshModels: hasKey && supportsModelRefresh,
         lastValidatedAt: meta?.lastValidatedAt ?? null,
         errorReason: meta?.status === 'fail' ? meta.errorReason ?? null : null,
+        probeSummary: formatProbeSummary(meta?.probeResult),
         isCustom: customProviderIds.has(provider.id),
       };
     });

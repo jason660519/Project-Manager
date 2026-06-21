@@ -1921,6 +1921,61 @@ export async function revalidateProviderKey(opts: {
   });
 }
 
+export interface ProbeProviderInferenceResult {
+  ok: boolean;
+  model: string;
+  latencyMs: number;
+  ttftMs?: number | null;
+  errorReason: string | null;
+}
+
+/**
+ * Run a lightweight 1-token inference probe (F56). Rust performs the HTTP
+ * call and optionally records baseline SLI into llm-router-state.json.
+ */
+export async function probeProviderInference(opts: {
+  providerId: string;
+  model: string;
+  apiKind: ProviderApiKind;
+  apiKey: string;
+  baseUrl?: string;
+  recordSli?: boolean;
+}): Promise<ProbeProviderInferenceResult> {
+  if (!isTauri()) {
+    throw new Error('probeProviderInference requires Tauri runtime');
+  }
+  return invoke<ProbeProviderInferenceResult>('probe_provider_inference', {
+    providerId: opts.providerId,
+    model: opts.model,
+    apiKind: opts.apiKind,
+    baseUrl: opts.baseUrl ?? null,
+    apiKey: opts.apiKey,
+    recordSli: opts.recordSli ?? true,
+  });
+}
+
+export interface LlmRouterHealthSnapshot {
+  deployments: Record<
+    string,
+    {
+      observations: Array<{
+        success: boolean;
+        latencyMs: number;
+        ttftMs?: number;
+        observedAtUnix: number;
+      }>;
+    }
+  >;
+  cooldownCount: number;
+  fetchedAtUnix: number;
+}
+
+/** Rolling SLI deployments for Settings health dashboard (F56 Slice 3). */
+export async function readLlmRouterHealth(): Promise<LlmRouterHealthSnapshot | null> {
+  if (!isTauri()) return null;
+  return invoke<LlmRouterHealthSnapshot>('read_llm_router_health');
+}
+
 // ── Multi-provider fallback call ─────────────────────────────────────────────
 
 export interface LlmFallbackAttempt {

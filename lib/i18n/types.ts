@@ -133,6 +133,25 @@ export interface Translations {
     copyPresetPrompt: string;
     importPresetPrompt: string;
     importPresetInvalid: string;
+    llmRouterHealthTitle: string;
+    llmRouterHealthHint: string;
+    llmRouterHealthRequiresTauri: string;
+    llmRouterHealthAliasLabel: string;
+    llmRouterHealthRefresh: string;
+    llmRouterHealthFetchedAt: string;
+    llmRouterHealthCooldowns: string;
+    llmRouterHealthEmpty: string;
+    llmRouterHealthColDeployment: string;
+    llmRouterHealthColSamples: string;
+    llmRouterHealthColP95: string;
+    llmRouterHealthColErrorRate: string;
+    llmRouterHealthColScore: string;
+    llmRouterHealthColGate: string;
+    llmRouterHealthColLastProbe: string;
+    llmRouterHealthGateOpen: string;
+    llmRouterHealthGateClosed: string;
+    llmRouterHealthGateCold: string;
+    llmRouterHealthSloP95: string;
   };
   common: {
     search: string;

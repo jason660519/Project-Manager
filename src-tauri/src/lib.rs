@@ -1,4 +1,6 @@
 mod dev_secrets;
+mod llm_router_probe;
+mod llm_router_sli;
 mod terminal_boundaries;
 mod xmux_webview;
 
@@ -1429,6 +1431,8 @@ struct LlmRouterCooldown {
 #[derive(Serialize, Deserialize, Default)]
 struct LlmRouterState {
     cooldowns: HashMap<String, LlmRouterCooldown>,
+    #[serde(default)]
+    deployments: HashMap<String, llm_router_sli::DeploymentSliStats>,
 }
 
 struct StoredChatProviderSpec {
@@ -1654,7 +1658,7 @@ async fn append_pm_operation_log(category: String, line: String) -> Result<(), S
     Ok(())
 }
 
-async fn read_llm_router_state() -> LlmRouterState {
+pub(crate) async fn read_llm_router_state() -> LlmRouterState {
     let path = match llm_router_state_path() {
         Ok(path) => path,
         Err(_) => return LlmRouterState::default(),
@@ -1665,7 +1669,7 @@ async fn read_llm_router_state() -> LlmRouterState {
     }
 }
 
-async fn write_llm_router_state(state: &LlmRouterState) -> Result<(), String> {
+pub(crate) async fn write_llm_router_state(state: &LlmRouterState) -> Result<(), String> {
     let path = llm_router_state_path()?;
     if let Some(parent) = path.parent() {
         tokio::fs::create_dir_all(parent)
@@ -1679,7 +1683,7 @@ async fn write_llm_router_state(state: &LlmRouterState) -> Result<(), String> {
         .map_err(|e| format!("Cannot write router state: {e}"))
 }
 
-fn unix_now_secs() -> u64 {
+pub(crate) fn unix_now_secs() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
@@ -2121,11 +2125,35 @@ async fn call_llm_routed(
         .cooldowns
         .retain(|_, cooldown| cooldown.cooldown_until_unix > now);
 
+    let slo = llm_router_sli::slo_for_alias(&alias);
+    let rankable: Vec<llm_router_sli::RankableCandidate> = route_candidates
+        .into_iter()
+        .enumerate()
+        .map(|(original_index, c)| llm_router_sli::RankableCandidate {
+            provider: c.provider,
+            model: c.model,
+            original_index,
+        })
+        .collect();
+    let ranked = llm_router_sli::rank_candidates_by_health(
+        rankable,
+        &state.deployments,
+        &alias,
+        now,
+    );
+    let ordered_candidates: Vec<LlmRouteCandidate> = ranked
+        .into_iter()
+        .map(|c| LlmRouteCandidate {
+            provider: c.provider,
+            model: c.model,
+        })
+        .collect();
+
     let mut attempts: Vec<LlmRouteAttempt> = Vec::new();
     let mut state_changed = false;
     let mut last_error: Option<String> = None;
 
-    for candidate in route_candidates {
+    for candidate in ordered_candidates {
         let Some(spec) = stored_chat_provider_spec(&candidate.provider) else {
             let error = format!("Unsupported provider: {}", candidate.provider);
             attempts.push(LlmRouteAttempt {
@@ -2158,6 +2186,26 @@ async fn call_llm_routed(
             }
         }
 
+        let empty_stats = llm_router_sli::DeploymentSliStats::default();
+        let metrics = llm_router_sli::compute_window_metrics(
+            state.deployments.get(&dep_id).unwrap_or(&empty_stats),
+            now,
+            llm_router_sli::SLI_WINDOW_SECONDS,
+        );
+        if llm_router_sli::deployment_exceeds_slo(&metrics, &slo) {
+            let reason = llm_router_sli::slo_breach_reason(&metrics, &slo);
+            attempts.push(LlmRouteAttempt {
+                provider: candidate.provider.clone(),
+                model: candidate_model.clone(),
+                status: "skipped_slo".to_string(),
+                error_reason: Some(reason.clone()),
+                cooldown_until: None,
+            });
+            last_error = Some(reason);
+            continue;
+        }
+
+        let started = std::time::Instant::now();
         match call_stored_chat_provider(
             candidate.provider.clone(),
             Some(candidate_model.clone()),
@@ -2170,9 +2218,18 @@ async fn call_llm_routed(
         .await
         {
             Ok(response) => {
-                if state_changed {
-                    let _ = write_llm_router_state(&state).await;
-                }
+                let latency_ms = started.elapsed().as_millis() as u64;
+                llm_router_sli::record_observation(
+                    state.deployments.entry(dep_id).or_default(),
+                    llm_router_sli::DeploymentObservation {
+                        success: true,
+                        latency_ms,
+                        ttft_ms: None,
+                        observed_at_unix: now,
+                    },
+                    now,
+                );
+                let _ = write_llm_router_state(&state).await;
                 attempts.push(LlmRouteAttempt {
                     provider: candidate.provider.clone(),
                     model: candidate_model.clone(),
@@ -2191,7 +2248,7 @@ async fn call_llm_routed(
                         route_decision_id,
                         model_alias: alias,
                         task_class,
-                        strategy: "deterministic-fallback-v1".to_string(),
+                        strategy: "slo-aware-fallback-v1".to_string(),
                         selected_provider: candidate.provider,
                         selected_model: candidate_model,
                         degraded,
@@ -2200,6 +2257,18 @@ async fn call_llm_routed(
                 });
             }
             Err(error) => {
+                let latency_ms = started.elapsed().as_millis() as u64;
+                llm_router_sli::record_observation(
+                    state.deployments.entry(dep_id.clone()).or_default(),
+                    llm_router_sli::DeploymentObservation {
+                        success: false,
+                        latency_ms,
+                        ttft_ms: None,
+                        observed_at_unix: now,
+                    },
+                    now,
+                );
+                state_changed = true;
                 let cooldown_seconds = cooldown_seconds_for_error(&error);
                 let cooldown_until = cooldown_seconds.map(|seconds| now + seconds);
                 if let Some(cooldown_until_unix) = cooldown_until {
@@ -2210,7 +2279,6 @@ async fn call_llm_routed(
                             reason: error.clone(),
                         },
                     );
-                    state_changed = true;
                 }
                 attempts.push(LlmRouteAttempt {
                     provider: candidate.provider,
@@ -2621,7 +2689,7 @@ async fn validate_github_token(api_key: &str) -> Result<Vec<String>, String> {
 }
 
 /// Keep error_reason short enough to render in a single line in the UI.
-fn truncate_error(text: &str) -> String {
+pub(crate) fn truncate_error(text: &str) -> String {
     const MAX: usize = 200;
     if text.chars().count() <= MAX {
         text.to_string()
@@ -2681,6 +2749,60 @@ async fn validate_provider_key(
     api_key: String,
 ) -> Result<ValidateProviderKeyResult, String> {
     run_validation(&api_kind, base_url.as_deref(), &api_key).await
+}
+
+/// Lightweight 1-token inference probe after list-models validation (F56).
+/// Optionally records a baseline SLI observation for routing health ranking.
+#[tauri::command]
+async fn probe_provider_inference(
+    provider_id: String,
+    model: String,
+    api_kind: String,
+    base_url: Option<String>,
+    api_key: String,
+    record_sli: Option<bool>,
+) -> Result<llm_router_probe::ProbeProviderInferenceResult, String> {
+    let result = llm_router_probe::run_probe_inference(
+        &api_kind,
+        base_url.as_deref(),
+        &api_key,
+        &model,
+    )
+    .await;
+
+    if record_sli.unwrap_or(true) {
+        let _ = llm_router_probe::record_probe_sli(
+            &provider_id,
+            &result.model,
+            result.ok,
+            result.latency_ms,
+            result.ttft_ms,
+        )
+        .await;
+    }
+
+    Ok(result)
+}
+
+#[derive(Serialize, Clone)]
+struct LlmRouterHealthSnapshot {
+    deployments: HashMap<String, llm_router_sli::DeploymentSliStats>,
+    #[serde(rename = "cooldownCount")]
+    cooldown_count: usize,
+    #[serde(rename = "fetchedAtUnix")]
+    fetched_at_unix: u64,
+}
+
+/// Read rolling SLI deployments for Settings health dashboard (F56 Slice 3).
+/// Returns no secrets — only latency/error observations per provider:model.
+#[tauri::command]
+async fn read_llm_router_health() -> LlmRouterHealthSnapshot {
+    let state = read_llm_router_state().await;
+    LlmRouterHealthSnapshot {
+        deployments: state.deployments,
+        cooldown_count: state.cooldowns.len(),
+        fetched_at_unix: unix_now_secs(),
+    }
 }
 
 /// Re-validate a key that is already stored in the keychain.  The renderer
@@ -6521,6 +6643,8 @@ pub fn run() {
             call_llm_routed,
             validate_provider_key,
             revalidate_provider_key,
+            probe_provider_inference,
+            read_llm_router_health,
             watch_config,
             fetch_github_repo,
             fetch_github_issues,

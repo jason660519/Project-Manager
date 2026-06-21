@@ -49,6 +49,7 @@ import type { ProviderSpec } from '../../../../lib/keys/registry';
 import {
   classifyValidationFailure,
   formatRelativeTime,
+  formatProbeSummary,
   type ModelListState,
 } from '../../../../lib/keys/providerMetadata';
 import type { Translations } from '../../../../lib/i18n';
@@ -81,6 +82,7 @@ export interface KeysRowData {
   canRefreshModels: boolean;
   lastValidatedAt: string | null;
   errorReason: string | null;
+  probeSummary: string | null;
 }
 
 interface KeysProviderTableProps {
@@ -232,12 +234,19 @@ function StatusCell({
     case 'verified':
       return (
         <div className="flex items-center gap-1.5">
-          <span
-            className="inline-flex items-center gap-1.5 border border-emerald-200/30 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-emerald-300/90"
-            title={row.lastValidatedAt ? `Validated ${formatRelativeTime(row.lastValidatedAt)}` : undefined}
-          >
-            <CheckCircle2 size={11} /> {copy.status.verified}
-          </span>
+          <div className="min-w-0">
+            <span
+              className="inline-flex items-center gap-1.5 border border-emerald-200/30 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-emerald-300/90"
+              title={row.lastValidatedAt ? `Validated ${formatRelativeTime(row.lastValidatedAt)}` : undefined}
+            >
+              <CheckCircle2 size={11} /> {copy.status.verified}
+            </span>
+            {row.probeSummary && (
+              <p className="mt-1 truncate text-[10px] normal-case tracking-0 text-emerald-200/70" title={row.probeSummary}>
+                {row.probeSummary}
+              </p>
+            )}
+          </div>
           {refreshButton}
         </div>
       );

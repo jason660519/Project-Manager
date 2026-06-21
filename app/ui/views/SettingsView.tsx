@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Upload,
+  Activity,
 } from 'lucide-react';
 
 import { getSecretsStorageBackend } from '../../../lib/bridge';
@@ -27,8 +28,9 @@ import {
   setAiCliPresetAllowlist,
 } from '../../../lib/storage/system-cli';
 import { KeyboardShortcutsView } from './KeyboardShortcutsView';
+import { LlmRouterHealthPanel } from './Settings/LlmRouterHealthPanel';
 
-type SettingsSheetKey = 'system-tray' | 'runtime-bridge' | 'system-cli' | 'shortcuts';
+type SettingsSheetKey = 'system-tray' | 'runtime-bridge' | 'llm-router-health' | 'system-cli' | 'shortcuts';
 
 const SETTINGS_SHEET_ORDER_STORAGE_KEY = 'projectManager.settings.sheetOrder';
 
@@ -272,6 +274,12 @@ export function SettingsView() {
         badge: isTauri ? 'Live' : 'Dry',
       },
       {
+        key: 'llm-router-health',
+        label: t.settingsView.llmRouterHealthTitle,
+        icon: <Activity size={14} />,
+        badge: isTauri ? 'SLI' : 'P2',
+      },
+      {
         key: 'system-cli',
         label: t.settingsView.systemCliPresetTitle,
         icon: <ShieldCheck size={14} />,
@@ -283,7 +291,7 @@ export function SettingsView() {
         icon: <Keyboard size={14} />,
       },
     ],
-    [aiCliPresetCount, isTauri, t.navItems.shortcuts, t.settingsView.runtimeBridgeTitle, t.settingsView.systemCliPresetTitle, t.settingsView.systemTrayTitle],
+    [aiCliPresetCount, isTauri, t.navItems.shortcuts, t.settingsView.llmRouterHealthTitle, t.settingsView.runtimeBridgeTitle, t.settingsView.systemCliPresetTitle, t.settingsView.systemTrayTitle],
   );
 
   const runtimeRows: SettingsRow[] = [
@@ -478,6 +486,18 @@ export function SettingsView() {
             description="Runtime status, AI route, secret storage, and process execution capability."
           />
           <SettingsRowsTable rows={runtimeRows} />
+        </SheetPanel>
+      )}
+
+      {activeSheet === 'llm-router-health' && (
+        <SheetPanel>
+          <SheetHeader
+            icon={<Activity size={17} />}
+            title={t.settingsView.llmRouterHealthTitle}
+            description={t.settingsView.llmRouterHealthHint}
+            meta={<SettingsStatusBadge tone={isTauri ? 'success' : 'warning'}>{isTauri ? 'Live' : 'P2'}</SettingsStatusBadge>}
+          />
+          <LlmRouterHealthPanel isTauri={isTauri} />
         </SheetPanel>
       )}
 

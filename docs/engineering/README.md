@@ -1,7 +1,7 @@
 # Project Manager Engineering Documentation
 
 > Status: Active  
-> Last updated: 2026-06-07  
+> Last updated: 2026-06-21  
 > Audience: AI engineers and maintainers
 
 ---
@@ -17,16 +17,17 @@ This folder contains operational engineering documentation for Project Manager. 
 1. [../file-naming-standards.md](../file-naming-standards.md)
 2. [runtime-bridge.md](./runtime-bridge.md)
 3. [storage-and-schema.md](./storage-and-schema.md)
-4. [ingestion-pipeline.md](./ingestion-pipeline.md)
-5. [security-and-secrets.md](./security-and-secrets.md)
-6. [table-standards.md](./table-standards.md)
-7. [document-classification-standard.md](./document-classification-standard.md)
-8. [documentation-site-sync.md](./documentation-site-sync.md)
-9. [hermes-agent-plugin.md](./hermes-agent-plugin.md)
-10. [openclaw-plugin.md](./openclaw-plugin.md)
-11. [verification-runbook.md](./verification-runbook.md)
-12. [ai-sdks-store.md](./ai-sdks-store.md)
-13. [multi-ai-config.md](./multi-ai-config.md)
+4. [domain-glossary.md](./domain-glossary.md) — product/engineering vocabulary and SSOT pointers
+5. [ingestion-pipeline.md](./ingestion-pipeline.md)
+6. [security-and-secrets.md](./security-and-secrets.md)
+7. [table-standards.md](./table-standards.md)
+8. [document-classification-standard.md](./document-classification-standard.md)
+9. [documentation-site-sync.md](./documentation-site-sync.md)
+10. [hermes-agent-plugin.md](./hermes-agent-plugin.md)
+11. [openclaw-plugin.md](./openclaw-plugin.md)
+12. [verification-runbook.md](./verification-runbook.md)
+13. [ai-sdks-store.md](./ai-sdks-store.md)
+14. [multi-ai-config.md](./multi-ai-config.md)
 
 ## 3. Ownership Map
 
@@ -34,6 +35,7 @@ This folder contains operational engineering documentation for Project Manager. 
 | --- | --- | --- |
 | Tauri commands, browser fallbacks, event contracts | `src-tauri/src/lib.rs`, `lib/bridge/index.ts`, `app/api/*` | [runtime-bridge.md](./runtime-bridge.md) |
 | Project list, selected project, schema migration | `lib/storage/*`, `schema/project-manager.schema.json`, `config/samples/*` | [storage-and-schema.md](./storage-and-schema.md) |
+| Product/engineering vocabulary (workspace, project, roles, runners) | `lib/auth/permissions.ts`, `lib/types/index.ts`, ADR-016 | [domain-glossary.md](./domain-glossary.md) |
 | Markdown import and AI-assisted spec import | `lib/ingestion/*`, `app/ui/views/IngestionView.tsx` | [ingestion-pipeline.md](./ingestion-pipeline.md) |
 | API keys, provider keys, GitHub token, API call boundary | `lib/storage/plugins.ts`, `lib/bridge/index.ts`, `src-tauri/src/lib.rs`, `app/api/anthropic/route.ts` | [security-and-secrets.md](./security-and-secrets.md) |
 | Table interaction, label contracts, sorting behavior, dashboard document-link cells, workstation viewport rules | `app/project-progress-dashboard/_components/PhaseTable.tsx`, `app/project-progress-dashboard/_lib/columns.tsx`, `app/project-progress-dashboard/_lib/pathLinks.tsx`, `app/ui/views/Plugins/PluginsHubView.tsx`, `app/ui/views/Plugins/_shared/IntegrationsTable.tsx`, `components/table/TableCore.tsx` | [table-standards.md](./table-standards.md) |
@@ -62,16 +64,17 @@ Update the relevant document whenever an implementation change changes a command
 1. [../file-naming-standards.md](../file-naming-standards.md)
 2. [runtime-bridge.md](./runtime-bridge.md)
 3. [storage-and-schema.md](./storage-and-schema.md)
-4. [ingestion-pipeline.md](./ingestion-pipeline.md)
-5. [security-and-secrets.md](./security-and-secrets.md)
-6. [table-standards.md](./table-standards.md)
-7. [document-classification-standard.md](./document-classification-standard.md)
-8. [documentation-site-sync.md](./documentation-site-sync.md)
-9. [hermes-agent-plugin.md](./hermes-agent-plugin.md)
-10. [openclaw-plugin.md](./openclaw-plugin.md)
-11. [verification-runbook.md](./verification-runbook.md)
-12. [ai-sdks-store.md](./ai-sdks-store.md)
-13. [multi-ai-config.md](./multi-ai-config.md)
+4. [domain-glossary.md](./domain-glossary.md) — 產品/工程詞彙與 SSOT 指標
+5. [ingestion-pipeline.md](./ingestion-pipeline.md)
+6. [security-and-secrets.md](./security-and-secrets.md)
+7. [table-standards.md](./table-standards.md)
+8. [document-classification-standard.md](./document-classification-standard.md)
+9. [documentation-site-sync.md](./documentation-site-sync.md)
+10. [hermes-agent-plugin.md](./hermes-agent-plugin.md)
+11. [openclaw-plugin.md](./openclaw-plugin.md)
+12. [verification-runbook.md](./verification-runbook.md)
+13. [ai-sdks-store.md](./ai-sdks-store.md)
+14. [multi-ai-config.md](./multi-ai-config.md)
 
 ## 3. 責任對照
 
@@ -79,6 +82,7 @@ Update the relevant document whenever an implementation change changes a command
 | --- | --- | --- |
 | Tauri commands、browser fallbacks、event contracts | `src-tauri/src/lib.rs`, `lib/bridge/index.ts`, `app/api/*` | [runtime-bridge.md](./runtime-bridge.md) |
 | Project list、selected project、schema migration | `lib/storage/*`, `schema/project-manager.schema.json`, `config/samples/*` | [storage-and-schema.md](./storage-and-schema.md) |
+| 產品/工程詞彙（workspace、project、roles、runners） | `lib/auth/permissions.ts`, `lib/types/index.ts`, ADR-016 | [domain-glossary.md](./domain-glossary.md) |
 | Markdown import 與 AI-assisted spec import | `lib/ingestion/*`, `app/ui/views/IngestionView.tsx` | [ingestion-pipeline.md](./ingestion-pipeline.md) |
 | API keys、provider keys、GitHub token、API call boundary | `lib/storage/plugins.ts`, `lib/bridge/index.ts`, `src-tauri/src/lib.rs`, `app/api/anthropic/route.ts` | [security-and-secrets.md](./security-and-secrets.md) |
 | Table 互動、label contracts、排序行為、dashboard 文件連結欄位與 workstation 視窗版面規則 | `app/project-progress-dashboard/_components/PhaseTable.tsx`, `app/project-progress-dashboard/_lib/columns.tsx`, `app/project-progress-dashboard/_lib/pathLinks.tsx`, `app/ui/views/Plugins/PluginsHubView.tsx`, `app/ui/views/Plugins/_shared/IntegrationsTable.tsx`, `components/table/TableCore.tsx` | [table-standards.md](./table-standards.md) |
