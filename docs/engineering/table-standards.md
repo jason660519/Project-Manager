@@ -61,6 +61,9 @@ Reusable layout (do not inline equivalents):
 
 Table references:
 
+- `app/ui/views/Keys/KeysProviderTable.tsx` — API Key Validation sheet; reference
+  for numeric `Freeze cols`, column/row resize, row/column context menus,
+  selected target highlighting, and preference recovery
 - `components/table/datasheet/` — Basic/Large sheet primitive (preferred)
 - `components/table/TableCore.tsx` — simple table styling
 - `app/project-progress-dashboard/_components/PhaseTable.tsx`
@@ -84,7 +87,8 @@ Table references:
   - auto-saved table view preferences
   - hide/show columns and rows
   - column sort arrows
-  - reorderable sheet tabs
+  - reorderable sheet tabs within the same functional module page, with
+    left/right movement and a keyboard-accessible move path
   - accessibility, localization, recovery, and performance requirements
 - If a feature ships the baseline in phases, document which items are deferred and where recovery/reset remains available.
 
@@ -190,6 +194,10 @@ Canonical labels for dashboard document columns:
   bottom sheet tabs and inside the browser viewport.
 - Context menus SHOULD render in a viewport-fixed or portal layer so table panes,
   sticky headers, scroll containers, and bottom tabs do not clip menu content.
+- Row and column context menus MUST expose the full Basic Sheet operation set
+  that applies to the target: sort/filter, resize current row/column,
+  resize all/default/auto-fit recovery, freeze/unfreeze, hide/show recovery,
+  and row-specific actions.
 - While a row or column context menu is open, the right-click target MUST be
   highlighted with a temporary low-emphasis context target state. Highlight the
   full row for row menus; highlight the header and visible cells for column menus.
