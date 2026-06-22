@@ -33,6 +33,7 @@ const MODULE_RULES = [
 ];
 
 const CLASSIFICATION_RULES = [
+  [/app\/[^/]+\/\[sheet\]\/page\.tsx$/, 'sheet-route'],
   [/app\/project-progress-dashboard\/ProjectProgressClient\.tsx$/, 'sheet-wrapper'],
   [/app\/ui\/views\/KeysView\.tsx$/, 'sheet-wrapper'],
   [/app\/ui\/views\/AiSdksView\.tsx$/, 'sheet-wrapper'],
@@ -73,12 +74,29 @@ const BASIC_REQUIREMENTS = [
   ['empty or filtered-empty state', /No rows match|filteredEmpty|empty|noProviders|noProvidersMatch|copy\.empty/i],
 ];
 
+const COMPANY_ADVANCED_REQUIREMENTS = [
+  ['numeric Freeze cols control', /Freeze cols|freezeCols|frozenDataColCount/i, /type=["']number["']|FreezeColsControl/],
+  ['row height resize', /rowHeight|rowHeightById|resizeRow|resize rows|Resize rows|cursor-row-resize/i],
+  ['row or column context menu', /onContextMenu|contextMenu|ContextMenu/i],
+  ['selected row/column target highlight', /data-context-target|contextTarget|context.*highlight|selectedColumn|selectedRow|contextColumnId|contextRowId|contextRowKey|selectedIssueKey|selectedProjectId|isSelected/i],
+  ['column width resize', /columnSizing|colWidths|columnWidths|onColumnWidthsChange|resizeColumn|cursor-col-resize/i],
+  ['hidden row/column recovery', /hiddenColumn|columnVisibility|hiddenRow|showHidden|restoreHidden|Hidden cols/i],
+];
+
 const SHEET_WRAPPER_REQUIREMENTS = [
   ['WorkstationFrame page frame', /<WorkstationFrame\b/],
   ['bottomTabs slot', /bottomTabs\s*=/],
   ['bottom sheet tabs', /<BottomSheetTabs\b|<SheetTabs\b/],
   ['reorderable sheet tabs', /reorderable|<SheetTabs\b/],
+  ['sheet order persistence', /orderStorageKey|persistSheetOrder|readStoredSheetOrder|onOrderChange|<SheetTabs\b/],
   ['table-owned scrolling', /scrollChildren=\{false\}/],
+];
+
+const SHEET_ROUTE_REQUIREMENTS = [
+  ['valid sheet list', /VALID_SHEETS|SHEET_SLUGS|INTEGRATION_SHEETS|AIAssistantSheetId/],
+  ['static params for sheet routes', /generateStaticParams/],
+  ['invalid sheet guard', /notFound\(|redirect\(/],
+  ['passes canonical sheet into MainClient', /MainClient[\s\S]*(keysSheet|aiSdksSheet|assistantSheet|integrationsSheet)/],
 ];
 
 function parseArgs(argv) {
@@ -129,6 +147,7 @@ function inferredClassification(path) {
 }
 
 function hasTableSurface(path, content) {
+  if (/^app\/[^/]+\/\[sheet\]\/page\.tsx$/.test(path)) return true;
   if (/useReactTable|DataTableShell|TableCore|<table\b/.test(content)) return true;
   return path.startsWith('app/') && /<WorkstationFrame\b|<BottomSheetTabs\b|<SheetTabs\b/.test(content);
 }
@@ -141,10 +160,13 @@ function implementationKind(content) {
   if (/DataTableShell/.test(content)) kinds.push('DataTableShell');
   if (/TableCore/.test(content)) kinds.push('TableCore');
   if (/<table\b/.test(content)) kinds.push('HTML table');
+  if (/generateStaticParams[\s\S]*(sheet)/.test(content)) kinds.push('sheet route');
   return kinds.join(' + ') || 'sheet wrapper';
 }
 
 function routeHint(path) {
+  const sheetRoute = path.match(/^app\/([^/]+)\/\[sheet\]\/page\.tsx$/);
+  if (sheetRoute) return `/${sheetRoute[1]}/[sheet]`;
   if (path.includes('project-progress-dashboard')) return '/project-progress-dashboard';
   if (path.includes('/Keys/') || path.endsWith('KeysView.tsx')) return '/keys';
   if (path.includes('/AiSdks') || path.endsWith('AiSdksView.tsx')) return '/ai-sdks';
@@ -174,9 +196,24 @@ function hasColIdUuidEvidence(path, content, uuidEvidenceDirs) {
   return uuidEvidenceDirs.has(dirname(path)) || uuidEvidenceDirs.has(dirname(dirname(path)));
 }
 
-function auditSurface(path, content, uuidEvidenceDirs) {
+function advancedSignalContent(path, content, entriesByPath) {
+  const parts = [content];
+  if (/DataTableShell/.test(content)) {
+    parts.push(entriesByPath.get('components/table/datasheet/DataTableShell.tsx') ?? '');
+  }
+  if (path === 'app/ui/views/Plugins/_shared/IntegrationsTable.tsx') {
+    parts.push(entriesByPath.get('app/ui/views/Plugins/PluginsHubView.tsx') ?? '');
+  }
+  if (path === 'app/project-progress-dashboard/_components/PhaseTable.tsx') {
+    parts.push(entriesByPath.get('app/project-progress-dashboard/_components/PhaseTableToolbar.tsx') ?? '');
+  }
+  return parts.join('\n');
+}
+
+function auditSurface(path, content, uuidEvidenceDirs, entriesByPath) {
   const explicit = explicitClassification(content);
   const classification = explicit ?? inferredClassification(path);
+  const advancedContent = advancedSignalContent(path, content, entriesByPath);
   const findings = [];
   const warnings = [];
 
@@ -202,11 +239,23 @@ function auditSurface(path, content, uuidEvidenceDirs) {
     if (declaresColId && !documentedColIdException && !hasColIdUuidEvidence(path, content, uuidEvidenceDirs)) {
       findings.push('col-id value has no UUID/deterministic-id evidence in this file or its column-definition siblings (table-governance.md §2.2).');
     }
+
+    for (const [label, ...patterns] of COMPANY_ADVANCED_REQUIREMENTS) {
+      if (!patterns.every((pattern) => pattern.test(advancedContent))) {
+        warnings.push(`Company advanced table-sheet signal missing: ${label}`);
+      }
+    }
   }
 
   if (classification === 'sheet-wrapper') {
     for (const [label, pattern] of SHEET_WRAPPER_REQUIREMENTS) {
       if (!pattern.test(content)) findings.push(`Missing static signal: ${label}`);
+    }
+  }
+
+  if (classification === 'sheet-route') {
+    for (const [label, pattern] of SHEET_ROUTE_REQUIREMENTS) {
+      if (!pattern.test(content)) findings.push(`Missing sheet route inventory signal: ${label}`);
     }
   }
 
@@ -235,6 +284,10 @@ function markdownReport(surfaces) {
   const warnings = surfaces.flatMap((surface) =>
     surface.warnings.map((warning) => `${surface.path}: ${warning}`),
   );
+  const routes = Array.from(new Set(surfaces.map((surface) => surface.route).filter(Boolean))).sort();
+  const sheetRoutes = surfaces.filter((surface) => surface.classification === 'sheet-route');
+  const wrappers = surfaces.filter((surface) => surface.classification === 'sheet-wrapper');
+  const basicSheets = surfaces.filter((surface) => surface.classification === 'basic');
 
   const lines = [
     '# Table Sheet Inventory',
@@ -248,9 +301,19 @@ function markdownReport(surfaces) {
     '## Summary',
     '',
     `- Surfaces scanned: ${surfaces.length}`,
-    `- Basic table sheets: ${surfaces.filter((s) => s.classification === 'basic').length}`,
+    `- Layer 1 inventory surfaces: ${surfaces.length}`,
+    `- Sheet routes: ${sheetRoutes.length}`,
+    `- Sheet wrappers: ${wrappers.length}`,
+    `- Basic table sheets: ${basicSheets.length}`,
     `- Blocking findings: ${blocking.length}`,
     `- Warnings: ${warnings.length}`,
+    `- Dynamic smoke routes: ${routes.length}`,
+    '',
+    '## Three-Layer Audit Model',
+    '',
+    '1. **Inventory completeness** — detects sheet routes, sheet wrappers, table primitives, and table bodies under `app/` and `components/`.',
+    '2. **Static compliance** — checks Basic Table Sheet source signals for identity, search/filter, numeric freeze, resize, hidden recovery, scroll ownership, empty states, context menus, and target highlighting.',
+    '3. **Dynamic smoke manifest** — lists routes and interactions that static analysis cannot prove and must be exercised in Chrome/Safari/Tauri.',
     '',
     '## Inventory',
     '',
@@ -273,14 +336,15 @@ function markdownReport(surfaces) {
   if (warnings.length === 0) lines.push('None.');
   else for (const warning of warnings) lines.push(`- ${warning}`);
 
-  const routes = Array.from(new Set(surfaces.map((surface) => surface.route).filter(Boolean))).sort();
   lines.push(
     '',
     '## Static Test Report',
     '',
     `- Inventory source: ${surfaces.length} source-detected table/sheet surfaces under \`app/\` and \`components/\`.`,
     `- Basic sheet checks: ${BASIC_REQUIREMENTS.map(([label]) => label).join(', ')}.`,
+    `- Company advanced checks: ${COMPANY_ADVANCED_REQUIREMENTS.map(([label]) => label).join(', ')}.`,
     `- Sheet wrapper checks: ${SHEET_WRAPPER_REQUIREMENTS.map(([label]) => label).join(', ')}.`,
+    `- Sheet route checks: ${SHEET_ROUTE_REQUIREMENTS.map(([label]) => label).join(', ')}.`,
     `- Routes requiring UI smoke when changed: ${routes.join(', ')}.`,
   );
 
@@ -288,7 +352,15 @@ function markdownReport(surfaces) {
     '',
     '## Required Dynamic Verification',
     '',
-    'Static audit does not replace UI smoke. For changed table routes, run:',
+    'Static audit does not replace UI smoke. For each changed table-heavy route, verify:',
+    '',
+    '- Sheet tabs can move left/right and persist display order.',
+    '- Column widths and row heights resize with handles and/or context-menu actions.',
+    '- Row and column right-click menus expose the expected operations.',
+    '- The active row or column target is visibly highlighted.',
+    '- Numeric `Freeze cols` freezes the leftmost N columns and keeps sticky offsets aligned.',
+    '- Hidden column/row recovery and reset controls work.',
+    '- Dev console and Next Issues badge remain clean.',
     '',
     '```bash',
     'npm run verify:dev-issues -- --routes /changed-route[,/another-route]',
@@ -303,6 +375,7 @@ function main() {
   const options = parseArgs(process.argv.slice(2));
   const files = SCAN_ROOTS.flatMap((root) => walk(join(ROOT, root)));
   const entries = files.map((file) => [rel(file), readFileSync(file, 'utf8')]);
+  const entriesByPath = new Map(entries);
 
   // A2 — build a directory-aware index of files that carry col-id UUID evidence, so a
   // table whose value is generated in a sibling column-definition file is not falsely
@@ -318,7 +391,7 @@ function main() {
   const surfaces = entries
     .filter(([path, content]) => hasTableSurface(path, content))
     .filter(([path]) => !path.startsWith('lib/generated/'))
-    .map(([path, content]) => auditSurface(path, content, uuidEvidenceDirs))
+    .map(([path, content]) => auditSurface(path, content, uuidEvidenceDirs, entriesByPath))
     .sort((a, b) => a.module.localeCompare(b.module) || a.path.localeCompare(b.path));
 
   const blocking = surfaces.flatMap((surface) => surface.findings);

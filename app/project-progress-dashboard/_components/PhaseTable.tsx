@@ -57,6 +57,9 @@ export function PhaseTable({ rows, columns, prefs, patch, handlers, categoryFilt
   const frozenCols = Math.max(0, Math.min(visibleColumns.length, prefs.frozenDataColCount));
   const frozenRows = Math.max(0, Math.min(rows.length, prefs.freezeRowCount));
   const sort = prefs.sorting[0] ?? null;
+  const contextColumnId = contextMenu?.type === 'column' ? contextMenu.columnId : null;
+  const contextRowKey = contextMenu?.type === 'row' ? contextMenu.rowKey : null;
+  const contextTargetClass = 'outline outline-1 -outline-offset-1 outline-emerald-300/45 bg-emerald-500/10';
 
   // Column resize: drag from the right edge of a <th>.
   const resizingIndex = useRef<number | null>(null);
@@ -164,6 +167,7 @@ export function PhaseTable({ rows, columns, prefs, patch, handlers, categoryFilt
               return (
                 <th
                   key={col.id}
+                  data-context-target={contextColumnId === col.id ? 'column' : undefined}
                   onContextMenu={(e) => {
                     e.preventDefault();
                     setContextMenu({
@@ -178,6 +182,7 @@ export function PhaseTable({ rows, columns, prefs, patch, handlers, categoryFilt
                   className={clsx(
                     'sticky top-0 z-40 overflow-hidden select-none border-b border-r border-stone-200/15 bg-[rgb(var(--pm-card))] px-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-stone-300',
                     isFrozen && 'z-50',
+                    contextColumnId === col.id && contextTargetClass,
                   )}
                   style={{
                     height: prefs.headerHeight,
@@ -237,6 +242,7 @@ export function PhaseTable({ rows, columns, prefs, patch, handlers, categoryFilt
               <tr
                 key={row.rowKey}
                 onClick={onClick}
+                data-context-target={contextRowKey === row.rowKey ? 'row' : undefined}
                 onContextMenu={(e) => {
                   e.preventDefault();
                   setContextMenu({ type: 'row', x: e.clientX, y: e.clientY, rowKey: row.rowKey });
@@ -244,6 +250,7 @@ export function PhaseTable({ rows, columns, prefs, patch, handlers, categoryFilt
                 className={clsx(
                   'group cursor-pointer border-b border-stone-200/10 transition-colors hover:bg-white/5',
                   isFrozenRow && 'bg-[rgb(var(--pm-card))]/85',
+                  contextRowKey === row.rowKey && 'bg-emerald-500/10',
                 )}
                 style={{ height: prefs.rowHeight }}
               >
@@ -252,10 +259,18 @@ export function PhaseTable({ rows, columns, prefs, patch, handlers, categoryFilt
                   return (
                     <td
                       key={col.id}
+                      data-context-target={
+                        contextRowKey === row.rowKey
+                          ? 'row'
+                          : contextColumnId === col.id
+                            ? 'column'
+                            : undefined
+                      }
                       className={clsx(
                         'overflow-hidden border-r border-stone-200/10 px-3 py-2 text-sm text-stone-200',
                         isFrozen && 'sticky z-20 bg-[rgb(var(--pm-rail))]/95',
                         isFrozenRow && 'sticky',
+                        (contextRowKey === row.rowKey || contextColumnId === col.id) && contextTargetClass,
                       )}
                       style={{
                         textAlign: prefs.columnAlignments[originalIndex],

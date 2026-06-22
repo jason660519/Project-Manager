@@ -90,6 +90,9 @@ This pattern standardizes how company apps build and review data tables so users
   formatting belongs in headers or cell renderers.
 - [ ] Null, empty, malformed, and upstream-missing values render consistently and
   do not crash the table.
+- [ ] Row-level error states (validation failure, upstream error, auth failure) are
+  displayed inline per row so users can distinguish per-row problems from table-level
+  errors.
 - [ ] Persisted table state references stable row IDs, sheet IDs, and column IDs,
   not array indexes or visible labels.
 
@@ -120,6 +123,13 @@ This pattern standardizes how company apps build and review data tables so users
   hide/show recovery, and row-specific actions where applicable.
 - [ ] Loading, disabled, slow action, double-click, and repeated-submit states do
   not create duplicate or partial operations.
+- [ ] In-row async operations (validate, refresh, save) show a per-row loading
+  indicator; the rest of the table remains interactive during the operation.
+- [ ] Add-row or inline-create forms validate uniqueness and required fields before
+  submission; duplicate or conflicting values are rejected with a visible inline
+  message, not silently overwritten.
+- [ ] Where row click opens a detail panel or slide-out, that navigation is
+  independent of inline action buttons in the same row (buttons stop propagation).
 - [ ] Editable cells keep focus across keystrokes and do not remount because
   column definitions are rebuilt on every render.
 

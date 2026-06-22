@@ -20,7 +20,7 @@ run npm run typecheck
 run npm run agents:check
 run npm run docs:check
 run npm run docs:site:check
-run node scripts/audit-table-sheets.mjs --check
+run node scripts/audit-table-sheets.mjs --check --fail-on-warnings
 run node scripts/check-static-export-hygiene.mjs
 run node scripts/check-native-dialogs.mjs
 run node scripts/check-ui-i18n.mjs

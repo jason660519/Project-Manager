@@ -21,6 +21,7 @@ import { connectedInstanceSearchText } from '../../../../../lib/integrations/map
 import { useI18n } from '../../../../../lib/i18n';
 import { uuidv5 } from '../../../../../lib/aiSdks/uuid';
 import { COL_ID_COLUMN_HEADER } from '../../../../../components/table/colId';
+import { useInAppPrompt } from '../../../../../components/ui/InAppDialog';
 import { StatusBadge } from './status-badge';
 
 export interface IntegrationRowTestResult {
@@ -164,7 +165,17 @@ export function IntegrationsTable({
   compactStatusCell = false,
 }: IntegrationsTableProps) {
   const { t } = useI18n();
+  const resizePrompt = useInAppPrompt();
   const [columnSizing, setColumnSizing] = useState<Record<string, number>>({});
+  const [rowHeightByKey, setRowHeightByKey] = useState<Record<string, number>>({});
+  const [contextMenu, setContextMenu] = useState<
+    | { type: 'column'; columnId: string; x: number; y: number }
+    | { type: 'row'; rowKey: string; x: number; y: number }
+    | null
+  >(null);
+  const contextColumnId = contextMenu?.type === 'column' ? contextMenu.columnId : null;
+  const contextRowKey = contextMenu?.type === 'row' ? contextMenu.rowKey : null;
+  const contextTargetClass = 'outline outline-1 -outline-offset-1 outline-emerald-300/45 bg-emerald-500/10';
   const columns = useMemo(
     () => [
       ...(onToggleCheck || onToggleEnabled
@@ -538,6 +549,33 @@ export function IntegrationsTable({
     return offsets;
   }, [leafColumns, clampedFrozenCols, columnSizing]);
   const rowPaddingClass = rowDensity === 'compact' ? 'py-2' : 'py-3';
+  const defaultRowHeight = rowDensity === 'compact' ? 40 : 48;
+
+  const resizeColumn = async (columnId: string) => {
+    const column = table.getColumn(columnId);
+    if (!column) return;
+    const raw = await resizePrompt.open({
+      title: 'Resize column',
+      message: 'Set column width in px.',
+      defaultValue: String(column.getSize()),
+    });
+    if (raw == null) return;
+    const next = Number(raw);
+    if (!Number.isFinite(next)) return;
+    setColumnSizing((prev) => ({ ...prev, [columnId]: Math.max(56, Math.min(640, next)) }));
+  };
+
+  const resizeRow = async (rowKey: string) => {
+    const raw = await resizePrompt.open({
+      title: 'Resize row',
+      message: 'Set row height in px.',
+      defaultValue: String(rowHeightByKey[rowKey] ?? defaultRowHeight),
+    });
+    if (raw == null) return;
+    const next = Number(raw);
+    if (!Number.isFinite(next)) return;
+    setRowHeightByKey((prev) => ({ ...prev, [rowKey]: Math.max(32, Math.min(180, next)) }));
+  };
 
   if (isLoading) {
     return (
@@ -556,7 +594,10 @@ export function IntegrationsTable({
   }
 
   return (
-    <div className="pm-scroll h-full overflow-auto border border-stone-200/12 bg-[rgb(var(--pm-panel))]/72">
+    <div
+      className="pm-scroll h-full overflow-auto border border-stone-200/12 bg-[rgb(var(--pm-panel))]/72"
+      onClick={() => setContextMenu(null)}
+    >
       <table className="w-full table-fixed min-w-[960px] border-collapse text-left text-sm">
         <thead className="sticky top-0 z-40 border-b border-stone-200/12 bg-[rgb(var(--pm-panel))]">
           {table.getHeaderGroups().map((hg) => (
@@ -564,10 +605,16 @@ export function IntegrationsTable({
               {hg.headers.map((h) => (
                 <th
                   key={h.id}
+                  data-context-target={contextColumnId === h.column.id ? 'column' : undefined}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setContextMenu({ type: 'column', columnId: h.column.id, x: event.clientX, y: event.clientY });
+                  }}
                   onClick={h.column.getCanSort() ? h.column.getToggleSortingHandler() : undefined}
                   className={`relative overflow-hidden select-none px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-400 ${
                     h.column.getCanSort() ? 'cursor-pointer' : ''
-                  }`}
+                  } ${contextColumnId === h.column.id ? contextTargetClass : ''}`}
                   style={{
                     width: h.column.getSize(),
                     minWidth: h.column.getSize(),
@@ -608,14 +655,32 @@ export function IntegrationsTable({
               <tr
                 key={row.id}
                 onClick={() => onRowClick(row.original)}
+                data-context-target={contextRowKey === row.original.rowKey ? 'row' : undefined}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setContextMenu({ type: 'row', rowKey: row.original.rowKey, x: event.clientX, y: event.clientY });
+                }}
                 className={`cursor-pointer border-b border-stone-200/10 transition-colors ${
                   active ? 'bg-emerald-950/20' : 'hover:bg-white/[0.045]'
-                }`}
+                } ${contextRowKey === row.original.rowKey ? 'bg-emerald-500/10' : ''}`}
+                style={{ height: rowHeightByKey[row.original.rowKey] }}
               >
                 {row.getVisibleCells().map((cell) => (
                   <td
                     key={cell.id}
-                    className={`overflow-hidden px-3 ${rowPaddingClass} align-middle text-sm text-stone-300`}
+                    data-context-target={
+                      contextRowKey === row.original.rowKey
+                        ? 'row'
+                        : contextColumnId === cell.column.id
+                          ? 'column'
+                          : undefined
+                    }
+                    className={`overflow-hidden px-3 ${rowPaddingClass} align-middle text-sm text-stone-300 ${
+                      contextRowKey === row.original.rowKey || contextColumnId === cell.column.id
+                        ? contextTargetClass
+                        : ''
+                    }`}
                     style={{
                       width: cell.column.getSize(),
                       minWidth: cell.column.getSize(),
@@ -651,6 +716,50 @@ export function IntegrationsTable({
           )}
         </tbody>
       </table>
+      {contextMenu && (
+        <div
+          className="fixed z-50 min-w-44 border border-stone-200/20 bg-[rgb(var(--pm-rail))] p-1 text-xs text-stone-200 shadow-xl"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          {contextMenu.type === 'column' ? (
+            <>
+              <button
+                type="button"
+                className="block w-full px-2 py-1.5 text-left hover:bg-white/10"
+                onClick={() => {
+                  table.getColumn(contextMenu.columnId)?.toggleSorting();
+                  setContextMenu(null);
+                }}
+              >
+                Sort / reset sort
+              </button>
+              <button
+                type="button"
+                className="block w-full px-2 py-1.5 text-left hover:bg-white/10"
+                onClick={() => {
+                  void resizeColumn(contextMenu.columnId);
+                  setContextMenu(null);
+                }}
+              >
+                Resize column
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="block w-full px-2 py-1.5 text-left hover:bg-white/10"
+              onClick={() => {
+                void resizeRow(contextMenu.rowKey);
+                setContextMenu(null);
+              }}
+            >
+              Resize row
+            </button>
+          )}
+        </div>
+      )}
+      {resizePrompt.dialog}
     </div>
   );
 }

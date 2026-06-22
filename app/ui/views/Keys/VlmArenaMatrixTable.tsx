@@ -3,15 +3,13 @@
 // @table-classification: basic
 // @table-reason: Operational VLM image-to-image evaluation matrix (many columns, horizontal
 //   overflow, repeated runs). Uses useArenaTablePrefs + the shared numeric Freeze cols control.
-// @table-waivers: shell-not-migrated — keeps bespoke eval/run/preview cells; thead/tbody render
-//   retained inline (full DataTableShell migration tracked as follow-up). All mandatory controls
-//   present: search, provider/status/output filters, numeric Freeze cols, resize+persist, hidden
-//   cols, sort arrows, reset.
+// @table-waivers: bespoke-cells — keeps bespoke eval/run/preview cell renderers while using the
+//   shared DataTableShell chrome for resize, context menu, target highlight, sticky freeze, sort,
+//   empty states, and scroll ownership.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   createColumnHelper,
-  flexRender,
   getCoreRowModel,
   getSortedRowModel,
   type SortingState,
@@ -41,6 +39,7 @@ import {
 } from './ArenaTableViewControls';
 import {
   applyFreezeColumnCount,
+  DataTableShell,
   FreezeColsControl,
   getFrozenColumnLayout,
   useLiveRef,
@@ -195,12 +194,6 @@ function RunningElapsedLabel({ startedAtMs }: { startedAtMs: number | null }) {
   if (!startedAtMs) return null;
   const seconds = Math.max(0, Math.floor((nowMs - startedAtMs) / 1000));
   return <span className="mt-1 block text-[10px] font-mono text-sky-200/80">運行中 {seconds}s</span>;
-}
-
-function SortMarker({ value }: { value: false | 'asc' | 'desc' }) {
-  if (value === 'asc') return <span className="text-emerald-200">↑</span>;
-  if (value === 'desc') return <span className="text-emerald-200">↓</span>;
-  return null;
 }
 
 function renderImagePreview(url: string, label: string, emptyText: string) {
@@ -650,10 +643,8 @@ export function VlmArenaMatrixTable({
     getSortedRowModel: getSortedRowModel(),
   });
 
-  const { cellStyle, frozenClass, freezeCandidateIds, frozenColumnCount } = getFrozenColumnLayout(
-    table,
-    frozenColumnIds,
-  );
+  const frozen = getFrozenColumnLayout(table, frozenColumnIds);
+  const { freezeCandidateIds, frozenColumnCount } = frozen;
   const hiddenCount = columnOptions.filter((option) => option.hideable && table.getColumn(option.id)?.getIsVisible() === false).length;
   const providerOptions = useMemo(() => Array.from(new Set(rows.map((row) => row.provider))), [rows]);
 
@@ -816,64 +807,13 @@ export function VlmArenaMatrixTable({
         </div>
       </div>
 
-      <div className="pm-scroll min-h-0 flex-1 overflow-auto">
-        <table className="table-fixed border-collapse text-left" style={{ width: table.getTotalSize() }}>
-          <thead className="sticky top-0 z-40 border-b border-stone-200/12 bg-stone-900">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <th
-                    key={header.id}
-                    className={`relative overflow-hidden select-none border-r border-stone-200/10 px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-stone-400 ${frozenClass(header.column.id, true)}`}
-                    style={cellStyle(header.column.id)}
-                  >
-                    <button
-                      type="button"
-                      onClick={header.column.getToggleSortingHandler()}
-                      disabled={!header.column.getCanSort()}
-                      className="flex w-full items-center justify-between gap-2 text-left disabled:cursor-default"
-                    >
-                      <span className="truncate">{flexRender(header.column.columnDef.header, header.getContext())}</span>
-                      <SortMarker value={header.column.getIsSorted()} />
-                    </button>
-                    {header.column.getCanResize() && (
-                      <button
-                        type="button"
-                        aria-label={`Resize ${String(header.column.columnDef.header ?? header.column.id)}`}
-                        onMouseDown={header.getResizeHandler()}
-                        onTouchStart={header.getResizeHandler()}
-                        className="absolute right-0 top-0 h-full w-2 cursor-col-resize border-r border-transparent hover:border-emerald-300/70 focus-visible:border-emerald-300"
-                      />
-                    )}
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
-          <tbody>
-            {table.getRowModel().rows.map((row) => (
-              <tr key={row.original.row.id} className="border-b border-stone-200/10 hover:bg-white/[0.03]">
-                {row.getVisibleCells().map((cell) => (
-                  <td
-                    key={cell.id}
-                    className={`relative isolate overflow-hidden border-r border-stone-200/10 px-3 py-2 text-sm text-stone-300 ${frozenClass(cell.column.id)}`}
-                    style={cellStyle(cell.column.id)}
-                  >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
-            ))}
-            {table.getRowModel().rows.length === 0 && (
-              <tr>
-                <td colSpan={table.getVisibleLeafColumns().length} className="px-4 py-8 text-center text-xs text-stone-500">
-                  {rows.length === 0 ? copy.emptyNoModels : 'No VLM Arena rows match the current filters.'}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTableShell
+        table={table}
+        frozen={frozen}
+        emptyText={copy.emptyNoModels}
+        filteredEmptyText="No VLM Arena rows match the current filters."
+        isFiltered={rows.length > 0}
+      />
     </section>
   );
 }
