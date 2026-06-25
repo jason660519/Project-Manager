@@ -1,0 +1,15 @@
+{
+  "default": null,
+  "permission": [
+    {
+      "identifier": "read-agent-runtime-session-boundary",
+      "description": "Allow the renderer to validate an approved Agent Runtime session reader target and receive metadata-only redacted results.",
+      "commands": {
+        "allow": [
+          "read_agent_runtime_session_boundary"
+        ],
+        "deny": []
+      }
+    }
+  ]
+}

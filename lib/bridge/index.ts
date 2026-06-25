@@ -9,6 +9,7 @@
 import { defaultDiscoveryPlan } from '../integrations/discovery/presets';
 import type { DiscoveryPlan } from '../integrations/discovery/types';
 import { createProgressSheetConfigFromTemplate } from '../progress-sheets/sheetConfig';
+import type { AgentRuntimeFilesystemSnapshot } from '../agent-runtime';
 import { migrateConfig } from '../storage';
 import type {
   BrowserAccessPolicy,
@@ -803,6 +804,172 @@ export interface GlobalCliInventoryEntry {
 export async function listGlobalCliInventory(): Promise<GlobalCliInventoryEntry[]> {
   if (!isTauri()) return [];
   return invoke<GlobalCliInventoryEntry[]>('list_global_cli_inventory');
+}
+
+/** Build a read-only metadata snapshot for the Agent Runtime scanner. */
+export async function buildAgentRuntimeSnapshot(projectRoot?: string): Promise<AgentRuntimeFilesystemSnapshot> {
+  if (!isTauri()) return { existingPaths: [], availableCommands: [] };
+  return invoke<AgentRuntimeFilesystemSnapshot>('build_agent_runtime_snapshot', {
+    projectRoot: projectRoot ?? null,
+  });
+}
+
+export interface AgentRuntimeSessionBoundaryRequest {
+  approved: boolean;
+  rootPaths: string[];
+  targetPath: string;
+  maxBytes: number;
+}
+
+export interface AgentRuntimeSessionTargetListRequest {
+  approved: boolean;
+  rootPaths: string[];
+  maxTargets: number;
+  maxDepth: number;
+}
+
+export interface AgentRuntimeRedactedSessionTarget {
+  id: string;
+  label: string;
+  summary: string;
+  targetPath: string;
+  rootPath: string;
+  byteLength?: number;
+  modifiedAt?: string;
+}
+
+export interface AgentRuntimeRedactedSessionTargetListResult {
+  status: 'ready' | 'blocked';
+  targets: AgentRuntimeRedactedSessionTarget[];
+  maxTargets: number;
+  maxDepth: number;
+  contentRedacted: boolean;
+  targetNamesRedacted: boolean;
+  blockedReasons: string[];
+}
+
+export interface AgentRuntimeSessionBoundaryResult {
+  status: 'ready' | 'blocked';
+  allowedRootPath?: string;
+  byteLength?: number;
+  maxBytes: number;
+  contentRedacted: boolean;
+  targetNameRedacted: boolean;
+  blockedReasons: string[];
+}
+
+/** Validate an approved session reader target and return metadata only. */
+export async function readAgentRuntimeSessionBoundary(
+  request: AgentRuntimeSessionBoundaryRequest,
+): Promise<AgentRuntimeSessionBoundaryResult> {
+  if (!isTauri()) {
+    return {
+      status: 'blocked',
+      maxBytes: request.maxBytes,
+      contentRedacted: true,
+      targetNameRedacted: true,
+      blockedReasons: ['Session reader boundary requires Tauri runtime.'],
+    };
+  }
+  return invoke<AgentRuntimeSessionBoundaryResult>('read_agent_runtime_session_boundary', {
+    request,
+  });
+}
+
+/** List approved session target candidates and return redacted display metadata only. */
+export async function listAgentRuntimeRedactedSessionTargets(
+  request: AgentRuntimeSessionTargetListRequest,
+): Promise<AgentRuntimeRedactedSessionTargetListResult> {
+  if (!isTauri()) {
+    return {
+      status: 'blocked',
+      targets: [],
+      maxTargets: request.maxTargets,
+      maxDepth: request.maxDepth,
+      contentRedacted: true,
+      targetNamesRedacted: true,
+      blockedReasons: ['Redacted session target lister requires Tauri runtime.'],
+    };
+  }
+  return invoke<AgentRuntimeRedactedSessionTargetListResult>('list_agent_runtime_redacted_session_targets', {
+    request,
+  });
+}
+
+export interface AgentRuntimeRedactedSessionStructure {
+  lineCount: number;
+  nonEmptyLineCount: number;
+  looksLikeJsonObject: boolean;
+  looksLikeJsonArray: boolean;
+}
+
+export interface AgentRuntimeRedactedSessionContentResult {
+  status: 'ready' | 'blocked';
+  allowedRootPath?: string;
+  byteLength?: number;
+  maxBytes: number;
+  contentRedacted: boolean;
+  targetNameRedacted: boolean;
+  structure: AgentRuntimeRedactedSessionStructure | null;
+  blockedReasons: string[];
+}
+
+/** Read bounded approved session content natively and return redacted structure only. */
+export async function readAgentRuntimeRedactedSessionContent(
+  request: AgentRuntimeSessionBoundaryRequest,
+): Promise<AgentRuntimeRedactedSessionContentResult> {
+  if (!isTauri()) {
+    return {
+      status: 'blocked',
+      maxBytes: request.maxBytes,
+      contentRedacted: true,
+      targetNameRedacted: true,
+      structure: null,
+      blockedReasons: ['Redacted session content reader requires Tauri runtime.'],
+    };
+  }
+  return invoke<AgentRuntimeRedactedSessionContentResult>('read_agent_runtime_redacted_session_content', {
+    request,
+  });
+}
+
+export interface AgentRuntimeRedactedSessionEnvelope {
+  messageCount: number;
+  userMessageCount: number;
+  assistantMessageCount: number;
+  toolMessageCount: number;
+  otherMessageCount: number;
+  toolCallCount: number;
+}
+
+export interface AgentRuntimeRedactedSessionEnvelopeResult {
+  status: 'ready' | 'blocked';
+  allowedRootPath?: string;
+  byteLength?: number;
+  maxBytes: number;
+  contentRedacted: boolean;
+  targetNameRedacted: boolean;
+  envelope: AgentRuntimeRedactedSessionEnvelope | null;
+  blockedReasons: string[];
+}
+
+/** Parse bounded approved session content natively and return aggregate redacted metadata only. */
+export async function readAgentRuntimeRedactedSessionEnvelope(
+  request: AgentRuntimeSessionBoundaryRequest,
+): Promise<AgentRuntimeRedactedSessionEnvelopeResult> {
+  if (!isTauri()) {
+    return {
+      status: 'blocked',
+      maxBytes: request.maxBytes,
+      contentRedacted: true,
+      targetNameRedacted: true,
+      envelope: null,
+      blockedReasons: ['Redacted session envelope parser requires Tauri runtime.'],
+    };
+  }
+  return invoke<AgentRuntimeRedactedSessionEnvelopeResult>('read_agent_runtime_redacted_session_envelope', {
+    request,
+  });
 }
 
 export interface ConnectedInstanceScannedDevice {

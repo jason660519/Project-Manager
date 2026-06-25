@@ -1,0 +1,15 @@
+{
+  "default": null,
+  "permission": [
+    {
+      "identifier": "list-agent-runtime-redacted-session-targets",
+      "description": "Allow the renderer to request metadata-only redacted Agent Runtime session target candidates.",
+      "commands": {
+        "allow": [
+          "list_agent_runtime_redacted_session_targets"
+        ],
+        "deny": []
+      }
+    }
+  ]
+}

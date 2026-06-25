@@ -2194,6 +2194,1094 @@
         ],
         "scope": "Slice 1–3: SLI collection, SLO gates, health ranking in call_llm_routed; Keys inference probe; Settings LLM Router Health UI. Future: scan quorum."
       }
+    },
+    {
+      "id": "F57",
+      "name": "Agent Environment Scanner Foundations",
+      "category": "Agent Runtime",
+      "status": "done",
+      "progress": 100,
+      "phase": "development",
+      "points": 8,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F57/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F57/",
+        "spec": ".project-manager/features/F57/feature-spec.md",
+        "tdd": ".project-manager/features/F57/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F57/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F57/",
+        "implementation": "lib/agent-runtime",
+        "test": ".project-manager/features/F57/tests/agentEnvironmentScanner.test.ts"
+      },
+      "notes": "Completed F57 foundation slice: CC Switch-inspired read-only agent environment scanner contract for Codex, Claude Code, Gemini CLI, OpenCode, OpenClaw, and Hermes Agent. Pure TS implementation, feature-folder tests green, typecheck green, verify:baseline green. No external config writes, no secrets, no bridge commands.",
+      "createdAt": "2026-06-22T17:03:13.620Z",
+      "updatedAt": "2026-06-22T17:09:37.000Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          ".project-manager/features/F57/README.md",
+          ".project-manager/features/F57/feature-spec.md",
+          ".project-manager/features/F57/tdd-spec.md",
+          ".project-manager/features/F57/test-scenarios.md",
+          ".project-manager/features/F57/dev-log.md",
+          ".project-manager/features/F57/tests/agentEnvironmentScanner.test.ts",
+          "lib/agent-runtime/types.ts",
+          "lib/agent-runtime/toolCatalog.ts",
+          "lib/agent-runtime/environmentScanner.ts",
+          "lib/agent-runtime/index.ts"
+        ],
+        "kickoffAt": "2026-06-22T17:03:13.620Z",
+        "scope": "Read-only agent environment inventory foundation for Codex, Claude Code, Gemini CLI, OpenCode, OpenClaw, and Hermes Agent. Pure TypeScript scanner over injected snapshots; no external config writes and no secret parsing.",
+        "risks": [
+          "Agent tool path conventions can drift as upstream CLIs change.",
+          "Future UI must not imply write/sync capability from this read-only inventory.",
+          "A later Tauri snapshot builder must keep Node fs out of client-reachable graphs and avoid parsing secret-bearing files."
+        ],
+        "plannedTestScope": [
+          "unit: default catalog covers six F57 tools in stable order",
+          "unit: scanner status model ready/partial/missing/unsupported",
+          "unit: command-only and config-only boundary states",
+          "unit: secret-bearing file observations do not leak content",
+          "unit: deterministic row IDs/order for future table preferences",
+          "integration: deferred Tauri filesystem snapshot builder",
+          "E2E: deferred Agent Runtime Inventory UI"
+        ],
+        "completedAt": "2026-06-22T17:09:37.000Z",
+        "verification": {
+          "focused": "npm test -- --run .project-manager/features/F57/tests/agentEnvironmentScanner.test.ts => 9 passed, 0 failed",
+          "typecheck": "npm run typecheck => passed",
+          "baseline": "npm run verify:baseline => PASS; vitest 1516 passed, 1 skipped; cargo check passed; build passed",
+          "manualUiSmoke": "Not applicable: F57 has no UI route changes."
+        }
+      }
+    },
+    {
+      "id": "F58",
+      "name": "Agent Runtime Tauri Snapshot Builder",
+      "category": "Agent Runtime",
+      "status": "done",
+      "progress": 100,
+      "phase": "development",
+      "points": 5,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F58/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F58/",
+        "spec": ".project-manager/features/F58/feature-spec.md",
+        "tdd": ".project-manager/features/F58/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F58/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F58/",
+        "implementation": "src-tauri/src/lib.rs",
+        "test": ".project-manager/features/F58/tests/agentRuntimeSnapshotBridge.test.ts"
+      },
+      "notes": "Completed F58 native metadata slice: read-only Tauri snapshot builder, typed bridge wrapper, custom permission/capability, and focused TS/Rust tests are green. verify:baseline passed; no UI smoke required.",
+      "createdAt": "2026-06-22T17:44:46.405Z",
+      "updatedAt": "2026-06-22T17:50:16.000Z",
+      "completedAt": "2026-06-22T17:50:16.000Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          ".project-manager/features/F58/README.md",
+          ".project-manager/features/F58/feature-spec.md",
+          ".project-manager/features/F58/tdd-spec.md",
+          ".project-manager/features/F58/test-scenarios.md",
+          ".project-manager/features/F58/dev-log.md",
+          ".project-manager/features/F58/tests/agentRuntimeSnapshotBridge.test.ts",
+          "lib/bridge/index.ts",
+          "src-tauri/src/lib.rs",
+          "src-tauri/permissions/build-agent-runtime-snapshot.json",
+          "src-tauri/capabilities/default.json"
+        ],
+        "kickoffAt": "2026-06-22T17:44:46.405Z",
+        "scope": "Add a read-only Tauri/Rust metadata snapshot builder for F57 agent-runtime scanner. It reports known agent paths and command availability only; no file content parsing and no external config writes.",
+        "risks": [
+          "Custom command permission must remain narrowly scoped to build_agent_runtime_snapshot.",
+          "Future callers must treat snapshot output as metadata evidence, not authorization to write external configs.",
+          "Agent path catalog can drift and should remain aligned with lib/agent-runtime/toolCatalog.ts."
+        ],
+        "plannedTestScope": [
+          "unit TS: bridge wrapper browser fallback returns empty snapshot",
+          "unit Rust: snapshot collects known existing paths without returning file contents",
+          "unit Rust: fake secret strings are absent from serialized snapshot",
+          "unit Rust: injected PATH command evidence is deterministic",
+          "integration compile: command registered in generate_handler and custom permission is valid"
+        ],
+        "verification": {
+          "focusedTs": "npm test -- --run .project-manager/features/F58/tests/agentRuntimeSnapshotBridge.test.ts => 1 passed, 0 failed",
+          "focusedRust": "cargo test --manifest-path src-tauri/Cargo.toml agent_runtime_snapshot => 2 passed, 0 failed",
+          "typecheck": "npm run typecheck => passed",
+          "baseline": "npm run verify:baseline => PASS; vitest 1517 passed, 1 skipped; cargo check passed; build passed",
+          "manualUiSmoke": "not applicable; no UI or route changes"
+        }
+      }
+    },
+    {
+      "id": "F59",
+      "name": "Agent Runtime Inventory Service",
+      "category": "Agent Runtime",
+      "status": "done",
+      "progress": 100,
+      "phase": "development",
+      "points": 5,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F59/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F59/",
+        "spec": ".project-manager/features/F59/feature-spec.md",
+        "tdd": ".project-manager/features/F59/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F59/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F59/",
+        "implementation": "lib/agent-runtime/inventoryService.ts",
+        "test": ".project-manager/features/F59/tests/agentRuntimeInventoryService.test.ts"
+      },
+      "notes": "Completed F59 service composition slice: injectable snapshot loader, diagnostics, default typed bridge loader, and secret-sanitized result contract are implemented. Focused tests, typecheck, and verify:baseline passed; no UI smoke required.",
+      "createdAt": "2026-06-22T18:44:05.171Z",
+      "updatedAt": "2026-06-22T18:48:14.000Z",
+      "completedAt": "2026-06-22T18:48:14.000Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          ".project-manager/features/F59/README.md",
+          ".project-manager/features/F59/feature-spec.md",
+          ".project-manager/features/F59/tdd-spec.md",
+          ".project-manager/features/F59/test-scenarios.md",
+          ".project-manager/features/F59/dev-log.md",
+          "lib/agent-runtime/inventoryService.ts",
+          "lib/agent-runtime/index.ts",
+          ".project-manager/features/F59/tests/agentRuntimeInventoryService.test.ts",
+          ".project-manager/config.json"
+        ],
+        "kickoffAt": "2026-06-22T18:44:05.171Z",
+        "scope": "Compose the F58 typed bridge snapshot wrapper with the F57 scanner through a renderer-safe TypeScript service. Return diagnostics instead of throwing on snapshot load failure.",
+        "risks": [
+          "Future UI callers should display diagnostics instead of hiding snapshot failures.",
+          "Future service changes must keep snapshot output sanitized and avoid returning fixture-only fileContents.",
+          "Default loader must continue using the typed bridge wrapper, not raw invoke."
+        ],
+        "plannedTestScope": [
+          "unit TS: injected snapshot loader receives projectRoot and scans inventory rows",
+          "unit TS: empty snapshot produces deterministic default rows",
+          "unit TS: rejected loader returns snapshot_load_failed diagnostic without throwing",
+          "unit TS: fixture fileContents and fake secrets are absent from serialized result",
+          "integration compile: service export and bridge dependency typecheck"
+        ],
+        "verification": {
+          "focusedTs": "npm test -- --run .project-manager/features/F59/tests/agentRuntimeInventoryService.test.ts => 4 passed, 0 failed",
+          "typecheck": "npm run typecheck => passed",
+          "baseline": "npm run verify:baseline => PASS; vitest 1521 passed, 1 skipped; cargo check passed; build passed",
+          "manualUiSmoke": "not applicable; no UI or route changes"
+        }
+      }
+    },
+    {
+      "id": "F60",
+      "name": "Agent Runtime Inventory Sheet",
+      "category": "Agent Runtime",
+      "status": "done",
+      "progress": 100,
+      "phase": "development",
+      "points": 8,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F60/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F60/",
+        "spec": ".project-manager/features/F60/feature-spec.md",
+        "tdd": ".project-manager/features/F60/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F60/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F60/",
+        "implementation": "app/ui/views/Plugins/PluginsHubView.tsx",
+        "test": ".project-manager/features/F60/tests/agentRuntimeIntegrationSheet.test.ts"
+      },
+      "notes": "Completed F60 read-only Agent Runtime sheet in Integrations Hub: mapper, sheet route/action registry, diagnostics banner, rescan/test actions, and existing Basic Table Sheet controls. Focused tests, typecheck, table audit, UI smoke, and verify:baseline passed.",
+      "createdAt": "2026-06-22T19:26:04.368Z",
+      "updatedAt": "2026-06-22T19:33:07.000Z",
+      "completedAt": "2026-06-22T19:33:07.000Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          ".project-manager/features/F60/README.md",
+          ".project-manager/features/F60/feature-spec.md",
+          ".project-manager/features/F60/tdd-spec.md",
+          ".project-manager/features/F60/test-scenarios.md",
+          ".project-manager/features/F60/dev-log.md",
+          "lib/integrations/types.ts",
+          "lib/integrations/sheet-actions.ts",
+          "lib/integrations/mappers/agent-runtime.ts",
+          "app/ui/views/Plugins/PluginsHubView.tsx",
+          ".project-manager/features/F60/tests/agentRuntimeIntegrationSheet.test.ts",
+          ".project-manager/config.json"
+        ],
+        "kickoffAt": "2026-06-22T19:26:04.368Z",
+        "scope": "Add a read-only Agent Runtime sheet under Integrations Hub using F59 inventory service and the existing IntegrationsTable Basic Table Sheet surface.",
+        "risks": [
+          "Manual UI smoke must confirm the new route renders without Next overlay errors.",
+          "Home directory inference from project/repo root is best-effort; Tauri snapshot still fails safely into deterministic rows and diagnostics.",
+          "Future row detail work must not expose secret contents from auth/env/session files."
+        ],
+        "plannedTestScope": [
+          "unit TS: mapper converts AgentRuntimeToolRow to IntegrationRow",
+          "unit TS: ready/partial/missing/unsupported statuses map to IntegrationStatus values",
+          "unit TS: sheet constants include agent-runtime for route and scan action validity",
+          "unit TS: serialized rows do not include fixture fileContents or fake secrets",
+          "static audit: table/sheet audit remains green",
+          "manual UI smoke: /integrations-hub/agent-runtime renders and has no dev overlay errors",
+          "baseline: npm run verify:baseline"
+        ],
+        "verification": {
+          "focusedTs": "npm test -- --run .project-manager/features/F60/tests/agentRuntimeIntegrationSheet.test.ts => 4 passed, 0 failed",
+          "typecheck": "npm run typecheck => passed",
+          "tableAudit": "npm run table:sheet:audit -- --check => Surfaces=36 Basic=9 Blocking=0 Warnings=0",
+          "manualUiSmoke": "npm run verify:dev-issues -- --routes /integrations-hub/agent-runtime => PASS, Next dev Issues 0; Playwright Chromium smoke => page content present and console/page errors 0",
+          "baseline": "npm run verify:baseline => PASS; vitest 1525 passed, 1 skipped; cargo check passed; build passed"
+        }
+      }
+    },
+    {
+      "id": "F61",
+      "name": "Agent Runtime Snapshot Root Metadata",
+      "category": "Agent Runtime",
+      "status": "done",
+      "progress": 100,
+      "phase": "development",
+      "points": 5,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F61/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F61/",
+        "spec": ".project-manager/features/F61/feature-spec.md",
+        "tdd": ".project-manager/features/F61/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F61/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F61/",
+        "implementation": "lib/agent-runtime/inventoryService.ts",
+        "test": ".project-manager/features/F61/tests/agentRuntimeRootMetadata.test.ts"
+      },
+      "notes": "Completed F61 root metadata slice: native snapshot returns non-secret home/project root metadata, inventory service consumes snapshot roots when callers omit them, and Agent Runtime sheet no longer guesses homeDir. Focused TS/Rust tests, typecheck, UI smoke, and verify:baseline passed.",
+      "createdAt": "2026-06-22T20:01:56.219Z",
+      "updatedAt": "2026-06-22T20:07:15.000Z",
+      "completedAt": "2026-06-22T20:07:15.000Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          ".project-manager/features/F61/README.md",
+          ".project-manager/features/F61/feature-spec.md",
+          ".project-manager/features/F61/tdd-spec.md",
+          ".project-manager/features/F61/test-scenarios.md",
+          ".project-manager/features/F61/dev-log.md",
+          "lib/agent-runtime/types.ts",
+          "lib/agent-runtime/inventoryService.ts",
+          "src-tauri/src/lib.rs",
+          "app/ui/views/Plugins/PluginsHubView.tsx",
+          ".project-manager/features/F61/tests/agentRuntimeRootMetadata.test.ts",
+          ".project-manager/config.json"
+        ],
+        "kickoffAt": "2026-06-22T20:01:56.219Z",
+        "scope": "Return non-secret root metadata from native Agent Runtime snapshots and let the inventory service consume it so UI callers no longer infer homeDir.",
+        "risks": [
+          "Future snapshot metadata must remain path-only and never include file contents.",
+          "Explicit service roots must continue to override snapshot roots for tests and non-native callers.",
+          "Agent Runtime UI should continue surfacing diagnostics if native snapshot loading fails."
+        ],
+        "plannedTestScope": [
+          "unit TS: service uses snapshot homeDir when caller omits homeDir",
+          "unit TS: explicit homeDir takes precedence over snapshot homeDir",
+          "unit TS: service keeps root metadata while dropping fixture fileContents and fake secrets",
+          "unit TS: loader failure still returns deterministic fallback rows",
+          "unit Rust: native snapshot serializes homeDir/projectRoot and excludes fake secrets",
+          "UI smoke: /integrations-hub/agent-runtime remains clean"
+        ],
+        "verification": {
+          "focusedTs": "npm test -- --run F61/F58/F60 focused tests => 9 passed, 0 failed",
+          "focusedRust": "cargo test --manifest-path src-tauri/Cargo.toml agent_runtime_snapshot => 2 passed, 0 failed",
+          "typecheck": "npm run typecheck => passed",
+          "manualUiSmoke": "npm run verify:dev-issues -- --routes /integrations-hub/agent-runtime => PASS, Next dev Issues 0; Playwright smoke => content present and console/page errors 0",
+          "baseline": "npm run verify:baseline => PASS; vitest 1529 passed, 1 skipped; cargo check passed; build passed"
+        }
+      }
+    },
+    {
+      "id": "F62",
+      "name": "Agent Runtime Detail Panel",
+      "category": "Agent Runtime",
+      "status": "completed",
+      "progress": 100,
+      "phase": "completed",
+      "points": 5,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F62/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F62/",
+        "spec": ".project-manager/features/F62/feature-spec.md",
+        "tdd": ".project-manager/features/F62/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F62/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F62/",
+        "implementation": "app/ui/views/Plugins/_shared/IntegrationsDetailSheet.tsx",
+        "test": ".project-manager/features/F62/tests/agentRuntimeDetailPanel.test.ts"
+      },
+      "notes": "Add a read-only Agent Runtime row detail panel showing runtime evidence, MCP/Skills/Session/Cost readiness, warnings, and diagnostics from the F60 sheet payload.",
+      "createdAt": "2026-06-22T20:10:12.305Z",
+      "updatedAt": "2026-06-22T20:18:12.000Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "app/ui/views/Plugins/_shared/IntegrationsDetailSheet.tsx",
+          "lib/integrations/mappers/agent-runtime-detail.ts",
+          ".project-manager/features/F62/tests/agentRuntimeDetailPanel.test.ts",
+          ".project-manager/features/F62/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-22T20:10:12.305Z",
+        "completedAt": "2026-06-22T20:18:12.000Z",
+        "verification": {
+          "focused": "npm test -- --run .project-manager/features/F60/tests/agentRuntimeIntegrationSheet.test.ts .project-manager/features/F62/tests/agentRuntimeDetailPanel.test.ts => 8 passed, 0 failed",
+          "typecheck": "npm run typecheck => passed",
+          "docs": "npm run docs:check => passed",
+          "manualUiSmoke": "npm run verify:dev-issues -- --routes /integrations-hub/agent-runtime => PASS, Next dev Issues 0; Playwright Chromium selected Codex CLI and rendered Agent Runtime Evidence with console/page errors 0",
+          "baseline": "npm run verify:baseline => PASS; vitest 1533 passed, 1 skipped; cargo check passed; build passed"
+        }
+      }
+    },
+    {
+      "id": "F63",
+      "name": "Agent Runtime Session Cost Evidence Summary",
+      "category": "Agent Runtime",
+      "status": "completed",
+      "progress": 100,
+      "phase": "completed",
+      "points": 5,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F63/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F63/",
+        "spec": ".project-manager/features/F63/feature-spec.md",
+        "tdd": ".project-manager/features/F63/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F63/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F63/",
+        "implementation": "lib/agent-runtime/sessionCostSummary.ts",
+        "test": ".project-manager/features/F63/tests/agentRuntimeSessionCostSummary.test.ts"
+      },
+      "notes": "Add a metadata-only Session/Cost evidence summary for Agent Runtime rows so future cost ledger work has a typed, secret-safe contract.",
+      "createdAt": "2026-06-22T20:31:15.302Z",
+      "updatedAt": "2026-06-22T20:35:50.000Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "lib/agent-runtime/sessionCostSummary.ts",
+          "lib/agent-runtime/index.ts",
+          "lib/integrations/mappers/agent-runtime-detail.ts",
+          ".project-manager/features/F63/tests/agentRuntimeSessionCostSummary.test.ts",
+          ".project-manager/features/F63/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-22T20:31:15.302Z",
+        "completedAt": "2026-06-22T20:35:50.000Z",
+        "verification": {
+          "focused": "npm test -- --run .project-manager/features/F62/tests/agentRuntimeDetailPanel.test.ts .project-manager/features/F63/tests/agentRuntimeSessionCostSummary.test.ts => 9 passed, 0 failed",
+          "typecheck": "npm run typecheck => passed",
+          "docs": "npm run docs:check => passed",
+          "manualUiSmoke": "npm run verify:dev-issues -- --routes /integrations-hub/agent-runtime => PASS, Next dev Issues 0; Playwright Chromium selected Codex CLI and rendered Session/Cost summaries with console/page errors 0",
+          "baseline": "npm run verify:baseline => PASS; vitest 1538 passed, 1 skipped; cargo check passed; build passed"
+        }
+      }
+    },
+    {
+      "id": "F64",
+      "name": "Agent Runtime Session Import Preview",
+      "category": "Agent Runtime",
+      "status": "completed",
+      "progress": 100,
+      "phase": "completed",
+      "points": 5,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F64/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F64/",
+        "spec": ".project-manager/features/F64/feature-spec.md",
+        "tdd": ".project-manager/features/F64/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F64/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F64/",
+        "implementation": "lib/agent-runtime/sessionImportPreview.ts",
+        "test": ".project-manager/features/F64/tests/agentRuntimeSessionImportPreview.test.ts"
+      },
+      "notes": "Add a metadata-only session import preview for Agent Runtime rows so future import work can show ready and blocked session roots without reading transcripts.",
+      "createdAt": "2026-06-22T20:57:24.952Z",
+      "updatedAt": "2026-06-22T21:01:17.000Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "lib/agent-runtime/sessionImportPreview.ts",
+          "lib/agent-runtime/index.ts",
+          "lib/integrations/mappers/agent-runtime-detail.ts",
+          "app/ui/views/Plugins/_shared/IntegrationsDetailSheet.tsx",
+          ".project-manager/features/F64/tests/agentRuntimeSessionImportPreview.test.ts",
+          ".project-manager/features/F64/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-22T20:57:24.952Z",
+        "completedAt": "2026-06-22T21:01:17.000Z",
+        "verification": {
+          "focused": "npm test -- --run .project-manager/features/F62/tests/agentRuntimeDetailPanel.test.ts .project-manager/features/F63/tests/agentRuntimeSessionCostSummary.test.ts .project-manager/features/F64/tests/agentRuntimeSessionImportPreview.test.ts => 14 passed, 0 failed",
+          "typecheck": "npm run typecheck => passed",
+          "docs": "npm run docs:check => passed",
+          "manualUiSmoke": "npm run verify:dev-issues -- --routes /integrations-hub/agent-runtime => PASS, Next dev Issues 0; Playwright Chromium selected Codex CLI and rendered Session import preview details with console/page errors 0",
+          "baseline": "npm run verify:baseline => PASS; vitest 1543 passed, 1 skipped; cargo check passed; build passed"
+        }
+      }
+    },
+    {
+      "id": "F65",
+      "name": "Agent Runtime Session Root Child Counts",
+      "category": "Agent Runtime",
+      "status": "completed",
+      "progress": 100,
+      "phase": "completed",
+      "points": 5,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F65/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F65/",
+        "spec": ".project-manager/features/F65/feature-spec.md",
+        "tdd": ".project-manager/features/F65/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F65/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F65/",
+        "implementation": "lib/agent-runtime/environmentScanner.ts",
+        "test": ".project-manager/features/F65/tests/agentRuntimeSessionRootChildCounts.test.ts"
+      },
+      "notes": "Add metadata-only child counts for Agent Runtime session roots so import preview can show approximate artifact availability without reading transcripts.",
+      "createdAt": "2026-06-22T21:04:43.750Z",
+      "updatedAt": "2026-06-22T21:08:46.000Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "lib/agent-runtime/types.ts",
+          "lib/agent-runtime/environmentScanner.ts",
+          "lib/agent-runtime/sessionImportPreview.ts",
+          "src-tauri/src/lib.rs",
+          ".project-manager/features/F65/tests/agentRuntimeSessionRootChildCounts.test.ts",
+          ".project-manager/features/F65/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-22T21:04:43.750Z",
+        "completedAt": "2026-06-22T21:08:46.000Z",
+        "verification": {
+          "focusedTs": "npm test -- --run .project-manager/features/F57/tests/agentEnvironmentScanner.test.ts .project-manager/features/F64/tests/agentRuntimeSessionImportPreview.test.ts .project-manager/features/F65/tests/agentRuntimeSessionRootChildCounts.test.ts => 16 passed, 0 failed",
+          "focusedRust": "cargo test --manifest-path src-tauri/Cargo.toml agent_runtime_snapshot_counts_session_root_children_without_contents => 1 passed, 0 failed",
+          "typecheck": "npm run typecheck => passed",
+          "docs": "npm run docs:check => passed",
+          "manualUiSmoke": "npm run verify:dev-issues -- --routes /integrations-hub/agent-runtime => PASS, Next dev Issues 0; Playwright Chromium selected Codex CLI and rendered Session import preview with console/page errors 0",
+          "baseline": "npm run verify:baseline => PASS; vitest 1545 passed, 1 skipped; cargo check passed; build passed"
+        }
+      }
+    },
+    {
+      "id": "F66",
+      "name": "Agent Runtime Count Aware Session Preview Copy",
+      "category": "Agent Runtime",
+      "status": "completed",
+      "progress": 100,
+      "phase": "completed",
+      "points": 3,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F66/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F66/",
+        "spec": ".project-manager/features/F66/feature-spec.md",
+        "tdd": ".project-manager/features/F66/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F66/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F66/",
+        "implementation": "lib/agent-runtime/sessionImportPreview.ts",
+        "test": ".project-manager/features/F66/tests/agentRuntimeCountAwareSessionPreview.test.ts"
+      },
+      "notes": "Show metadata-only session root child counts in Agent Runtime import preview copy without listing filenames or reading transcripts.",
+      "createdAt": "2026-06-22T21:11:08.036Z",
+      "updatedAt": "2026-06-22T21:15:47Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "lib/agent-runtime/sessionImportPreview.ts",
+          "lib/integrations/mappers/agent-runtime-detail.ts",
+          ".project-manager/features/F66/tests/agentRuntimeCountAwareSessionPreview.test.ts",
+          ".project-manager/features/F66/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-22T21:11:08.036Z",
+        "completedAt": "2026-06-22T21:15:47Z",
+        "verification": {
+          "red": "npm test -- --run .project-manager/features/F66/tests/agentRuntimeCountAwareSessionPreview.test.ts => failed before implementation because preview.summary did not exist",
+          "focusedTs": "npm test -- --run .project-manager/features/F66/tests/agentRuntimeCountAwareSessionPreview.test.ts => 5 passed, 0 failed",
+          "regressionTs": "npm test -- --run .project-manager/features/F64/tests/agentRuntimeSessionImportPreview.test.ts .project-manager/features/F65/tests/agentRuntimeSessionRootChildCounts.test.ts .project-manager/features/F66/tests/agentRuntimeCountAwareSessionPreview.test.ts => 12 passed, 0 failed",
+          "typecheck": "npm run typecheck => passed",
+          "docs": "npm run docs:check => passed",
+          "manualUiSmoke": "npm run verify:dev-issues -- --routes /integrations-hub/agent-runtime => PASS, Next dev Issues 0; Playwright Chromium selected Codex CLI and rendered count-aware Session import preview with console/page errors 0",
+          "baseline": "npm run verify:baseline => PASS; vitest 1550 passed, 1 skipped; cargo check passed; build passed"
+        }
+      }
+    },
+    {
+      "id": "F67",
+      "name": "Agent Runtime Session Import Dry Run Contract",
+      "category": "Agent Runtime",
+      "status": "completed",
+      "progress": 100,
+      "phase": "completed",
+      "points": 3,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F67/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F67/",
+        "spec": ".project-manager/features/F67/feature-spec.md",
+        "tdd": ".project-manager/features/F67/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F67/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F67/",
+        "implementation": "lib/agent-runtime/sessionImportDryRun.ts",
+        "test": ".project-manager/features/F67/tests/agentRuntimeSessionImportDryRun.test.ts"
+      },
+      "notes": "Create a metadata-only session import dry-run plan from Agent Runtime preview candidates without reading transcripts or listing filenames.",
+      "createdAt": "2026-06-22T21:18:47.399Z",
+      "updatedAt": "2026-06-22T21:22:08Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "lib/agent-runtime/sessionImportDryRun.ts",
+          "lib/agent-runtime/index.ts",
+          "lib/integrations/mappers/agent-runtime-detail.ts",
+          ".project-manager/features/F67/tests/agentRuntimeSessionImportDryRun.test.ts",
+          ".project-manager/features/F67/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-22T21:18:47.399Z",
+        "completedAt": "2026-06-22T21:22:08Z",
+        "verification": {
+          "red": "npm test -- --run .project-manager/features/F67/tests/agentRuntimeSessionImportDryRun.test.ts => failed before implementation because sessionImportDryRun helper did not exist",
+          "focusedTs": "npm test -- --run .project-manager/features/F67/tests/agentRuntimeSessionImportDryRun.test.ts => 6 passed, 0 failed",
+          "regressionTs": "npm test -- --run .project-manager/features/F64/tests/agentRuntimeSessionImportPreview.test.ts .project-manager/features/F65/tests/agentRuntimeSessionRootChildCounts.test.ts .project-manager/features/F66/tests/agentRuntimeCountAwareSessionPreview.test.ts .project-manager/features/F67/tests/agentRuntimeSessionImportDryRun.test.ts => 18 passed, 0 failed",
+          "typecheck": "npm run typecheck => passed",
+          "docs": "npm run docs:check => passed",
+          "manualUiSmoke": "npm run verify:dev-issues -- --routes /integrations-hub/agent-runtime => PASS, Next dev Issues 0; Playwright Chromium selected Codex CLI and rendered preview plus dry-run copy with console/page errors 0",
+          "baseline": "npm run verify:baseline => PASS; vitest 1556 passed, 1 skipped; cargo check passed; build passed"
+        }
+      }
+    },
+    {
+      "id": "F68",
+      "name": "Agent Runtime Session Import Approval Boundary",
+      "category": "Agent Runtime",
+      "status": "completed",
+      "progress": 100,
+      "phase": "completed",
+      "points": 3,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F68/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F68/",
+        "spec": ".project-manager/features/F68/feature-spec.md",
+        "tdd": ".project-manager/features/F68/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F68/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F68/",
+        "implementation": "lib/agent-runtime/sessionImportApproval.ts",
+        "test": ".project-manager/features/F68/tests/agentRuntimeSessionImportApproval.test.ts"
+      },
+      "notes": "Add an explicit approval boundary between metadata-only session import dry run and any future transcript reader execution.",
+      "createdAt": "2026-06-22T21:27:30.421Z",
+      "updatedAt": "2026-06-22T21:31:12Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "lib/agent-runtime/sessionImportApproval.ts",
+          "lib/agent-runtime/index.ts",
+          "lib/integrations/mappers/agent-runtime-detail.ts",
+          ".project-manager/features/F68/tests/agentRuntimeSessionImportApproval.test.ts",
+          ".project-manager/features/F68/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-22T21:27:30.421Z",
+        "completedAt": "2026-06-22T21:31:12Z",
+        "verification": {
+          "red": "npm test -- --run .project-manager/features/F68/tests/agentRuntimeSessionImportApproval.test.ts => failed before implementation because sessionImportApproval helper did not exist",
+          "focusedTs": "npm test -- --run .project-manager/features/F68/tests/agentRuntimeSessionImportApproval.test.ts => 7 passed, 0 failed",
+          "regressionTs": "npm test -- --run .project-manager/features/F64/tests/agentRuntimeSessionImportPreview.test.ts .project-manager/features/F65/tests/agentRuntimeSessionRootChildCounts.test.ts .project-manager/features/F66/tests/agentRuntimeCountAwareSessionPreview.test.ts .project-manager/features/F67/tests/agentRuntimeSessionImportDryRun.test.ts .project-manager/features/F68/tests/agentRuntimeSessionImportApproval.test.ts => 25 passed, 0 failed",
+          "typecheck": "npm run typecheck => passed after narrowing blockedStatusFor return type",
+          "docs": "npm run docs:check => passed",
+          "manualUiSmoke": "npm run verify:dev-issues -- --routes /integrations-hub/agent-runtime => PASS, Next dev Issues 0; Playwright Chromium selected Codex CLI and rendered preview, dry-run, and approval copy with console/page errors 0",
+          "baseline": "npm run verify:baseline => PASS; vitest 1563 passed, 1 skipped; cargo check passed; build passed"
+        }
+      }
+    },
+    {
+      "id": "F69",
+      "name": "Agent Runtime Session Reader Boundary",
+      "category": "Agent Runtime",
+      "status": "completed",
+      "progress": 100,
+      "phase": "completed",
+      "points": 5,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F69/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F69/",
+        "spec": ".project-manager/features/F69/feature-spec.md",
+        "tdd": ".project-manager/features/F69/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F69/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F69/",
+        "implementation": "src-tauri/src/lib.rs",
+        "test": ".project-manager/features/F69/tests/agentRuntimeSessionReaderBoundary.test.ts"
+      },
+      "notes": "Add a Rust-side approved session reader boundary with allowlisted roots, max-byte guard, and metadata-only redacted responses.",
+      "createdAt": "2026-06-22T21:37:03.670Z",
+      "updatedAt": "2026-06-22T21:42:15Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "src-tauri/src/lib.rs",
+          "lib/bridge/index.ts",
+          "src-tauri/capabilities/default.json",
+          "src-tauri/permissions/read-agent-runtime-session-boundary.json",
+          ".project-manager/features/F69/tests/agentRuntimeSessionReaderBoundary.test.ts",
+          ".project-manager/features/F69/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-22T21:37:03.670Z",
+        "completedAt": "2026-06-22T21:42:15Z",
+        "verification": {
+          "redTs": "npm test -- --run .project-manager/features/F69/tests/agentRuntimeSessionReaderBoundary.test.ts => failed before implementation because permission/bridge contract did not exist",
+          "redRust": "cargo test --manifest-path src-tauri/Cargo.toml agent_runtime_session_boundary --lib => failed before implementation because request/helper did not exist",
+          "focusedTs": "npm test -- --run .project-manager/features/F69/tests/agentRuntimeSessionReaderBoundary.test.ts => 2 passed, 0 failed",
+          "focusedRust": "cargo test --manifest-path src-tauri/Cargo.toml agent_runtime_session_boundary --lib => 4 passed, 0 failed",
+          "regressionTs": "npm test -- --run F64-F69 Agent Runtime feature tests => 27 passed, 0 failed",
+          "regressionRust": "cargo test --manifest-path src-tauri/Cargo.toml agent_runtime --lib => 7 passed, 0 failed",
+          "typecheck": "npm run typecheck => passed",
+          "docs": "npm run docs:check => passed",
+          "cargoCheck": "cargo check --manifest-path src-tauri/Cargo.toml => passed",
+          "manualUiSmoke": "npm run verify:dev-issues -- --routes /integrations-hub/agent-runtime => PASS, Next dev Issues 0; Playwright Chromium selected Codex CLI and rendered preview/dry-run/approval copy with console/page errors 0",
+          "baseline": "npm run verify:baseline => PASS; vitest 1565 passed, 1 skipped; cargo check passed; build passed"
+        }
+      }
+    },
+    {
+      "id": "F70",
+      "name": "Agent Runtime Redacted Session Content Reader",
+      "category": "Agent Runtime",
+      "status": "completed",
+      "progress": 100,
+      "phase": "completed",
+      "points": 5,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F70/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F70/",
+        "spec": ".project-manager/features/F70/feature-spec.md",
+        "tdd": ".project-manager/features/F70/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F70/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F70/",
+        "implementation": "src-tauri/src/lib.rs",
+        "test": ".project-manager/features/F70/tests/agentRuntimeRedactedSessionContentReader.test.ts"
+      },
+      "notes": "Read bounded approved session content natively and return redacted structural metadata only.",
+      "createdAt": "2026-06-22T21:49:07.196Z",
+      "updatedAt": "2026-06-22T21:53:18Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "src-tauri/src/lib.rs",
+          "lib/bridge/index.ts",
+          "src-tauri/capabilities/default.json",
+          "src-tauri/permissions/read-agent-runtime-redacted-session-content.json",
+          ".project-manager/features/F70/tests/agentRuntimeRedactedSessionContentReader.test.ts",
+          ".project-manager/features/F70/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-22T21:49:07.196Z",
+        "completedAt": "2026-06-22T21:53:18Z",
+        "verification": {
+          "redTs": "npm test -- --run .project-manager/features/F70/tests/agentRuntimeRedactedSessionContentReader.test.ts => failed before implementation because permission/bridge contract did not exist",
+          "redRust": "cargo test --manifest-path src-tauri/Cargo.toml agent_runtime_redacted --lib => failed before implementation because redacted reader helper did not exist",
+          "focusedTs": "npm test -- --run .project-manager/features/F70/tests/agentRuntimeRedactedSessionContentReader.test.ts => 2 passed, 0 failed",
+          "focusedRust": "cargo test --manifest-path src-tauri/Cargo.toml agent_runtime_redacted --lib => 3 passed, 0 failed",
+          "regressionTs": "npm test -- --run F64-F70 Agent Runtime feature tests => 29 passed, 0 failed",
+          "regressionRust": "cargo test --manifest-path src-tauri/Cargo.toml agent_runtime --lib => 10 passed, 0 failed",
+          "typecheck": "npm run typecheck => passed",
+          "docs": "npm run docs:check => passed",
+          "cargoCheck": "cargo check --manifest-path src-tauri/Cargo.toml => passed",
+          "manualUiSmoke": "npm run verify:dev-issues -- --routes /integrations-hub/agent-runtime => PASS, Next dev Issues 0; Playwright Chromium selected Codex CLI and rendered session import copy with console/page errors 0",
+          "baseline": "npm run verify:baseline => PASS; vitest 1567 passed, 1 skipped; cargo check passed; build passed"
+        }
+      }
+    },
+    {
+      "id": "F71",
+      "name": "Agent Runtime Redacted Session Envelope Parser",
+      "category": "Agent Runtime",
+      "status": "completed",
+      "progress": 100,
+      "phase": "completed",
+      "points": 5,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F71/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F71/",
+        "spec": ".project-manager/features/F71/feature-spec.md",
+        "tdd": ".project-manager/features/F71/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F71/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F71/",
+        "implementation": "src-tauri/src/lib.rs",
+        "test": ".project-manager/features/F71/tests/agentRuntimeRedactedSessionEnvelopeParser.test.ts"
+      },
+      "notes": "Parse bounded approved session content natively and return redacted aggregate envelope metadata only.",
+      "createdAt": "2026-06-22T21:56:46.704Z",
+      "updatedAt": "2026-06-22T22:00:22Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "src-tauri/src/lib.rs",
+          "lib/bridge/index.ts",
+          "src-tauri/capabilities/default.json",
+          "src-tauri/permissions/read-agent-runtime-redacted-session-envelope.json",
+          ".project-manager/features/F71/tests/agentRuntimeRedactedSessionEnvelopeParser.test.ts",
+          ".project-manager/features/F71/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-22T21:56:46.704Z",
+        "completedAt": "2026-06-22T22:00:22Z",
+        "verification": {
+          "redTs": "npm test -- --run .project-manager/features/F71/tests/agentRuntimeRedactedSessionEnvelopeParser.test.ts => failed before implementation because permission/bridge contract did not exist",
+          "redRust": "cargo test --manifest-path src-tauri/Cargo.toml agent_runtime_redacted_envelope --lib => failed before implementation because envelope parser helper did not exist",
+          "focusedTs": "npm test -- --run .project-manager/features/F71/tests/agentRuntimeRedactedSessionEnvelopeParser.test.ts => 2 passed, 0 failed",
+          "focusedRust": "cargo test --manifest-path src-tauri/Cargo.toml agent_runtime_redacted_envelope --lib => 3 passed, 0 failed",
+          "regressionTs": "npm test -- --run F64-F71 Agent Runtime feature tests => 31 passed, 0 failed",
+          "regressionRust": "cargo test --manifest-path src-tauri/Cargo.toml agent_runtime --lib => 13 passed, 0 failed",
+          "typecheck": "npm run typecheck => passed",
+          "docs": "npm run docs:check => passed",
+          "cargoCheck": "cargo check --manifest-path src-tauri/Cargo.toml => passed",
+          "manualUiSmoke": "npm run verify:dev-issues -- --routes /integrations-hub/agent-runtime => PASS, Next dev Issues 0; Playwright Chromium selected Codex CLI and rendered session import copy with console/page errors 0",
+          "baseline": "npm run verify:baseline => PASS; vitest 1569 passed, 1 skipped; cargo check passed; build passed"
+        }
+      }
+    },
+    {
+      "id": "F72",
+      "name": "Agent Runtime Redacted Session Envelope Detail Summary",
+      "category": "Agent Runtime",
+      "status": "completed",
+      "progress": 100,
+      "phase": "completed",
+      "points": 3,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F72/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F72/",
+        "spec": ".project-manager/features/F72/feature-spec.md",
+        "tdd": ".project-manager/features/F72/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F72/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F72/",
+        "implementation": "lib/agent-runtime/sessionEnvelopeSummary.ts, lib/integrations/mappers/agent-runtime-detail.ts",
+        "test": ".project-manager/features/F72/tests/agentRuntimeSessionEnvelopeSummary.test.ts"
+      },
+      "notes": "Render F71 aggregate-only session envelope metadata in Agent Runtime Session detail copy without transcript content.",
+      "createdAt": "2026-06-22T22:08:47.971Z",
+      "updatedAt": "2026-06-22T22:18:00Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "lib/agent-runtime/sessionEnvelopeSummary.ts",
+          "lib/agent-runtime/index.ts",
+          "lib/integrations/mappers/agent-runtime-detail.ts",
+          ".project-manager/features/F72/tests/agentRuntimeSessionEnvelopeSummary.test.ts",
+          ".project-manager/features/F72/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-22T22:08:47.971Z",
+        "completedAt": "2026-06-22T22:18:00Z",
+        "verification": {
+          "redTs": "npm test -- --run .project-manager/features/F72/tests/agentRuntimeSessionEnvelopeSummary.test.ts => failed before implementation because sessionEnvelopeSummary helper did not exist",
+          "focusedTs": "npm test -- --run .project-manager/features/F72/tests/agentRuntimeSessionEnvelopeSummary.test.ts => 5 passed, 0 failed",
+          "regressionTs": "npm test -- --run F64-F72 Agent Runtime feature tests => 36 passed, 0 failed",
+          "typecheck": "npm run typecheck => passed",
+          "docs": "npm run docs:check => passed",
+          "manualUiSmoke": "npm run verify:dev-issues -- --routes /integrations-hub/agent-runtime => PASS, Next dev Issues 0; Playwright Chromium selected Codex CLI and rendered Agent Runtime Evidence with console/page errors 0",
+          "baseline": "npm run verify:baseline => PASS; vitest 1574 passed, 1 skipped; cargo check passed; build passed"
+        }
+      }
+    },
+    {
+      "id": "F73",
+      "name": "Agent Runtime Approved Session Envelope Parse Action",
+      "category": "Agent Runtime",
+      "status": "completed",
+      "progress": 100,
+      "phase": "completed",
+      "points": 3,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F73/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F73/",
+        "spec": ".project-manager/features/F73/feature-spec.md",
+        "tdd": ".project-manager/features/F73/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F73/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F73/",
+        "implementation": "lib/agent-runtime/sessionEnvelopeParseAction.ts, lib/integrations/mappers/agent-runtime-detail.ts",
+        "test": ".project-manager/features/F73/tests/agentRuntimeSessionEnvelopeParseAction.test.ts"
+      },
+      "notes": "Build an explicit approval-gated request contract for parsing one selected session envelope aggregate.",
+      "createdAt": "2026-06-22T22:18:23.554Z",
+      "updatedAt": "2026-06-22T22:43:00Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "lib/agent-runtime/sessionEnvelopeParseAction.ts",
+          "lib/agent-runtime/index.ts",
+          "lib/integrations/mappers/agent-runtime-detail.ts",
+          ".project-manager/features/F73/tests/agentRuntimeSessionEnvelopeParseAction.test.ts",
+          ".project-manager/features/F73/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-22T22:18:23.554Z",
+        "completedAt": "2026-06-22T22:25:00Z",
+        "verification": {
+          "redTs": "npm test -- --run .project-manager/features/F73/tests/agentRuntimeSessionEnvelopeParseAction.test.ts => failed before implementation because sessionEnvelopeParseAction helper did not exist",
+          "focusedTs": "npm test -- --run .project-manager/features/F73/tests/agentRuntimeSessionEnvelopeParseAction.test.ts => 7 passed, 0 failed",
+          "regressionTs": "npm test -- --run F64-F73 Agent Runtime feature tests => 43 passed, 0 failed",
+          "typecheck": "npm run typecheck => passed",
+          "docs": "npm run docs:check => passed",
+          "manualUiSmoke": "npm run verify:dev-issues -- --routes /integrations-hub/agent-runtime => PASS, Next dev Issues 0; Playwright Chromium selected Codex CLI and rendered Agent Runtime Evidence plus Session envelope parse action with console/page errors 0",
+          "baseline": "npm run verify:baseline => PASS; vitest 1581 passed, 1 skipped; cargo check passed; build passed"
+        }
+      }
+    },
+    {
+      "id": "F74",
+      "name": "Agent Runtime Session Envelope Parse Executor Boundary",
+      "category": "Agent Runtime",
+      "status": "completed",
+      "progress": 100,
+      "phase": "completed",
+      "points": 3,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F74/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F74/",
+        "spec": ".project-manager/features/F74/feature-spec.md",
+        "tdd": ".project-manager/features/F74/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F74/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F74/",
+        "implementation": "lib/agent-runtime/sessionEnvelopeParseExecutor.ts",
+        "test": ".project-manager/features/F74/tests/agentRuntimeSessionEnvelopeParseExecutor.test.ts"
+      },
+      "notes": "Execute approved envelope parse actions through an injected parser and return redacted aggregate summaries only.",
+      "createdAt": "2026-06-22T22:45:40.107Z",
+      "updatedAt": "2026-06-22T22:51:40.000Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "lib/agent-runtime/sessionEnvelopeParseExecutor.ts",
+          ".project-manager/features/F74/tests/agentRuntimeSessionEnvelopeParseExecutor.test.ts",
+          ".project-manager/features/F74/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-22T22:45:40.107Z",
+        "verification": {
+          "red": "Focused F74 suite failed 6/6 before implementation because executeAgentRuntimeSessionEnvelopeParseAction was not exported",
+          "focused": "npm test -- --run .project-manager/features/F74/tests/agentRuntimeSessionEnvelopeParseExecutor.test.ts => 6 passed, 0 failed",
+          "regressionTs": "npm test -- --run F64-F74 Agent Runtime feature tests => 38 passed, 0 failed",
+          "typecheck": "npm run typecheck => passed",
+          "docs": "npm run docs:check => passed",
+          "manualUiSmoke": "npm run verify:dev-issues -- --routes /integrations-hub/agent-runtime => PASS, Next dev Issues 0; Playwright Chromium selected Codex CLI and rendered Agent Runtime Evidence plus Session envelope parse action with console/page errors 0",
+          "baseline": "npm run verify:baseline => PASS; vitest 1587 passed, 1 skipped; cargo check passed; build passed"
+        }
+      }
+    },
+    {
+      "id": "F75",
+      "name": "Agent Runtime Session Envelope UI Execute Flow",
+      "category": "Agent Runtime",
+      "status": "completed",
+      "progress": 100,
+      "phase": "completed",
+      "points": 3,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F75/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F75/",
+        "spec": ".project-manager/features/F75/feature-spec.md",
+        "tdd": ".project-manager/features/F75/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F75/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F75/",
+        "implementation": "app/ui/views/Plugins/_shared/IntegrationsDetailSheet.tsx",
+        "test": ".project-manager/features/F75/tests/agentRuntimeSessionEnvelopeUiExecuteFlow.test.ts"
+      },
+      "notes": "Wire the approved redacted session envelope parse executor into Agent Runtime UI state without leaking transcript filenames or content.",
+      "createdAt": "2026-06-22T22:53:18.877Z",
+      "updatedAt": "2026-06-22T23:00:05.000Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "app/ui/views/Plugins/_shared/IntegrationsDetailSheet.tsx",
+          ".project-manager/features/F75/tests/agentRuntimeSessionEnvelopeUiExecuteFlow.test.ts",
+          ".project-manager/features/F75/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-22T22:53:18.877Z",
+        "verification": {
+          "red": "Focused F75 suite failed 4/4 before implementation because the UI parse helper and redacted parser region were missing",
+          "focused": "npm test -- --run .project-manager/features/F75/tests/agentRuntimeSessionEnvelopeUiExecuteFlow.test.ts => 4 passed, 0 failed",
+          "regressionTs": "npm test -- --run F64-F75 Agent Runtime feature tests => 42 passed, 0 failed",
+          "typecheck": "npm run typecheck => passed",
+          "docs": "npm run docs:check => passed",
+          "manualUiSmoke": "npm run verify:dev-issues -- --routes /integrations-hub/agent-runtime => PASS, Next dev Issues 0; Playwright Chromium selected Codex CLI, found redacted parser controls, confirmed disabled blocked state for live row without existing session root or target, console/page errors 0",
+          "baseline": "npm run verify:baseline => PASS; vitest 1591 passed, 1 skipped; cargo check passed; build passed"
+        }
+      }
+    },
+    {
+      "id": "F76",
+      "name": "Agent Runtime Redacted Session Target Selector",
+      "category": "Agent Runtime",
+      "status": "completed",
+      "progress": 100,
+      "phase": "completed",
+      "points": 3,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F76/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F76/",
+        "spec": ".project-manager/features/F76/feature-spec.md",
+        "tdd": ".project-manager/features/F76/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F76/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F76/",
+        "implementation": "lib/integrations/mappers/agent-runtime-detail.ts",
+        "test": ".project-manager/features/F76/tests/agentRuntimeRedactedSessionTargetSelector.test.ts"
+      },
+      "notes": "Add a redacted session target candidate selector for Agent Runtime envelope parsing without exposing filenames or transcript content.",
+      "createdAt": "2026-06-22T23:01:14.492Z",
+      "updatedAt": "2026-06-22T23:05:50.000Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "lib/integrations/mappers/agent-runtime-detail.ts",
+          ".project-manager/features/F76/tests/agentRuntimeRedactedSessionTargetSelector.test.ts",
+          ".project-manager/features/F76/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-22T23:01:14.492Z",
+        "verification": {
+          "red": "Focused F76 suite failed before implementation because buildAgentRuntimeRedactedSessionTargetOptions and selector UI were missing",
+          "focused": "npm test -- --run .project-manager/features/F76/tests/agentRuntimeRedactedSessionTargetSelector.test.ts => 3 passed, 0 failed",
+          "regressionTs": "npm test -- --run F64-F76 Agent Runtime feature tests => 45 passed, 0 failed",
+          "typecheck": "npm run typecheck => passed",
+          "docs": "npm run docs:check => passed",
+          "manualUiSmoke": "npm run verify:dev-issues -- --routes /integrations-hub/agent-runtime => PASS, Next dev Issues 0; Playwright Chromium selected Codex CLI, found parser panel, confirmed live fallback input when no target candidates exist, console/page errors 0",
+          "baseline": "npm run verify:baseline => PASS; vitest 1594 passed, 1 skipped; cargo check passed; build passed"
+        }
+      }
+    },
+    {
+      "id": "F77",
+      "name": "Agent Runtime Native Redacted Session Target Lister",
+      "category": "Agent Runtime",
+      "status": "completed",
+      "progress": 100,
+      "phase": "completed",
+      "points": 3,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F77/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F77/",
+        "spec": ".project-manager/features/F77/feature-spec.md",
+        "tdd": ".project-manager/features/F77/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F77/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F77/",
+        "implementation": "src-tauri/src/lib.rs",
+        "test": ".project-manager/features/F77/tests/agentRuntimeNativeRedactedSessionTargetLister.test.ts"
+      },
+      "notes": "Add a native metadata-only session target lister with redacted labels, bridge wrapper, capability, and permission.",
+      "createdAt": "2026-06-22T23:06:40.810Z",
+      "updatedAt": "2026-06-22T23:13:35.000Z",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "src-tauri/src/lib.rs",
+          ".project-manager/features/F77/tests/agentRuntimeNativeRedactedSessionTargetLister.test.ts",
+          ".project-manager/features/F77/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-22T23:06:40.810Z",
+        "verification": {
+          "red": "Focused TS failed before wrapper/permission; focused Rust failed before request/helper",
+          "focused": "npm test -- --run .project-manager/features/F77/tests/agentRuntimeNativeRedactedSessionTargetLister.test.ts => 2 passed, 0 failed",
+          "focusedRust": "cargo test --manifest-path src-tauri/Cargo.toml agent_runtime_target_lister -- --nocapture => 2 passed, 0 failed",
+          "regressionTs": "npm test -- --run F64-F77 Agent Runtime feature tests => 47 passed, 0 failed",
+          "typecheck": "npm run typecheck => passed",
+          "docs": "npm run docs:check => passed",
+          "cargoCheck": "cargo check --manifest-path src-tauri/Cargo.toml => passed",
+          "manualUiSmoke": "npm run verify:dev-issues -- --routes /integrations-hub/agent-runtime => PASS, Next dev Issues 0; Playwright Chromium selected Codex CLI, found parser panel, sensitive fixture strings absent, console/page errors 0",
+          "baseline": "npm run verify:baseline => PASS; vitest 1596 passed, 1 skipped; cargo check passed; build passed"
+        }
+      }
+    },
+    {
+      "id": "F78",
+      "name": "Agent Runtime Session Target Hydration",
+      "category": "Agent Runtime",
+      "status": "completed",
+      "progress": 100,
+      "phase": "done",
+      "points": 3,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F78/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F78/",
+        "spec": ".project-manager/features/F78/feature-spec.md",
+        "tdd": ".project-manager/features/F78/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F78/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F78/",
+        "implementation": "lib/integrations/mappers/agent-runtime.ts",
+        "test": ".project-manager/features/F78/tests/agentRuntimeSessionTargetHydration.test.ts"
+      },
+      "notes": "Hydrate Agent Runtime rows with F77 native redacted session target candidates for the F76 selector. Focused F78 tests pass 4/4; F64-F78 regression passes 62/62; route health/browser smoke pass; baseline passes.",
+      "createdAt": "2026-06-22T23:28:31.115Z",
+      "updatedAt": "2026-06-23T09:36:00.000+10:00",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "lib/integrations/mappers/agent-runtime.ts",
+          ".project-manager/features/F78/tests/agentRuntimeSessionTargetHydration.test.ts",
+          ".project-manager/features/F78/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-22T23:28:31.115Z",
+        "verification": {
+          "focused": "npm test -- --run .project-manager/features/F78/tests/agentRuntimeSessionTargetHydration.test.ts => 4 passed",
+          "regression": "npm test -- --run F64-F78 Agent Runtime feature-folder tests => 62 passed",
+          "typecheck": "npm run typecheck => passed",
+          "docs": "npm run docs:check => passed",
+          "routeHealth": "npm run verify:dev-issues -- --routes /integrations-hub/agent-runtime => PASS, Next dev Issues 0",
+          "manualUiSmoke": "Playwright Chromium route smoke => runtime rows/detail signal rendered, unsafe fixture strings absent, console/page errors 0",
+          "baseline": "npm run verify:baseline => PASS; vitest 1600 passed, 1 skipped; cargo check passed; build passed"
+        }
+      }
+    },
+    {
+      "id": "F79",
+      "name": "Agent Runtime Session Target Diagnostics UI",
+      "category": "Agent Runtime",
+      "status": "completed",
+      "progress": 100,
+      "phase": "done",
+      "points": 2,
+      "locatedSection": "Project Dashboard > Development",
+      "readmePath": ".project-manager/features/F79/README.md",
+      "paths": {
+        "featureFolder": ".project-manager/features/F79/",
+        "spec": ".project-manager/features/F79/feature-spec.md",
+        "tdd": ".project-manager/features/F79/tdd-spec.md",
+        "testScenarios": ".project-manager/features/F79/test-scenarios.md",
+        "developmentLogSummaryFolder": ".project-manager/features/F79/",
+        "implementation": "app/ui/views/Plugins/_shared/IntegrationsDetailSheet.tsx",
+        "test": ".project-manager/features/F79/tests/agentRuntimeSessionTargetDiagnosticsUi.test.tsx"
+      },
+      "notes": "Surface F78 session target hydration diagnostics in Agent Runtime UI without exposing target filenames or transcript content. Focused F79 tests pass 3/3; F64-F79 regression passes 65/65; route health/browser smoke pass; baseline passes.",
+      "createdAt": "2026-06-23T02:04:42.930Z",
+      "updatedAt": "2026-06-23T12:09:00.000+10:00",
+      "updatedBy": "Codex",
+      "metadata": {
+        "evidencePaths": [
+          "app/ui/views/Plugins/_shared/IntegrationsDetailSheet.tsx",
+          ".project-manager/features/F79/tests/agentRuntimeSessionTargetDiagnosticsUi.test.tsx",
+          ".project-manager/features/F79/dev-log.md"
+        ],
+        "kickoffAt": "2026-06-23T02:04:42.930Z",
+        "verification": {
+          "focused": "npm test -- --run .project-manager/features/F79/tests/agentRuntimeSessionTargetDiagnosticsUi.test.tsx => 3 passed",
+          "regression": "npm test -- --run F64-F79 Agent Runtime feature-folder tests => 65 passed",
+          "typecheck": "npm run typecheck => passed",
+          "docs": "npm run docs:check => passed",
+          "routeHealth": "npm run verify:dev-issues -- --routes /integrations-hub/agent-runtime => PASS, Next dev Issues 0",
+          "manualUiSmoke": "Playwright Chromium route smoke => runtime rows/detail signal rendered, unsafe fixture strings absent, console/page errors 0",
+          "baseline": "npm run verify:baseline => PASS; vitest 1603 passed, 1 skipped; cargo check passed; build passed"
+        }
+      }
     }
   ],
   "id": "beab9be6-b931-4ec1-ad3e-7e6aadf6c6c0",
@@ -2225,6 +3313,6 @@
   ],
   "activeBackendProfileMode": "local-files",
   "schemaVersion": 11,
-  "updatedAt": "2026-06-21T01:30:00.000Z",
-  "updatedBy": "Cursor"
+  "updatedAt": "2026-06-23T02:04:42.930Z",
+  "updatedBy": "Codex"
 }

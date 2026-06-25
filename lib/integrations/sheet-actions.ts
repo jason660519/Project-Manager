@@ -3,6 +3,7 @@ import type { ScanOutcome } from './scan-diff';
 
 export const INTEGRATION_INVENTORY_SHEETS = [
   'system_installed_apps',
+  'agent-runtime',
   'coding-tools',
   'mcp',
   'skills',
@@ -20,6 +21,7 @@ export type IntegrationSheetTestMode = 'selected-rows' | 'sheet';
 
 export const INTEGRATION_SHEET_ACTION_LABELS: Record<IntegrationInventorySheet, string> = {
   system_installed_apps: 'System Installed Apps',
+  'agent-runtime': 'Agent Runtime',
   'coding-tools': 'Coding Tools',
   mcp: 'MCP',
   skills: 'Skills',

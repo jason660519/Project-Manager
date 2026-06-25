@@ -2,6 +2,7 @@
 
 export const INTEGRATION_SHEETS = [
   'system_installed_apps',
+  'agent-runtime',
   // Legacy URL/storage sheet id. Keep it in the route set so old links can redirect
   // without changing existing manual metadata row keys such as `plugins:codex`.
   'plugins',
@@ -65,6 +66,7 @@ export type IntegrationSourceKind =
   | 'memory'
   | 'slash-command'
   | 'system-cli'
+  | 'agent-runtime'
   | 'connected-instance'
   | 'workflow-execution-request'
   | 'workflow-execution-record'

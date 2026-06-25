@@ -1,0 +1,15 @@
+{
+  "default": null,
+  "permission": [
+    {
+      "identifier": "read-agent-runtime-redacted-session-envelope",
+      "description": "Allow the renderer to request aggregate-only redacted Agent Runtime session envelope metadata.",
+      "commands": {
+        "allow": [
+          "read_agent_runtime_redacted_session_envelope"
+        ],
+        "deny": []
+      }
+    }
+  ]
+}

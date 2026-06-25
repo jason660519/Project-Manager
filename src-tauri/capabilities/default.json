@@ -13,6 +13,11 @@
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister",
     "pty:default",
+    "build-agent-runtime-snapshot",
+    "read-agent-runtime-session-boundary",
+    "list-agent-runtime-redacted-session-targets",
+    "read-agent-runtime-redacted-session-content",
+    "read-agent-runtime-redacted-session-envelope",
     {
       "identifier": "shell:allow-open",
       "allow": [

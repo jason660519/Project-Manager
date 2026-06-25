@@ -1,0 +1,15 @@
+{
+  "default": null,
+  "permission": [
+    {
+      "identifier": "build-agent-runtime-snapshot",
+      "description": "Allow the renderer to request read-only agent runtime path and command metadata.",
+      "commands": {
+        "allow": [
+          "build_agent_runtime_snapshot"
+        ],
+        "deny": []
+      }
+    }
+  ]
+}

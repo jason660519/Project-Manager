@@ -1,0 +1,86 @@
+import type { AgentRuntimeToolSpec } from './types';
+
+export const DEFAULT_AGENT_TOOL_SPECS: AgentRuntimeToolSpec[] = [
+  {
+    id: 'codex',
+    label: 'Codex CLI',
+    command: 'codex',
+    capabilities: { runtime: true, mcp: true, skills: true, sessions: true, cost: true },
+    paths: [
+      { kind: 'config-root', path: '~/.codex', required: true },
+      { kind: 'config-file', path: '~/.codex/config.toml' },
+      { kind: 'secret-file', path: '~/.codex/auth.json', secretBearing: true },
+      { kind: 'skills-root', path: '~/.codex/skills' },
+      { kind: 'sessions-root', path: '~/.codex/sessions' },
+      { kind: 'sessions-root', path: '~/.codex/archived_sessions' },
+    ],
+  },
+  {
+    id: 'claude-code',
+    label: 'Claude Code',
+    command: 'claude',
+    capabilities: { runtime: true, mcp: true, skills: true, sessions: true, cost: false },
+    paths: [
+      { kind: 'config-root', path: '~/.claude', required: true },
+      { kind: 'config-file', path: '~/.claude/settings.json' },
+      { kind: 'mcp-file', path: '~/.claude.json' },
+      { kind: 'skills-root', path: '~/.claude/skills' },
+      { kind: 'sessions-root', path: '~/.claude/projects' },
+      { kind: 'secret-file', path: '~/.claude/settings.json', secretBearing: true },
+    ],
+  },
+  {
+    id: 'gemini-cli',
+    label: 'Gemini CLI',
+    command: 'gemini',
+    capabilities: { runtime: true, mcp: true, skills: true, sessions: true, cost: true },
+    paths: [
+      { kind: 'config-root', path: '~/.gemini', required: true },
+      { kind: 'config-file', path: '~/.gemini/.env' },
+      { kind: 'mcp-file', path: '~/.gemini/settings.json' },
+      { kind: 'skills-root', path: '~/.gemini/skills' },
+      { kind: 'sessions-root', path: '~/.gemini/tmp' },
+      { kind: 'secret-file', path: '~/.gemini/.env', secretBearing: true },
+    ],
+  },
+  {
+    id: 'opencode',
+    label: 'OpenCode',
+    command: 'opencode',
+    capabilities: { runtime: true, mcp: true, skills: true, sessions: true, cost: true },
+    paths: [
+      { kind: 'config-root', path: '~/.config/opencode', required: true },
+      { kind: 'config-file', path: '~/.config/opencode/opencode.json' },
+      { kind: 'mcp-file', path: '~/.config/opencode/opencode.json' },
+      { kind: 'skills-root', path: '~/.config/opencode/skills' },
+      { kind: 'sessions-root', path: '~/.local/share/opencode/sessions' },
+    ],
+  },
+  {
+    id: 'openclaw',
+    label: 'OpenClaw',
+    command: 'openclaw',
+    capabilities: { runtime: true, mcp: false, skills: false, sessions: true, cost: false },
+    paths: [
+      { kind: 'binary', path: '{projectRoot}/.project-manager/bin/openclaw' },
+      { kind: 'config-root', path: '~/.openclaw', required: true },
+      { kind: 'config-file', path: '~/.openclaw/openclaw.json' },
+      { kind: 'sessions-root', path: '~/.openclaw/sessions' },
+    ],
+  },
+  {
+    id: 'hermes-agent',
+    label: 'Hermes Agent',
+    command: 'hermes',
+    capabilities: { runtime: true, mcp: true, skills: true, sessions: true, cost: false },
+    paths: [
+      { kind: 'binary', path: '{projectRoot}/.project-manager/bin/hermes' },
+      { kind: 'config-root', path: '~/.hermes', required: true },
+      { kind: 'config-file', path: '~/.hermes/config.yaml' },
+      { kind: 'mcp-file', path: '~/.hermes/config.yaml' },
+      { kind: 'skills-root', path: '~/.hermes/skills' },
+      { kind: 'sessions-root', path: '~/.hermes/sessions' },
+      { kind: 'secret-file', path: '~/.hermes/config.yaml', secretBearing: true },
+    ],
+  },
+];

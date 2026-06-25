@@ -1,0 +1,15 @@
+{
+  "default": null,
+  "permission": [
+    {
+      "identifier": "read-agent-runtime-redacted-session-content",
+      "description": "Allow the renderer to request bounded approved Agent Runtime session content inspection with redacted structural metadata only.",
+      "commands": {
+        "allow": [
+          "read_agent_runtime_redacted_session_content"
+        ],
+        "deny": []
+      }
+    }
+  ]
+}

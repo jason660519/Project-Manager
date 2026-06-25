@@ -124,12 +124,21 @@ import {
   telegramStatusAll,
   telegramStopPoll,
   onTelegramStatus,
+  listAgentRuntimeRedactedSessionTargets,
+  readAgentRuntimeRedactedSessionEnvelope,
   safeUnlisten,
   spawnTerminal,
   scanMacosApplications,
   writeFile,
   type ScanMacosApplicationsResult,
 } from '../../../../lib/bridge';
+import {
+  executeAgentRuntimeSessionEnvelopeParseAction,
+  loadAgentRuntimeInventory,
+  type AgentRuntimeSessionEnvelopeParseAction,
+  type AgentRuntimeInventoryDiagnostic,
+  type AgentRuntimeInventoryServiceResult,
+} from '../../../../lib/agent-runtime';
 import {
   approveProjectWorkflowExecutionRequest,
   buildProjectWorkflowExecutorHandoffRecord,
@@ -160,6 +169,10 @@ import { McpLogsViewer } from './_shared/McpLogsViewer';
 import { ConnectSheet } from './ConnectSheet';
 import { CapabilitySheetView } from './CapabilitySheetView';
 import { buildSystemInstalledAppsRows } from '../../../../lib/integrations/mappers/system-installed-apps';
+import {
+  hydrateAgentRuntimeRowsWithSessionTargets,
+  mapAgentRuntimeInventoryRows,
+} from '../../../../lib/integrations/mappers/agent-runtime';
 import { deriveSystemAppsScanPhase, SystemAppsScanBanner } from './SystemInstalledAppsSheet';
 import { ScanReportPanel } from './_shared/ScanReportPanel';
 import { DiscoverPlanDialog } from './_shared/DiscoverPlanDialog';
@@ -284,16 +297,20 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
   const channelCatalogRef = useRef<ChannelCatalog>({ channels: [], commandMappings: [] });
   const [skillsDir, setSkillsDir] = useState('');
   const [skillRows, setSkillRows] = useState<IntegrationRow[]>([]);
+  const [agentRuntimeRows, setAgentRuntimeRows] = useState<IntegrationRow[]>([]);
+  const [agentRuntimeDiagnostics, setAgentRuntimeDiagnostics] = useState<AgentRuntimeInventoryDiagnostic[]>([]);
   const [memoryRows, setMemoryRows] = useState<IntegrationRow[]>([]);
   const [commandRows, setCommandRows] = useState<IntegrationRow[]>([]);
   const [workflowExecutionRequestRows, setWorkflowExecutionRequestRows] = useState<IntegrationRow[]>([]);
   const [workflowExecutionRecordRows, setWorkflowExecutionRecordRows] = useState<IntegrationRow[]>([]);
   const [skillsLoading, setSkillsLoading] = useState(false);
+  const [agentRuntimeLoading, setAgentRuntimeLoading] = useState(false);
   const [memoryLoading, setMemoryLoading] = useState(false);
   const [commandsLoading, setCommandsLoading] = useState(false);
   const [workflowExecutionRequestsLoading, setWorkflowExecutionRequestsLoading] = useState(false);
   const [workflowExecutionRecordsLoading, setWorkflowExecutionRecordsLoading] = useState(false);
   const [skillsError, setSkillsError] = useState<string | null>(null);
+  const [agentRuntimeError, setAgentRuntimeError] = useState<string | null>(null);
   const [memoryError, setMemoryError] = useState<string | null>(null);
   const [commandsError, setCommandsError] = useState<string | null>(null);
   const [workflowExecutionRequestsError, setWorkflowExecutionRequestsError] = useState<string | null>(null);
@@ -496,6 +513,35 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
     void loadSkills();
   }, [loadSkills]);
 
+  const loadAgentRuntime = useCallback(async (): Promise<AgentRuntimeInventoryServiceResult | null> => {
+    setAgentRuntimeLoading(true);
+    setAgentRuntimeError(null);
+    try {
+      const result = await loadAgentRuntimeInventory({
+        projectRoot: pmRoot || projectRoot,
+      });
+      const mappedRows = mapAgentRuntimeInventoryRows(result);
+      const hydrated = await hydrateAgentRuntimeRowsWithSessionTargets(
+        mappedRows,
+        listAgentRuntimeRedactedSessionTargets,
+      );
+      const diagnostics = [...result.diagnostics, ...hydrated.diagnostics];
+      setAgentRuntimeRows(hydrated.rows);
+      setAgentRuntimeDiagnostics(diagnostics);
+      return {
+        ...result,
+        diagnostics,
+      };
+    } catch (error) {
+      setAgentRuntimeRows([]);
+      setAgentRuntimeDiagnostics([]);
+      setAgentRuntimeError(error instanceof Error ? error.message : 'Unknown agent runtime load error');
+      return null;
+    } finally {
+      setAgentRuntimeLoading(false);
+    }
+  }, [pmRoot, projectRoot]);
+
   const loadMemory = useCallback(async () => {
     setMemoryLoading(true);
     setMemoryError(null);
@@ -654,6 +700,10 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
     },
     [loadWorkflowExecutionRecords, loadWorkflowExecutionRequests, pmRoot, workflowExecutionRecordsRoot],
   );
+
+  useEffect(() => {
+    if (activeSheet === 'agent-runtime') void loadAgentRuntime();
+  }, [activeSheet, loadAgentRuntime]);
 
   useEffect(() => {
     if (activeSheet === 'memory') void loadMemory();
@@ -904,6 +954,7 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
   }, [channelCatalog, pollStatuses, manualVersion]);
 
   const skillsRowsMerged = useMemo(() => mergeAllManual(skillRows), [skillRows, manualVersion]);
+  const agentRuntimeRowsMerged = useMemo(() => mergeAllManual(agentRuntimeRows), [agentRuntimeRows, manualVersion]);
   const memoryRowsMerged = useMemo(() => mergeAllManual(memoryRows), [memoryRows, manualVersion]);
   const commandRowsMerged = useMemo(() => mergeAllManual(commandRows), [commandRows, manualVersion]);
   const connectedInstanceRows = useMemo(() => {
@@ -1030,6 +1081,36 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
       mcpStatuses,
     ],
   );
+
+  const rescanAgentRuntime = useCallback(async (): Promise<ScanOutcome> => {
+    const startedAt = Date.now();
+    const prev = agentRuntimeRowsMerged;
+    try {
+      const result = await loadAgentRuntime();
+      const next = result ? mergeAllManual(mapAgentRuntimeInventoryRows(result)) : [];
+      return {
+        sheetId: 'agent-runtime',
+        label: 'Agent Runtime',
+        count: next.length,
+        ...diffRows(prev, next),
+        durationMs: Date.now() - startedAt,
+        ...(result && result.diagnostics.length > 0
+          ? { skipped: result.diagnostics.map((diagnostic) => diagnostic.message).join('; ') }
+          : {}),
+      };
+    } catch (e) {
+      return {
+        sheetId: 'agent-runtime',
+        label: 'Agent Runtime',
+        count: prev.length,
+        added: [],
+        removed: [],
+        updated: [],
+        error: e instanceof Error ? e.message : String(e),
+        durationMs: Date.now() - startedAt,
+      };
+    }
+  }, [agentRuntimeRowsMerged, loadAgentRuntime]);
 
   const rescanCodingTools = useCallback(
     async (sharedCtx?: SharedPluginCtx): Promise<ScanOutcome> => {
@@ -1378,6 +1459,8 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
     let rows =
       activeSheet === SYSTEM_INSTALLED_APPS_SHEET
         ? systemInstalledAppsRows
+        : activeSheet === 'agent-runtime'
+          ? agentRuntimeRowsMerged
         : activeSheet === 'coding-tools'
           ? codingToolRows
           : activeSheet === 'mcp'
@@ -1404,6 +1487,7 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
   }, [
     activeSheet,
     systemInstalledAppsRows,
+    agentRuntimeRowsMerged,
     codingToolRows,
     mcpRows,
     skillsRowsMerged,
@@ -1833,6 +1917,7 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
       label: t.integrations.sheetPlugins,
       badge: systemInstalledAppsRows.length,
     },
+    { key: 'agent-runtime', label: 'Agent Runtime', badge: agentRuntimeRowsMerged.length },
     { key: 'coding-tools', label: 'Coding Tools', badge: codingToolRows.length },
     { key: 'mcp', label: t.integrations.sheetMcp, badge: mcpRows.length },
     { key: 'skills', label: t.integrations.sheetSkills, badge: skillsRowsMerged.length },
@@ -1992,6 +2077,28 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
     [fetchSkillRows, skillsDir],
   );
 
+  const testAgentRuntimeSheet = useCallback(async (rows: IntegrationRow[]): Promise<ScanOutcome> => {
+    const startedAt = Date.now();
+    try {
+      const result = await loadAgentRuntime();
+      return createSheetTestOutcome({
+        sheetId: 'agent-runtime',
+        count: result?.inventory.rows.length ?? rows.length,
+        skipped: result && result.diagnostics.length > 0
+          ? result.diagnostics.map((diagnostic) => diagnostic.message).join('; ')
+          : undefined,
+        durationMs: Date.now() - startedAt,
+      });
+    } catch (e) {
+      return createSheetTestOutcome({
+        sheetId: 'agent-runtime',
+        count: rows.length,
+        error: e instanceof Error ? e.message : String(e),
+        durationMs: Date.now() - startedAt,
+      });
+    }
+  }, [loadAgentRuntime]);
+
   const testChannelsSheet = useCallback(async (rows: IntegrationRow[]): Promise<ScanOutcome> => {
     const startedAt = Date.now();
     try {
@@ -2129,6 +2236,7 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
           test: (rows) => testPluginRowsForSheet('system_installed_apps', rows),
           testMode: 'selected-rows',
         },
+        'agent-runtime': { scan: rescanAgentRuntime, test: testAgentRuntimeSheet },
         'coding-tools': {
           scan: rescanCodingTools,
           test: (rows) => testPluginRowsForSheet('coding-tools', rows),
@@ -2155,6 +2263,7 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
       }),
     [
       rescanSystemInstalledApps,
+      rescanAgentRuntime,
       rescanCodingTools,
       rescanMcp,
       rescanSkills,
@@ -2165,6 +2274,7 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
       rescanWorkflowExecutionRecords,
       rescanConnectedInstances,
       testPluginRowsForSheet,
+      testAgentRuntimeSheet,
       testSkillsSheet,
       testChannelsSheet,
       testMemorySheet,
@@ -2265,6 +2375,8 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
   const activeSheetLoading =
     activeSheet === SYSTEM_INSTALLED_APPS_SHEET
       ? macosAppsScanning && !macosAppsSnapshot
+      : activeSheet === 'agent-runtime'
+        ? agentRuntimeLoading
       : activeSheet === 'skills'
         ? skillsLoading
         : activeSheet === 'memory'
@@ -2282,6 +2394,8 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
       ? macosAppsScanPhase === 'error' || macosAppsScanPhase === 'permission'
         ? macosAppsScanError
         : null
+      : activeSheet === 'agent-runtime'
+        ? agentRuntimeError
       : activeSheet === 'skills'
         ? skillsError
         : activeSheet === 'memory'
@@ -2569,6 +2683,23 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
                   .replace('{whitelisted}', String(exposedSystemCliConfigured))}
               </div>
             )}
+            {activeSheet === 'agent-runtime' && (
+              <div
+                className={`shrink-0 border px-3 py-2 text-xs ${
+                  agentRuntimeDiagnostics.length > 0 || agentRuntimeError
+                    ? 'border-amber-400/25 bg-amber-950/25 text-amber-100/90'
+                    : 'border-emerald-400/20 bg-emerald-950/20 text-emerald-100/90'
+                }`}
+              >
+                {agentRuntimeError
+                  ? `Agent Runtime inventory failed: ${agentRuntimeError}`
+                  : agentRuntimeDiagnostics.length > 0
+                    ? `Agent Runtime inventory loaded with ${agentRuntimeDiagnostics.length} diagnostic(s): ${agentRuntimeDiagnostics
+                        .map((diagnostic) => diagnostic.message)
+                        .join('; ')}`
+                    : `Agent Runtime inventory is read-only. ${agentRuntimeRowsMerged.length} runtime row(s) loaded from local metadata.`}
+              </div>
+            )}
             {activeSheet === 'workflow-execution-requests' && (
               <div className="shrink-0 border border-emerald-400/20 bg-emerald-950/20 px-3 py-2 text-xs text-emerald-100/90">
                 Dry-run queue for Project Workflow draft requests. Rows are
@@ -2733,6 +2864,9 @@ export function PluginsHubView({ projectRoot = '', pmRepoRoot, initialSheet }: P
         onOpenWorkflowExecutionRequest={(requestId) => {
           router.push(`/integrations-hub/workflow-execution-requests?requestId=${encodeURIComponent(requestId)}`);
         }}
+        onParseAgentRuntimeSessionEnvelope={async (action: AgentRuntimeSessionEnvelopeParseAction) => (
+          executeAgentRuntimeSessionEnvelopeParseAction(action, readAgentRuntimeRedactedSessionEnvelope)
+        )}
       />
 
       {logsForId && <McpLogsViewer pluginId={logsForId} onClose={() => setLogsForId(null)} />}

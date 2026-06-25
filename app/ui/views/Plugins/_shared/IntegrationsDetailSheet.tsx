@@ -14,6 +14,18 @@ import {
   X,
 } from 'lucide-react';
 import type { IntegrationRow } from '../../../../../lib/integrations/types';
+import {
+  buildAgentRuntimeDetailModel,
+  buildAgentRuntimeRedactedSessionTargetOptions,
+  buildAgentRuntimeSessionEnvelopeUiParseAction,
+  type AgentRuntimeDetailGroup,
+  type AgentRuntimeDetailMessage,
+  type AgentRuntimeDetailModel,
+} from '../../../../../lib/integrations/mappers/agent-runtime-detail';
+import type {
+  AgentRuntimeSessionEnvelopeParseAction,
+  AgentRuntimeSessionEnvelopeParseExecution,
+} from '../../../../../lib/agent-runtime';
 import type {
   IntegrationRuntimeCommand,
   IntegrationRuntimeMetadata,
@@ -80,6 +92,19 @@ function resolveRuntimePath(rootPath: string, path: string): string {
 
 function formatRuntimeCommand(command: IntegrationRuntimeCommand): string {
   return [command.command, ...command.args].join(' ');
+}
+
+function readinessTone(state: AgentRuntimeDetailGroup['state']): string {
+  if (state === 'ready') return 'border-emerald-400/20 bg-emerald-950/15 text-emerald-100';
+  if (state === 'partial') return 'border-amber-400/25 bg-amber-950/15 text-amber-100';
+  if (state === 'unsupported') return 'border-stone-200/15 bg-white/[0.025] text-stone-300';
+  return 'border-red-400/20 bg-red-950/15 text-red-100';
+}
+
+function messageTone(severity: AgentRuntimeDetailMessage['severity']): string {
+  if (severity === 'error') return 'border-red-400/25 bg-red-950/20 text-red-100';
+  if (severity === 'warning') return 'border-amber-400/25 bg-amber-950/20 text-amber-100';
+  return 'border-stone-200/15 bg-white/[0.025] text-stone-300';
 }
 
 interface WorkflowExecutionRequestPayload {
@@ -274,6 +299,9 @@ export interface IntegrationsDetailSheetProps {
   onRunWorkflowExecutionLive?: (row: IntegrationRow) => Promise<void> | void;
   onOpenWorkflowRun?: (target: WorkflowRunNavigationTarget) => void;
   onOpenWorkflowExecutionRequest?: (requestId: string) => void;
+  onParseAgentRuntimeSessionEnvelope?: (
+    action: AgentRuntimeSessionEnvelopeParseAction,
+  ) => Promise<AgentRuntimeSessionEnvelopeParseExecution> | AgentRuntimeSessionEnvelopeParseExecution;
 }
 
 export function IntegrationsDetailSheet({
@@ -317,6 +345,7 @@ export function IntegrationsDetailSheet({
   onRunWorkflowExecutionLive,
   onOpenWorkflowRun,
   onOpenWorkflowExecutionRequest,
+  onParseAgentRuntimeSessionEnvelope,
 }: IntegrationsDetailSheetProps) {
   const { t } = useI18n();
   const [notes, setNotes] = useState('');
@@ -347,6 +376,14 @@ export function IntegrationsDetailSheet({
     status: 'idle' | 'success' | 'error';
     running: boolean;
   }>({ message: '', status: 'idle', running: false });
+  const [sessionEnvelopeTargetPath, setSessionEnvelopeTargetPath] = useState('');
+  const [sessionEnvelopeTargetOptionId, setSessionEnvelopeTargetOptionId] = useState('');
+  const [sessionEnvelopeApproved, setSessionEnvelopeApproved] = useState(false);
+  const [sessionEnvelopeExecution, setSessionEnvelopeExecution] = useState<{
+    message: string;
+    status: 'idle' | 'ready' | 'blocked' | 'needs_approval' | 'unsupported';
+    running: boolean;
+  }>({ message: '', status: 'idle', running: false });
 
   useEffect(() => {
     if (!row) return;
@@ -357,6 +394,11 @@ export function IntegrationsDetailSheet({
     setExecutionApproval({ message: '', status: 'idle', running: false });
     setExecutionRecordAction({ message: '', status: 'idle', running: false });
     setExecutionDryRunAction({ message: '', status: 'idle', running: false });
+    setExecutionLiveRunAction({ message: '', status: 'idle', running: false });
+    setSessionEnvelopeTargetPath('');
+    setSessionEnvelopeTargetOptionId('');
+    setSessionEnvelopeApproved(false);
+    setSessionEnvelopeExecution({ message: '', status: 'idle', running: false });
   }, [row?.rowKey]);
 
   useEffect(() => {
@@ -384,6 +426,7 @@ export function IntegrationsDetailSheet({
   const mapping = row.payload.mapping as CommandMapping | undefined;
   const skillPath = (row.payload.skill as { absPath?: string } | undefined)?.absPath ?? row.sourceId;
   const filePath = (row.payload.file as { absPath?: string } | undefined)?.absPath;
+  const agentRuntimeDetail = buildAgentRuntimeDetailModel(row);
   const instancePayload = row.sourceKind === 'connected-instance' ? row.payload : null;
   const executionRequest = row.sourceKind === 'workflow-execution-request'
     ? workflowExecutionRequestPayload(row.payload)
@@ -399,6 +442,19 @@ export function IntegrationsDetailSheet({
     : executionRecord
       ? workflowRunNavigationTarget(executionRecord)
       : null;
+  const sessionTargetOptions = agentRuntimeDetail
+    ? buildAgentRuntimeRedactedSessionTargetOptions(row)
+    : [];
+  const selectedSessionTargetOption = sessionTargetOptions.find((option) => option.id === sessionEnvelopeTargetOptionId);
+  const selectedSessionEnvelopeTargetPath = selectedSessionTargetOption?.targetPath ?? sessionEnvelopeTargetPath;
+  const sessionEnvelopeParseAction = agentRuntimeDetail
+    ? buildAgentRuntimeSessionEnvelopeUiParseAction(row, {
+        approved: sessionEnvelopeApproved,
+        targetPath: selectedSessionEnvelopeTargetPath,
+        maxBytes: 65536,
+        approvedBy: 'Project Manager UI',
+      })
+    : null;
 
   const runRuntimeCommand = async (command: IntegrationRuntimeCommand) => {
     if (!onRunRuntimeCommand) return;
@@ -490,6 +546,27 @@ export function IntegrationsDetailSheet({
       setExecutionLiveRunAction({
         message: error instanceof Error ? error.message : 'Unable to run live executor.',
         status: 'error',
+        running: false,
+      });
+    }
+  };
+
+  const parseAgentRuntimeSessionEnvelope = async () => {
+    if (!onParseAgentRuntimeSessionEnvelope || !sessionEnvelopeParseAction || sessionEnvelopeParseAction.status !== 'ready') {
+      return;
+    }
+    setSessionEnvelopeExecution({ message: 'Parsing redacted envelope metadata...', status: 'idle', running: true });
+    try {
+      const execution = await onParseAgentRuntimeSessionEnvelope(sessionEnvelopeParseAction);
+      setSessionEnvelopeExecution({
+        message: execution.summary,
+        status: execution.status,
+        running: false,
+      });
+    } catch {
+      setSessionEnvelopeExecution({
+        message: 'Session envelope parse execution: blocked. Envelope parser failed; redacted error recorded.',
+        status: 'blocked',
         running: false,
       });
     }
@@ -822,6 +899,23 @@ export function IntegrationsDetailSheet({
                 </p>
               )}
             </section>
+          )}
+
+          {agentRuntimeDetail && (
+            <AgentRuntimeEvidencePanel
+              detail={agentRuntimeDetail}
+              sessionEnvelopeTargetPath={sessionEnvelopeTargetPath}
+              onSessionEnvelopeTargetPathChange={setSessionEnvelopeTargetPath}
+              sessionTargetOptions={sessionTargetOptions}
+              selectedSessionTargetOptionId={sessionEnvelopeTargetOptionId}
+              onSelectedSessionTargetOptionIdChange={setSessionEnvelopeTargetOptionId}
+              sessionEnvelopeApproved={sessionEnvelopeApproved}
+              onSessionEnvelopeApprovedChange={setSessionEnvelopeApproved}
+              sessionEnvelopeParseAction={sessionEnvelopeParseAction}
+              sessionEnvelopeExecution={sessionEnvelopeExecution}
+              onParseSessionEnvelope={parseAgentRuntimeSessionEnvelope}
+              canParseSessionEnvelope={Boolean(onParseAgentRuntimeSessionEnvelope)}
+            />
           )}
 
           {row.sourceKind === 'plugin-marketplace' && onInstallMarketplace && (
@@ -1273,5 +1367,248 @@ function TokenList({ title, values }: { title: string; values: string[] }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function executionTone(status: 'idle' | 'ready' | 'blocked' | 'needs_approval' | 'unsupported'): string {
+  if (status === 'ready') return 'border-emerald-400/20 bg-emerald-950/15 text-emerald-100';
+  if (status === 'blocked') return 'border-red-400/20 bg-red-950/15 text-red-100';
+  if (status === 'needs_approval') return 'border-amber-400/25 bg-amber-950/15 text-amber-100';
+  if (status === 'unsupported') return 'border-stone-200/15 bg-white/[0.025] text-stone-300';
+  return 'border-stone-200/15 bg-white/[0.025] text-stone-300';
+}
+
+function isSessionTargetDiagnostic(message: AgentRuntimeDetailMessage): boolean {
+  return message.code === 'session_target_list_failed';
+}
+
+function AgentRuntimeEvidencePanel({
+  detail,
+  sessionEnvelopeTargetPath,
+  onSessionEnvelopeTargetPathChange,
+  sessionTargetOptions,
+  selectedSessionTargetOptionId,
+  onSelectedSessionTargetOptionIdChange,
+  sessionEnvelopeApproved,
+  onSessionEnvelopeApprovedChange,
+  sessionEnvelopeParseAction,
+  sessionEnvelopeExecution,
+  onParseSessionEnvelope,
+  canParseSessionEnvelope,
+}: {
+  detail: AgentRuntimeDetailModel;
+  sessionEnvelopeTargetPath: string;
+  onSessionEnvelopeTargetPathChange: (value: string) => void;
+  sessionTargetOptions: ReturnType<typeof buildAgentRuntimeRedactedSessionTargetOptions>;
+  selectedSessionTargetOptionId: string;
+  onSelectedSessionTargetOptionIdChange: (value: string) => void;
+  sessionEnvelopeApproved: boolean;
+  onSessionEnvelopeApprovedChange: (value: boolean) => void;
+  sessionEnvelopeParseAction: AgentRuntimeSessionEnvelopeParseAction | null;
+  sessionEnvelopeExecution: {
+    message: string;
+    status: 'idle' | 'ready' | 'blocked' | 'needs_approval' | 'unsupported';
+    running: boolean;
+  };
+  onParseSessionEnvelope: () => void;
+  canParseSessionEnvelope: boolean;
+}) {
+  const sessionTargetDiagnostics = detail.diagnostics.filter(isSessionTargetDiagnostic);
+  const generalDiagnostics = detail.diagnostics.filter((message) => !isSessionTargetDiagnostic(message));
+  const generalMessages = [...detail.warnings, ...generalDiagnostics];
+  const parseDisabled =
+    !canParseSessionEnvelope ||
+    sessionEnvelopeExecution.running ||
+    sessionEnvelopeParseAction?.status !== 'ready';
+
+  return (
+    <section className="border-t border-stone-200/12 pt-4 space-y-4">
+      <div className="space-y-1">
+        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-stone-500">
+          Agent Runtime Evidence
+        </p>
+        <p className="text-[11px] leading-relaxed text-stone-400">
+          Read-only local metadata for runtime readiness, MCP, Skills, Session, and Cost follow-up work.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <MetaRow label="tool" value={detail.toolId} />
+        <MetaRow label="status" value={detail.status} />
+        <MetaRow label="command" value={detail.command.label || 'not configured'} />
+        <MetaRow label="command state" value={detail.command.available ? 'available' : 'missing'} />
+        <MetaRow label="loaded" value={detail.loadedAt} />
+      </div>
+
+      <div className="grid gap-2">
+        {detail.groups.map((group) => (
+          <div key={group.id} className={`border px-3 py-2 ${readinessTone(group.state)}`}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2">
+                {group.state === 'ready' && <CheckCircle2 size={14} className="shrink-0" />}
+                <p className="truncate text-xs font-medium">{group.label}</p>
+              </div>
+              <span className="shrink-0 text-[10px] uppercase tracking-[0.12em]">{group.state}</span>
+            </div>
+            <p className="mt-1 text-[11px] leading-relaxed opacity-80">{group.summary}</p>
+            {group.details.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {group.details.map((detail) => (
+                  <p key={detail} className="text-[10px] leading-relaxed opacity-75">
+                    {detail}
+                  </p>
+                ))}
+              </div>
+            )}
+            {group.evidence.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {group.evidence.map((item) => (
+                  <div
+                    key={`${group.id}:${item.kind}:${item.path}`}
+                    className="grid grid-cols-[96px_1fr] gap-2 text-[10px]"
+                  >
+                    <span className="uppercase tracking-[0.1em] opacity-70">
+                      {item.kind}
+                      {item.secretBearing ? ' metadata' : ''}
+                    </span>
+                    <span className="break-all font-mono">
+                      {item.exists ? 'exists' : 'missing'} · {item.path}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <section
+        role="region"
+        aria-label="Redacted session envelope parser"
+        className="space-y-3 border border-stone-200/15 bg-white/[0.025] px-3 py-3"
+      >
+        <div className="space-y-1">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-stone-500">
+            Redacted Session Envelope Parser
+          </p>
+          <p className="text-[11px] leading-relaxed text-stone-400">
+            Parse one approved session artifact as aggregate metadata only. Transcript content and target names stay redacted.
+          </p>
+        </div>
+
+        {sessionTargetOptions.length > 0 ? (
+          <label className="block space-y-1">
+            <span className="text-[10px] uppercase tracking-[0.12em] text-stone-500">Redacted session target</span>
+            <select
+              value={selectedSessionTargetOptionId}
+              onChange={(event) => onSelectedSessionTargetOptionIdChange(event.target.value)}
+              className={`${inputCls} text-xs`}
+            >
+              <option value="">Select a redacted target</option>
+              {sessionTargetOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.summary}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <label className="block space-y-1">
+            <span className="text-[10px] uppercase tracking-[0.12em] text-stone-500">Session target path</span>
+            <input
+              value={sessionEnvelopeTargetPath}
+              onChange={(event) => onSessionEnvelopeTargetPathChange(event.target.value)}
+              className={`${inputCls} font-mono text-xs`}
+              placeholder="/path/to/session.json"
+            />
+          </label>
+        )}
+
+        <label className="flex items-start gap-2 text-[11px] leading-relaxed text-stone-300">
+          <input
+            type="checkbox"
+            checked={sessionEnvelopeApproved}
+            onChange={(event) => onSessionEnvelopeApprovedChange(event.target.checked)}
+            className="mt-0.5 h-3.5 w-3.5 accent-emerald-400"
+          />
+          <span>Approve metadata-only envelope parse</span>
+        </label>
+
+        {sessionEnvelopeParseAction && (
+          <p className={`border px-3 py-2 text-[11px] leading-relaxed ${executionTone(sessionEnvelopeParseAction.status)}`}>
+            {sessionEnvelopeParseAction.summary}
+          </p>
+        )}
+
+        <button
+          type="button"
+          onClick={onParseSessionEnvelope}
+          disabled={parseDisabled}
+          className="flex w-full items-center justify-center gap-2 border border-emerald-300/30 bg-emerald-950/35 px-3 py-2 text-xs font-medium text-emerald-100 hover:bg-emerald-950/55 disabled:cursor-not-allowed disabled:border-stone-200/12 disabled:bg-white/[0.025] disabled:text-stone-500"
+        >
+          <FileText size={14} />
+          {sessionEnvelopeExecution.running ? 'Parsing envelope metadata' : 'Parse envelope metadata'}
+        </button>
+
+        {sessionEnvelopeExecution.message && (
+          <p className={`border px-3 py-2 text-[11px] leading-relaxed ${executionTone(sessionEnvelopeExecution.status)}`}>
+            {sessionEnvelopeExecution.message}
+          </p>
+        )}
+      </section>
+
+      {sessionTargetDiagnostics.length > 0 && (
+        <section
+          role="region"
+          aria-label="Session target diagnostics"
+          className="space-y-2 border border-amber-400/25 bg-amber-950/15 px-3 py-3 text-amber-100"
+        >
+          <div className="space-y-1">
+            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-amber-100">
+              Session target diagnostics
+            </p>
+            <p className="text-[11px] leading-relaxed text-amber-100/80">
+              Native redacted target metadata is unavailable. Manual session target path fallback remains available.
+            </p>
+          </div>
+          <div className="space-y-2">
+            {sessionTargetDiagnostics.map((message, index) => (
+              <div
+                key={`${message.code}:${index}`}
+                className={`border px-3 py-2 text-[11px] leading-relaxed ${messageTone(message.severity)}`}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] opacity-75">
+                    {message.severity}
+                  </span>
+                  <span className="font-mono text-[10px] opacity-75">{message.code}</span>
+                </div>
+                {message.message && <p className="mt-1">{message.message}</p>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {generalMessages.length > 0 && (
+        <div className="space-y-2">
+          {generalMessages.map((message, index) => (
+            <div
+              key={`${message.code}:${message.path ?? ''}:${index}`}
+              className={`border px-3 py-2 text-[11px] leading-relaxed ${messageTone(message.severity)}`}
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-[10px] uppercase tracking-[0.12em] opacity-75">
+                  {message.severity}
+                </span>
+                {message.code && <span className="font-mono text-[10px] opacity-75">{message.code}</span>}
+              </div>
+              {message.message && <p className="mt-1">{message.message}</p>}
+              {message.path && <p className="mt-1 break-all font-mono opacity-75">{message.path}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

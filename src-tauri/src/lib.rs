@@ -5021,6 +5021,1366 @@ async fn list_global_cli_inventory() -> Result<Vec<GlobalCliEntry>, String> {
     Ok(rows)
 }
 
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct AgentRuntimeFilesystemSnapshot {
+    existing_paths: Vec<String>,
+    available_commands: Vec<String>,
+    home_dir: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    project_root: Option<String>,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    session_root_child_counts: HashMap<String, usize>,
+}
+
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+struct AgentRuntimeSessionBoundaryRequest {
+    approved: bool,
+    root_paths: Vec<String>,
+    target_path: String,
+    max_bytes: u64,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct AgentRuntimeSessionBoundaryResult {
+    status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    allowed_root_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    byte_length: Option<u64>,
+    max_bytes: u64,
+    content_redacted: bool,
+    target_name_redacted: bool,
+    blocked_reasons: Vec<String>,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct AgentRuntimeRedactedSessionStructure {
+    line_count: usize,
+    non_empty_line_count: usize,
+    looks_like_json_object: bool,
+    looks_like_json_array: bool,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct AgentRuntimeRedactedSessionContentResult {
+    status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    allowed_root_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    byte_length: Option<u64>,
+    max_bytes: u64,
+    content_redacted: bool,
+    target_name_redacted: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    structure: Option<AgentRuntimeRedactedSessionStructure>,
+    blocked_reasons: Vec<String>,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct AgentRuntimeRedactedSessionEnvelope {
+    message_count: usize,
+    user_message_count: usize,
+    assistant_message_count: usize,
+    tool_message_count: usize,
+    other_message_count: usize,
+    tool_call_count: usize,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct AgentRuntimeRedactedSessionEnvelopeResult {
+    status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    allowed_root_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    byte_length: Option<u64>,
+    max_bytes: u64,
+    content_redacted: bool,
+    target_name_redacted: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    envelope: Option<AgentRuntimeRedactedSessionEnvelope>,
+    blocked_reasons: Vec<String>,
+}
+
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+struct AgentRuntimeSessionTargetListRequest {
+    approved: bool,
+    root_paths: Vec<String>,
+    max_targets: usize,
+    max_depth: usize,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct AgentRuntimeRedactedSessionTarget {
+    id: String,
+    label: String,
+    summary: String,
+    target_path: String,
+    root_path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    byte_length: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    modified_at: Option<String>,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct AgentRuntimeRedactedSessionTargetListResult {
+    status: String,
+    targets: Vec<AgentRuntimeRedactedSessionTarget>,
+    max_targets: usize,
+    max_depth: usize,
+    content_redacted: bool,
+    target_names_redacted: bool,
+    blocked_reasons: Vec<String>,
+}
+
+const AGENT_RUNTIME_COMMANDS: &[&str] = &[
+    "codex",
+    "claude",
+    "gemini",
+    "opencode",
+    "openclaw",
+    "hermes",
+];
+
+const AGENT_RUNTIME_HOME_PATHS: &[&str] = &[
+    ".codex",
+    ".codex/config.toml",
+    ".codex/auth.json",
+    ".codex/skills",
+    ".codex/sessions",
+    ".codex/archived_sessions",
+    ".claude",
+    ".claude/settings.json",
+    ".claude/skills",
+    ".claude/projects",
+    ".claude.json",
+    ".gemini",
+    ".gemini/.env",
+    ".gemini/settings.json",
+    ".gemini/skills",
+    ".gemini/tmp",
+    ".config/opencode",
+    ".config/opencode/opencode.json",
+    ".config/opencode/skills",
+    ".local/share/opencode/sessions",
+    ".openclaw",
+    ".openclaw/openclaw.json",
+    ".openclaw/sessions",
+    ".hermes",
+    ".hermes/config.yaml",
+    ".hermes/skills",
+    ".hermes/sessions",
+];
+
+const AGENT_RUNTIME_PROJECT_PATHS: &[&str] = &[
+    ".project-manager/bin/openclaw",
+    ".project-manager/bin/hermes",
+];
+
+fn command_exists_in_paths(command: &str, path_dirs: &[PathBuf]) -> bool {
+    let trimmed = command.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+
+    let direct = Path::new(trimmed);
+    if direct.is_absolute() && direct.is_file() {
+        return true;
+    }
+
+    for dir in path_dirs {
+        let candidate = dir.join(trimmed);
+        if candidate.is_file() {
+            return true;
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            for ext in ["exe", "cmd", "bat"] {
+                if dir.join(format!("{trimmed}.{ext}")).is_file() {
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
+}
+
+fn build_agent_runtime_snapshot_from_roots(
+    home_dir: &Path,
+    project_root: Option<&Path>,
+    path_dirs: &[PathBuf],
+) -> AgentRuntimeFilesystemSnapshot {
+    let mut existing_paths = Vec::new();
+    let mut session_root_child_counts = HashMap::new();
+
+    for relative in AGENT_RUNTIME_HOME_PATHS {
+        let path = home_dir.join(relative);
+        if path.exists() {
+            if relative.ends_with("sessions")
+                || relative.ends_with("archived_sessions")
+                || relative.ends_with("projects")
+                || relative.ends_with("tmp")
+            {
+                session_root_child_counts.insert(
+                    path.to_string_lossy().to_string(),
+                    shallow_child_count(&path),
+                );
+            }
+            existing_paths.push(path.to_string_lossy().to_string());
+        }
+    }
+
+    if let Some(project_root) = project_root {
+        for relative in AGENT_RUNTIME_PROJECT_PATHS {
+            let path = project_root.join(relative);
+            if path.exists() {
+                existing_paths.push(path.to_string_lossy().to_string());
+            }
+        }
+    }
+
+    existing_paths.sort();
+    existing_paths.dedup();
+
+    let mut available_commands: Vec<String> = AGENT_RUNTIME_COMMANDS
+        .iter()
+        .copied()
+        .filter(|command| command_exists_in_paths(command, path_dirs))
+        .map(str::to_string)
+        .collect();
+    available_commands.sort();
+    available_commands.dedup();
+
+    AgentRuntimeFilesystemSnapshot {
+        existing_paths,
+        available_commands,
+        home_dir: home_dir.to_string_lossy().to_string(),
+        project_root: project_root.map(|path| path.to_string_lossy().to_string()),
+        session_root_child_counts,
+    }
+}
+
+fn shallow_child_count(path: &Path) -> usize {
+    match std::fs::read_dir(path) {
+        Ok(entries) => entries.filter_map(Result::ok).count(),
+        Err(_) => 0,
+    }
+}
+
+fn blocked_agent_runtime_session_boundary(
+    max_bytes: u64,
+    allowed_root_path: Option<String>,
+    byte_length: Option<u64>,
+    blocked_reasons: Vec<String>,
+) -> AgentRuntimeSessionBoundaryResult {
+    AgentRuntimeSessionBoundaryResult {
+        status: "blocked".to_string(),
+        allowed_root_path,
+        byte_length,
+        max_bytes,
+        content_redacted: true,
+        target_name_redacted: true,
+        blocked_reasons,
+    }
+}
+
+fn blocked_agent_runtime_target_list(
+    max_targets: usize,
+    max_depth: usize,
+    blocked_reasons: Vec<String>,
+) -> AgentRuntimeRedactedSessionTargetListResult {
+    AgentRuntimeRedactedSessionTargetListResult {
+        status: "blocked".to_string(),
+        targets: Vec::new(),
+        max_targets,
+        max_depth,
+        content_redacted: true,
+        target_names_redacted: true,
+        blocked_reasons,
+    }
+}
+
+fn canonical_allowlisted_roots(root_paths: &[String]) -> Vec<(PathBuf, String)> {
+    root_paths
+        .iter()
+        .filter_map(|raw| {
+            let trimmed = raw.trim();
+            if trimmed.is_empty() {
+                return None;
+            }
+            let canonical = std::fs::canonicalize(trimmed).ok()?;
+            if !canonical.is_dir() {
+                return None;
+            }
+            Some((canonical, trimmed.to_string()))
+        })
+        .collect()
+}
+
+fn is_hidden_path(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name.starts_with('.'))
+        .unwrap_or(false)
+}
+
+fn modified_at_summary(metadata: &std::fs::Metadata) -> Option<String> {
+    let modified = metadata.modified().ok()?;
+    let duration = modified.duration_since(std::time::UNIX_EPOCH).ok()?;
+    Some(format!("unix:{}", duration.as_secs()))
+}
+
+fn redacted_target_summary(label: &str, byte_length: Option<u64>, modified_at: Option<&str>) -> String {
+    let mut parts = vec![label.to_string()];
+    if let Some(byte_length) = byte_length {
+        parts.push(format!("{byte_length} byte(s)"));
+    }
+    if let Some(modified_at) = modified_at {
+        parts.push(format!("modified {modified_at}"));
+    }
+    parts.join(" · ")
+}
+
+fn collect_redacted_session_targets_for_root(
+    canonical_root: &Path,
+    raw_root: &str,
+    current: &Path,
+    depth: usize,
+    max_depth: usize,
+    max_targets: usize,
+    targets: &mut Vec<AgentRuntimeRedactedSessionTarget>,
+) {
+    if targets.len() >= max_targets || depth > max_depth {
+        return;
+    }
+
+    let entries = match std::fs::read_dir(current) {
+        Ok(entries) => entries,
+        Err(_) => return,
+    };
+
+    let mut paths: Vec<PathBuf> = entries.filter_map(Result::ok).map(|entry| entry.path()).collect();
+    paths.sort();
+
+    for path in paths {
+        if targets.len() >= max_targets {
+            return;
+        }
+        if is_hidden_path(&path) {
+            continue;
+        }
+
+        let canonical = match std::fs::canonicalize(&path) {
+            Ok(path) => path,
+            Err(_) => continue,
+        };
+        if !canonical.starts_with(canonical_root) {
+            continue;
+        }
+
+        let metadata = match std::fs::metadata(&canonical) {
+            Ok(metadata) => metadata,
+            Err(_) => continue,
+        };
+
+        if metadata.is_dir() {
+            if depth < max_depth {
+                collect_redacted_session_targets_for_root(
+                    canonical_root,
+                    raw_root,
+                    &canonical,
+                    depth + 1,
+                    max_depth,
+                    max_targets,
+                    targets,
+                );
+            }
+            continue;
+        }
+
+        if !metadata.is_file() {
+            continue;
+        }
+
+        let index = targets.len() + 1;
+        let label = format!("Session target {index}");
+        let byte_length = Some(metadata.len());
+        let modified_at = modified_at_summary(&metadata);
+
+        targets.push(AgentRuntimeRedactedSessionTarget {
+            id: format!("session-target-{index}"),
+            summary: redacted_target_summary(&label, byte_length, modified_at.as_deref()),
+            label,
+            target_path: canonical.to_string_lossy().to_string(),
+            root_path: raw_root.to_string(),
+            byte_length,
+            modified_at,
+        });
+    }
+}
+
+fn read_agent_runtime_session_boundary_from_request(
+    request: &AgentRuntimeSessionBoundaryRequest,
+) -> AgentRuntimeSessionBoundaryResult {
+    if !request.approved {
+        return blocked_agent_runtime_session_boundary(
+            request.max_bytes,
+            None,
+            None,
+            vec!["Approved session reader request is required.".to_string()],
+        );
+    }
+
+    if request.max_bytes == 0 {
+        return blocked_agent_runtime_session_boundary(
+            request.max_bytes,
+            None,
+            None,
+            vec!["Max byte guard must be greater than zero.".to_string()],
+        );
+    }
+
+    let roots = canonical_allowlisted_roots(&request.root_paths);
+    if roots.is_empty() {
+        return blocked_agent_runtime_session_boundary(
+            request.max_bytes,
+            None,
+            None,
+            vec!["At least one approved session root is required.".to_string()],
+        );
+    }
+
+    let target = match std::fs::canonicalize(request.target_path.trim()) {
+        Ok(path) => path,
+        Err(_) => {
+            return blocked_agent_runtime_session_boundary(
+                request.max_bytes,
+                None,
+                None,
+                vec!["Target metadata could not be read.".to_string()],
+            );
+        }
+    };
+
+    let allowed_root = roots
+        .iter()
+        .find(|(canonical_root, _raw_root)| target.starts_with(canonical_root));
+    let Some((_canonical_root, raw_root)) = allowed_root else {
+        return blocked_agent_runtime_session_boundary(
+            request.max_bytes,
+            None,
+            None,
+            vec!["Target path is outside approved session roots.".to_string()],
+        );
+    };
+
+    let metadata = match std::fs::metadata(&target) {
+        Ok(metadata) if metadata.is_file() => metadata,
+        Ok(_) => {
+            return blocked_agent_runtime_session_boundary(
+                request.max_bytes,
+                Some(raw_root.clone()),
+                None,
+                vec!["Target metadata is not a file.".to_string()],
+            );
+        }
+        Err(_) => {
+            return blocked_agent_runtime_session_boundary(
+                request.max_bytes,
+                Some(raw_root.clone()),
+                None,
+                vec!["Target metadata could not be read.".to_string()],
+            );
+        }
+    };
+    let byte_length = metadata.len();
+
+    if byte_length > request.max_bytes {
+        return blocked_agent_runtime_session_boundary(
+            request.max_bytes,
+            Some(raw_root.clone()),
+            Some(byte_length),
+            vec!["Target file exceeds max byte guard.".to_string()],
+        );
+    }
+
+    AgentRuntimeSessionBoundaryResult {
+        status: "ready".to_string(),
+        allowed_root_path: Some(raw_root.clone()),
+        byte_length: Some(byte_length),
+        max_bytes: request.max_bytes,
+        content_redacted: true,
+        target_name_redacted: true,
+        blocked_reasons: Vec::new(),
+    }
+}
+
+fn list_agent_runtime_redacted_session_targets_from_request(
+    request: &AgentRuntimeSessionTargetListRequest,
+) -> AgentRuntimeRedactedSessionTargetListResult {
+    if !request.approved {
+        return blocked_agent_runtime_target_list(
+            request.max_targets,
+            request.max_depth,
+            vec!["Approved session target list request is required.".to_string()],
+        );
+    }
+
+    if request.max_targets == 0 {
+        return blocked_agent_runtime_target_list(
+            request.max_targets,
+            request.max_depth,
+            vec!["Max target guard must be greater than zero.".to_string()],
+        );
+    }
+
+    if request.max_depth > 4 {
+        return blocked_agent_runtime_target_list(
+            request.max_targets,
+            request.max_depth,
+            vec!["Max depth guard must be between 0 and 4.".to_string()],
+        );
+    }
+
+    let roots = canonical_allowlisted_roots(&request.root_paths);
+    if roots.is_empty() {
+        return blocked_agent_runtime_target_list(
+            request.max_targets,
+            request.max_depth,
+            vec!["At least one approved session root is required.".to_string()],
+        );
+    }
+
+    let max_targets = request.max_targets.min(100);
+    let mut targets = Vec::new();
+
+    for (canonical_root, raw_root) in roots {
+        if targets.len() >= max_targets {
+            break;
+        }
+        collect_redacted_session_targets_for_root(
+            &canonical_root,
+            &raw_root,
+            &canonical_root,
+            0,
+            request.max_depth,
+            max_targets,
+            &mut targets,
+        );
+    }
+
+    AgentRuntimeRedactedSessionTargetListResult {
+        status: "ready".to_string(),
+        targets,
+        max_targets: request.max_targets,
+        max_depth: request.max_depth,
+        content_redacted: true,
+        target_names_redacted: true,
+        blocked_reasons: Vec::new(),
+    }
+}
+
+fn structure_from_redacted_content(content: &str) -> AgentRuntimeRedactedSessionStructure {
+    let line_count = content.lines().count();
+    let non_empty_line_count = content.lines().filter(|line| !line.trim().is_empty()).count();
+    let trimmed = content.trim_start();
+    AgentRuntimeRedactedSessionStructure {
+        line_count,
+        non_empty_line_count,
+        looks_like_json_object: trimmed.starts_with('{'),
+        looks_like_json_array: trimmed.starts_with('['),
+    }
+}
+
+fn read_agent_runtime_redacted_session_content_from_request(
+    request: &AgentRuntimeSessionBoundaryRequest,
+) -> AgentRuntimeRedactedSessionContentResult {
+    let boundary = read_agent_runtime_session_boundary_from_request(request);
+    if boundary.status != "ready" {
+        return AgentRuntimeRedactedSessionContentResult {
+            status: boundary.status,
+            allowed_root_path: boundary.allowed_root_path,
+            byte_length: boundary.byte_length,
+            max_bytes: boundary.max_bytes,
+            content_redacted: true,
+            target_name_redacted: true,
+            structure: None,
+            blocked_reasons: boundary.blocked_reasons,
+        };
+    }
+
+    let content = match std::fs::read_to_string(request.target_path.trim()) {
+        Ok(content) => content,
+        Err(_) => {
+            return AgentRuntimeRedactedSessionContentResult {
+                status: "blocked".to_string(),
+                allowed_root_path: boundary.allowed_root_path,
+                byte_length: boundary.byte_length,
+                max_bytes: boundary.max_bytes,
+                content_redacted: true,
+                target_name_redacted: true,
+                structure: None,
+                blocked_reasons: vec!["Target content could not be read as text.".to_string()],
+            };
+        }
+    };
+
+    AgentRuntimeRedactedSessionContentResult {
+        status: "ready".to_string(),
+        allowed_root_path: boundary.allowed_root_path,
+        byte_length: boundary.byte_length,
+        max_bytes: boundary.max_bytes,
+        content_redacted: true,
+        target_name_redacted: true,
+        structure: Some(structure_from_redacted_content(&content)),
+        blocked_reasons: Vec::new(),
+    }
+}
+
+fn message_values_from_session_json(value: &serde_json::Value) -> Vec<&serde_json::Value> {
+    if let Some(items) = value.as_array() {
+        return items.iter().collect();
+    }
+    if let Some(items) = value.get("messages").and_then(|messages| messages.as_array()) {
+        return items.iter().collect();
+    }
+    Vec::new()
+}
+
+fn redacted_envelope_from_content(content: &str) -> AgentRuntimeRedactedSessionEnvelope {
+    let parsed = serde_json::from_str::<serde_json::Value>(content).ok();
+    let messages = parsed
+        .as_ref()
+        .map(message_values_from_session_json)
+        .unwrap_or_default();
+    let mut envelope = AgentRuntimeRedactedSessionEnvelope {
+        message_count: 0,
+        user_message_count: 0,
+        assistant_message_count: 0,
+        tool_message_count: 0,
+        other_message_count: 0,
+        tool_call_count: 0,
+    };
+
+    for message in messages {
+        envelope.message_count += 1;
+        match message.get("role").and_then(|role| role.as_str()).unwrap_or("") {
+            "user" => envelope.user_message_count += 1,
+            "assistant" => envelope.assistant_message_count += 1,
+            "tool" => envelope.tool_message_count += 1,
+            _ => envelope.other_message_count += 1,
+        }
+        if let Some(tool_calls) = message.get("tool_calls").and_then(|value| value.as_array()) {
+            envelope.tool_call_count += tool_calls.len();
+        }
+        if let Some(tool_calls) = message.get("toolCalls").and_then(|value| value.as_array()) {
+            envelope.tool_call_count += tool_calls.len();
+        }
+    }
+
+    envelope
+}
+
+fn read_agent_runtime_redacted_session_envelope_from_request(
+    request: &AgentRuntimeSessionBoundaryRequest,
+) -> AgentRuntimeRedactedSessionEnvelopeResult {
+    let reader = read_agent_runtime_redacted_session_content_from_request(request);
+    if reader.status != "ready" {
+        return AgentRuntimeRedactedSessionEnvelopeResult {
+            status: reader.status,
+            allowed_root_path: reader.allowed_root_path,
+            byte_length: reader.byte_length,
+            max_bytes: reader.max_bytes,
+            content_redacted: true,
+            target_name_redacted: true,
+            envelope: None,
+            blocked_reasons: reader.blocked_reasons,
+        };
+    }
+
+    let content = match std::fs::read_to_string(request.target_path.trim()) {
+        Ok(content) => content,
+        Err(_) => {
+            return AgentRuntimeRedactedSessionEnvelopeResult {
+                status: "blocked".to_string(),
+                allowed_root_path: reader.allowed_root_path,
+                byte_length: reader.byte_length,
+                max_bytes: reader.max_bytes,
+                content_redacted: true,
+                target_name_redacted: true,
+                envelope: None,
+                blocked_reasons: vec!["Target content could not be read as text.".to_string()],
+            };
+        }
+    };
+
+    AgentRuntimeRedactedSessionEnvelopeResult {
+        status: "ready".to_string(),
+        allowed_root_path: reader.allowed_root_path,
+        byte_length: reader.byte_length,
+        max_bytes: reader.max_bytes,
+        content_redacted: true,
+        target_name_redacted: true,
+        envelope: Some(redacted_envelope_from_content(&content)),
+        blocked_reasons: Vec::new(),
+    }
+}
+
+#[tauri::command]
+async fn build_agent_runtime_snapshot(
+    project_root: Option<String>,
+) -> Result<AgentRuntimeFilesystemSnapshot, String> {
+    let home_dir = std::env::var("HOME")
+        .map(PathBuf::from)
+        .map_err(|_| "Cannot resolve HOME for agent runtime snapshot".to_string())?;
+    let project_root_buf = match project_root {
+        Some(raw) if !raw.trim().is_empty() => Some(PathBuf::from(raw.trim())),
+        _ => find_project_manager_root(),
+    };
+    let path_dirs: Vec<PathBuf> = std::env::var_os("PATH")
+        .map(|paths| std::env::split_paths(&paths).collect())
+        .unwrap_or_default();
+
+    Ok(build_agent_runtime_snapshot_from_roots(
+        &home_dir,
+        project_root_buf.as_deref(),
+        &path_dirs,
+    ))
+}
+
+#[tauri::command]
+async fn read_agent_runtime_session_boundary(
+    request: AgentRuntimeSessionBoundaryRequest,
+) -> Result<AgentRuntimeSessionBoundaryResult, String> {
+    Ok(read_agent_runtime_session_boundary_from_request(&request))
+}
+
+#[tauri::command]
+async fn list_agent_runtime_redacted_session_targets(
+    request: AgentRuntimeSessionTargetListRequest,
+) -> Result<AgentRuntimeRedactedSessionTargetListResult, String> {
+    Ok(list_agent_runtime_redacted_session_targets_from_request(
+        &request,
+    ))
+}
+
+#[tauri::command]
+async fn read_agent_runtime_redacted_session_content(
+    request: AgentRuntimeSessionBoundaryRequest,
+) -> Result<AgentRuntimeRedactedSessionContentResult, String> {
+    Ok(read_agent_runtime_redacted_session_content_from_request(
+        &request,
+    ))
+}
+
+#[tauri::command]
+async fn read_agent_runtime_redacted_session_envelope(
+    request: AgentRuntimeSessionBoundaryRequest,
+) -> Result<AgentRuntimeRedactedSessionEnvelopeResult, String> {
+    Ok(read_agent_runtime_redacted_session_envelope_from_request(
+        &request,
+    ))
+}
+
+#[cfg(test)]
+mod agent_runtime_snapshot_tests {
+    use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_root(name: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock before unix epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("pm-{name}-{nanos}"));
+        fs::create_dir_all(&dir).expect("create temp test dir");
+        dir
+    }
+
+    fn write_file(path: &Path, content: &str) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create parent dir");
+        }
+        fs::write(path, content).expect("write test file");
+    }
+
+    #[test]
+    fn agent_runtime_snapshot_collects_paths_without_contents() {
+        let root = temp_root("agent-runtime-paths");
+        let home = root.join("home");
+        let project = root.join("project");
+        write_file(&home.join(".codex/config.toml"), "model = \"gpt-test\"");
+        write_file(&home.join(".codex/auth.json"), "{\"OPENAI_API_KEY\":\"sk-fake-secret\"}");
+        write_file(&home.join(".gemini/.env"), "GEMINI_API_KEY=sk-gemini-fake");
+        write_file(&project.join(".project-manager/bin/openclaw"), "#!/bin/sh\n");
+
+        let snapshot = build_agent_runtime_snapshot_from_roots(&home, Some(&project), &[]);
+        let serialized = serde_json::to_string(&snapshot).expect("serialize snapshot");
+
+        assert!(snapshot
+            .existing_paths
+            .contains(&home.join(".codex/config.toml").to_string_lossy().to_string()));
+        assert!(snapshot
+            .existing_paths
+            .contains(&home.join(".codex/auth.json").to_string_lossy().to_string()));
+        assert!(snapshot.existing_paths.contains(
+            &project
+                .join(".project-manager/bin/openclaw")
+                .to_string_lossy()
+                .to_string()
+        ));
+        assert_eq!(snapshot.home_dir, home.to_string_lossy().to_string());
+        assert_eq!(
+            snapshot.project_root,
+            Some(project.to_string_lossy().to_string())
+        );
+        assert!(serialized.contains("\"homeDir\""));
+        assert!(serialized.contains("\"projectRoot\""));
+        assert!(!serialized.contains("sk-fake-secret"));
+        assert!(!serialized.contains("sk-gemini-fake"));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn agent_runtime_snapshot_collects_known_commands_from_injected_path() {
+        let root = temp_root("agent-runtime-commands");
+        let bin = root.join("bin");
+        fs::create_dir_all(&bin).expect("create bin dir");
+        let codex = bin.join("codex");
+        write_file(&codex, "#!/bin/sh\nprintf codex\n");
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut permissions = fs::metadata(&codex).expect("metadata").permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(&codex, permissions).expect("set executable");
+        }
+
+        let snapshot = build_agent_runtime_snapshot_from_roots(
+            &root.join("home"),
+            Some(&root.join("project")),
+            &[bin],
+        );
+
+        assert_eq!(snapshot.available_commands, vec!["codex".to_string()]);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn agent_runtime_snapshot_counts_session_root_children_without_contents() {
+        let root = temp_root("agent-runtime-session-counts");
+        let home = root.join("home");
+        let session_root = home.join(".codex/sessions");
+        let nested = session_root.join("session-a");
+        write_file(&nested.join("transcript.json"), "{\"secret\":\"sk-session-secret\"}");
+        write_file(&session_root.join("session-b.json"), "{\"message\":\"private\"}");
+
+        let snapshot = build_agent_runtime_snapshot_from_roots(&home, None, &[]);
+        let serialized = serde_json::to_string(&snapshot).expect("serialize snapshot");
+        let session_root_key = session_root.to_string_lossy().to_string();
+
+        assert_eq!(
+            snapshot.session_root_child_counts.get(&session_root_key),
+            Some(&2)
+        );
+        assert!(serialized.contains("sessionRootChildCounts"));
+        assert!(!serialized.contains("session-a"));
+        assert!(!serialized.contains("session-b"));
+        assert!(!serialized.contains("sk-session-secret"));
+        assert!(!serialized.contains("private"));
+
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
+#[cfg(test)]
+mod agent_runtime_session_reader_boundary_tests {
+    use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_root(name: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock before unix epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("pm-{name}-{nanos}"));
+        fs::create_dir_all(&dir).expect("create temp test dir");
+        dir
+    }
+
+    fn write_file(path: &Path, content: &str) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create parent dir");
+        }
+        fs::write(path, content).expect("write test file");
+    }
+
+    #[test]
+    fn agent_runtime_session_boundary_returns_redacted_metadata_for_approved_in_root_file() {
+        let root = temp_root("agent-runtime-reader-ready");
+        let session_root = root.join("sessions");
+        let target = session_root.join("session-a.json");
+        write_file(&target, "{\"secret\":\"sk-session-secret\"}");
+
+        let request = AgentRuntimeSessionBoundaryRequest {
+            approved: true,
+            root_paths: vec![session_root.to_string_lossy().to_string()],
+            target_path: target.to_string_lossy().to_string(),
+            max_bytes: 4096,
+        };
+
+        let result = read_agent_runtime_session_boundary_from_request(&request);
+        let serialized = serde_json::to_string(&result).expect("serialize result");
+
+        assert_eq!(result.status, "ready");
+        assert_eq!(
+            result.allowed_root_path,
+            Some(session_root.to_string_lossy().to_string())
+        );
+        assert_eq!(
+            result.byte_length,
+            Some("{\"secret\":\"sk-session-secret\"}".len() as u64)
+        );
+        assert_eq!(result.max_bytes, 4096);
+        assert!(result.content_redacted);
+        assert!(result.target_name_redacted);
+        assert!(result.blocked_reasons.is_empty());
+        assert!(!serialized.contains("session-a.json"));
+        assert!(!serialized.contains("sk-session-secret"));
+        assert!(!serialized.contains("secret"));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn agent_runtime_session_boundary_blocks_without_approval() {
+        let root = temp_root("agent-runtime-reader-unapproved");
+        let session_root = root.join("sessions");
+        let target = session_root.join("session-a.json");
+        write_file(&target, "{}");
+
+        let request = AgentRuntimeSessionBoundaryRequest {
+            approved: false,
+            root_paths: vec![session_root.to_string_lossy().to_string()],
+            target_path: target.to_string_lossy().to_string(),
+            max_bytes: 4096,
+        };
+
+        let result = read_agent_runtime_session_boundary_from_request(&request);
+        let serialized = serde_json::to_string(&result).expect("serialize result");
+
+        assert_eq!(result.status, "blocked");
+        assert!(result
+            .blocked_reasons
+            .contains(&"Approved session reader request is required.".to_string()));
+        assert_eq!(result.byte_length, None);
+        assert!(!serialized.contains("session-a.json"));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn agent_runtime_session_boundary_blocks_target_outside_allowlisted_roots() {
+        let root = temp_root("agent-runtime-reader-root-escape");
+        let session_root = root.join("sessions");
+        let outside = root.join("outside/session-a.json");
+        fs::create_dir_all(&session_root).expect("create session root");
+        write_file(&outside, "{}");
+
+        let request = AgentRuntimeSessionBoundaryRequest {
+            approved: true,
+            root_paths: vec![session_root.to_string_lossy().to_string()],
+            target_path: outside.to_string_lossy().to_string(),
+            max_bytes: 4096,
+        };
+
+        let result = read_agent_runtime_session_boundary_from_request(&request);
+        let serialized = serde_json::to_string(&result).expect("serialize result");
+
+        assert_eq!(result.status, "blocked");
+        assert!(result
+            .blocked_reasons
+            .contains(&"Target path is outside approved session roots.".to_string()));
+        assert_eq!(result.allowed_root_path, None);
+        assert!(!serialized.contains("session-a.json"));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn agent_runtime_session_boundary_blocks_oversized_files() {
+        let root = temp_root("agent-runtime-reader-too-large");
+        let session_root = root.join("sessions");
+        let target = session_root.join("session-a.json");
+        write_file(&target, "0123456789");
+
+        let request = AgentRuntimeSessionBoundaryRequest {
+            approved: true,
+            root_paths: vec![session_root.to_string_lossy().to_string()],
+            target_path: target.to_string_lossy().to_string(),
+            max_bytes: 4,
+        };
+
+        let result = read_agent_runtime_session_boundary_from_request(&request);
+        let serialized = serde_json::to_string(&result).expect("serialize result");
+
+        assert_eq!(result.status, "blocked");
+        assert!(result
+            .blocked_reasons
+            .contains(&"Target file exceeds max byte guard.".to_string()));
+        assert_eq!(result.byte_length, Some(10));
+        assert!(result.content_redacted);
+        assert!(!serialized.contains("session-a.json"));
+        assert!(!serialized.contains("0123456789"));
+
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
+#[cfg(test)]
+mod agent_runtime_redacted_session_content_tests {
+    use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_root(name: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock before unix epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("pm-{name}-{nanos}"));
+        fs::create_dir_all(&dir).expect("create temp test dir");
+        dir
+    }
+
+    fn write_file(path: &Path, content: &str) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create parent dir");
+        }
+        fs::write(path, content).expect("write test file");
+    }
+
+    #[test]
+    fn agent_runtime_redacted_reader_returns_structure_without_content_for_json_object() {
+        let root = temp_root("agent-runtime-redacted-object");
+        let session_root = root.join("sessions");
+        let target = session_root.join("session-a.json");
+        let content = "{\n  \"secret\": \"sk-session-secret\",\n  \"prompt\": \"private transcript text\"\n}";
+        write_file(&target, content);
+
+        let request = AgentRuntimeSessionBoundaryRequest {
+            approved: true,
+            root_paths: vec![session_root.to_string_lossy().to_string()],
+            target_path: target.to_string_lossy().to_string(),
+            max_bytes: 4096,
+        };
+
+        let result = read_agent_runtime_redacted_session_content_from_request(&request);
+        let serialized = serde_json::to_string(&result).expect("serialize result");
+
+        assert_eq!(result.status, "ready");
+        assert_eq!(result.byte_length, Some(content.len() as u64));
+        assert!(result.content_redacted);
+        assert!(result.target_name_redacted);
+        let structure = result.structure.as_ref().expect("structure");
+        assert_eq!(structure.line_count, 4);
+        assert_eq!(structure.non_empty_line_count, 4);
+        assert!(structure.looks_like_json_object);
+        assert!(!structure.looks_like_json_array);
+        assert!(!serialized.contains("session-a.json"));
+        assert!(!serialized.contains("sk-session-secret"));
+        assert!(!serialized.contains("private transcript text"));
+        assert!(!serialized.contains("prompt"));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn agent_runtime_redacted_reader_detects_json_array_shape() {
+        let root = temp_root("agent-runtime-redacted-array");
+        let session_root = root.join("sessions");
+        let target = session_root.join("session-a.jsonl");
+        write_file(&target, "[{\"message\":\"private\"}]\n");
+
+        let request = AgentRuntimeSessionBoundaryRequest {
+            approved: true,
+            root_paths: vec![session_root.to_string_lossy().to_string()],
+            target_path: target.to_string_lossy().to_string(),
+            max_bytes: 4096,
+        };
+
+        let result = read_agent_runtime_redacted_session_content_from_request(&request);
+        let structure = result.structure.as_ref().expect("structure");
+        let serialized = serde_json::to_string(&result).expect("serialize result");
+
+        assert_eq!(result.status, "ready");
+        assert!(structure.looks_like_json_array);
+        assert!(!structure.looks_like_json_object);
+        assert!(!serialized.contains("private"));
+        assert!(!serialized.contains("session-a"));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn agent_runtime_redacted_reader_reuses_boundary_blocks() {
+        let root = temp_root("agent-runtime-redacted-blocked");
+        let session_root = root.join("sessions");
+        let target = session_root.join("session-a.json");
+        write_file(&target, "{}");
+
+        let request = AgentRuntimeSessionBoundaryRequest {
+            approved: false,
+            root_paths: vec![session_root.to_string_lossy().to_string()],
+            target_path: target.to_string_lossy().to_string(),
+            max_bytes: 4096,
+        };
+
+        let result = read_agent_runtime_redacted_session_content_from_request(&request);
+        let serialized = serde_json::to_string(&result).expect("serialize result");
+
+        assert_eq!(result.status, "blocked");
+        assert_eq!(result.structure, None);
+        assert!(result
+            .blocked_reasons
+            .contains(&"Approved session reader request is required.".to_string()));
+        assert!(!serialized.contains("session-a.json"));
+
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
+#[cfg(test)]
+mod agent_runtime_redacted_session_envelope_tests {
+    use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_root(name: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock before unix epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("pm-{name}-{nanos}"));
+        fs::create_dir_all(&dir).expect("create temp test dir");
+        dir
+    }
+
+    fn write_file(path: &Path, content: &str) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create parent dir");
+        }
+        fs::write(path, content).expect("write test file");
+    }
+
+    #[test]
+    fn agent_runtime_redacted_envelope_counts_array_messages_without_content() {
+        let root = temp_root("agent-runtime-envelope-array");
+        let session_root = root.join("sessions");
+        let target = session_root.join("session-a.json");
+        let content = r#"[
+          {"role":"user","content":"private prompt OPENAI_API_KEY=bad"},
+          {"role":"assistant","content":"private answer"},
+          {"role":"tool","tool_calls":[{"name":"shell","arguments":"cat secret"}]}
+        ]"#;
+        write_file(&target, content);
+
+        let request = AgentRuntimeSessionBoundaryRequest {
+            approved: true,
+            root_paths: vec![session_root.to_string_lossy().to_string()],
+            target_path: target.to_string_lossy().to_string(),
+            max_bytes: 4096,
+        };
+
+        let result = read_agent_runtime_redacted_session_envelope_from_request(&request);
+        let serialized = serde_json::to_string(&result).expect("serialize result");
+        let envelope = result.envelope.as_ref().expect("envelope");
+
+        assert_eq!(result.status, "ready");
+        assert_eq!(envelope.message_count, 3);
+        assert_eq!(envelope.user_message_count, 1);
+        assert_eq!(envelope.assistant_message_count, 1);
+        assert_eq!(envelope.tool_message_count, 1);
+        assert_eq!(envelope.tool_call_count, 1);
+        assert!(!serialized.contains("private prompt"));
+        assert!(!serialized.contains("OPENAI_API_KEY"));
+        assert!(!serialized.contains("cat secret"));
+        assert!(!serialized.contains("session-a.json"));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn agent_runtime_redacted_envelope_counts_nested_object_messages() {
+        let root = temp_root("agent-runtime-envelope-object");
+        let session_root = root.join("sessions");
+        let target = session_root.join("session-a.json");
+        let content = r#"{"messages":[{"role":"user","content":"secret"},{"role":"assistant","content":"answer"}]}"#;
+        write_file(&target, content);
+
+        let request = AgentRuntimeSessionBoundaryRequest {
+            approved: true,
+            root_paths: vec![session_root.to_string_lossy().to_string()],
+            target_path: target.to_string_lossy().to_string(),
+            max_bytes: 4096,
+        };
+
+        let result = read_agent_runtime_redacted_session_envelope_from_request(&request);
+        let envelope = result.envelope.as_ref().expect("envelope");
+        let serialized = serde_json::to_string(&result).expect("serialize result");
+
+        assert_eq!(result.status, "ready");
+        assert_eq!(envelope.message_count, 2);
+        assert_eq!(envelope.user_message_count, 1);
+        assert_eq!(envelope.assistant_message_count, 1);
+        assert_eq!(envelope.tool_message_count, 0);
+        assert_eq!(envelope.tool_call_count, 0);
+        assert!(!serialized.contains("secret"));
+        assert!(!serialized.contains("answer"));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn agent_runtime_redacted_envelope_reuses_reader_boundary_blocks() {
+        let root = temp_root("agent-runtime-envelope-blocked");
+        let session_root = root.join("sessions");
+        let target = session_root.join("session-a.json");
+        write_file(&target, "[]");
+
+        let request = AgentRuntimeSessionBoundaryRequest {
+            approved: false,
+            root_paths: vec![session_root.to_string_lossy().to_string()],
+            target_path: target.to_string_lossy().to_string(),
+            max_bytes: 4096,
+        };
+
+        let result = read_agent_runtime_redacted_session_envelope_from_request(&request);
+        let serialized = serde_json::to_string(&result).expect("serialize result");
+
+        assert_eq!(result.status, "blocked");
+        assert_eq!(result.envelope, None);
+        assert!(result
+            .blocked_reasons
+            .contains(&"Approved session reader request is required.".to_string()));
+        assert!(!serialized.contains("session-a.json"));
+
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
+#[cfg(test)]
+mod agent_runtime_redacted_session_target_lister_tests {
+    use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_root(name: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock before unix epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("pm-{name}-{nanos}"));
+        fs::create_dir_all(&dir).expect("create temp test dir");
+        dir
+    }
+
+    fn write_file(path: &Path, content: &str) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create parent dir");
+        }
+        fs::write(path, content).expect("write test file");
+    }
+
+    #[test]
+    fn agent_runtime_target_lister_returns_redacted_metadata_for_approved_roots() {
+        let root = temp_root("agent-runtime-target-list-ready");
+        let session_root = root.join("sessions");
+        let target = session_root.join("session-a.json");
+        write_file(&target, "{\"content\":\"private transcript text\",\"key\":\"openai_api_key=bad\"}");
+        write_file(&session_root.join(".hidden-session.json"), "{}");
+        fs::create_dir_all(session_root.join("nested-dir")).expect("create nested dir");
+
+        let request = AgentRuntimeSessionTargetListRequest {
+            approved: true,
+            root_paths: vec![session_root.to_string_lossy().to_string()],
+            max_targets: 10,
+            max_depth: 1,
+        };
+
+        let result = list_agent_runtime_redacted_session_targets_from_request(&request);
+
+        assert_eq!(result.status, "ready");
+        assert_eq!(result.targets.len(), 1);
+        assert_eq!(result.targets[0].id, "session-target-1");
+        assert_eq!(result.targets[0].label, "Session target 1");
+        assert!(result.targets[0].target_path.ends_with("/sessions/session-a.json"));
+        assert_eq!(result.targets[0].root_path, session_root.to_string_lossy().to_string());
+        assert!(result.targets[0].byte_length.is_some());
+        assert!(result.content_redacted);
+        assert!(result.target_names_redacted);
+        assert!(!result.targets[0].label.contains("session-a.json"));
+        assert!(!result.targets[0].summary.contains("session-a.json"));
+        assert!(!result.targets[0].summary.contains("private transcript text"));
+        assert!(!result.targets[0].summary.contains("openai_api_key=bad"));
+        assert!(!result.targets[0].summary.contains(".hidden-session"));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn agent_runtime_target_lister_blocks_without_approval_or_limits() {
+        let root = temp_root("agent-runtime-target-list-blocked");
+        let session_root = root.join("sessions");
+        write_file(&session_root.join("session-a.json"), "{}");
+
+        let unapproved = AgentRuntimeSessionTargetListRequest {
+            approved: false,
+            root_paths: vec![session_root.to_string_lossy().to_string()],
+            max_targets: 10,
+            max_depth: 1,
+        };
+        let invalid_limit = AgentRuntimeSessionTargetListRequest {
+            approved: true,
+            root_paths: vec![session_root.to_string_lossy().to_string()],
+            max_targets: 0,
+            max_depth: 1,
+        };
+
+        let unapproved_result = list_agent_runtime_redacted_session_targets_from_request(&unapproved);
+        let invalid_limit_result = list_agent_runtime_redacted_session_targets_from_request(&invalid_limit);
+
+        assert_eq!(unapproved_result.status, "blocked");
+        assert!(unapproved_result.targets.is_empty());
+        assert!(unapproved_result
+            .blocked_reasons
+            .contains(&"Approved session target list request is required.".to_string()));
+        assert_eq!(invalid_limit_result.status, "blocked");
+        assert!(invalid_limit_result.targets.is_empty());
+        assert!(invalid_limit_result
+            .blocked_reasons
+            .contains(&"Max target guard must be greater than zero.".to_string()));
+
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct ConnectedInstanceScannedDevice {
@@ -7089,6 +8449,11 @@ pub fn run() {
             probe_command_version,
             resolve_install_path,
             list_global_cli_inventory,
+            build_agent_runtime_snapshot,
+            read_agent_runtime_session_boundary,
+            list_agent_runtime_redacted_session_targets,
+            read_agent_runtime_redacted_session_content,
+            read_agent_runtime_redacted_session_envelope,
             scan_connected_instances,
             run_discovery_plan,
             ensure_nmap_installed_command,
